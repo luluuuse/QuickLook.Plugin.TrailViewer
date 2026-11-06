@@ -1,0 +1,57 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Library</OutputType>
+    <TargetFramework>net462</TargetFramework>
+    <RootNamespace>QuickLook.Plugin.TrailViewer</RootNamespace>
+    <AssemblyName>QuickLook.Plugin.TrailViewer</AssemblyName>
+    <UseWPF>true</UseWPF>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
+    <OutputPath>..\bin\$(Configuration)\</OutputPath>
+    <Version>1.15.11</Version>
+    <Product>QuickLook.Plugin.TrailViewer</Product>
+    <Description>Previews GPX, KML and KMZ tracks, routes, areas and waypoints on a map, with photos on waypoints and an English/Chinese interface.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Same WebView2 SDK version as QuickLook's own HtmlViewer, so both plugins load identical assemblies. -->
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.3912.50" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- KMZ is a zip: opening it needs the framework's own zip support, nothing to ship. -->
+    <Reference Include="System.IO.Compression" />
+    <Reference Include="System.IO.Compression.FileSystem" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- QuickLook loads its own QuickLook.Common.dll; never ship a second copy. -->
+    <ProjectReference Include="..\QuickLook.Common\QuickLook.Common.csproj" Private="false" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The metadata is a template now: @VERSION@ is filled in by the target below. Shipping it as-is is how it
+         came to say 1.7.0 while the assembly was at 1.15.x. -->
+    <None Include="QuickLook.Plugin.Metadata.config" />
+    <None Include="..\viewer\**\*" LinkBase="viewer" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="TrailViewer.Harness" />
+  </ItemGroup>
+
+  <!-- QuickLook reads a plugin's version from this file, not from the assembly, so the number in its plugin list
+       comes from here. Written from $(Version) at build time: one hand-kept copy had drifted six releases behind
+       the code, and no amount of care would have kept the two in step. -->
+  <Target Name="WritePluginMetadata" AfterTargets="Build">
+    <PropertyGroup>
+      <_MetadataTemplate>$([System.IO.File]::ReadAllText('$(MSBuildProjectDirectory)\QuickLook.Plugin.Metadata.config'))</_MetadataTemplate>
+      <_MetadataText>$(_MetadataTemplate.Replace('@VERSION@', '$(Version)'))</_MetadataText>
+    </PropertyGroup>
+    <WriteLinesToFile File="$(OutputPath)QuickLook.Plugin.Metadata.config" Lines="$(_MetadataText)" Overwrite="true" WriteOnlyWhenDifferent="true" />
+  </Target>
+
+</Project>

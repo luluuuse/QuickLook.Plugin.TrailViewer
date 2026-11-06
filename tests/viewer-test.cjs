@@ -40,7 +40,8 @@ async function main() {
   const server = await serve();
   const base = `http://127.0.0.1:${server.address().port}`;
   const browser = await chromium.launch({ executablePath: process.env.CHROMIUM || undefined });
-  const context = await browser.newContext({ viewport: { width: 1200, height: 800 } });
+  // Pinned to en-US: the assertions below read English labels, and the viewer follows the system language.
+  const context = await browser.newContext({ viewport: { width: 1200, height: 800 }, locale: 'en-US' });
   const page = await context.newPage();
   const pageErrors = [];
   page.on('pageerror', (e) => pageErrors.push(e.message));
@@ -80,7 +81,7 @@ async function main() {
         info: document.getElementById('info').innerText,
       };
     });
-    for (const key of ['tracks', 'segments', 'routes', 'waypoints', 'points', 'durationSeconds', 'elevation']) {
+    for (const key of ['tracks', 'segments', 'routes', 'waypoints', 'areas', 'points', 'durationSeconds', 'elevation']) {
       check(fixture, key, got[key], want[key]);
     }
     check(fixture, 'start', iso(got.start), want.start);

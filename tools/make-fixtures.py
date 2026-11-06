@@ -86,6 +86,8 @@ def expected(tracks=(), routes=(), waypoints=()):
         'segments': len(segments),
         'routes': len(routes),
         'waypoints': len(waypoints),
+        # A GPX file has no polygons, so nothing is drawn as an area beneath the line.
+        'areas': 0,
         'points': len(track_pts),
         'distanceMeters': round(dist, 1),
         'start': iso(times[0]) if times else None,
@@ -137,6 +139,14 @@ def main():
     files['truncated.gpx'] = files['track-time-ele.gpx'][:len(files['track-time-ele.gpx']) // 2]
     exp['truncated.gpx'] = {'error': True}
 
+    # A long file name on a tall, narrow window. The card is only as wide as its longest line, so the name is
+    # part of the fixture: this is the width that used to push the corner switches onto the card.
+    t5 = START + timedelta(days=4)
+    traverse = loop(46.42, 7.66, 181, 0.03, t5, 40, ele=(2600, 420), phase=0.4)
+    long_name = '2026-02-01-alpine-snow-traverse-1793781751910.gpx'
+    files[long_name] = gpx_doc(NS11, '1.1', '', track_xml('Alpine snow traverse', [traverse]))
+    exp[long_name] = expected(tracks=[('Alpine snow traverse', [traverse])])
+
     # Rejected by CanHandle.
     files['empty.gpx'] = ''
     files['broken.gpx'] = '<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="x"<trk>\n'
@@ -152,11 +162,24 @@ def main():
 
     for name, text in files.items():
         (OUT / name).write_bytes(text.encode('utf-8'))
-    detect = {name: name not in ('empty.gpx', 'broken.gpx', 'not-gpx.gpx', 'late-root.gpx') for name in sorted(files)}
+    # Merged into whatever is already there rather than replacing it: this script writes the GPX fixtures,
+    # and the KML/KMZ ones (and their expected numbers) are checked in beside them. Rewriting the file from
+    # scratch silently dropped thirteen entries the first time it was run.
+    known = json.loads((OUT / 'expected.json').read_text(encoding='utf-8')) if (OUT / 'expected.json').exists() else {}
+    detect = known.get('detect', {})
+    # Anything already listed keeps the answer it was given: a few of these were corrected by hand against
+    # what the detector actually does (not-gpx.gpx is accepted), and a formula here would undo that.
+    for name in sorted(files):
+        detect.setdefault(name, name not in ('empty.gpx', 'broken.gpx', 'not-gpx.gpx', 'late-root.gpx'))
+    viewer = known.get('viewer', {})
+    # Shallow merge per fixture: the numbers come from here, while keys this script does not produce (areas,
+    # elevation, the line and marker counts) stay as checked in.
+    for name, values in exp.items():
+        viewer[name] = {**viewer.get(name, {}), **values}
     # Bytes, not text mode: the same LF line endings on Windows (CI checks the files are unchanged).
     (OUT / 'expected.json').write_bytes(
-        (json.dumps({'detect': detect, 'viewer': exp}, indent=2) + '\n').encode('utf-8'))
-    print(f'{len(files)} fixtures written to {OUT.name}/')
+        (json.dumps({'detect': detect, 'viewer': viewer}, indent=2) + '\n').encode('utf-8'))
+    print(f'{len(files)} fixtures written to {OUT.name}/, {len(detect)} known to the tests')
 
 
 if __name__ == '__main__':

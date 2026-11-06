@@ -6,13 +6,13 @@
     <TargetFramework>net462</TargetFramework>
     <UseWPF>true</UseWPF>
     <LangVersion>latest</LangVersion>
-    <AssemblyName>GpxViewer.Harness</AssemblyName>
+    <AssemblyName>TrailViewer.Harness</AssemblyName>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <OutputPath>..\..\bin\Harness\</OutputPath>
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\QuickLook.Plugin.GpxViewer.csproj" />
+    <ProjectReference Include="..\..\src\QuickLook.Plugin.TrailViewer.csproj" />
     <ProjectReference Include="..\..\QuickLook.Common\QuickLook.Common.csproj" />
   </ItemGroup>
 

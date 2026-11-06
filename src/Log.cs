@@ -1,7 +1,7 @@
 using System;
 using System.IO;
 
-namespace QuickLook.Plugin.GpxViewer;
+namespace QuickLook.Plugin.TrailViewer;
 
 /// <summary>
 /// One line per previewed file in %LOCALAPPDATA%\GpxViewer\log.txt, so problems can be

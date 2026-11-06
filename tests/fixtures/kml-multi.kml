@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>Nested folders</name>
+    <Folder>
+      <name>Outer</name>
+      <Folder>
+        <name>Inner</name>
+        <Placemark>
+          <name>Multi</name>
+          <MultiGeometry>
+            <LineString><coordinates>114.1,30.1 114.2,30.2 114.3,30.1</coordinates></LineString>
+            <LineString><coordinates>114.4,30.4 114.5,30.5</coordinates></LineString>
+            <Point><coordinates>114.1,30.1,0</coordinates></Point>
+          </MultiGeometry>
+        </Placemark>
+      </Folder>
+    </Folder>
+    <Placemark>
+      <name>Park</name>
+      <Polygon>
+        <outerBoundaryIs>
+          <LinearRing>
+            <coordinates>114.0,30.0 114.1,30.0 114.1,30.1 114.0,30.1 114.0,30.0</coordinates>
+          </LinearRing>
+        </outerBoundaryIs>
+        <innerBoundaryIs>
+          <LinearRing>
+            <coordinates>114.03,30.03 114.05,30.03 114.05,30.05 114.03,30.05 114.03,30.03</coordinates>
+          </LinearRing>
+        </innerBoundaryIs>
+      </Polygon>
+    </Placemark>
+  </Document>
+</kml>

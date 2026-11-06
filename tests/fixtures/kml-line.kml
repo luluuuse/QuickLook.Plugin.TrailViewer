@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>Line strings</name>
+    <Placemark>
+      <name>Riverside loop</name>
+      <LineString>
+        <tessellate>1</tessellate>
+        <coordinates>
+          114.2810,30.6262,6.0
+          114.2900,30.6300,7.5
+          114.3000,30.6200,5.0
+          114.2810,30.6262,6.0
+        </coordinates>
+      </LineString>
+    </Placemark>
+    <Placemark>
+      <name>A second line</name>
+      <LineString>
+        <coordinates>114.2500,30.6000 114.2600,30.6050</coordinates>
+      </LineString>
+    </Placemark>
+  </Document>
+</kml>

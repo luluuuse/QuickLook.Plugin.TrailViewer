@@ -32,12 +32,12 @@ jobs:
           ql=$(tr -d '[:space:]' < quicklook-version.txt)
           ql_latest=$(gh api repos/QL-Win/QuickLook/releases/latest --jq .tag_name)
           [ "$ql" = "$ql_latest" ] || notes+=("QuickLook: built against $ql, latest release is $ql_latest. Update \`quicklook-version.txt\`.")
-          wv=$(grep -oP 'Microsoft\.Web\.WebView2" Version="\K[^"]+' src/QuickLook.Plugin.GpxViewer.csproj) \
+          wv=$(grep -oP 'Microsoft\.Web\.WebView2" Version="\K[^"]+' src/QuickLook.Plugin.TrailViewer.csproj) \
             || { echo 'Could not read the WebView2 version of this plugin'; exit 1; }
           wv_ql=$(gh api "repos/QL-Win/QuickLook/contents/QuickLook.Plugin/QuickLook.Plugin.HtmlViewer/QuickLook.Plugin.HtmlViewer.csproj?ref=$ql_latest" --jq .content \
             | base64 -d | grep -oP 'Microsoft\.Web\.WebView2" Version="\K[^"]+') \
             || { echo "Could not read the WebView2 version of QuickLook $ql_latest"; exit 1; }
-          [ "$wv" = "$wv_ql" ] || notes+=("WebView2 SDK: $wv here, QuickLook $ql_latest ships $wv_ql. Update \`src/QuickLook.Plugin.GpxViewer.csproj\`.")
+          [ "$wv" = "$wv_ql" ] || notes+=("WebView2 SDK: $wv here, QuickLook $ql_latest ships $wv_ql. Update \`src/QuickLook.Plugin.TrailViewer.csproj\`.")
 
           # Leaflet is bundled in viewer/vendor/ (versions.json). Only stable releases count.
           leaflet=$(jq -r .leaflet viewer/vendor/versions.json)

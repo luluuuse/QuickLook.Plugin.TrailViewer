@@ -17,3 +17,5 @@ QuickLook.Common/
 .quicklook-src/
 GitVersion.cs
 screenshots/
+shots/
+terrain-layer.png

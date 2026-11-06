@@ -2,7 +2,7 @@ using QuickLook.Common.Plugin;
 using System.IO;
 using System.Windows;
 
-namespace QuickLook.Plugin.GpxViewer;
+namespace QuickLook.Plugin.TrailViewer;
 
 public class Plugin : IViewer
 {
@@ -15,7 +15,7 @@ public class Plugin : IViewer
     {
     }
 
-    public bool CanHandle(string path) => !Directory.Exists(path) && GpxDetector.IsGpx(path);
+    public bool CanHandle(string path) => !Directory.Exists(path) && DocumentDetector.CanPreview(path);
 
     public void Prepare(string path, ContextObject context)
     {
@@ -28,6 +28,9 @@ public class Plugin : IViewer
 
     public void View(string path, ContextObject context)
     {
+        // QuickLook calls Cleanup() before the next View() in practice; disposing first keeps a stray
+        // WebView2 - and the folder a KMZ was unpacked into - from outliving the preview it belonged to.
+        _panel?.Dispose();
         _panel = new GpxPanel();
         _panel.Finished += _ => context.IsBusy = false;
         context.ViewerContent = _panel;

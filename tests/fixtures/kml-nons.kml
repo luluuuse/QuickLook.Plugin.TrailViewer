@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml>
+  <Document>
+    <name>No namespace</name>
+    <Placemark>
+      <name>Older KML 2.1 style</name>
+      <LineString>
+        <coordinates>8.0,47.0,0 8.1,47.1,0 8.2,47.0,0</coordinates>
+      </LineString>
+    </Placemark>
+  </Document>
+</kml>

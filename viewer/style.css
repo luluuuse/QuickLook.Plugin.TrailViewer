@@ -22,10 +22,6 @@ html, body {
   background: var(--bg);
 }
 
-body.with-profile #map {
-  bottom: 110px;
-}
-
 body.no-map #map {
   background: #20242a;
 }
@@ -41,9 +37,20 @@ body.no-map #map {
 
 #info {
   top: 10px;
-  left: 54px;
+  left: 10px;
   max-width: min(340px, calc(100% - 180px));
   padding: 10px 14px;
+}
+
+/* The zoom buttons stand against the right edge of the summary rather than in the far corner: the eye is on the
+   card, and the card's width depends on the file name and the language, so script sets --zoom-left from the
+   measured card. Leaflet's own 10 px margin is cancelled so the gap is exactly the one written there. */
+#map .leaflet-top.leaflet-left {
+  left: var(--zoom-left, 10px);
+}
+
+#map .leaflet-top.leaflet-left .leaflet-control {
+  margin-left: 0;
 }
 
 #info h1 {
@@ -59,18 +66,65 @@ body.no-map #map {
   overflow-wrap: anywhere;
 }
 
-#info dl {
+/* The headline numbers: three across, then the pair that says how big the route is. A rule above the first
+   row marks them off from the title, and the labels sit under the values in the muted colour. */
+/* One grid for both rows, so the columns line up down the card: the point count sits under the drop, not
+   wherever its own text happens to end. Each row is unpacked into this grid (see .row below). */
+#info .stats {
+  display: grid;
+  grid-template-columns: repeat(3, max-content);
+  justify-content: start;
+  column-gap: 14px;
+  row-gap: 7px;
+  margin: 9px 0 0;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.09);
+}
+
+#info .stats .row {
+  display: contents;
+}
+
+#info .stats .pair {
+  display: flex;
+  flex-direction: column-reverse; /* value above its label, while the markup keeps label first */
+  min-width: 0;
+}
+
+#info .stats dt {
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+
+#info .stats dd {
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Facts read once: date, time, what the file holds, photos. Two columns, as before. */
+#info .facts {
   display: grid;
   grid-template-columns: auto 1fr;
   gap: 2px 12px;
-  margin: 8px 0 0;
+  margin: 9px 0 0;
 }
 
-#info dt {
+/* A box around each pair, unpacked again on a wide screen: dt and dd go back to being the grid's own cells,
+   so the two-column list above is exactly what it was. A narrow screen packs the pairs instead. */
+#info .fact {
+  display: contents;
+}
+
+#info .facts dt {
   color: var(--muted);
 }
 
-#info dd {
+#info .facts dd {
   margin: 0;
 }
 
@@ -79,36 +133,458 @@ body.no-map #map {
   color: var(--muted);
 }
 
+/* Keys: a bar of its own above the map. The summary describes the file; how to drive the viewer is a
+   different question, and next to the numbers it read as part of them. */
+#keys {
+  position: absolute;
+  z-index: 1000;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 4px 8px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--panel);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.4);
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.7;
+  /* A drag that starts under the bar belongs to the map, not to the bar. */
+  pointer-events: none;
+}
+
+/* display: flex above would otherwise beat the hidden attribute. */
+#keys[hidden] {
+  display: none;
+}
+
+#keys .hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  white-space: nowrap;
+}
+
+#keys .sep {
+  opacity: 0.55;
+}
+
+#keys kbd {
+  min-width: 14px;
+  padding: 0 4px;
+  border: 1px solid rgba(230, 230, 230, 0.22);
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--text);
+  font: inherit;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.6;
+  text-align: center;
+}
+
+/* Narrow window: a centred bar and the summary would meet in the middle, and the summary can reach 340 px.
+   The waypoint keys step aside first; measured, the full bar needs about 1240 px to clear a long file name. */
+@media (max-width: 1240px) {
+  /* One pair of keys for stepping through the waypoints is all a medium window can afford: with both the bar
+     runs into the zoom buttons and the layer switch. */
+  #keys .nav {
+    display: none;
+  }
+
+  #info {
+    max-width: calc(50% - 190px);
+  }
+}
+
+/* Portrait -- taller than it is wide, whatever the window size -- and narrow landscape, where the same shortage
+   of width bites. Here the card's old ceiling of half the window minus a fixed gap collapses, stacking the three
+   headline numbers into a column and growing the card taller than the map it describes; the top line of chrome is
+   also longer than the window is wide. The card takes the width, the controls step down to a line of their own,
+   and the key bar stands aside. */
+@media (max-aspect-ratio: 1/1), (max-width: 959px) {
+  /* The card keeps its own width -- the shape of the window is no reason to stretch it across the map -- and
+     only gives way when the window is narrower than the card itself. */
+  #info {
+    max-width: calc(100% - 20px);
+  }
+
+  /* The key bar is the widest thing on a narrow screen and the first to collide with both corners; the keys
+     themselves keep working. */
+  #keys {
+    display: none;
+  }
+
+  /* Only when the card and both corners cannot share the top band do the controls step down to a line beneath
+     it: the zoom against the left edge, the three switches against the right. Whether they have to is measured
+     rather than guessed -- placeZoom in app.js writes body.stepped -- because the card is only as wide as its
+     longest line, so a tall window with a short name has room for all of it up top, and dropping the switches
+     halfway down the map there just leaves them hanging in the middle of nowhere. */
+  body.stepped #map .leaflet-top.leaflet-left,
+  body.stepped #map .leaflet-top.leaflet-right {
+    top: var(--tools-top, 150px);
+  }
+
+  body.stepped #map .leaflet-top.leaflet-left {
+    left: 0;
+  }
+
+  body.stepped #map .leaflet-top.leaflet-left .leaflet-control {
+    margin-left: 10px;
+  }
+
+  /* The credit line names every layer and is longer than a narrow window: it wraps to a second line and stays
+     off the scale bar instead of running underneath it. */
+  .leaflet-container .leaflet-control-attribution {
+    max-width: 64%;
+    white-space: normal;
+    text-align: right;
+  }
+}
+
+/* Too narrow even for one control line -- the three switches would sit on top of the zoom buttons. They take a
+   second line, still against the right edge. */
+@media (max-width: 419px) {
+  #map .leaflet-top.leaflet-right {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    max-width: calc(100% - 54px);
+  }
+}
+
+/* Floating over the map like the summary, in the same translucent panel: the tiles keep going underneath and
+   show through, instead of the strip cutting the bottom off the picture. Only the chart takes the pointer --
+   everywhere else a drag still belongs to the map. */
 #profile {
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 110px;
-  border-radius: 0;
+  /* The width of the axis column and the gap after it, named once: the gutter is laid out from these and the
+     legend is indented by their sum, so the two cannot drift apart. */
+  --gutter: 44px;
+  --gutter-gap: 7px;
+  left: 10px;
+  right: 10px;
+  bottom: 10px;
+  /* The panel is as tall as the drawing inside it. The drawing is set to a fixed vertical exaggeration, so
+     its height depends on the route: 126 px of ground for a 15.8 km walk with 600 m of climb, 56 px for a
+     flat ride. A fixed 130 px made the exaggeration the window's business, and the same slope read steeper
+     in a narrow window than in a wide one. */
   box-sizing: border-box;
   padding: 6px 10px 8px;
+  pointer-events: none;
+}
+
+/* Leaflet puts the attribution and the scale on the floor, which is now under the panel. Written by
+   renderProfile from the measured height, so the credit clears the drawing whatever it grew to. */
+body.with-profile .leaflet-bottom {
+  margin-bottom: calc(var(--profile-height, 130px) + 10px);
+}
+
+/* S takes every piece of interface off the map: the summary, the key bar, both top corners (zoom, layers,
+   markers, language) and the profile. The scale and the OSM credit stay -- one says how big the picture is, the
+   other is the terms the tiles come under -- and with no panel in the way they drop back to the floor. */
+body.chrome-hidden #info,
+body.chrome-hidden #keys,
+body.chrome-hidden #profile,
+body.chrome-hidden #map .leaflet-top {
+  display: none;
+}
+
+body.chrome-hidden.with-profile .leaflet-bottom {
+  margin-bottom: 0;
 }
 
 #profile .label {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
   color: var(--muted);
-  height: 18px;
+  height: 16px;
+}
+
+/* How far the drawing is stretched vertically. Unsaid, a flat route's profile looks like a mountain range
+   and a 40 % climb looks like a gentle rise; said, the reader can convert what they see back to the ground.
+   Only shown when the stretch leaves the readable band, which is most files never. */
+#profile .label .scale {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+#profile .label .scale[hidden] {
+  display: none;
+}
+
+/* The pointer's own reading, riding above the cursor. It is a label on the ground it is measuring, so it stays
+   see-through: the ground under it -- the band, the curve, how far the end of the route still is -- is what the
+   number is about, and an opaque card would hide exactly that. A shadow on the glyphs keeps them legible over
+   the pale pink and orange bands without a solid fill behind them. */
+#profile .readout {
+  position: absolute;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 2px 6px 3px;
+  transform: translateX(-50%);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 4px;
+  background: rgba(16, 16, 16, 0.5);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+  color: var(--text);
+  font-size: 9.5px;
+  line-height: 1.35;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9), 0 0 3px rgba(0, 0, 0, 0.7);
+  pointer-events: none;
+}
+
+/* A flex box ignores the hidden attribute, so it is spelled out. */
+#profile .readout[hidden] {
+  display: none;
+}
+
+/* The height is the reason the tip exists; the distance and the clock are the caption. */
+#profile .readout .ele {
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+/* Lighter than the rest of the muted text: this sits on whatever colour the ground happens to be. */
+#profile .readout .meta {
+  color: #cfcfcf;
+}
+
+/* The two ends of the vertical range, sitting on the curve where they happen. HTML rather than SVG for the
+   same reason as the readout: the drawing is stretched sideways, and text inside it would be stretched too. */
+#profile .extremum {
+  --anchor-x: -50%;
+  --anchor-y: -100%;
+  position: absolute;
+  z-index: 2;
+  padding: 0 4px;
+  transform: translate(var(--anchor-x), var(--anchor-y));
+  border-radius: 3px;
+  background: rgba(16, 16, 16, 0.55);
+  color: var(--text);
+  font-size: 9.5px;
+  line-height: 15px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
+  pointer-events: none;
+}
+
+#profile .extremum b {
+  font-weight: 600;
+}
+
+/* Warm for the top, cool for the bottom: the same split the fill uses, so the pair reads as one idea. */
+#profile .extremum.high b { color: #ffd166; }
+#profile .extremum.low b { color: #8fd4ff; }
+
+/* Near an edge there is no room to centre the label on its point. */
+#profile .extremum.left { --anchor-x: 0; }
+#profile .extremum.right { --anchor-x: -100%; }
+
+/* No room above the curve either, so the label drops under it instead of being cut off. */
+#profile .extremum.below { --anchor-y: 0; margin-top: 4px; }
+#profile .extremum.above { --anchor-y: -100%; margin-top: -4px; }
+
+/* Two numbers and the scale they came from. The categories that used to be counted here went with the
+   five-colour fill: a count of stretches pointed at blocks the continuous ramp no longer draws. */
+/* Indented past the axis column: at the left edge the legend sat in the same narrow strip as the heights below
+   it, and the two read as one crowded block. It starts where the ground does instead. */
+#profile .legend {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 20px;
+  margin: 2px 0 0 calc(var(--gutter) + var(--gutter-gap));
+  color: var(--muted);
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+#profile .legend .item {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 3px;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The words around the numbers are quiet; the numbers are what the row is for. */
+#profile .legend .key {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+#profile .legend .value {
+  font-size: 12px;
+}
+
+#profile .legend .sep {
+  margin: 0 1px;
+  color: var(--muted);
+}
+
+/* The scale the fill is drawn from: level at the left, a 25 % wall at the right. Pushed to the far end of the
+   row, and the first thing to go when the window is narrow -- the numbers alone still say how hard it is. */
+#profile .legend .scale {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 9px;
+  font-variant-numeric: tabular-nums;
+}
+
+#profile .legend .scale-bar {
+  display: block;
+  width: 66px;
+  height: 6px;
+  border-radius: 3px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18);
+}
+
+/* The plot is a column of numbers and, beside it, the drawing. The two never overlap: the axis ends used to
+   float on the curve, and where the route ran high the numbers sat on top of it.
+   The height here is only the starting point: renderProfile writes the real one, worked out from the route
+   so that a metre of climb always takes the same number of pixels relative to a metre of ground. */
+#profile .plot {
+  display: flex;
+  gap: var(--gutter-gap);
+  height: 78px;
+}
+
+#profile .gutter {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: space-between;
+  width: var(--gutter);
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+  user-select: none;
+}
+
+#profile .chart {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  cursor: crosshair;
+  touch-action: none;
+  pointer-events: auto; /* the panel is see-through to the map; the drawing is not */
+}
+
+/* A hairline where the numbers end and the ground begins; drawn, not a border, so no pixel of the plot is
+   taken from the drawing and every position stays a true fraction of the route. */
+#profile .chart::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
+  pointer-events: none;
 }
 
 #profile svg {
   display: block;
   width: 100%;
-  height: 78px;
+  height: 100%;
 }
 
+/* Filled by the gradient of each stretch, so the shape of the climb is readable before the axis is. The
+   colours are opaque on purpose: two half-transparent shapes that meet leave a dark seam where neither
+   quite covers. The colour itself is computed per cell in profile.js -- nothing here may set `fill`, or it
+   would win over the attribute and every stretch would be the same shade again. */
 #profile .area {
-  fill: rgba(47, 155, 255, 0.25);
+  stroke: none;
 }
 
 #profile .line {
   fill: none;
-  stroke: var(--accent);
-  stroke-width: 1.5;
+  stroke: rgba(255, 255, 255, 0.8);
+  stroke-width: 1.3;
   vector-effect: non-scaling-stroke;
+}
+
+#profile .guide {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 0;
+  border-left: 1px dashed rgba(255, 255, 255, 0.65);
+  pointer-events: none;
+  z-index: 3;
+}
+
+/* The two ends of the axis, in their own column. */
+#profile .axis {
+  font-variant-numeric: tabular-nums;
+}
+
+/* A waypoint, where the track passes closest to it. The ring says there is a photo at this one. */
+#profile .pin {
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  margin: -3.5px 0 0 -3.5px;
+  border-radius: 50%;
+  background: #f5c400;
+  box-shadow: 0 0 0 1.5px rgba(24, 24, 24, 0.65);
+  cursor: pointer;
+  z-index: 2;
+}
+
+#profile .pin.photo {
+  box-shadow: 0 0 0 1.5px rgba(24, 24, 24, 0.65), 0 0 0 3px rgba(255, 255, 255, 0.9);
+}
+
+/* Above rules set a position, which is enough to beat the browser's [hidden] rule on its own; stated here so
+   the marker switch keeps working if one of them ever grows a display value. */
+#profile .pin[hidden] {
+  display: none;
+}
+
+#profile .pin:hover {
+  transform: scale(1.4);
+}
+
+#profile .dot {
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  margin: -3.5px 0 0 -3.5px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 0 0 2px rgba(24, 24, 24, 0.55), 0 0 0 3.5px #ffffff;
+  pointer-events: none;
+  z-index: 4;
+}
+
+/* Pinned: the point stays put so it can be read without holding the mouse still. */
+#profile .plot.pinned .guide {
+  border-left: 1px solid #f5c400;
+}
+
+#profile .plot.pinned .dot {
+  width: 9px;
+  height: 9px;
+  margin: -4.5px 0 0 -4.5px;
+  background: #f5c400;
+  box-shadow: 0 0 0 2px rgba(24, 24, 24, 0.55), 0 0 0 4px #f5c400;
 }
 
 #message {
@@ -118,6 +594,34 @@ body.no-map #map {
   max-width: min(560px, calc(100% - 48px));
   padding: 20px 24px;
   text-align: center;
+}
+
+/* One line, said once: what the key was that just emptied the screen. It fades on its own -- there is nothing
+   to click while the interface is away. */
+#toast {
+  position: absolute;
+  z-index: 1100;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  padding: 8px 16px;
+  border-radius: 999px;
+  background: rgba(16, 16, 16, 0.9);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.45);
+  color: var(--text);
+  font-size: 12.5px;
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  pointer-events: none;
+}
+
+#toast.on {
+  opacity: 1;
+}
+
+#toast[hidden] {
+  display: none;
 }
 
 #message h1 {
@@ -143,13 +647,14 @@ body.failed #map {
 }
 
 /* Leaflet controls in the dark theme */
-.leaflet-bar a, .layer-switch button {
+.leaflet-bar a, .layer-switch button, .locate-switch button, .pins-switch button, .lang-switch button {
   background: #2a2a2a;
   color: var(--text);
   border-color: #444;
 }
 
-.leaflet-bar a:hover, .layer-switch button:hover {
+.leaflet-bar a:hover, .layer-switch button:hover, .locate-switch button:hover,
+.pins-switch button:hover, .lang-switch button:hover {
   background: #383838;
   color: #fff;
 }
@@ -161,6 +666,29 @@ body.failed #map {
 
 .layer-switch {
   display: flex;
+}
+
+/* The way home sits under the zoom buttons, in the same column and the same 30 px square. Both are about
+   where the map looks; the other corner is about what the map shows, and that row already runs into the key
+   bar on a narrow window. Six pixels instead of Leaflet's ten: it reads as the next cell of the same stack. */
+.leaflet-top.leaflet-left .locate-switch {
+  margin-top: 6px;
+}
+
+.locate-switch {
+  display: flex;
+  overflow: hidden; /* the bar's radius has to clip the button, which carries the background */
+}
+
+.locate-switch button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  cursor: pointer;
 }
 
 .layer-switch button {
@@ -178,6 +706,70 @@ body.failed #map {
 .layer-switch button.active {
   background: var(--accent);
   color: #fff;
+}
+
+/* The top-right corner holds three controls; one line keeps them together and out of the map. */
+.leaflet-top.leaflet-right {
+  display: flex;
+  align-items: flex-start;
+}
+
+/* Show/hide the waypoint pins. The dot says whether they are on: hollow when hidden, filled when shown,
+   so the word itself never has to change and the button never changes width. */
+.pins-switch {
+  display: flex;
+}
+
+.pins-switch button {
+  display: flex;
+  align-items: center;
+  border: 0;
+  padding: 5px 10px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.pins-switch .dot {
+  width: 7px;
+  height: 7px;
+  margin-right: 7px;
+  border: 2px solid currentColor;
+  border-radius: 50%;
+  box-sizing: content-box;
+}
+
+.pins-switch button.active {
+  background: var(--accent);
+  color: #fff;
+}
+
+.pins-switch button.active .dot {
+  background: currentColor;
+}
+
+.pins-switch button:not(.active) {
+  color: var(--muted);
+}
+
+.pins-switch button:not(.active) .dot {
+  border-color: var(--muted);
+}
+
+.pins-switch button:not(.active):hover {
+  color: #fff;
+}
+
+/* One button, one job: it shows the language the page is in and flips to the other one. */
+.lang-switch {
+  display: flex;
+}
+
+.lang-switch button {
+  border: 0;
+  padding: 5px 10px;
+  min-width: 34px;
+  font: inherit;
+  cursor: pointer;
 }
 
 .leaflet-container .leaflet-control-attribution {
@@ -208,4 +800,269 @@ body.failed #map {
 .gpx-pin {
   background: none;
   border: 0;
+}
+
+/* ---------- waypoint photos ---------- */
+
+.point-popup .point-text {
+  max-width: 260px;
+  margin-top: 4px;
+  color: var(--muted);
+  white-space: pre-wrap;
+}
+
+/* The badge means "there is something to open here". The first click opens a card, not the original. */
+.gpx-pin.has-photo {
+  cursor: pointer;
+}
+
+.gpx-pin.has-photo svg {
+  filter: drop-shadow(0 0 5px rgba(245, 196, 0, 0.5));
+}
+
+/* The pin the keyboard is on. Blue, the accent the rest of the UI uses for "this one"; it also replaces
+   the photo pin's yellow glow, so the selected pin is the only one that stands out. */
+.gpx-pin.selected svg {
+  filter: drop-shadow(0 0 6px rgba(47, 155, 255, 0.95));
+  transform: scale(1.25);
+  transform-origin: 50% 100%;
+}
+
+/* The small card a photo pin opens first. Sized to the pin, not to the window: the window is for the
+   second click, when the original is actually wanted. */
+.photo-popup .leaflet-popup-close-button {
+  padding: 6px 7px 0 0;
+  color: var(--muted);
+  font-size: 18px;
+}
+
+.photo-popup .leaflet-popup-close-button:hover {
+  color: #fff;
+}
+
+/* A placemark description can run to paragraphs; the card stays small and scrolls instead of growing. */
+.photo-popup .leaflet-popup-content {
+  max-height: 60vh;
+  overflow: auto;
+}
+
+.photo-preview .point-text {
+  max-height: 84px;
+  overflow: auto;
+}
+
+.photo-thumbs {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.photo-thumbs.single {
+  grid-template-columns: 1fr;
+}
+
+/* Two or four thumbnails fill their rows instead of leaving an empty third column behind. */
+.photo-thumbs:has(.photo-thumb:nth-child(2):last-child),
+.photo-thumbs:has(.photo-thumb:nth-child(4):last-child) {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.photo-thumb {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  height: 64px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 4px;
+  background: #1b1b1b;
+  cursor: zoom-in;
+}
+
+.photo-thumbs.single .photo-thumb {
+  height: 148px;
+}
+
+.photo-thumb:hover {
+  border-color: rgba(255, 255, 255, 0.42);
+}
+
+.photo-thumb img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* A broken thumbnail still has to lead somewhere: hiding the image leaves the frame as the button it is. */
+.photo-thumb.failed img {
+  visibility: hidden;
+}
+
+.photo-thumb.failed::after {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: #ff9b9b;
+  content: "!";
+  font-size: 18px;
+}
+
+.photo-hint {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.photo-viewer {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  display: flex;
+  flex-direction: column;
+  /* Opaque: bits of the info panel showing through behind a photo read as smudges. */
+  background: #0b0b0c;
+}
+
+/* Kept explicit: "display: flex" above would otherwise win over the hidden attribute. */
+.photo-viewer[hidden] {
+  display: none;
+}
+
+.photo-bar {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px 14px 14px;
+  background: linear-gradient(rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0));
+}
+
+.photo-titles {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.photo-titles strong {
+  display: block;
+  font-size: 14px;
+}
+
+.photo-meta {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.photo-counter {
+  flex: 0 0 auto;
+  padding: 2px 9px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.09);
+  color: var(--text);
+  font: 12px Consolas, monospace;
+}
+
+.photo-counter[hidden] {
+  display: none;
+}
+
+.photo-close {
+  flex: 0 0 auto;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: var(--text);
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.photo-close:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.photo-stage {
+  position: relative;
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+  padding: 0 56px 18px;
+}
+
+.photo-image {
+  max-width: 100%;
+  max-height: 100%;
+  border-radius: 4px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6);
+  /* Not a button: clicking the original neither steps nor closes. */
+  cursor: default;
+}
+
+.photo-image[hidden] {
+  display: none;
+}
+
+.photo-status {
+  color: var(--muted);
+}
+
+.photo-status[hidden] {
+  display: none;
+}
+
+.photo-status.failed {
+  display: grid;
+  gap: 8px;
+  justify-items: center;
+  max-width: 78vw;
+  color: #ff9b9b;
+  text-align: center;
+}
+
+.photo-status.failed code {
+  color: var(--muted);
+  font: 11px Consolas, monospace;
+  overflow-wrap: anywhere;
+}
+
+.photo-arrow {
+  position: absolute;
+  top: 50%;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.09);
+  color: var(--text);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  transform: translateY(-50%);
+}
+
+.photo-arrow:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.photo-arrow.prev {
+  left: 8px;
+}
+
+.photo-arrow.next {
+  right: 8px;
+}
+
+.photo-arrow[hidden] {
+  display: none;
 }

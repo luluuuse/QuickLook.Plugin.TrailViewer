@@ -2,20 +2,30 @@ using System;
 using System.IO;
 using System.Xml;
 
-namespace QuickLook.Plugin.GpxViewer;
+namespace QuickLook.Plugin.TrailViewer;
 
 /// <summary>
-/// Decides whether a file is a GPX document: a .gpx file whose root element is &lt;gpx&gt;.
+/// Decides whether a file is a track document this plugin can draw: a .gpx or .kml file whose root element
+/// is &lt;gpx&gt; or &lt;kml&gt;, or a .kmz archive that holds one.
 /// Only the start of the file is read, so huge tracks are accepted without parsing them here;
 /// the web viewer parses the whole file and reports errors further in.
 /// </summary>
-internal static class GpxDetector
+internal static class DocumentDetector
 {
     private const int HeadBytes = 64 * 1024;
 
-    public static bool IsGpx(string path)
+    private static readonly string[] Extensions = { ".gpx", ".kml" };
+
+    // Matched against the local name, so the kml: prefix and the missing namespace of older files both work.
+    private static readonly string[] Roots = { "gpx", "kml" };
+
+    public static bool CanPreview(string path)
     {
-        if (!path.EndsWith(".gpx", StringComparison.OrdinalIgnoreCase))
+        // A zip has no XML head, so it is opened instead of sniffed; no map inside means another viewer gets it.
+        if (KmzArchive.IsKmz(path))
+            return KmzArchive.HasDocument(path);
+
+        if (!HasTrackExtension(path))
             return false;
 
         try
@@ -33,12 +43,24 @@ internal static class GpxDetector
                 IgnoreWhitespace = true,
             };
             using var reader = XmlReader.Create(new MemoryStream(head), settings);
-            return reader.MoveToContent() == XmlNodeType.Element && reader.LocalName == "gpx";
+            return reader.MoveToContent() == XmlNodeType.Element
+                && Array.IndexOf(Roots, reader.LocalName) >= 0;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or XmlException)
         {
             return false;
         }
+    }
+
+    private static bool HasTrackExtension(string path)
+    {
+        foreach (var extension in Extensions)
+        {
+            if (path.EndsWith(extension, StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+
+        return false;
     }
 
     private static byte[] ReadHead(string path)

@@ -1,0 +1,171 @@
+# QuickLook.Plugin.TrailViewer
+
+[English](README.md) | [简体中文](README.zh-CN.md)
+
+在 Windows 上不打开地图软件也能看轨迹：在资源管理器里选中 `.gpx`、`.kml` 或 `.kmz` 文件，按 <kbd>Space</kbd>，
+路线就画在地图上了。
+
+![轨迹画在地图上，带信息卡、键位提示条和海拔剖面](docs/screenshot-map.jpg)
+
+这是 [QuickLook](https://github.com/QL-Win/QuickLook) 的插件。QuickLook 把 macOS 的「快速查看」搬到了
+Windows：在文件上按 <kbd>Space</kbd> 就能预览。没有插件时，它把 `.gpx` 当 XML 文本显示、把 `.kmz` 当压缩包；
+装上之后，轨迹画在地图上，附带日期、距离和用时。
+
+## 致谢
+
+本插件基于 **McBenac** 的开源项目
+[QuickLook.Plugin.GpxViewer](https://github.com/McBenac/QuickLook.Plugin.GpxViewer)（MIT，© 2026 McBenac）
+二次开发。GPX 解析、地图视图、预览窗口和原始界面都来自他的作品；1.1.0 起的 KML / KMZ、标记点照片、
+可交互海拔剖面、键盘浏览和中英文界面（见 [CHANGELOG.md](CHANGELOG.md)）是在此基础上加的。
+
+上游版权声明原样保留在 [LICENSE](LICENSE) 中，与二次开发部分的版权（© 2026 luluuuse）并列，
+两份声明都随 `.qlplugin` 一起分发。
+
+## 能显示什么
+
+- **轨迹**（GPX 的 `trk`；KML 的 `LineString` 和 `gx:Track`，含 `MultiGeometry` 里的）画成线，每一段一种
+  颜色，起点绿、终点红，每个记录点一个小圆点（上限 20,000 点，见[大文件](#大文件)）。点一下圆点就能看到
+  它的时间、坐标和海拔。
+- **路线**（`rte`）画成虚线，**标记点**（`wpt`）画成图钉；KML 里 `Point` 是图钉，`Polygon` 在轨迹下面铺一层
+  淡蓝色区域，鼠标悬停显示名字。
+- **标记点照片**：描述里带 `<img>` 的地标会多一个相机角标，点开先是缩略图卡片，再点一次才加载原图——照片
+  不会未经询问就铺满整个屏幕。
+- **信息卡**：文件名、首末点的时间、点数、距离、用时、平均速度、累计爬升与下降，以及文件里装了什么。
+  爬升先过一遍滑动平均，只统计 10 m 以上的回头，GPS 抖动不算爬升。
+- **海拔剖面**（轨迹带 `<ele>` 时）：浮在地图底部的半透明面板，地图在它后面一直铺到窗口底边。曲线下方的
+  填充按坡度本身上色——平地绿、10% 附近黄、20% 以上转橙红、25% 封顶——不用读纵轴就能看出哪段在爬。上方
+  一行写着陡坡有多长、全线最陡多少，右侧是从中取色的色带；最高点和最低点直接标在曲线上。航点落在轨迹
+  经过的位置，点一下打开地图上同一个图钉。
+  鼠标沿剖面移动会显示该处海拔，以及到达它的距离和时间，半透明小卡片浮在指针上方：透到能看见下面的色带
+  和曲线，本来就是为了能对着图读数。
+  面板高度按图形需要来，图形高度按路线需要来：换算方式是「爬升 1 米占的像素约为地面 1 米的三倍」。以前
+  高度写死、宽度却随窗口变，同一段爬升在宽窗口是 1.7 倍、窄窗口是 3.1 倍。落在区间外的路线（40 km 只有
+  几米落差，或 2 km 爬 500 m）会卡在下限或上限，标题旁边会写出实际的垂直夸大倍数。
+- **四种底图**，右上角切换：**地图**（OpenStreetMap 人道主义风格）、**地形**（CyclOSM：等高线、山体阴影、
+  高程点和步道）、**卫星**（Esri World Imagery）和**无底图**（轨迹画在网格上）。选择会被记住。
+
+  ![同一段轨迹换成地形底图](docs/screenshot-terrain.jpg)
+
+- **一个开关**（在底图右边）隐藏地图上的圆点：标记点图钉和每个记录点的小圆点。长轨迹不然就是一条点带，
+  四千多个点糊在一起看不出形状。同一批航点在剖面上还画了一次，这个开关一次管两处，剖面不会指向地图上
+  已经不显示的标记。线、区域、起终点旗标、曲线和坐标轴不受影响；选择会被记住，本来就不画点的文件不会
+  出现这个按钮。
+- **定位按钮**（缩放按钮下方）和 <kbd>C</kbd>：把整条轨迹拉回视野，取景和刚打开文件时完全一致。平移跑远
+  了、或者跟着某个图钉钻到某一小段之后，按它回家。
+- **中英文界面**：首次跟随系统语言，右上角一个按钮切换，选择会被记住。切换会就地重绘已经在屏幕上的内容
+  ——信息卡、打开的卡片、剖面和照片栏——不重新加载页面。
+- **竖版窗口会自动折叠**（高大于宽，或宽度小于 960 px）：键位提示条让位，缩放按钮和右上角几个开关下移到
+  信息卡下方单独一行——只在真的放不下时才下移，因为信息卡宽度只由它最长的一行决定，角落通常空着。
+
+支持 GPX 1.0 / 1.1、KML 2.2（含 `gx:Track` 和 `MultiGeometry`）以及 zip 压缩的 `.kmz`；`.kmz` 只解压里面
+那份 KML，解到临时目录，预览关掉即删。不是合法 XML 的文件会显示错误页，附解析器的原始信息。
+
+界面文案在 `viewer/i18n.js`：一种语言一张表，值是带 `{占位符}` 的字符串，或者函数（中文没有单复数）。
+加一种语言＝加一张表，再把两字母代码加进 `LANGS`。
+
+[CHANGELOG.md](CHANGELOG.md) 用一条记录写清插件现在具备的能力；每发一版重写这一条，只写「现在是什么样」。
+
+## 键盘
+
+<kbd>←</kbd> <kbd>→</kbd> 或 <kbd>A</kbd> <kbd>D</kbd> 在标记点之间走：选中的图钉描蓝边，地图跟着
+它，卡片同时打开，所以不用碰鼠标就能一个个读完地标文字和照片。原图打开时，同样的键在相册里翻页，
+翻到头会接着走进相邻的标记点。如果图钉被开关藏起来了，按一下键会先把它叫回来。
+
+<kbd>Space</kbd> 和 <kbd>Esc</kbd> 归 QuickLook 管，所以预览不会因为 <kbd>Esc</kbd> 而关掉：点 × 或者点
+图片外面。如果方向键在你机器上被别的东西占了，<kbd>A</kbd> <kbd>D</kbd> 效果一样。
+
+<kbd>W</kbd> 开关标记：地图上的图钉和圆点、剖面上的航点圆点一起——它们是同一批航点画了两遍。和按钮
+完全等价。<kbd>Q</kbd> <kbd>E</kbd> 在 地图 / 地形 / 卫星 / 无底图 之间前后切换，到头折返，和点一下按钮
+一样会被记住。原图打开时这两个键不响应——照片后面的底图换了，也要等关掉才看得见；按住不放只算一次，
+标记不会闪。
+
+<kbd>C</kbd> 把整条轨迹拉回视野：就是文件刚打开时的取景，横跨两个山谷的行程会原样回来，而不是停在
+最后一次缩放的哪一级。和定位按钮等价，原图打开时同样不响应。
+
+<kbd>S</kbd> 清屏：信息卡、键位条、海拔剖面和所有按钮都收起来，只留地图本身——轨迹、标记、比例尺和
+版权行——递给只想看个形状的人。第一次按会在屏幕中间淡入一行提示，否则就没有任何东西告诉你怎么把界面
+叫回来；再按一次 <kbd>S</kbd> 恢复。和其它键一样，原图打开时它让路，那时候收起界面就什么都不剩了。
+
+地图上方有一条键位提示条，一直显示着这些键。它从不接收鼠标，所以从它下面开始的拖拽照样平移地图；
+快捷键第一次按下就响应——QuickLook 显示预览时不抢焦点，插件只能用自己的低级键盘钩子捕获 W、Q、E、C、S，
+和 QuickLook 捕获 Space、方向键是同一套办法。钩子只在有预览时存在，也只在前台是这个预览或打开它的
+文件管理器时才接管这些键，在别处它们还是普通字母。竖版窗口（高大于等于宽）里提示条直接隐藏，而不是
+挤成一团，快捷键照样能用。
+
+## 大文件
+
+- **轨迹点超过 20,000**：轨迹画成线，起终点照常标，但不给每个点画可点击的圆点。点再多预览会明显变慢，
+  到二十万点左右会崩。
+- **实测 30,000 点**约 3.5 秒打开。更大的文件没测过，可能超过预览的 20 秒上限，那时会显示
+  *Timed out while loading the preview.*，这类文件请用地图软件打开。
+
+## 隐私
+
+**地图**、**地形**、**卫星**三种模式下，瓦片来自 [OpenStreetMap France](https://www.openstreetmap.fr/)
+（`*.tile.openstreetmap.fr`，以及 CyclOSM 的 `tile-cyclosm.openstreetmap.fr`）和 [Esri](https://www.esri.com/)
+（`server.arcgisonline.com`）。请求了哪些瓦片，等于大致暴露了轨迹在哪，服务器也会看到你的 IP。除此之外
+没有任何数据离开你的电脑：文件在本地读，从不上传。
+
+**无底图**不下载任何东西。选一次，之后每次预览都默认用它。
+
+## 安装
+
+**前提**：[QuickLook 4.x](https://github.com/QL-Win/QuickLook/releases/latest)——先装它，插件是通过
+QuickLook 自己安装的。另外需要 Microsoft Edge WebView2 Runtime，Windows 10 / 11 已经自带。
+
+1. 从 [Releases](../../releases) 下载 `QuickLook.Plugin.TrailViewer.qlplugin`。
+2. 在资源管理器里选中它，按 <kbd>Space</kbd>，点 **Click here to install this plugin.**
+3. 装完后点 **Restart now...**。
+
+## 操作
+
+- 拖动平移，滚轮缩放。一格滚轮走一整级；按住 <kbd>Alt</kbd> 同样的滚动只走半级，方便把某个盘山路弯
+  按在指针下面，而不是让它跑进刚翻倍的视野里。<kbd>+</kbd> <kbd>-</kbd> 按钮始终走整级。海拔剖面只在
+  图形本身上接鼠标，从它的空白处开始的拖拽照样平移地图。
+- <kbd>Space</kbd> 或 <kbd>Esc</kbd> 关闭预览，方向键切到下一个文件，和 QuickLook 平时一样。
+
+## 疑难
+
+每次预览会往 `%LOCALAPPDATA%\GpxViewer\log.txt` 追加一行：文件名、点数、距离、耗时，或者错误。
+
+## 构建
+
+插件是 .NET Framework 4.6.2 类库（WPF + WebView2），在 Windows 上构建。先从仓库克隆一份，然后：
+
+```
+pwsh scripts/get-quicklook-common.ps1
+dotnet build src/QuickLook.Plugin.TrailViewer.csproj -c Release
+node scripts/pack.cjs
+```
+
+`get-quicklook-common.ps1` 会按 `quicklook-version.txt` 里记的版本号从 QuickLook 的 release 拉取
+`QuickLook.Common`，这样插件和 QuickLook 本身是用同一份库编译的。版本号只有一处——项目文件里的
+`<Version>`。`QuickLook.Plugin.Metadata.config` 是模板，`@VERSION@` 由构建填进去，因为 QuickLook 是从这个
+文件读插件版本、而不是从程序集读，手工在两处维护必然漂移。GitHub Actions 在每次 PR 上做同样的事：跑文件
+识别测试、产出 `.qlplugin`；另有一个每月的工作流，发现 QuickLook 或 Leaflet 有新版本就开一个 issue。
+
+`viewer/` 里的网页可以用任意本地服务器在浏览器里直接打开，例如
+`viewer/index.html?src=../tests/fixtures/track-time-ele.gpx`。`tests/` 下的脚本用
+[Playwright](https://playwright.dev/) 驱动 Chromium，一个文件管一块：`viewer-test.cjs` 拿
+`tests/fixtures/expected.json` 对数，其余分别管照片、标记点浏览、圆点开关、地形图层、快捷键、两种语言、
+剖面与光标读数、剖面高度与垂直比例、定位按钮、竖版布局和版本号。全是普通 Node 脚本，每条检查打印一行
+`PASS` 或 `FAIL`。在 cmd 窗口里：
+
+```
+set NODE_PATH=<playwright-core 所在目录>\node_modules
+set CHROMIUM=<chrome 或 msedge.exe 的路径>
+for %f in (tests\*-test.cjs) do node %f
+```
+
+`version-test.cjs` 不需要浏览器：它只读 changelog、项目文件和构建出来的元数据，可以单独跑，用来抓版本
+漂移。测试样本由 `tools/make-fixtures.py` 生成，全部是公式算出来的合成数据，不含任何真实轨迹。
+
+## 第三方组件
+
+`viewer/vendor/leaflet/` 是 [Leaflet](https://leafletjs.com/) 1.9.4 的原样拷贝（BSD 2-Clause，许可证在
+同目录），版本记录在 `viewer/vendor/versions.json`。
+地图数据 © [OpenStreetMap](https://www.openstreetmap.org/copyright) 贡献者；卫星影像 © Esri 及其数据提供方。
+
+## 许可证
+
+MIT

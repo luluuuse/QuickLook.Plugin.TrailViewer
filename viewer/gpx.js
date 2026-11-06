@@ -1,6 +1,8 @@
 // Parses GPX 1.0 and 1.1 with DOMParser and computes the summary shown in the info box.
 // Elements are matched by local name, so files with or without the GPX namespace both work.
 
+import { t } from './i18n.js';
+
 const EARTH_RADIUS_M = 6371008.8; // mean Earth radius, same as tools/make-fixtures.py
 
 export class GpxError extends Error {}
@@ -50,17 +52,27 @@ function pathLength(points) {
   return total;
 }
 
-/** Parses GPX text. Throws GpxError with a readable message when the file cannot be shown. */
-export function parseGpx(text) {
+/** Parses XML text once, for either format. Throws GpxError when the text is not well-formed XML. */
+export function parseXml(text) {
   const doc = new DOMParser().parseFromString(text, 'application/xml');
   const error = doc.getElementsByTagName('parsererror')[0];
   if (error) {
     // Chromium puts the parser message in a <div> inside <parsererror>.
     const detail = (error.querySelector('div')?.textContent || error.textContent || '').trim().split('\n')[0];
-    throw new GpxError(`The file is not valid XML${detail ? `: ${detail}` : '.'}`);
+    throw new GpxError(t('error.notXml', { detail }));
   }
-  const root = doc.documentElement;
-  if (!root || root.localName !== 'gpx') throw new GpxError('The file is not a GPX document.');
+  return doc;
+}
+
+/** Parses GPX text. Throws GpxError with a readable message when the file cannot be shown. */
+export function parseGpx(text) {
+  return parseGpxDocument(parseXml(text));
+}
+
+/** Parses an already parsed GPX document. */
+export function parseGpxDocument(doc) {
+  const root = doc?.documentElement;
+  if (!root || root.localName !== 'gpx') throw new GpxError(t('error.notGpx'));
 
   const metadata = children(root, 'metadata')[0];
   const tracks = children(root, 'trk').map((trk) => ({
@@ -101,16 +113,27 @@ export function summarize(gpx) {
     if (!end || p.time > end) end = p.time;
   }
 
+  // An elevation profile only says something when the heights actually differ: KML often carries a
+  // constant 0 altitude, which would draw a flat line and an "Elevation 0-0 m" label.
+  let lowest = Infinity;
+  let highest = -Infinity;
+  for (const p of trackPoints) {
+    if (p.ele === undefined) continue;
+    lowest = Math.min(lowest, p.ele);
+    highest = Math.max(highest, p.ele);
+  }
+
   return {
     tracks: gpx.tracks.length,
     segments: segments.length,
     routes: gpx.routes.length,
     waypoints: gpx.waypoints.length,
+    areas: gpx.areas?.length || 0,
     points: trackPoints.length,
     distanceMeters: distance,
     start,
     end,
     durationSeconds: start ? Math.round((end - start) / 1000) : null,
-    elevation: trackPoints.some((p) => p.ele !== undefined),
+    elevation: highest - lowest >= 1,
   };
 }

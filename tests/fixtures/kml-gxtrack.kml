@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2" xmlns:gx="http://www.google.com/kml/ext/2.2">
+  <Document>
+    <name>Recorded track</name>
+    <Placemark>
+      <name>Morning run</name>
+      <TimeStamp><when>2026-10-06T05:05:25Z</when></TimeStamp>
+      <gx:Track>
+        <when>2026-10-06T05:05:25Z</when>
+        <when>2026-10-06T05:05:35Z</when>
+        <when>2026-10-06T05:05:45Z</when>
+        <when>2026-10-06T05:05:55Z</when>
+        <when>2026-10-06T05:06:05Z</when>
+        <gx:coord>114.2810 30.6262 6.0</gx:coord>
+        <gx:coord>114.2820 30.6270 6.4</gx:coord>
+        <gx:coord>114.2830 30.6278 12.0</gx:coord>
+        <gx:coord>114.2840 30.6286 13.2</gx:coord>
+        <gx:coord>114.2850 30.6294 9.1</gx:coord>
+      </gx:Track>
+    </Placemark>
+    <Placemark>
+      <name>Multi track</name>
+      <gx:MultiTrack>
+        <gx:Track>
+          <when>2026-10-06T07:00:00Z</when>
+          <when>2026-10-06T07:00:10Z</when>
+          <gx:coord>114.2900 30.6300 7.0</gx:coord>
+          <gx:coord>114.2910 30.6310 7.5</gx:coord>
+        </gx:Track>
+        <gx:Track>
+          <when>2026-10-06T07:10:00Z</when>
+          <when>2026-10-06T07:10:10Z</when>
+          <gx:coord>114.2920 30.6320 8.0</gx:coord>
+          <gx:coord>114.2930 30.6330 8.5</gx:coord>
+        </gx:Track>
+      </gx:MultiTrack>
+    </Placemark>
+  </Document>
+</kml>

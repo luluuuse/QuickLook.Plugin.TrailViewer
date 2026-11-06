@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>Loop with a hole</name>
+    <Placemark>
+      <name>Park boundary</name>
+      <Polygon>
+        <outerBoundaryIs>
+          <LinearRing>
+            <coordinates>
+              114.3000,30.5800,0 114.3200,30.5800,0 114.3200,30.6000,0 114.3000,30.6000,0 114.3000,30.5800,0
+            </coordinates>
+          </LinearRing>
+        </outerBoundaryIs>
+        <innerBoundaryIs>
+          <LinearRing>
+            <coordinates>
+              114.3060,30.5860,0 114.3140,30.5860,0 114.3140,30.5940,0 114.3060,30.5940,0 114.3060,30.5860,0
+            </coordinates>
+          </LinearRing>
+        </innerBoundaryIs>
+      </Polygon>
+    </Placemark>
+    <Placemark>
+      <name>Lakeside run</name>
+      <LineString>
+        <coordinates>
+          114.3020,30.5820,12 114.3100,30.5830,13 114.3180,30.5820,11 114.3180,30.5900,10
+        </coordinates>
+      </LineString>
+    </Placemark>
+    <Placemark>
+      <name>Start gate</name>
+      <Point>
+        <coordinates>114.3020,30.5820,12</coordinates>
+      </Point>
+    </Placemark>
+  </Document>
+</kml>
