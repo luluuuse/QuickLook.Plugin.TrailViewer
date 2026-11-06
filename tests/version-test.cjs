@@ -46,7 +46,7 @@ if (fs.existsSync(built)) {
   check('the built metadata carries the same number', shipped === current, `${shipped} vs ${current}`);
 }
 
-// 4. The virtual host QuickLook is pointed at is the one this version derives to: app-1-15-4.example.
+// 4. The virtual host QuickLook is pointed at is the one this version derives to: 1.16.6 -> app-1-16-6.
 const host = current.replace(/\./g, '-');
 check('the changelog names the current virtual host', changelog.includes(`app-${host}.gpxviewer.example`), `app-${host}`);
 

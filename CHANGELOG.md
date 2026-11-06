@@ -1,6 +1,6 @@
 # 版本更新日志 / Changelog
 
-**1.16.6 — 2026-11-06**，本仓库的首发版本。下面这一条写的是插件**现在具备的全部能力**，不是某一次改动的
+**1.16.6 — 2026-11-07**，本仓库的首发版本。下面这一条写的是插件**现在具备的全部能力**，不是某一次改动的
 流水账。版本号沿用上游编号：`1.0.0` 是上游基线（只支持 GPX），`1.1.0` 起的开发都发生在这里。
 
 逐版记录不随仓库发布，这里只保留当前这一版。
@@ -8,7 +8,7 @@
 版本号同时决定前端所在的虚拟主机名（`app-1-16-6.gpxviewer.example`），用于绕开 WebView2 的磁盘缓存，
 所以**每次升级都需要从托盘退出 QuickLook 再启动**。
 
-**1.16.6 — 2026-11-06** is the first release of this repository. What follows describes what the plugin does
+**1.16.6 — 2026-11-07** is the first release of this repository. What follows describes what the plugin does
 today rather than what one commit changed. The numbering continues upstream (`1.0.0` is McBenac's baseline,
 GPX only); everything from `1.1.0` on was written here. This note is rewritten with every release -- it says
 what the plugin is now, and the per-version log is not published. The version number is also the WebView2
@@ -17,7 +17,7 @@ tray after every upgrade.
 
 ---
 
-## 1.16.6 — 2026-11-06 · 首发版本 / First release
+## 1.16.6 — 2026-11-07 · 首发版本 / First release
 
 ### 文件格式 / Formats
 
@@ -114,13 +114,13 @@ tray after every upgrade.
   两端各一个圆标，右侧竖排里程、用时、最高海拔、均速、上升。整张图从解析出的点现算，不是截屏，所以导出
   结果与当前缩放、平移、底图和窗口大小都无关，背景是真透明，可以直接叠到照片上。
 - 同一个动作也有按钮：地图左上角、全览按钮下面那个方框图标，悬停提示里带着键位。
-- <kbd>⇧X</kbd> 打开一个小面板：版式（**方版** / **竖版** / **横版**）、**墨色**（黑 / 白）、底衬（无 / 淡）。
+- <kbd>⇧X</kbd> 打开一个小面板：比例（**方版** / **竖版** / **横版**）、**墨色**（黑 / 白）、底衬（无 / 淡）。
   三个版式按用途命名，不按比例数字——「1:1」「9:16」看不出哪一张该叠在照片上；默认是竖版。
   选择会记住，之后按 <kbd>X</kbd> 就按上次的设置直接出图，默认是黑字、无底衬。
 - 墨色是整张图唯一的一支笔：数值、标签、分隔线都由它派生，底衬方向自动跟它反相——黑字配浅底衬、白字配深底衬，
   不用自己判断该开哪一种。起终点圆标里的「起 / 终」恒为黑字，压在绿、红两个实心圆上。底衬也认版式：竖版铺在
   右半边，横版铺在上方数据区。
-- 方版与竖版是「右侧竖排」：一列数字右对齐，顶部一条竖线做边。**横版换了一种排法**，从上往下读：数据收在
+- 方版与竖版是「右侧竖排」：一列数字右对齐，左边一条竖线做边。**横版换了一种排法**，从上往下读：数据收在
   左上「半宽 × 三分之一高」的一格里，**轨迹占下方整条横带**（约 2 : 1）。里程是标题，字号最大、左对齐、不带
   中文名；其余四项在它下面排成 2 × 2，每格数字在上、标签在下，数字与标签都在格内居中，标签用更浅的墨色，视线
   先落在数字上。横版不画分隔线，靠间距分块。
@@ -196,7 +196,8 @@ tray after every upgrade.
   预览窗口内时生效（焦点在资源管理器时按键被 QuickLook 的全局钩子拿去切文件），<kbd>A</kbd> <kbd>D</kbd>
   是兜底。
 - 地形图层依赖境外服务，首屏可能要几秒才铺满，断网时只是灰底，不影响轨迹与剖面。
-- 叠加图的文字是黑的：照片本身很暗（夜景、阴影、深色天空）时，用 <kbd>⇧X</kbd> 里的「淡」底衬。
+- 白墨靠身后一圈暗影撑住笔画，压在浅色照片上仍不如黑墨结实；照片一半亮一半暗时，单一墨色总有一边吃亏——
+  这时开 <kbd>⇧X</kbd> 里的「淡」底衬。
 
 - `http://` images do not load: the page runs on an `https://` virtual host, so mixed content is blocked
   (`https` and `data:` are fine). Relative-path images inside a `.kmz` are not supported yet.
@@ -205,8 +206,9 @@ tray after every upgrade.
   fallback for when Explorer keeps it.
 - The terrain layer comes from a service outside China: the first screen can take a few seconds, and offline it
   is a grey background that leaves the track and the profile untouched.
-- The overlay's type is black: on a photo that is itself dark (night, shade, a deep sky) turn on the "soft"
-  backing under <kbd>⇧X</kbd>.
+- White type is held up by a dark shadow behind it, and still reads less solidly than black on a light photo;
+  on a photo that is bright on one side and dark on the other, one ink always loses somewhere -- turn on the
+  "soft" backing under <kbd>⇧X</kbd>.
 
 ### 测试 / Tests
 

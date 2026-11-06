@@ -134,7 +134,9 @@ are is written where they are used: the tooltip of each button names its key.
 <kbd>X</kbd> writes a transparent PNG next to the file being previewed: the route coloured by height from green
 to red, a badge at each end, and distance, time, highest point, average speed and ascent set beside it. It is
 drawn from the parsed points rather than captured from the screen, so it ignores the current zoom, pan,
-background and window size -- and the background really is transparent, ready to be laid over a photo.
+background and window size -- and the background really is transparent, ready to be laid over a photo. Its
+labels are written in the interface language, which is why the picture below reads Chinese: it came from a
+Chinese install.
 
 ![The wide shape: the figures in the top left corner, the track across the band below](docs/screenshot-overlay.png)
 

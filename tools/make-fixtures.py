@@ -147,6 +147,18 @@ def main():
     files[long_name] = gpx_doc(NS11, '1.1', '', track_xml('Alpine snow traverse', [traverse]))
     exp[long_name] = expected(tracks=[('Alpine snow traverse', [traverse])])
 
+    # A track that runs across rather than around: the landscape overlay gathers the figures into the top-left
+    # corner and puts the track in the band below, and only a track that runs the width of that band can show
+    # the band is being used. Written here but deliberately left out of expected.json: the overlay test measures
+    # it in pixels, while the viewer test has no summary numbers for it to compare.
+    t6 = datetime(2026, 5, 2, 7, 0, 0, tzinfo=timezone.utc)
+    across = [{'lat': round(30.02 + 0.03 * i / 239, 6),
+               'lon': round(100.00 + 0.62 * i / 239, 6),
+               'ele': round(420 + 70 * math.sin(math.pi * i / 239), 1),
+               'time': t6 + timedelta(seconds=30 * i)} for i in range(240)]
+    (OUT / 'wide-track.gpx').write_bytes(
+        gpx_doc(NS11, '1.1', '', track_xml('East-west traverse', [across])).encode('utf-8'))
+
     # Rejected by CanHandle.
     files['empty.gpx'] = ''
     files['broken.gpx'] = '<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="x"<trk>\n'
