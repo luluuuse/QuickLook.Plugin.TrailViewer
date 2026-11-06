@@ -296,11 +296,16 @@ internal static class Program
 
             foreach (var raw in list.Split(','))
             {
-                var key = raw.Trim();
+                var token = raw.Trim();
+                if (token.Length == 0) continue;
+                // A leading + is shift held down: "+x" is the panel, "x" exports straight away.
+                var shift = token[0] == '+';
+                var key = shift ? token.Substring(1) : token;
                 if (key.Length == 0) continue;
                 var vk = char.ToUpperInvariant(key[0]);
                 var code = "Key" + vk;
-                var payload = "{\"type\":\"keyDown\",\"modifiers\":0,\"windowsVirtualKeyCode\":" + (int)vk
+                var modifiers = shift ? 8 : 0;
+                var payload = "{\"type\":\"keyDown\",\"modifiers\":" + modifiers + ",\"windowsVirtualKeyCode\":" + (int)vk
                     + ",\"nativeVirtualKeyCode\":" + (int)vk + ",\"code\":\"" + code + "\",\"key\":\"" + key
                     + "\",\"text\":\"" + key + "\",\"unmodifiedText\":\"" + key + "\"}";
                 await panel.Core.CallDevToolsProtocolMethodAsync("Input.dispatchKeyEvent", payload);
@@ -309,11 +314,16 @@ internal static class Program
                 await Task.Delay(250);
             }
 
+            // The overlay export finishes after the key: the picture is drawn, encoded and posted in pieces.
+            if (list.Contains("x"))
+                await Task.Delay(2000);
+
             // hasFocus is the whole point of the keys check: a page that never got the keyboard still passes a
             // CDP-dispatched key, so the handler can look fine while a real user presses keys into nothing.
             Console.WriteLine("KEYS " + await panel.RunScriptAsync(
                 "JSON.stringify({seen: window.__seen, pins: window.gpxViewer.pins.visible(),"
                 + " layer: window.gpxViewer.layer(), focus: document.hasFocus(),"
+                + " panel: window.gpxViewer.panelOpen(),"
                 + " active: document.activeElement && document.activeElement.tagName})"));
             exitCode = 0;
             app.Shutdown();

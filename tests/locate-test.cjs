@@ -157,17 +157,21 @@ async function main() {
   await page.keyboard.press('s');
   await page.waitForTimeout(300);
 
-  // 6. The key bar mentions it.
-  const hint = await page.evaluate(() => document.getElementById('keys')?.textContent || '');
-  check('the key bar lists C', /C/.test(hint) && /全览/.test(hint), hint.slice(0, 60));
-
-  // 7. The corner row must not grow: the button costs the top band nothing, which is why it went under zoom.
-  const row = await page.evaluate(() => {
-    const keys = document.getElementById('keys').getBoundingClientRect();
-    const tools = document.querySelector('#map .leaflet-top.leaflet-right').getBoundingClientRect();
-    return { gap: Math.round(tools.left - keys.right) };
+  // 6. The export button follows it down the same column: the top band belongs to the summary, and the right
+  //    corner already carries three switches, so anything else about "the route as a whole" stacks here.
+  const pair = await page.evaluate(() => {
+    const fit = document.querySelector('.locate-switch button').getBoundingClientRect();
+    const out = document.querySelector('.export-switch button').getBoundingClientRect();
+    return {
+      dx: Math.round(out.left - fit.left),
+      dy: Math.round(out.top - fit.bottom),
+      w: Math.round(out.width),
+      h: Math.round(out.height),
+    };
   });
-  check('the key bar still clears the corner switches', row.gap >= 12, `${row.gap} px between them`);
+  check('an export button follows the fit button down the column',
+    pair.w === 30 && pair.h === 30 && Math.abs(pair.dx) <= 1 && pair.dy >= 4,
+    `${pair.w}x${pair.h}, ${pair.dx} px sideways, ${pair.dy} px under`);
 
   check('the page threw nothing', pageErrors.length === 0, pageErrors.join(' | ') || 'clean');
 

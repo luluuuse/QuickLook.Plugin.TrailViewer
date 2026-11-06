@@ -11,7 +11,7 @@
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
     <OutputPath>..\bin\$(Configuration)\</OutputPath>
-    <Version>1.15.11</Version>
+    <Version>1.16.6</Version>
     <Product>QuickLook.Plugin.TrailViewer</Product>
     <Description>Previews GPX, KML and KMZ tracks, routes, areas and waypoints on a map, with photos on waypoints and an English/Chinese interface.</Description>
   </PropertyGroup>

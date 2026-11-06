@@ -5,7 +5,7 @@
 Preview GPX and KML tracks on Windows without opening a map app: select a `.gpx`, `.kml` or `.kmz` file in
 Explorer, press <kbd>Space</kbd>, and see where the track goes.
 
-![A track drawn on a map, with the summary card, the keyboard bar and the elevation profile](docs/screenshot-map.jpg)
+![A track drawn on a map, with the summary card and the elevation profile](docs/screenshot-map.jpg)
 
 This is a plugin for [QuickLook](https://github.com/QL-Win/QuickLook), the free app that brings macOS-style
 Quick Look to Windows: pressing <kbd>Space</kbd> on a file in Explorer shows a preview of it. Without the
@@ -69,13 +69,16 @@ The upstream copyright notice is kept verbatim in [LICENSE](LICENSE), next to th
   draws no dots at all gets no button.
 - A button under the zoom buttons -- and <kbd>C</kbd> -- puts the whole track back in view, framed
   exactly as the file opened. It is the way home after panning away or following a pin to one stretch.
+- <kbd>X</kbd> saves the track as a transparent PNG to lay over a photo, with the totals beside it and the
+  route coloured by height. The button sits under the locate one; see
+  [Exporting the track as a picture](#exporting-the-track-as-a-picture) for the three shapes.
 - An English or Chinese interface, following the system language on first use and switched by one button
   next to the backgrounds. The choice is remembered, and switching repaints what is already on screen -
   the summary, an open card, the profile and the photo bar - without reloading the page.
 - A layout that folds up in a portrait window (as tall as it is wide or taller, or narrower than 960 px): the
-  keyboard bar makes way, and the zoom buttons and the corner switches step down onto a line of their own
-  beneath the summary -- but only once they no longer fit beside it, since the summary is only as wide as its
-  longest line and the corner is usually free.
+  zoom buttons and the corner switches step down onto a line of their own beneath the summary -- but only once
+  they no longer fit beside it, since the summary is only as wide as its longest line and the corner is usually
+  free.
 
 GPX 1.0 and 1.1, KML 2.2 (including `gx:Track` and `MultiGeometry`) and zipped `.kmz` archives are supported;
 only the KML document inside a `.kmz` is unpacked, into a temporary folder that lives exactly as long as the
@@ -111,19 +114,54 @@ so the markers do not blink.
 two valleys comes back as it was rather than at whatever zoom the last gesture stopped on. It is the same
 thing the locate button does, and it is ignored while a full-size photo is open, like the other keys.
 
-<kbd>S</kbd> clears the map: the summary, the keyboard bar, the elevation profile and every button go, leaving
+<kbd>S</kbd> clears the map: the summary, the elevation profile and every button go, leaving
 the map itself -- track, markers, scale and credit line -- the view to hand someone who only wants to see the
 shape of the walk. A hint fades in the middle of the screen the first time, because otherwise there would be
 nothing on screen saying how to get the interface back; <kbd>S</kbd> again puts it back. Like the other keys
 it stands aside while a full-size photo is open, where there would be nothing left to see.
 
-A bar above the map keeps these keys in sight. It never takes the mouse, so a drag that starts under it
-still pans the map, and the shortcuts answer on the first press: QuickLook shows its preview without
-activating it, so the plugin catches W, Q, E, C and S with a low-level keyboard hook of its own, exactly the way
-QuickLook catches Space and the arrows. The hook only exists while a preview is on screen and only takes
-the keys when the foreground is this preview or the file manager it was opened from; anywhere else they
-are ordinary letters. In a portrait window -- as tall as it is wide, or taller -- the bar is hidden rather
-than squeezed; the shortcuts work all the same.
+<kbd>X</kbd> exports the overlay with the last settings, and <kbd>⇧X</kbd> opens the panel that sets them.
+Both stand aside while a full-size photo is open, like the other keys.
+
+The keys answer on the first press: QuickLook shows its preview without activating it, so the plugin catches
+W, Q, E, C, S, X and ⇧X with a low-level keyboard hook of its own, exactly the way QuickLook catches Space and
+the arrows. The hook only exists while a preview is on screen and only takes the keys when the foreground is
+this preview or the file manager it was opened from; anywhere else they are ordinary letters. What the keys
+are is written where they are used: the tooltip of each button names its key.
+
+## Exporting the track as a picture
+
+<kbd>X</kbd> writes a transparent PNG next to the file being previewed: the route coloured by height from green
+to red, a badge at each end, and distance, time, highest point, average speed and ascent set beside it. It is
+drawn from the parsed points rather than captured from the screen, so it ignores the current zoom, pan,
+background and window size -- and the background really is transparent, ready to be laid over a photo.
+
+![The wide shape: the figures in the top left corner, the track across the band below](docs/screenshot-overlay.png)
+
+<kbd>⇧X</kbd> opens the panel that sets it. All three choices are remembered, and <kbd>X</kbd> then exports
+with them.
+
+| Setting | | |
+| --- | --- | --- |
+| **Shape** | **Portrait** | 1080 × 1920, the phone screen. The default. |
+| | **Square** | 1536 × 1536, for a post that is not a story. |
+| | **Wide** | 2048 × 1536, read top down: the figures in the top left corner, the track across the band below. |
+| **Ink** | **Black** / **White** | Black is the default and needs nothing behind it on a bright photo. |
+| **Backing** | **None** / **Soft** | A soft wash for a photo the type would otherwise sink into. It follows the ink: light behind black, dark behind white. |
+
+The shapes are named for the job rather than for their proportion, because "1:1" does not say which one belongs
+on a photo. Sizes are chosen for being laid into *part* of one, not over all of it: a 12 MP frame's short edge
+is about 3000 px, and half of that is what the picture occupies when it sits in one half of the frame.
+
+The portrait and square pages stack the figures in a right-hand column, right-aligned against a rule. The wide
+page is a different layout rather than a rotation: the distance becomes the heading -- largest type, top left,
+flush with the column edge, with no name under it -- and the other four sit beneath in a 2 × 2 block, number
+over label, centred in their cell, the label in a lighter ink. Its track band is about 2 : 1, so a track that
+runs east-west uses the whole width; a loop or a north-south track fills the height and centres instead.
+
+The file is named after the source with the proportion appended -- `2026-05-02-traverse-track-4x3.png` -- so two
+shapes of one track never overwrite each other while a re-export of the same shape updates in place. A file
+without height data falls back to a single colour and drops the two height rows.
 
 ## Large files
 
@@ -193,9 +231,8 @@ The web viewer in `viewer/` can be opened in any browser through a local web ser
 with [Playwright](https://playwright.dev/), one file per area: `viewer-test.cjs` holds the numbers against
 `tests/fixtures/expected.json`, and the rest cover photos, waypoint navigation, the pin switch, the terrain
 layer, the keyboard shortcuts, the two languages, the profile and its cursor readout, the profile's height
-and vertical scale, the locating button, the portrait layout and the version numbers. All of them are plain
-Node scripts and print one `PASS` or `FAIL` line per check. In a
-cmd window:
+and vertical scale, the locating button, the overlay export, the portrait layout and the version numbers. All
+of them are plain Node scripts and print one `PASS` or `FAIL` line per check. In a cmd window:
 
 ```
 set NODE_PATH=<path to playwright-core>\node_modules

@@ -39,7 +39,7 @@ async function main() {
   const server = await serve();
   const base = `http://127.0.0.1:${server.address().port}`;
   const browser = await chromium.launch({ executablePath: process.env.CHROMIUM || undefined });
-  // en-US so the assertions can read the hint line; the Chinese side is checked at the end by switching.
+  // en-US so the assertions can read the tooltips; the Chinese side is checked at the end by switching.
   const page = await browser.newPage({ viewport: { width: 1200, height: 800 }, locale: 'en-US' });
   const pageErrors = [];
   page.on('pageerror', (e) => pageErrors.push(e.message));
@@ -61,9 +61,11 @@ async function main() {
     pinsActive: document.querySelector('.pins-switch button')?.classList.contains('active'),
     hasControl: window.gpxViewer.pins.hasControl(),
     photo: window.gpxViewer.photos.isOpen(),
-    hint: document.getElementById('keys')?.textContent || '',
-    hintShown: document.getElementById('keys')?.hidden === false,
-    navHint: document.querySelectorAll('#keys .nav').length,
+    bar: !!document.getElementById('keys'),
+    layerTitle: document.querySelector('.layer-switch button')?.title || '',
+    pinsTitle: document.querySelector('.pins-switch button')?.title || '',
+    fitTitle: document.querySelector('.locate-switch button')?.title || '',
+    exportTitle: document.querySelector('.export-switch button')?.title || '',
     summaryKeys: document.querySelectorAll('#info .keys').length,
   }));
 
@@ -79,11 +81,15 @@ async function main() {
   });
   await open('kml-photos.kml');
 
-  // 1. The keys are named on a bar of their own, above the map -- not inside the summary box.
+  // 1. There is no key bar any more: each key is named on the tooltip of the button it stands for, so the
+  //    place that shows the map is not also a cheat sheet for it.
   let s = await state();
-  check('the bar above the map names the keys', s.hintShown && /markers/.test(s.hint) && /background/.test(s.hint),
-    s.hint);
-  check('the summary no longer carries them', s.summaryKeys === 0, `${s.summaryKeys}`);
+  check('the key bar is gone', s.bar === false);
+  check('the background buttons name Q and E', /Q\s*\/\s*E/.test(s.layerTitle), s.layerTitle);
+  check('the marker button names W', /\(W\)/.test(s.pinsTitle), s.pinsTitle);
+  check('the fit button names C', /\(C\)/.test(s.fitTitle), s.fitTitle);
+  check('and the export button names X', /\(X\)/.test(s.exportTitle), s.exportTitle);
+  check('the summary does not carry them either', s.summaryKeys === 0, `${s.summaryKeys}`);
   check('the background starts on the map', s.layer === 'map', s.layer);
 
   // 2. W is the marker switch: the same hide/show the button does, with the same state.
@@ -155,8 +161,7 @@ async function main() {
   await page.evaluate(() => localStorage.removeItem('gpxviewer.pins'));
   await open('gpx10.gpx');
   s = await state();
-  check('a pure track gets the switch and the hint', s.hasControl === true && s.marks === 30, `${s.marks}`);
-  check('no waypoints, no waypoint keys on the bar', s.navHint === 0, `${s.navHint}`);
+  check('a pure track gets the switch', s.hasControl === true && s.marks === 30, `${s.marks}`);
   await press('w');
   s = await state();
   check('W hides the dots of a pure track', s.pinsVisible === false, `${s.pinsVisible}`);
@@ -194,11 +199,12 @@ async function main() {
   s = await state();
   check('the background keys still work on an area-only file', s.layer === next, `${s.layer}, wanted ${next}`);
 
-  // 9. The bar follows the interface language.
+  // 9. The tooltips follow the interface language.
   await page.locator('.lang-switch button').click();
   await page.waitForTimeout(200);
   s = await state();
-  check('the bar speaks Chinese', /标记点/.test(s.hint) && /切换底图/.test(s.hint), s.hint);
+  check('the tooltips speak Chinese', /切换/.test(s.layerTitle) && /（C）/.test(s.fitTitle),
+    `${s.layerTitle} | ${s.fitTitle}`);
   await page.locator('.lang-switch button').click();
   await page.waitForTimeout(200);
 
@@ -214,27 +220,24 @@ async function main() {
     const toast = document.getElementById('toast');
     return {
       hidden: document.body.classList.contains('chrome-hidden'),
-      info: shown('#info'), keys: shown('#keys'), profile: shown('#profile'),
+      info: shown('#info'), profile: shown('#profile'),
       zoom: shown('.leaflet-control-zoom'), layers: shown('.layer-switch'),
       pins: shown('.pins-switch'), lang: shown('.lang-switch'),
       scale: shown('.leaflet-control-scale'), credit: shown('.leaflet-control-attribution'),
       map: shown('#map'),
       markers: document.querySelectorAll('.gpx-pin').length,
       toast: toast.hidden === false, toastText: toast.textContent,
-      hint: document.getElementById('keys').textContent,
     };
   });
 
   await open('kml-photos.kml');
   let c = await chrome();
   check('everything is on the map to begin with',
-    c.info && c.keys && c.profile && c.zoom && c.layers && c.pins && c.lang, JSON.stringify(c));
-  check('the bar names the new key', /S/.test(c.hint) && /interface/.test(c.hint), c.hint);
+    c.info && c.profile && c.zoom && c.layers && c.pins && c.lang, JSON.stringify(c));
 
   await press('s');
   c = await chrome();
   check('S takes the summary away', c.info === false);
-  check('and the key bar', c.keys === false);
   check('and the profile', c.profile === false);
   check('and the buttons in both top corners', c.zoom === false && c.layers === false && c.pins === false && c.lang === false,
     `${c.zoom}/${c.layers}/${c.pins}/${c.lang}`);
@@ -247,7 +250,7 @@ async function main() {
   await press('s');
   c = await chrome();
   check('S brings everything back',
-    c.info && c.keys && c.profile && c.zoom && c.layers && c.pins && c.lang, JSON.stringify(c));
+    c.info && c.profile && c.zoom && c.layers && c.pins && c.lang, JSON.stringify(c));
   check('and the class is gone', c.hidden === false);
 
   // The host sends the same key through pressKey when QuickLook is holding the keyboard.

@@ -54,7 +54,9 @@ async function main() {
       labels,
       values: Array.from(document.querySelectorAll('#info dd')).map((n) => n.textContent),
       facts: Array.from(document.querySelectorAll('#info .facts dd')).map((n) => n.textContent),
-      keys: text('#keys'),
+      // The keys are named on the buttons now: one tooltip per control that has one.
+      tips: ['.layer-switch button', '.pins-switch button', '.locate-switch button', '.export-switch button']
+        .map((q) => document.querySelector(q)?.title || '').join(' | '),
       layers: Array.from(document.querySelectorAll('.layer-switch button')).map((n) => n.textContent),
       langButton: text('.lang-switch button'),
       langTitle: document.querySelector('.lang-switch button')?.title || '',
@@ -97,9 +99,8 @@ async function main() {
     s.values.join(' | ').slice(0, 120));
   check('the photo line is translated', s.values.some((v) => v.includes('张照片，分布在 3 个标记点')),
     s.values[s.values.length - 1]);
-  check('the key bar is translated', s.keys.includes('切换标记点') && s.keys.includes('切换底图'), s.keys);
-  // The arrow keys still step through the waypoints, but the bar no longer spells them out.
-  check('the bar lists A and D, not the arrows', !/[←→]/.test(s.keys) && /A\s*D/.test(s.keys), s.keys);
+  check('the tooltips name the keys in Chinese',
+    /Q \/ E 切换/.test(s.tips) && /（W）/.test(s.tips) && /（C）/.test(s.tips) && /（X）/.test(s.tips), s.tips);
   check('the layer buttons are translated', s.layers.join('/') === '地图/地形/卫星/无底图', s.layers.join('/'));
   check('the profile title is translated', s.profile === '海拔', s.profile);
   check('the profile axis is translated but keeps its unit', s.axis.length === 2 && s.axis.every((a) => /^-?\d+ m$/.test(a)), s.axis.join(' / '));
@@ -128,7 +129,8 @@ async function main() {
   check('the labels follow', s.labels.includes('Points') && s.labels.includes('Contents'), s.labels.join('/'));
   check('the contents line switches too', s.values.some((v) => v.startsWith('1 track, 5 waypoints')),
     s.values.join(' | ').slice(0, 120));
-  check('the key bar follows', s.keys.includes('switch markers') && s.keys.includes('background'), s.keys);
+  check('the tooltips follow',
+    /Q \/ E switch/.test(s.tips) && /\(W\)/.test(s.tips) && /\(C\)/.test(s.tips) && /\(X\)/.test(s.tips), s.tips);
   check('the layer buttons follow', s.layers.join('/') === 'Map/Terrain/Satellite/No map', s.layers.join('/'));
   check('the profile follows', s.profile === 'Elevation', s.profile);
   check('and so does its axis', s.axis.every((a) => /^-?\d+ m$/.test(a)), s.axis.join(' / '));

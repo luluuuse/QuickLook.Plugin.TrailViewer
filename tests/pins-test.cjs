@@ -98,7 +98,8 @@ async function main() {
   check('the two ends are marked from the start', s.ends === 2, `${s.ends}`);
   check('the switch starts out on', s.visible === true && s.active === true);
   check('it is named after what it controls', s.label === 'Markers', s.label);
-  check('the tooltip offers to hide them', s.title === 'Hide the markers', s.title);
+  // The key is part of the tooltip now that there is no bar to spell it out on.
+  check('the tooltip offers to hide them', s.title === 'Hide the markers (W)', s.title);
 
   // 2. Hiding takes the pins off the map and leaves everything else alone.
   await page.locator('.pins-switch button').click();
@@ -111,7 +112,7 @@ async function main() {
   check('the markers still exist for the keyboard', s.stops === 5, `${s.stops}`);
   check('the track is untouched', s.tracks === 1, `${s.tracks}`);
   check('the switch is off', s.visible === false && s.active === false);
-  check('the tooltip now offers to show them', s.title === 'Show the markers', s.title);
+  check('the tooltip now offers to show them', s.title === 'Show the markers (W)', s.title);
   check('the dot is hollow while they are hidden', s.dot === 'rgba(0, 0, 0, 0)', s.dot);
 
   // 3. A key press outranks the hidden state: the pins come back and the first one is selected.
@@ -155,13 +156,13 @@ async function main() {
   await page.waitForTimeout(200);
   s = await state();
   check('the switch speaks Chinese', s.label === '标记点', s.label);
-  check('the tooltip is Chinese too', s.title === '隐藏标记点', s.title);
+  check('the tooltip is Chinese too', s.title === '隐藏标记点（W）', s.title);
   check('the pins are still shown', s.pins === 5 && s.active === true, `${s.pins}`);
 
   await page.locator('.pins-switch button').click();
   await page.waitForTimeout(200);
   s = await state();
-  check('the Chinese button hides them', s.pins === 0 && s.title === '显示标记点', `${s.pins} ${s.title}`);
+  check('the Chinese button hides them', s.pins === 0 && s.title === '显示标记点（W）', `${s.pins} ${s.title}`);
   await page.locator('.lang-switch button').click();
   await page.waitForTimeout(200);
 

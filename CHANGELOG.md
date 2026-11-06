@@ -1,23 +1,23 @@
 # 版本更新日志 / Changelog
 
-**1.15.11 — 2026-11-06**，本仓库的首发版本。下面这一条写的是插件**现在具备的全部能力**，不是某一次改动的
+**1.16.6 — 2026-11-06**，本仓库的首发版本。下面这一条写的是插件**现在具备的全部能力**，不是某一次改动的
 流水账。版本号沿用上游编号：`1.0.0` 是上游基线（只支持 GPX），`1.1.0` 起的开发都发生在这里。
 
 逐版记录不随仓库发布，这里只保留当前这一版。
 
-版本号同时决定前端所在的虚拟主机名（`app-1-15-11.gpxviewer.example`），用于绕开 WebView2 的磁盘缓存，
+版本号同时决定前端所在的虚拟主机名（`app-1-16-6.gpxviewer.example`），用于绕开 WebView2 的磁盘缓存，
 所以**每次升级都需要从托盘退出 QuickLook 再启动**。
 
-**1.15.11 — 2026-11-06** is the first release of this repository. What follows describes what the plugin does
+**1.16.6 — 2026-11-06** is the first release of this repository. What follows describes what the plugin does
 today rather than what one commit changed. The numbering continues upstream (`1.0.0` is McBenac's baseline,
 GPX only); everything from `1.1.0` on was written here. This note is rewritten with every release -- it says
 what the plugin is now, and the per-version log is not published. The version number is also the WebView2
-virtual host (`app-1-15-11.gpxviewer.example`) that defeats the browser cache, so restart QuickLook from the
+virtual host (`app-1-16-6.gpxviewer.example`) that defeats the browser cache, so restart QuickLook from the
 tray after every upgrade.
 
 ---
 
-## 1.15.11 — 2026-11-06 · 首发版本 / First release
+## 1.16.6 — 2026-11-06 · 首发版本 / First release
 
 ### 文件格式 / Formats
 
@@ -92,14 +92,85 @@ tray after every upgrade.
 
 - 中英双语，首次按系统语言，右上角一个按钮切换。选择会记住，切换时重绘已有内容（摘要、打开的卡片、剖面、
   照片条）而不重载页面。日期和时间也跟着界面语言走，不跟系统走。
-- 竖版窗口（高 ≥ 宽，或宽 < 960 px）折叠布局：键位提示条让位，缩放按钮和角落开关下移到摘要框下方——只在
+- 顶部不再有键位提示条：每个键写在它对应按钮的悬停提示里——底图 Q / E、标记点 W、全览 C、导出 X。
+  没有按钮的键（方向键、A / D、S）不单独说明。摘要框标题最多两行、文件名一行，超出的部分进悬停提示，
+  长文件名不会再把卡片撑宽。
+- 竖版窗口（高 ≥ 宽，或宽 < 960 px）折叠布局：缩放按钮和角落开关下移到摘要框下方——只在
   确实放不下时才下移，摘要框的宽度只等于它最长的一行，角落通常是空的。
 
 - English or Chinese, following the system language on first use and switched by one button. The choice is
   remembered, and switching repaints what is already on screen without reloading the page. Dates and times
   follow the interface language, not the system one.
-- In a portrait window (as tall as it is wide or taller, or narrower than 960 px) the keyboard bar makes way
-  and the corner controls step down beneath the summary -- but only once they no longer fit.
+- The key bar across the top is gone: each key now lives in the tooltip of the button it stands for --
+  backgrounds Q / E, markers W, fit C, export X. Keys without a button (the arrows, A / D, S) are not spelled
+  out anywhere. The summary clamps its title to two lines and its file name to one, with the full text on the
+  tooltip, so a long name no longer widens the card.
+- In a portrait window (as tall as it is wide or taller, or narrower than 960 px) the corner controls step
+  down beneath the summary -- but only once they no longer fit.
+
+### 叠加图导出 / Overlay export
+
+- <kbd>X</kbd> 把当前轨迹画成一张透明 PNG，写到源文件同目录：左侧轨迹按海拔从绿到红渐变、
+  两端各一个圆标，右侧竖排里程、用时、最高海拔、均速、上升。整张图从解析出的点现算，不是截屏，所以导出
+  结果与当前缩放、平移、底图和窗口大小都无关，背景是真透明，可以直接叠到照片上。
+- 同一个动作也有按钮：地图左上角、全览按钮下面那个方框图标，悬停提示里带着键位。
+- <kbd>⇧X</kbd> 打开一个小面板：版式（**方版** / **竖版** / **横版**）、**墨色**（黑 / 白）、底衬（无 / 淡）。
+  三个版式按用途命名，不按比例数字——「1:1」「9:16」看不出哪一张该叠在照片上；默认是竖版。
+  选择会记住，之后按 <kbd>X</kbd> 就按上次的设置直接出图，默认是黑字、无底衬。
+- 墨色是整张图唯一的一支笔：数值、标签、分隔线都由它派生，底衬方向自动跟它反相——黑字配浅底衬、白字配深底衬，
+  不用自己判断该开哪一种。起终点圆标里的「起 / 终」恒为黑字，压在绿、红两个实心圆上。底衬也认版式：竖版铺在
+  右半边，横版铺在上方数据区。
+- 方版与竖版是「右侧竖排」：一列数字右对齐，顶部一条竖线做边。**横版换了一种排法**，从上往下读：数据收在
+  左上「半宽 × 三分之一高」的一格里，**轨迹占下方整条横带**（约 2 : 1）。里程是标题，字号最大、左对齐、不带
+  中文名；其余四项在它下面排成 2 × 2，每格数字在上、标签在下，数字与标签都在格内居中，标签用更浅的墨色，视线
+  先落在数字上。横版不画分隔线，靠间距分块。
+- 横版的轨迹框是「按比例装进去」：东西向长轨迹铺满 0.05–0.95 的全宽，把横版的宽度用足；环形与南北向轨迹只能
+  按高度撑满，左右留白并居中——这是等比装入的必然，不是排错。
+- 出图尺寸按「叠在照片局部」定，不按照片本身：竖版 1080 × 1920，方版 1536 × 1536，横版 2048 × 1536（后两者
+  的短边是 12 MP 照片短边的一半）。线宽与字号按画布等比缩放，三种版式的观感一致。文件名带版式比例
+  （`-9x16`、`-1x1`、`-4x3`），同一轨迹导不同版式互不覆盖，同版式重导则直接更新。没有海拔的文件退化为单色线，
+  并省掉「最高海拔」「上升」两行。
+- 横版的字号是自适应的：里程按整栏宽度缩放，2 × 2 里的四个数字取同一个字号，由其中最宽的那个（通常是
+  `02:00:00`）决定——四个数一样大，才不会读成四种数。里程与四项的字号比是 2 : 1（112 : 54）：里程一眼是这张
+  图的主角，四项在照片局部尺寸下也仍然读得清。
+- 绘制代码在按需加载的模块里，首次导出约 0.1–0.3 s（大头是 PNG 编码），打开文件与预览响应不受影响。
+
+- <kbd>X</kbd> draws the track as a transparent PNG beside the source file: the route coloured by height from
+  green to red with a badge at each end, and distance, time, highest point, average speed and ascent stacked on
+  the right. The picture is computed from the parsed points rather than captured from the screen, so it ignores
+  the current zoom, pan, background and window size -- and the background is actually transparent, ready to be
+  laid over a photo.
+- The same action has a button: the framed-route icon under the fit button in the top-left column, with the key
+  named in its tooltip.
+- <kbd>⇧X</kbd> opens a small panel: shape (**Square** / **Portrait** / **Wide**), **ink** (black / white) and
+  backing (none / soft). The three shapes are named for the job, not for their proportion -- "1:1" and "9:16" say
+  nothing about which one belongs on a photo -- and Portrait is the default. The choices are remembered, and
+  <kbd>X</kbd> then exports with them: black ink and no backing unless you say otherwise.
+- The ink is the one pen the picture is drawn with: values, labels and rules all derive from it, and the backing
+  flips to oppose it (light wash behind black type, dark wash behind white), so the two can never be set against
+  each other. The characters inside the start and end badges stay black in both inks, sitting as they do on a
+  solid green or red disc. The backing knows the page too: the right half of a portrait one, the figures' band
+  across the top of a landscape one.
+- Square and Portrait stack the figures in a right-hand column, right-aligned against a rule. The
+  **Wide page reads top down**: the figures are gathered into a top-left cell half the width and a third of
+  the height, and **the track takes the whole band below** (about 2 : 1). Distance is the heading -- largest
+  type, flush left, with no name under it -- and the other four sit beneath in a 2 x 2 block, number over
+  label, both centred in their cell, the label in a lighter ink so the eye lands on the numbers first. No rules
+  on this page; the spacing does the separating.
+- The landscape band is fitted, not filled: an east-west track uses the full 0.05--0.95 width, which is what the
+  page is for, while a loop or a north-south track can only fill the height and centres with photograph either
+  side. That is what containing a shape in a 2 : 1 box does, not a layout gone wrong.
+- Sizes are chosen for being laid into *part* of a photo, not over all of it: Portrait is 1080 × 1920, Square
+  1536 × 1536 and Wide 2048 × 1536 -- the last two with a short edge of half a 12 MP frame. The line and type
+  scale with the canvas, so all three read the same. The proportion is part of the file name (`-9x16`, `-1x1`,
+  `-4x3`), so two shapes of one track never overwrite each other while a re-export of the same shape updates in
+  place. A file without heights falls back to one colour and drops the two height rows.
+- Landscape sizes itself: the heading is fitted to the column width, and the 2 x 2 block takes one size for all
+  four numbers, set by the widest of them (usually a `02:00:00` clock) -- four numbers at four sizes would read
+  as four different kinds of number. The heading is set at twice the block (112 : 54): unmistakably the subject
+  of the page, and the four still legible once the picture is laid into a photo.
+- The drawing code is loaded on demand: about 0.1--0.3 s for the first export, most of it PNG encoding, with
+  opening a file and the rest of the preview untouched.
 
 ### 隐私 / Privacy
 
@@ -125,6 +196,7 @@ tray after every upgrade.
   预览窗口内时生效（焦点在资源管理器时按键被 QuickLook 的全局钩子拿去切文件），<kbd>A</kbd> <kbd>D</kbd>
   是兜底。
 - 地形图层依赖境外服务，首屏可能要几秒才铺满，断网时只是灰底，不影响轨迹与剖面。
+- 叠加图的文字是黑的：照片本身很暗（夜景、阴影、深色天空）时，用 <kbd>⇧X</kbd> 里的「淡」底衬。
 
 - `http://` images do not load: the page runs on an `https://` virtual host, so mixed content is blocked
   (`https` and `data:` are fine). Relative-path images inside a `.kmz` are not supported yet.
@@ -133,10 +205,12 @@ tray after every upgrade.
   fallback for when Explorer keeps it.
 - The terrain layer comes from a service outside China: the first screen can take a few seconds, and offline it
   is a grey background that leaves the track and the profile untouched.
+- The overlay's type is black: on a photo that is itself dark (night, shade, a deep sky) turn on the "soft"
+  backing under <kbd>⇧X</kbd>.
 
 ### 测试 / Tests
 
-14 组脚本，全部是普通 Node 脚本，每条检查打印一行 `PASS` 或 `FAIL`：
+15 组脚本，全部是普通 Node 脚本，每条检查打印一行 `PASS` 或 `FAIL`：
 
 | 套件 | 覆盖 |
 | --- | --- |
@@ -147,9 +221,10 @@ tray after every upgrade.
 | `pins-test.cjs` / `keys-test.cjs` | 圆点开关与记忆，快捷键 |
 | `lang-test.cjs` | 中英文默认、切换、记忆、日期格式、错误页 |
 | `terrain-test.cjs` / `zoom-test.cjs` / `locate-test.cjs` | 底图切换与瓦片请求，缩放步长，定位按钮 |
+| `export-test.cjs` | 叠加图：三种版式与尺寸、透明、黑白墨、横版「上数据下轨迹」与 2 × 2 排布、底衬方向、面板与设置记忆 |
 | `version-test.cjs` | 版本号在 csproj、元数据与两份日志之间一致 |
 
 测试样本全部由 `tools/make-fixtures.py` 生成，不含真实轨迹。
 
-Fourteen plain Node scripts driving the viewer in Chromium, one `PASS`/`FAIL` line per check. The fixtures are
+Fifteen plain Node scripts driving the viewer in Chromium, one `PASS`/`FAIL` line per check. The fixtures are
 synthetic, generated by `tools/make-fixtures.py`; no recorded track is checked in.

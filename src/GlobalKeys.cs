@@ -8,8 +8,8 @@ using System.Windows.Threading;
 namespace QuickLook.Plugin.TrailViewer;
 
 /// <summary>
-/// W, Q, E, S and C, caught below the application instead of inside it. Measured: QuickLook shows its preview with
-/// ShowActivated="False" and reads its own keys (Space, Esc, arrows) through a global keyboard hook, so the
+/// W, Q, E, S, C and X, caught below the application instead of inside it. Measured: QuickLook shows its preview
+/// with ShowActivated="False" and reads its own keys (Space, Esc, arrows) through a global keyboard hook, so the
 /// keyboard never enters this window -- a WPF handler only ever sees a key after someone clicks into the
 /// preview. A raw low-level hook is the only place that always sees it first.
 ///
@@ -119,9 +119,16 @@ internal sealed class GlobalKeys : IDisposable
         if (message != WmKeyDown && message != WmSysKeyDown)
             return Next(code, wParam, lParam);
 
-        if (AnyModifierDown() || !SafeOnScreen() || !HostIsForeground())
+        // Shift carries a meaning of its own on one key only: Shift+X asks for the export panel, and the page
+        // is told by the case of the letter. Any other combination with a modifier belongs to somebody else
+        // -- Ctrl+S is save, Alt+W opens a menu -- so it is let through untouched.
+        var shifted = name == "x" && Down(VkShift)
+            && !Down(VkControl) && !Down(VkMenu) && !Down(VkLWin) && !Down(VkRWin);
+
+        if ((AnyModifierDown() && !shifted) || !SafeOnScreen() || !HostIsForeground())
         {
-            Reason = AnyModifierDown() ? "modifier" : !SafeOnScreen() ? "off-screen" : "foreground=" + ForegroundName();
+            Reason = AnyModifierDown() && !shifted ? "modifier"
+                : !SafeOnScreen() ? "off-screen" : "foreground=" + ForegroundName();
             return Next(code, wParam, lParam);
         }
 
@@ -131,7 +138,7 @@ internal sealed class GlobalKeys : IDisposable
 
         try
         {
-            _onKey(name);
+            _onKey(shifted ? "X" : name);
         }
         catch (Exception ex)
         {
@@ -216,6 +223,7 @@ internal sealed class GlobalKeys : IDisposable
         0x45 => "e",
         0x53 => "s",
         0x43 => "c",
+        0x58 => "x",
         _ => null,
     };
 

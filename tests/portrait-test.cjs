@@ -47,7 +47,7 @@ const measure = (page) => page.evaluate(() => {
     parts[name] = { l: Math.round(box.left), r: Math.round(box.right), t: Math.round(box.top), b: Math.round(box.bottom) };
   };
   add('info', '#info');
-  add('keys', '#keys');
+  add('export', '.export-switch');
   add('zoom', '.leaflet-control-zoom');
   add('layers', '.layer-switch');
   add('pins', '.pins-switch');
@@ -120,8 +120,6 @@ async function main() {
     pairs[3].left === pairs[0].left && pairs[4].left === pairs[1].left && pairs[5].left === pairs[2].left,
     pairs.map((x) => `${x.label}@${x.left}`).join(' '));
 
-  check('the key bar stands down', !p.keys, p.keys ? `${p.keys.l}..${p.keys.r}` : 'hidden');
-
   // The English switches are wide enough that this corner cannot hold them beside the card, so the controls step
   // down and take a line of their own: the zoom against the left edge, the three switches against the right.
   check('this window leaves no room up top, so the controls step down', m.stepped);
@@ -152,7 +150,7 @@ async function main() {
   // 2. The other side of the breakpoint: a wide window keeps the old arrangement.
   const wide = await openAt(1200, 800);
   const wm = await measure(wide);
-  check('a wide window keeps the key bar', !!wm.parts.keys, wm.parts.keys ? 'shown' : 'hidden');
+  check('a wide window keeps the export button', !!wm.parts.export, wm.parts.export ? 'shown' : 'hidden');
   check('and the card keeps its own width',
     wm.parts.info.r - wm.parts.info.l < wm.w * 0.4, `${wm.parts.info.r - wm.parts.info.l} of ${wm.w}`);
   check('the wide window has no overlaps', clashes(wm.parts).length === 0, clashes(wm.parts).join(' ') || 'clean');
@@ -163,8 +161,8 @@ async function main() {
   const tall = await openAt(1000, 1400);
   const tallM = await measure(tall);
   check('a wide-but-tall window is portrait too',
-    tallM.parts.info.l === 10 && !tallM.parts.keys,
-    `${tallM.parts.info.l}..${tallM.parts.info.r} in ${tallM.w}, keys ${tallM.parts.keys ? 'shown' : 'hidden'}`);
+    tallM.parts.info.l === 10,
+    `${tallM.parts.info.l}..${tallM.parts.info.r} in ${tallM.w}`);
   check('but here the card leaves the corner free, so nothing steps down',
     !tallM.stepped && tallM.parts.layers.t < 60,
     `${tallM.stepped ? 'stepped' : 'top band'}, layers at ${tallM.parts.layers.t}`);
@@ -177,22 +175,22 @@ async function main() {
     const narrow = await openAt(w, h);
     const nm = await measure(narrow);
     check(`a ${w}x${h} window is compact`,
-      nm.parts.info.l === 10 && !nm.parts.keys,
-      `${nm.parts.info.l}..${nm.parts.info.r} in ${nm.w}, keys ${nm.parts.keys ? 'shown' : 'hidden'}`);
+      nm.parts.info.l === 10,
+      `${nm.parts.info.l}..${nm.parts.info.r} in ${nm.w}`);
     check(`and ${w}x${h} has no overlaps`, clashes(nm.parts).length === 0, clashes(nm.parts).join(' ') || 'clean');
     await narrow.close();
   }
   const narrow = await openAt(820, 600);
   const nm = await measure(narrow);
   check('a narrow landscape window is compact too',
-    nm.parts.info.l === 10 && !nm.parts.keys,
-    `${nm.parts.info.l}..${nm.parts.info.r} in ${nm.w}, keys ${nm.parts.keys ? 'shown' : 'hidden'}`);
+    nm.parts.info.l === 10,
+    `${nm.parts.info.l}..${nm.parts.info.r} in ${nm.w}`);
   check('and has no overlaps', clashes(nm.parts).length === 0, clashes(nm.parts).join(' ') || 'clean');
   await narrow.close();
 
   const squat = await openAt(1100, 1000);
   const squatM = await measure(squat);
-  check('a landscape window of the same size keeps the bar', !!squatM.parts.keys);
+  check('a landscape window of the same size keeps the export button', !!squatM.parts.export);
   check('and the card keeps its own width',
     squatM.parts.info.r - squatM.parts.info.l < squatM.w * 0.4,
     `${squatM.parts.info.r - squatM.parts.info.l} of ${squatM.w}`);

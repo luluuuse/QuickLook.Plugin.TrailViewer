@@ -36,6 +36,8 @@ internal sealed class GpxPanel : UserControl, IDisposable
     private string _path;
     private string _name;
     private string _unpackedFolder;
+    private MemoryStream _export;
+    private string _exportName;
     private WebView2 _webView;
     private GlobalKeys _keys;
     private volatile bool _onScreen;
@@ -276,7 +278,10 @@ internal sealed class GpxPanel : UserControl, IDisposable
             return;
         if (key.RoutedEvent != Keyboard.PreviewKeyDownEvent || key.IsRepeat)
             return;
-        if (key.KeyboardDevice.Modifiers != ModifierKeys.None)
+        // Shift is spoken for by one key only: Shift+X opens the export panel while X on its own exports with
+        // the settings already chosen. The page learns the difference from the case of the letter.
+        var shifted = key.KeyboardDevice.Modifiers == ModifierKeys.Shift && key.Key == Key.X;
+        if (key.KeyboardDevice.Modifiers != ModifierKeys.None && !shifted)
             return;
 
         var window = Window.GetWindow(this);
@@ -290,6 +295,7 @@ internal sealed class GpxPanel : UserControl, IDisposable
             case Key.Q: name = "q"; break;
             case Key.E: name = "e"; break;
             case Key.S: name = "s"; break;
+            case Key.X: name = shifted ? "X" : "x"; break;
             default: return;
         }
 
@@ -326,11 +332,114 @@ internal sealed class GpxPanel : UserControl, IDisposable
             return;
         }
 
-        Trace("message from viewer: " + message);
-        if (message == "ready" || message.StartsWith("ready\t", StringComparison.Ordinal))
+        Trace("message from viewer: " + Summarise(message));
+        if (message.StartsWith("export\t", StringComparison.Ordinal))
+            BeginExport(message.Substring("export\t".Length));
+        else if (message.StartsWith("exportchunk\t", StringComparison.Ordinal))
+            AppendExport(message.Substring("exportchunk\t".Length));
+        else if (message.StartsWith("exportdone\t", StringComparison.Ordinal))
+            FinishExport();
+        else if (message == "ready" || message.StartsWith("ready\t", StringComparison.Ordinal))
             Finish(null, message.Length > 6 ? message.Substring(6) : "");
         else if (message.StartsWith("error:", StringComparison.Ordinal))
             Finish(message.Substring("error:".Length), "");
+    }
+
+    /// <summary>The trace is read by a person watching the harness: a chunk of base64 is not worth a line.</summary>
+    private static string Summarise(string message) =>
+        message.StartsWith("exportchunk\t", StringComparison.Ordinal) ? "exportchunk ..." : message;
+
+    // The overlay arrives as base64 in pieces, because a 2160x2880 PNG is close to the size where one
+    // postMessage starts to be unreliable. Each piece is written straight into the stream: no string is
+    // ever built out of the whole picture.
+    private void BeginExport(string name)
+    {
+        _export?.Dispose();
+        _export = new MemoryStream();
+        _exportName = Sanitise(name);
+    }
+
+    private void AppendExport(string body)
+    {
+        if (_export == null)
+            return;
+        var split = body.IndexOf('\t');
+        if (split < 0)
+            return;
+        try
+        {
+            var bytes = Convert.FromBase64String(body.Substring(split + 1));
+            _export.Write(bytes, 0, bytes.Length);
+        }
+        catch (FormatException ex)
+        {
+            Trace("export chunk was not base64: " + ex.Message);
+            _export.Dispose();
+            _export = null;
+        }
+    }
+
+    /// <summary>Writes the picture beside the track, or into the plugin's own folder when that one is read-only.</summary>
+    private void FinishExport()
+    {
+        if (_export == null || _export.Length == 0)
+            return;
+
+        var bytes = _export.ToArray();
+        _export.Dispose();
+        _export = null;
+
+        string target;
+        try
+        {
+            target = Path.Combine(Path.GetDirectoryName(_path) ?? "", _exportName);
+            File.WriteAllBytes(target, bytes);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException)
+        {
+            // A network share, a locked folder, a read-only stick: the picture is kept rather than dropped.
+            try
+            {
+                var fallback = Path.Combine(SettingHelper.LocalDataPath, "exports");
+                Directory.CreateDirectory(fallback);
+                target = Path.Combine(fallback, _exportName);
+                File.WriteAllBytes(target, bytes);
+            }
+            catch (Exception inner)
+            {
+                Trace($"export failed: {ex.Message} / {inner.Message}");
+                _ = SendToViewer($"exportFailed('{Escape(inner.Message)}')");
+                return;
+            }
+        }
+
+        Trace($"exported overlay to {target}");
+        _ = SendToViewer($"exported('{Escape(target)}')");
+    }
+
+    private static string Sanitise(string name)
+    {
+        var leaf = Path.GetFileName(name ?? "");
+        foreach (var bad in Path.GetInvalidFileNameChars())
+            leaf = leaf.Replace(bad, '_');
+        return string.IsNullOrWhiteSpace(leaf) ? "overlay.png" : leaf;
+    }
+
+    private static string Escape(string text) =>
+        (text ?? "").Replace("\\", "\\\\").Replace("'", "\\'");
+
+    private async System.Threading.Tasks.Task SendToViewer(string call)
+    {
+        try
+        {
+            var core = _webView?.CoreWebView2;
+            if (core != null)
+                await core.ExecuteScriptAsync($"window.gpxViewer && window.gpxViewer.{call}");
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or ObjectDisposedException)
+        {
+            // The preview closed between the write and the toast; nothing left to tell.
+        }
     }
 
     /// <summary>Shows the error in place of the viewer and ends loading.</summary>
@@ -422,6 +531,8 @@ internal sealed class GpxPanel : UserControl, IDisposable
         InputManager.Current.PreProcessInput -= OnPreProcessInput;
         _keys?.Dispose();
         _keys = null;
+        _export?.Dispose();
+        _export = null;
         if (_webView != null)
         {
             _webView.CoreWebView2InitializationCompleted -= OnInitialized;

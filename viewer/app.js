@@ -421,8 +421,16 @@ function renderInfo(gpx, summary, elevations) {
   const box = document.getElementById('info');
   // Called again on every language switch: the box is rebuilt, never appended to.
   box.replaceChildren();
-  box.append(el('h1', null, gpx.name || fileName));
-  if (gpx.name && gpx.name !== fileName) box.append(el('p', 'file', fileName));
+  // The card is clamped to two lines so a long file name cannot turn it into a wall: the full text stays on
+  // the tooltip, and the width stays the width the corner switches were measured against.
+  const heading = el('h1', null, gpx.name || fileName);
+  heading.title = gpx.name || fileName;
+  box.append(heading);
+  if (gpx.name && gpx.name !== fileName) {
+    const file = el('p', 'file', fileName);
+    file.title = fileName;
+    box.append(file);
+  }
 
   // The numbers a walker looks at first, on rows of their own instead of one per line: three across, then the
   // pair that says how big the route is. The label sits under the value -- it is read once, the number every
@@ -498,36 +506,12 @@ function renderInfo(gpx, summary, elevations) {
   if (rows.length > 0) box.append(table);
   if (parts.length === 0) box.append(el('p', 'empty', t('info.empty')));
   box.hidden = false;
-  renderKeys(gpx);
 }
 
-/** The keys, on their own above the map: the summary is about the file, not about how to drive the viewer. */
-const KEY_HINTS = [
-  // The arrow keys do the same thing as A and D, so only one pair is spelled out.
-  {
-    keys: ['A', 'D'], text: 'keys.nav', className: 'nav',
-    // Nothing to step through in a file without waypoints, so that group is left out rather than lying.
-    when: (gpx) => (gpx.waypoints || []).length > 1,
-  },
-  { keys: ['W'], text: 'keys.pin' },
-  { keys: ['Q', 'E'], text: 'keys.layer' },
-  { keys: ['C'], text: 'keys.locate' },
-  { keys: ['S'], text: 'keys.chrome' },
-];
-
-function renderKeys(gpx) {
-  const bar = document.getElementById('keys');
-  bar.replaceChildren();
-  const groups = KEY_HINTS.filter((hint) => !hint.when || hint.when(gpx));
-  for (const hint of groups) {
-    if (bar.childElementCount > 0) bar.append(el('span', 'sep', '\u00b7'));
-    const group = el('span', hint.className ? 'hint ' + hint.className : 'hint');
-    for (const key of hint.keys) group.append(el('kbd', null, key));
-    group.append(el('span', null, t(hint.text)));
-    bar.append(group);
-  }
-  bar.hidden = groups.length === 0;
-}
+// There used to be a bar of key hints across the top of the map. It took the widest part of the window and
+// pushed the summary and the corner switches apart, so the keys now live where their own control is: the
+// tooltip of the button they stand for (Q/E on the backgrounds, W on the markers, C on the fit button, X on
+// the export button). Keys with no button of their own -- the arrows, A/D, S -- are left unsaid.
 
 // ---------- elevation profile ----------
 
@@ -1246,6 +1230,50 @@ function locateControl(map) {
   };
 }
 
+/**
+ * The export button: exactly what X does, for anyone who never learns the key. It sits under the fit button
+ * because both act on the route as a whole, and the top-right corner already carries three switches. A file
+ * with no line gets none of this: there would be nothing to draw.
+ */
+function exportControl(map, run) {
+  let button = null;
+
+  const Control = L.Control.extend({
+    options: { position: 'topleft' },
+    onAdd() {
+      const bar = el('div', 'export-switch leaflet-bar');
+      button = el('button');
+      button.type = 'button';
+      button.title = t('export.title');
+      button.setAttribute('aria-label', t('export.title'));
+      button.tabIndex = -1; // never keep focus: Space and Esc belong to QuickLook
+      button.dataset.export = 'overlay';
+      // A framed route: the picture this makes, rather than a camera or a disk.
+      button.innerHTML = '<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">'
+        + '<rect x="1.6" y="3.1" width="12.8" height="9.8" rx="1.6" fill="none" stroke="currentColor"'
+        + ' stroke-width="1.5"/><path d="M2.8 10.9l3.1-3.2 2.1 2.1 2.9-3 2.3 2.4" fill="none"'
+        + ' stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>'
+        + '<circle cx="11.1" cy="5.9" r="1.05" fill="currentColor"/></svg>';
+      button.addEventListener('click', () => {
+        run();
+        button.blur();
+      });
+      bar.append(button);
+      L.DomEvent.disableClickPropagation(bar);
+      return bar;
+    },
+  });
+  map.addControl(new Control());
+
+  return {
+    relabel() {
+      if (!button) return;
+      button.title = t('export.title');
+      button.setAttribute('aria-label', t('export.title'));
+    },
+  };
+}
+
 // The badge on the right tells a photo pin from a plain one; without it every pin looks clickable.
 // White on yellow: a yellow badge would disappear into the pin's own colour at this size.
 const PHOTO_BADGE = '<circle cx="23" cy="7.5" r="5.6" fill="#ffffff" stroke="#1b1b1b" stroke-width="1.2"/>'
@@ -1490,6 +1518,9 @@ function toggleChrome() {
   chromeHidden = !chromeHidden;
   document.body.classList.toggle('chrome-hidden', chromeHidden);
   if (chromeHidden) {
+    // The panel is part of the interface, so it goes with it -- hidden rather than closed would leave it
+    // open in a state where nothing on it can be seen.
+    exportPanel?.close();
     // With every button gone there is no way to guess the key from the screen, so it is said once and fades.
     showToast(t('chrome.hint'));
   } else {
@@ -1500,7 +1531,7 @@ function toggleChrome() {
 }
 
 let toastTimer = 0;
-function showToast(text) {
+function showToast(text, hold = 1500) {
   const node = document.getElementById('toast');
   if (!node) return;
   node.textContent = text;
@@ -1511,18 +1542,200 @@ function showToast(text) {
   toastTimer = setTimeout(() => {
     node.classList.remove('on');
     setTimeout(() => { node.hidden = true; }, 300); // after the fade, not instead of it
-  }, 1500);
+  }, hold);
+}
+
+// ---------- overlay export ----------
+
+// Set by main once the file is parsed: the drawing needs the points, and nothing up here has them.
+let exportNow = null;
+// Built by main as well: the panel only exists once there is something to export.
+let exportPanel = null;
+
+// The three settings, remembered per origin. Pressing X on its own always means "the same picture as last
+// time"; the panel is where those choices come from, and nothing else does.
+const SIZE_KEY = 'gpxviewer.exportSize';
+const INK_KEY = 'gpxviewer.exportInk';
+const SCRIM_KEY = 'gpxviewer.exportScrim';
+const SIZES = ['1:1', '9:16', '4:3'];
+const INKS = ['black', 'white'];
+const SCRIMS = ['none', 'soft'];
+
+function remembered(key, allowed, fallback) {
+  try {
+    const value = localStorage.getItem(key);
+    return allowed.includes(value) ? value : fallback;
+  } catch {
+    return fallback; // private mode: the default holds for this preview
+  }
+}
+
+function remember(key, value) {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    // Not remembered, still applied to this preview.
+  }
+}
+
+const exportSettings = {
+  size: remembered(SIZE_KEY, SIZES, '9:16'),
+  ink: remembered(INK_KEY, INKS, 'black'),
+  scrim: remembered(SCRIM_KEY, SCRIMS, 'none'),
+};
+
+/**
+ * The panel: two rows of choices and one button.
+ *
+ * It opens on Shift+X rather than sitting on the screen, because it is needed once in a while and would
+ * otherwise be the fifth thing in a corner. Every button drops the focus it was given: in a QuickLook preview
+ * the keyboard belongs to the file manager, and a button that keeps focus would take the next Space for
+ * itself instead of letting it close the preview.
+ */
+function buildExportPanel(onExport) {
+  const node = document.getElementById('export');
+  const title = el('h2', null, t('export.panel'));
+
+  const pickers = [];
+  const picker = (labelKey, values, current, onChange) => {
+    const row = el('div', 'row');
+    const label = el('span', 'label', t(labelKey));
+    const pick = el('div', 'pick');
+    const buttons = values.map((value) => {
+      const button = el('button', value.key === current ? 'option on' : 'option', value.label());
+      button.type = 'button';
+      button.tabIndex = -1;
+      button.dataset.value = value.key;
+      button.addEventListener('click', () => {
+        for (const other of pick.children) other.classList.toggle('on', other === button);
+        onChange(value.key);
+        button.blur();
+      });
+      pick.append(button);
+      return button;
+    });
+    row.append(label, pick);
+    pickers.push({ label, labelKey, buttons, values });
+    return row;
+  };
+
+  // Named for what they are used for, not for their proportion: a number tells you nothing about which one you
+  // want on a photo.
+  const sizeRow = picker('export.size', [
+    { key: '1:1', label: () => t('export.sizeSquare') },
+    { key: '9:16', label: () => t('export.sizePortrait') },
+    { key: '4:3', label: () => t('export.sizeLandscape') },
+  ], exportSettings.size, (key) => {
+    exportSettings.size = key;
+    remember(SIZE_KEY, key);
+  });
+  const inkRow = picker('export.ink', [
+    { key: 'black', label: () => t('export.inkBlack') },
+    { key: 'white', label: () => t('export.inkWhite') },
+  ], exportSettings.ink, (key) => {
+    exportSettings.ink = key;
+    remember(INK_KEY, key);
+  });
+  const scrimRow = picker('export.scrim', [
+    { key: 'none', label: () => t('export.scrimNone') },
+    { key: 'soft', label: () => t('export.scrimSoft') },
+  ], exportSettings.scrim, (key) => {
+    exportSettings.scrim = key;
+    remember(SCRIM_KEY, key);
+  });
+
+  const go = el('button', 'go', t('export.go'));
+  go.type = 'button';
+  go.tabIndex = -1;
+  go.addEventListener('click', () => {
+    go.blur();
+    onExport();
+  });
+
+  node.replaceChildren(title, sizeRow, inkRow, scrimRow, go);
+  // A drag that starts on the panel belongs to the panel, not to the map underneath it.
+  L.DomEvent.disableClickPropagation(node);
+
+  return {
+    open: () => { node.hidden = false; },
+    close: () => { node.hidden = true; },
+    isOpen: () => !node.hidden,
+    toggle() { node.hidden = !node.hidden; },
+    relabel() {
+      title.textContent = t('export.panel');
+      go.textContent = t('export.go');
+      for (const { label, labelKey, buttons, values } of pickers) {
+        label.textContent = t(labelKey);
+        buttons.forEach((button, i) => { button.textContent = values[i].label(); });
+      }
+    },
+  };
+}
+
+/** The column's rows, in the order the numbers get read: how far, how long, how high, how fast, how much up. */
+function exportRows(summary, elevations) {
+  const rows = [{ label: t('info.distance'), ...splitUnit(formatDistance(summary.distanceMeters)) }];
+  if (summary.durationSeconds !== null && summary.durationSeconds !== undefined) {
+    rows.push({ label: t('info.time'), value: clock(summary.durationSeconds), unit: '' });
+  }
+  if (elevations) {
+    rows.push({ label: t('export.maxEle'), value: Math.round(elevations.max).toLocaleString(), unit: t('unit.m') });
+  }
+  if (summary.durationSeconds > 0 && summary.distanceMeters > 0) {
+    const speed = (summary.distanceMeters / summary.durationSeconds) * 3.6;
+    rows.push({ label: t('info.speed'), value: speed.toFixed(1), unit: t('unit.kmh') });
+  }
+  if (elevations) {
+    rows.push({ label: t('info.ascent'), value: Math.round(elevations.ascent).toLocaleString(), unit: t('unit.m') });
+  }
+  return rows;
+}
+
+/** "8.16 公里" as a number and a unit, so the drawing can set them at two sizes on one baseline. */
+function splitUnit(text) {
+  const gap = text.lastIndexOf(' ');
+  return gap < 0 ? { value: text, unit: '' } : { value: text.slice(0, gap), unit: text.slice(gap + 1) };
+}
+
+/** 04:48:23 -- a stopwatch, not "4 hours 48 minutes": the column gives it one line and the eye scans digits. */
+function clock(seconds) {
+  const pad = (n) => String(n).padStart(2, '0');
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  return `${pad(h)}:${pad(m)}:${pad(Math.floor(seconds % 60))}`;
+}
+
+function base64Of(bytes) {
+  let text = '';
+  const step = 0x8000; // String.fromCharCode.apply chokes on a whole file's worth at once
+  for (let i = 0; i < bytes.length; i += step) {
+    text += String.fromCharCode.apply(null, bytes.subarray(i, i + step));
+  }
+  return btoa(text);
 }
 
 /**
  * One key, applied. The page calls this for its own keydowns, and the host calls it when QuickLook -- not the
  * page -- is holding the keyboard: the key has to mean the same thing on both roads. Nothing happens while a
  * photo is open, and a file with no marker switch takes W quietly.
+ *
+ * X and X with shift: the lower-case key exports with the settings already chosen, the upper-case one opens
+ * the panel to change them. The host spells the difference the same way (see GlobalKeys), because the page
+ * never sees the shift itself.
  */
 function pressKey(name) {
   if (photoViewer.isOpen()) return;
   if (name === 'c') {
     fitRoute?.();
+    return;
+  }
+  if (name === 'x' || name === 'X') {
+    if (name === 'X') {
+      exportPanel?.toggle();
+    } else {
+      exportPanel?.close();
+      exportNow?.();
+    }
     return;
   }
   if (name === 's') {
@@ -1543,10 +1756,11 @@ function onKeyDown(e) {
   if (target && target.closest && target.closest('input, textarea, select, [contenteditable="true"]')) return;
   const key = e.key.toLowerCase();
   const photoOpen = photoViewer.isOpen();
-  if (!photoOpen && (key === 'w' || key === 's' || key === 'c' || LAYER_KEYS[key])) {
+  if (!photoOpen && (key === 'w' || key === 'x' || key === 's' || key === 'c' || LAYER_KEYS[key])) {
     if (e.repeat) return;
     e.preventDefault();
-    pressKey(key);
+    // Shift+X is the panel; the case is how the host says the same thing when the page has no keyboard.
+    pressKey(key === 'x' && e.shiftKey ? 'X' : key);
     return;
   }
   const delta = STEP_KEYS[key];
@@ -1706,6 +1920,7 @@ async function main() {
 
   // First of the corner controls, so it stands leftmost: "where the map looks" before "what the map shows".
   const locateCtrl = locateControl(map);
+  const exportCtrl = overlaySegments().length > 0 ? exportControl(map, () => void saveOverlay()) : null;
   const switcher = layerSwitcher(map); // after the view is set: the grid needs the map bounds
   layerSwitch = switcher;
   // A file that draws no dots and has no waypoints gets no switch: there is nothing for it to show or hide.
@@ -1722,6 +1937,7 @@ async function main() {
     renderInfo(gpx, summary, elevations);
     switcher.relabel();
     locateCtrl.relabel();
+    exportCtrl?.relabel();
     pinControl?.relabel();
     langControl.relabel();
     repaintLocalized();
@@ -1734,10 +1950,76 @@ async function main() {
       open.marker.openPopup();
     }
     photoViewer.relabel();
+    exportPanel?.relabel();
     // The switch labels grew or shrank with the language, so whether the corner still holds them is a new
     // question -- and the card may not have changed width at all, leaving the observer silent.
     requestAnimationFrame(() => placeZoom?.());
   });
+
+  // ---------- export ----------
+  // Drawn on demand, then sent in pieces: even at 1536x2048 the base64 is several hundred kilobytes, well
+  // past the size where a single postMessage is safe, and one rejected message loses the whole picture.
+  //
+  // `options` overrides the remembered settings, which is how the tests photograph the other sizes without
+  // touching what the user chose.
+
+  function overlaySegments() {
+    return [
+      ...gpx.tracks.flatMap((track) => track.segments),
+      ...(gpx.routes || []).map((route) => route.points),
+    ].filter((line) => line && line.length > 0);
+  }
+
+  async function buildOverlay(options) {
+    const segments = overlaySegments();
+    if (segments.length === 0) return null;
+    const { drawOverlay } = await import('./export.js');
+    return drawOverlay({
+      segments,
+      rows: exportRows(summary, elevations),
+      ends: { start: t('export.start'), end: t('export.end') },
+      size: options?.size ?? exportSettings.size,
+      ink: options?.ink ?? exportSettings.ink,
+      scrim: options?.scrim ?? exportSettings.scrim,
+    });
+  }
+
+  async function saveOverlay() {
+    try {
+      const canvas = await buildOverlay();
+      if (!canvas) {
+        showToast(t('export.empty'), 3000);
+        return;
+      }
+      const blob = await new Promise((done) => canvas.toBlob(done, 'image/png'));
+      if (!blob) throw new Error('the canvas produced no image');
+      const data = base64Of(new Uint8Array(await blob.arrayBuffer()));
+      // 262,144 characters: a multiple of four, so every piece decodes to bytes on its own.
+      const chunk = 1 << 18;
+      const base = (fileName || 'track').replace(/\.[^.]+$/, '');
+      // The shape is part of the name: three exports of one track are three pictures, and a second 3:4 is the
+      // same picture redrawn, so it overwrites itself and nothing else.
+      const shape = exportSettings.size.replace(':', 'x');
+      post(`export\t${base}-${t('export.suffix')}-${shape}.png`);
+      for (let i = 0; i < data.length; i += chunk) {
+        post(`exportchunk\t${i / chunk}\t${data.slice(i, i + chunk)}`);
+      }
+      post(`exportdone\t${Math.ceil(data.length / chunk)}`);
+    } catch (e) {
+      showToast(t('export.failed', { detail: e.message }), 4000);
+    }
+  }
+
+  exportNow = () => { void saveOverlay(); };
+
+  if (overlaySegments().length > 0) {
+    exportPanel = buildExportPanel(() => {
+      exportPanel.close();
+      void saveOverlay();
+    });
+    // A click on the map is a click away from the panel, and away means closed.
+    map.on('click', () => exportPanel?.close());
+  }
 
   window.gpxViewer = {
     gpx, summary, map, scrub, photos: photoViewer,
@@ -1758,6 +2040,13 @@ async function main() {
     locate: () => fitRoute?.(),
     // For the host: it owns the keys until the page gets the keyboard (see GpxPanel).
     pressKey,
+    // The overlay export: the canvas is exposed for the tests, the toast callbacks for the host.
+    overlayCanvas: (options) => buildOverlay(options),
+    exportOverlay: () => saveOverlay(),
+    exportSettings: () => ({ ...exportSettings }),
+    panelOpen: () => exportPanel?.isOpen() ?? false,
+    exported: (path) => showToast(t('export.done', { name: String(path).split(/[\\/]/).pop() }), 4000),
+    exportFailed: (detail) => showToast(t('export.failed', { detail }), 4000),
   };
   document.body.classList.add('loaded');
   post(`ready\t${summary.points} points, ${distanceLog(summary.distanceMeters)}`);
