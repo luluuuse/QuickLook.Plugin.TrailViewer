@@ -88,8 +88,9 @@ Interface text lives in `viewer/i18n.js`: one table per language, values either 
 or a function for the cases a string cannot express (Chinese does not pluralise). Adding a language means
 adding a table and the two-letter code to `LANGS`.
 
-[CHANGELOG.md](CHANGELOG.md) describes what the plugin does today, as one release note. It is rewritten with
-each release rather than appended to, so it never turns into a maintenance diary.
+[CHANGELOG.md](CHANGELOG.md) starts with one entry that describes the whole plugin as 1.16.6 shipped it, and
+each release since is a new entry on top of it saying what that version changed. Entries are added, never
+rewritten, so the log reads as a history rather than a description that quietly changes.
 
 ## Keyboard
 

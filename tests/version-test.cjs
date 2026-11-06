@@ -17,22 +17,33 @@ function check(what, ok, detail) {
   if (!ok) failures.push(what);
 }
 
-// 1. One file. CHANGELOG.md is the release note for what ships now: exactly one heading, describing the
-//    feature set. The per-version record is kept outside this repository, so there is nothing to cross-check
-//    here -- what this guard has to catch is a changelog that drifted from the version being built.
+// 1. The log. 1.16.6 is the baseline entry, describing the plugin as it first shipped; every release since is
+//    a new entry on top of it saying only what that version changed. Entries are appended, never rewritten, so
+//    what this guard has to catch is an entry that does not match the version being built, an entry inserted
+//    out of order, and one left without a date.
 const changelog = read('CHANGELOG.md');
 const parse = (text) => [...text.matchAll(/^## (\d+\.\d+\.\d+)(?: — (\d{4}-\d{2}-\d{2}))?/gm)]
   .map((m) => ({ version: m[1], date: m[2] || null }));
 const release = parse(changelog);
+const older = (a, b) => {
+  const x = a.split('.').map(Number);
+  const y = b.split('.').map(Number);
+  for (let i = 0; i < 3; i += 1) if (x[i] !== y[i]) return x[i] - y[i];
+  return 0;
+};
 
-check('the release note describes exactly one version', release.length === 1,
+check('the log has a release note', release.length >= 1,
   release.map((v) => v.version).join(' ') || 'none');
-check('and it carries a date', Boolean(release[0]?.date), release[0]?.date);
+check('every entry carries a date', release.every((v) => v.date),
+  release.filter((v) => !v.date).map((v) => v.version).join(' ') || 'all dated');
+check('and they run newest first, nothing inserted out of order',
+  release.every((v, i) => i === 0 || older(release[i - 1].version, v.version) > 0),
+  release.map((v) => v.version).join(' '));
 
-// 2. The csproj carries the version this build will be: it must be the one in the release note.
+// 2. The csproj carries the version this build will be: it must be the newest entry in the log.
 const csproj = read('src/QuickLook.Plugin.TrailViewer.csproj');
 const current = (csproj.match(/<Version>([\d.]+)<\/Version>/) || [])[1];
-check('the build version is the release in the changelog', release[0]?.version === current,
+check('the build version is the newest entry in the log', release[0]?.version === current,
   `${current} vs ${release[0]?.version}`);
 
 // 3. The metadata is a template now: a hard-coded version there is the bug this test exists for.

@@ -1,19 +1,22 @@
 # 版本更新日志 / Changelog
 
-**1.16.6 — 2026-11-07**，本仓库的首发版本。下面这一条写的是插件**现在具备的全部能力**，不是某一次改动的
-流水账。版本号沿用上游编号：`1.0.0` 是上游基线（只支持 GPX），`1.1.0` 起的开发都发生在这里。
+**1.16.6 是本仓库的起点**：下面这一条写的是插件当时具备的全部能力，作为后面每一条的基线。从下一版起，
+新版本另起一条加在最上面，只写这一版改了什么，已有的条目不再改动。
 
-逐版记录不随仓库发布，这里只保留当前这一版。
+版本号沿用上游编号：`1.0.0` 是上游基线（只支持 GPX），`1.1.0` 起的开发都发生在这里。
 
-版本号同时决定前端所在的虚拟主机名（`app-1-16-6.gpxviewer.example`），用于绕开 WebView2 的磁盘缓存，
-所以**每次升级都需要从托盘退出 QuickLook 再启动**。
+版本号同时决定前端所在的虚拟主机名（当前 `app-1-16-6.gpxviewer.example`），用于绕开 WebView2 的磁盘
+缓存，所以**每次升级都需要从托盘退出 QuickLook 再启动**。
 
-**1.16.6 — 2026-11-07** is the first release of this repository. What follows describes what the plugin does
-today rather than what one commit changed. The numbering continues upstream (`1.0.0` is McBenac's baseline,
-GPX only); everything from `1.1.0` on was written here. This note is rewritten with every release -- it says
-what the plugin is now, and the per-version log is not published. The version number is also the WebView2
-virtual host (`app-1-16-6.gpxviewer.example`) that defeats the browser cache, so restart QuickLook from the
-tray after every upgrade.
+**1.16.6 is where this repository starts**: the entry below says what the plugin could do at that point, and
+is the baseline every later entry is read against. From the next version on, each release gets its own entry
+at the top saying only what it changed; entries already written are left alone.
+
+The numbering continues upstream (`1.0.0` is McBenac's baseline, GPX only); everything from `1.1.0` on was
+written here.
+
+The version number is also the WebView2 virtual host (`app-1-16-6.gpxviewer.example` today), which defeats the
+browser cache -- so restart QuickLook from the tray after every upgrade.
 
 ---
 
