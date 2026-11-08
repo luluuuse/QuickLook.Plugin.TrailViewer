@@ -1,4 +1,5 @@
-// Packs bin\Release into QuickLook.Plugin.TrailViewer.qlplugin, the zip QuickLook installs on Space.
+// Packs bin\Release into QuickLook.Plugin.TrailViewer-<version>.qlplugin, the zip QuickLook installs on Space.
+// The version in the name comes from the csproj, so downloads of different releases never collide in a folder.
 //
 //   node scripts/pack.cjs
 //
@@ -9,8 +10,17 @@ const path = require('path');
 const zlib = require('zlib');
 
 const root = path.resolve(__dirname, '..');
-const out = path.join(root, 'QuickLook.Plugin.TrailViewer.qlplugin');
 const release = path.join(root, 'bin', 'Release');
+
+// The csproj is the one place a version is written down; everything else derives from it.
+const csproj = fs.readFileSync(path.join(root, 'src', 'QuickLook.Plugin.TrailViewer.csproj'), 'utf8');
+const versionTag = csproj.match(/<Version>\s*([^<\s]+)\s*<\/Version>/);
+if (!versionTag) {
+  console.error('no <Version> in src/QuickLook.Plugin.TrailViewer.csproj');
+  process.exit(1);
+}
+const version = versionTag[1];
+const out = path.join(root, `QuickLook.Plugin.TrailViewer-${version}.qlplugin`);
 const skip = new Set(['.pdb', '.xml']);
 
 function walk(dir, prefix = '') {
@@ -115,6 +125,21 @@ const entries = walk(release);
 if (entries.length === 0) {
   console.error(`${release} is empty`);
   process.exit(1);
+}
+
+// A file name carrying one version over a binary carrying another is worse than no version at all: it
+// survives review, gets published, and misleads everyone who downloads it. Catch a stale build here.
+const builtConfig = path.join(release, 'QuickLook.Plugin.Metadata.config');
+if (fs.existsSync(builtConfig)) {
+  const built = fs.readFileSync(builtConfig, 'utf8').match(/<Version>\s*([^<\s]+)\s*<\/Version>/);
+  if (!built) {
+    console.error(`${builtConfig} has no <Version>`);
+    process.exit(1);
+  }
+  if (built[1] !== version) {
+    console.error(`build output is ${built[1]} but the csproj says ${version}; rebuild before packing`);
+    process.exit(1);
+  }
 }
 // The upstream MIT notice has to travel with the binary: this is a fork of McBenac's plugin.
 entries.unshift({ name: 'LICENSE', data: fs.readFileSync(path.join(root, 'LICENSE')) });

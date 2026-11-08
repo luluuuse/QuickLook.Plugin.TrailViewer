@@ -191,7 +191,7 @@ see your IP address. Nothing else leaves your computer: the file is read locally
 is installed through QuickLook itself. It also needs the Microsoft Edge WebView2 Runtime, which Windows 10 and 11
 already have.
 
-1. Download `QuickLook.Plugin.TrailViewer.qlplugin` from [Releases](../../releases).
+1. Download `QuickLook.Plugin.TrailViewer-<version>.qlplugin` from [Releases](../../releases).
 2. Select it in Explorer, press <kbd>Space</kbd> and click **Click here to install this plugin.**
 3. Click **Restart now...** when the installation is done.
 

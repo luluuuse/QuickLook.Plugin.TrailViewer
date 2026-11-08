@@ -147,7 +147,7 @@ Time、Ascent。
 **前提**：[QuickLook 4.x](https://github.com/QL-Win/QuickLook/releases/latest)——先装它，插件是通过
 QuickLook 自己安装的。另外需要 Microsoft Edge WebView2 Runtime，Windows 10 / 11 已经自带。
 
-1. 从 [Releases](../../releases) 下载 `QuickLook.Plugin.TrailViewer.qlplugin`。
+1. 从 [Releases](../../releases) 下载 `QuickLook.Plugin.TrailViewer-<版本号>.qlplugin`。
 2. 在资源管理器里选中它，按 <kbd>Space</kbd>，点 **Click here to install this plugin.**
 3. 装完后点 **Restart now...**。
 

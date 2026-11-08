@@ -31,6 +31,17 @@ browser cache -- so restart QuickLook from the tray after every upgrade.
   of three layouts, and "proportion" reads like something to be measured. The export button's tooltip
   follows. The English label already said Shape.
 
+### 打包 / Packaging
+
+- 安装包文件名带版本号（`QuickLook.Plugin.TrailViewer-1.16.7.qlplugin`），从 csproj 的 `<Version>` 推导。
+  以前每版都叫同一个名字，几个版本下到同一个文件夹会互相覆盖。打包前还会比对 `bin/Release` 里的元数据，
+  版本对不上就拒绝出包，避免出现「文件名是新的、里面是旧编译」的包。
+
+- The installer is named after its version (`QuickLook.Plugin.TrailViewer-1.16.7.qlplugin`), derived from the
+  csproj `<Version>`. Every release used to share one name, so two downloads landed on top of each other.
+  Packing now also checks the metadata in `bin/Release` and refuses to build when it disagrees, so a new name
+  can never wrap a stale binary.
+
 ## 1.16.6 — 2026-11-07 · 首发版本 / First release
 
 ### 文件格式 / Formats
