@@ -5,7 +5,7 @@
 
 版本号沿用上游编号：`1.0.0` 是上游基线（只支持 GPX），`1.1.0` 起的开发都发生在这里。
 
-版本号同时决定前端所在的虚拟主机名（当前 `app-1-16-6.gpxviewer.example`），用于绕开 WebView2 的磁盘
+版本号同时决定前端所在的虚拟主机名（当前 `app-1-16-7.gpxviewer.example`），用于绕开 WebView2 的磁盘
 缓存，所以**每次升级都需要从托盘退出 QuickLook 再启动**。
 
 **1.16.6 is where this repository starts**: the entry below says what the plugin could do at that point, and
@@ -15,10 +15,21 @@ at the top saying only what it changed; entries already written are left alone.
 The numbering continues upstream (`1.0.0` is McBenac's baseline, GPX only); everything from `1.1.0` on was
 written here.
 
-The version number is also the WebView2 virtual host (`app-1-16-6.gpxviewer.example` today), which defeats the
+The version number is also the WebView2 virtual host (`app-1-16-7.gpxviewer.example` today), which defeats the
 browser cache -- so restart QuickLook from the tray after every upgrade.
 
 ---
+
+## 1.16.7 — 2026-11-07 · 面板用词 / Panel wording
+
+### 文案 / Wording
+
+- <kbd>⇧X</kbd> 面板首行的中文标签由**比例**改为**版式**：这一行挑的是方版 / 竖版 / 横版三种排法中的一种，
+  写成「比例」容易被读成要找数字比例。导出按钮的悬停提示同步改用「版式」。英文一直是 Shape，未动。
+
+- The first row of the <kbd>⇧X</kbd> panel reads 版式 (layout) rather than 比例 (proportion): the row picks one
+  of three layouts, and "proportion" reads like something to be measured. The export button's tooltip
+  follows. The English label already said Shape.
 
 ## 1.16.6 — 2026-11-07 · 首发版本 / First release
 
