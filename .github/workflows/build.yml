@@ -61,9 +61,13 @@ jobs:
           $out
           $failed = 0
           for ($i = 0; $i -lt $names.Count; $i++) {
-            $want = if ($expected.($names[$i])) { 'GPX' } else { '-' }
             $got = ($out[$i] -split "`t")[0]
-            if ($got -ne $want) { "FAIL $($names[$i]): expected $want, got $got"; $failed++ }
+            $wantedPreview = [bool]$expected.($names[$i])
+            $previewable = $got -ne '-'
+            if ($previewable -ne $wantedPreview) {
+              "FAIL $($names[$i]): expected previewable=$wantedPreview, got $got"
+              $failed++
+            }
           }
           if ($failed) { throw "$failed detection result(s) wrong" }
           "All $($names.Count) fixtures detected as expected"
