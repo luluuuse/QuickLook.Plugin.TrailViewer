@@ -224,8 +224,10 @@ async function main() {
   anomalyPage.on('pageerror', (error) => pageErrors.push(error.message));
   await openViewer(anomalyPage, base, 'gps-anomaly.gpx');
   await anomalyPage.waitForSelector('.gpx-anomaly-marker');
+  await waitForLayout(anomalyPage);
   const beforeZoom = await anomalyPage.evaluate(() => window.gpxViewer.map.getZoom());
   await anomalyPage.locator('.gpx-anomaly-marker').first().click();
+  await anomalyPage.waitForFunction((zoom) => window.gpxViewer.map.getZoom() > zoom, beforeZoom);
   await waitForMapIdle(anomalyPage);
   const clickedZoom = await anomalyPage.evaluate(() => window.gpxViewer.map.getZoom());
   check('clicking a GPS anomaly zooms into it', clickedZoom > beforeZoom, `${beforeZoom} -> ${clickedZoom}`);

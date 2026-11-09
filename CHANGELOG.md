@@ -21,6 +21,17 @@ tray after installing a new release.
 
 ---
 
+## 1.17.1 — 2026-11-09 · CI 可重复性修复 / Reproducible CI
+
+- 导出面板测试显式使用中文系统，不再依赖 CI runner 的默认语言。
+- GPS 异常图标测试等待标签重绘完成并显式等待缩放变化，消除地图空闲与 marker 重建之间的竞态。
+- 测试意图和产品行为不变；本版修复 `v1.17.0` 发布流水线中的两处环境相关失败。
+
+- The export-panel test now selects a Chinese locale instead of relying on the CI runner's system language.
+- The GPS-anomaly test waits for marker repaint and an explicit zoom change, removing a race between map idle
+  and marker recreation.
+- Product behaviour is unchanged; this patch fixes two environment-dependent failures in the `v1.17.0` release run.
+
 ## 1.17.0 — 2026-11-09 · 版本规划与沿线导航 / Versioning and route-ordered navigation
 
 ### Added / 新增

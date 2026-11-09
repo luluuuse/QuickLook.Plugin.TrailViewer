@@ -166,7 +166,7 @@ async function rowOf(page, base, fixture, options) {
 async function main() {
   const { server, base } = await startStaticServer(root);
   const browser = await launchBrowser();
-  const page = await browser.newPage({ viewport: { width: 1200, height: 800 } });
+  const page = await browser.newPage({ viewport: { width: 1200, height: 800 }, locale: 'zh-CN' });
   await artifacts.start(page);
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
