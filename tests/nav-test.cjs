@@ -5,42 +5,29 @@
 //
 // Set CHROMIUM to a Chromium/Chrome executable if Playwright's own browser is not installed.
 const fs = require('fs');
-const http = require('http');
 const path = require('path');
-const { chromium } = require('playwright-core');
+const {
+  launchBrowser,
+  settlePopup,
+  waitForLayout,
+  waitForPhoto,
+} = require('./support/browser.cjs');
+const { createChecker } = require('./support/assertions.cjs');
+const { createArtifacts } = require('./support/artifacts.cjs');
+const { startStaticServer } = require('./support/server.cjs');
 
 const root = path.resolve(__dirname, '..');
 const shot = process.argv[2] ? path.resolve(process.argv[2]) : null;
 const fixture = 'kml-photos.kml';
-const types = {
-  '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.gpx': 'application/gpx+xml',
-};
-
-function serve() {
-  const server = http.createServer((req, res) => {
-    const file = path.join(root, decodeURIComponent(new URL(req.url, 'http://x').pathname));
-    if (!file.startsWith(root + path.sep) || !fs.existsSync(file) || !fs.statSync(file).isFile()) {
-      res.writeHead(404).end();
-      return;
-    }
-    res.writeHead(200, { 'Content-Type': types[path.extname(file)] || 'application/octet-stream' });
-    fs.createReadStream(file).pipe(res);
-  });
-  return new Promise((resolve) => server.listen(0, '127.0.0.1', () => resolve(server)));
-}
-
-const failures = [];
-function check(what, ok, detail) {
-  console.log(`${ok ? 'PASS' : 'FAIL'}  ${what}${detail ? `  (${detail})` : ''}`);
-  if (!ok) failures.push(what);
-}
+const { check, failures } = createChecker('nav');
+const artifacts = createArtifacts('nav');
 
 async function main() {
-  const server = await serve();
-  const base = `http://127.0.0.1:${server.address().port}`;
-  const browser = await chromium.launch({ executablePath: process.env.CHROMIUM || undefined });
+  const { server, base } = await startStaticServer(root);
+  const browser = await launchBrowser();
   // Pinned to en-US: the assertions below read English labels, and the viewer follows the system language.
   const page = await browser.newPage({ viewport: { width: 1200, height: 800 }, locale: 'en-US' });
+  await artifacts.start(page);
   const pageErrors = [];
   page.on('pageerror', (e) => pageErrors.push(e.message));
   const cspViolations = [];
@@ -68,11 +55,12 @@ async function main() {
     src: (document.querySelector('.photo-image')?.getAttribute('src') || '').split('/').pop(),
   }));
 
-  // Leaflet fades a closed popup out over ~200 ms, so a press is followed by a short settle: the queries
-  // below then see exactly one card, the one the last press opened.
+  // Wait for the popup transition where it applies. Presses inside the full-size viewer leave the map card
+  // closed, so those wait for the next image instead of assuming that every key opens a Leaflet popup.
   const press = async (key) => {
     await page.keyboard.press(key);
-    await page.waitForTimeout(260);
+    if (await page.evaluate(() => window.gpxViewer.photos.isOpen())) await waitForLayout(page);
+    else await settlePopup(page, '.leaflet-popup', 1);
   };
 
   check('five markers and three of them with photos',
@@ -122,14 +110,14 @@ async function main() {
 
   // 4. The keys work while the full-size photo is open, and follow the markers' photos.
   await page.locator('.photo-popup .photo-thumb').nth(0).click();
-  await page.waitForFunction(() => document.querySelector('.photo-image')?.naturalWidth > 0);
+  await waitForPhoto(page);
   s = await state();
   check('the viewer opens on the selected marker', s.viewing === true && s.caption === 'Remote', s.caption);
   check('a single photo has no counter', s.counter === '', s.counter);
 
   // Remote has one photo, so the next press continues with the next pin rather than staying put.
   await press('ArrowRight');
-  await page.waitForFunction(() => document.querySelector('.photo-image')?.naturalWidth > 0);
+  await waitForPhoto(page);
   s = await state();
   check('right arrow moves to the next pin', s.viewing === true && s.caption === 'Album', `${s.caption} ${s.src}`);
   check('the viewer starts at that pin\'s first photo', s.counter === '1 / 2', s.counter);
@@ -137,29 +125,29 @@ async function main() {
 
   // Inside an album the key moves one photo first.
   await press('D');
-  await page.waitForFunction(() => document.querySelector('.photo-image')?.naturalWidth > 0);
+  await waitForPhoto(page);
   s = await state();
   check('inside an album the key steps one photo', s.caption === 'Album' && s.counter === '2 / 2', `${s.caption} ${s.counter}`);
   check('the second photo is on screen', s.src === 'photo2.png', s.src);
 
   await press('ArrowRight');
-  await page.waitForFunction(() => document.querySelector('.photo-image')?.naturalWidth > 0);
+  await waitForPhoto(page);
   s = await state();
   check('past the last photo the next pin follows', s.caption === 'Inline' && s.viewing === true, s.caption);
 
   await press('ArrowRight');
-  await page.waitForFunction(() => document.querySelector('.photo-image')?.naturalWidth > 0);
+  await waitForPhoto(page);
   s = await state();
   check('the last photo pin wraps to the first', s.caption === 'Remote', s.caption);
 
   // 5. Going back lands on the previous pin's last photo, not its first.
   await press('ArrowLeft');
-  await page.waitForFunction(() => document.querySelector('.photo-image')?.naturalWidth > 0);
+  await waitForPhoto(page);
   s = await state();
   check('left arrow goes back to the previous pin', s.caption === 'Inline', s.caption);
 
   await press('ArrowLeft');
-  await page.waitForFunction(() => document.querySelector('.photo-image')?.naturalWidth > 0);
+  await waitForPhoto(page);
   s = await state();
   check('back into an album starts at its last photo', s.caption === 'Album' && s.counter === '2 / 2',
     `${s.caption} ${s.counter}`);
@@ -183,11 +171,11 @@ async function main() {
   // loses the race and is toggled shut again (which is exactly how the click appeared to do nothing).
   if (await page.locator('.leaflet-popup-close-button').count()) {
     await page.locator('.leaflet-popup-close-button').click();
-    await page.waitForTimeout(260);
+    await settlePopup(page, '.leaflet-popup', 0);
   }
 
   await page.locator('.gpx-pin[title="Remote"]').click();
-  await page.waitForTimeout(400);
+  await settlePopup(page, '.leaflet-popup', 1);
   s = await state();
   check('a click selects the marker', s.index === 0 && s.selected === 'Remote', `${s.index} ${s.selected}`);
   check('the click opens the card', s.card.includes('Standing on the bridge'), s.card);
@@ -195,19 +183,19 @@ async function main() {
   check('the clicked card shows its thumbnail', s.thumbs === 1, `${s.thumbs}`);
 
   await page.locator('.photo-popup .photo-thumb').nth(0).click();
-  await page.waitForFunction(() => document.querySelector('.photo-image')?.naturalWidth > 0);
+  await waitForPhoto(page);
   s = await state();
   check('a thumbnail in the clicked card opens the photo', s.viewing === true && s.caption === 'Remote', s.caption);
   await page.locator('.photo-close').click();
 
   await page.locator('.gpx-pin[title="Album"]').click();
-  await page.waitForTimeout(400);
+  await settlePopup(page, '.leaflet-popup', 1);
   s = await state();
   check('clicking another pin moves the selection', s.index === 1 && s.selected === 'Album', `${s.index} ${s.selected}`);
   check('only one card is open at a time', (await page.locator('.leaflet-popup').count()) === 1);
 
   await page.locator('.gpx-pin[title="Album"]').click();
-  await page.waitForTimeout(400);
+  await settlePopup(page, '.leaflet-popup', 0);
   check('a second click on the same pin closes the card', (await page.locator('.leaflet-popup').count()) === 0);
   check('closing the card leaves the selection alone', (await state()).selected === 'Album');
 
@@ -216,13 +204,14 @@ async function main() {
   check('the keys carry on from the clicked marker', s.index === 2 && s.selected === 'Inline', `${s.index} ${s.selected}`);
 
   if (shot) {
-    await page.waitForTimeout(300);
+    await waitForLayout(page);
     await page.screenshot({ path: shot });
   }
 
   check('no page errors', pageErrors.length === 0, pageErrors.join('; '));
   check('no CSP violations', cspViolations.length === 0, cspViolations.join('; ').slice(0, 300));
 
+  await artifacts.capture(page, failures, pageErrors);
   await browser.close();
   server.close();
   console.log(failures.length === 0 ? '\nall checks passed' : `\n${failures.length} failed: ${failures.join(', ')}`);

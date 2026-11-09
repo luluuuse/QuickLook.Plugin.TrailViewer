@@ -12,6 +12,10 @@ const MIN_RUN = 200; // a stretch shorter than this is folded into the neighbour
 const FLAT = 0.03; // |slope| below this is level
 const STEEP = 0.10; // slope at or beyond this is steep
 
+/** @typedef {import('./types.js').ElevationSample} ElevationSample */
+/** @typedef {import('./types.js').ProfileData} ProfileData */
+/** @typedef {import('./types.js').GroundCell} GroundCell */
+
 /**
  * The gradient the colour scale is full at.
  *
@@ -23,6 +27,7 @@ const STEEP = 0.10; // slope at or beyond this is steep
 export const SLOPE_FULL = 0.25;
 
 /** Moving average over `window` samples, shrinking at the ends instead of padding with zeros. */
+/** @param {number[]} values @returns {number[]} */
 export function smooth(values, window = SMOOTH_WINDOW) {
   const half = Math.floor(window / 2);
   const out = new Array(values.length);
@@ -42,6 +47,7 @@ export function smooth(values, window = SMOOTH_WINDOW) {
  * Walking forward from a committed point, the highest point seen is remembered; the climb to it is only
  * added once the track has fallen `threshold` metres below it, which is what tells a hill from a wobble.
  */
+/** @param {number[]} values @returns {{ ascent: number, descent: number }} */
 export function elevationGain(values, threshold = GAIN_THRESHOLD) {
   if (values.length < 2) return { ascent: 0, descent: 0 };
   let ascent = 0;
@@ -67,6 +73,22 @@ export function elevationGain(values, threshold = GAIN_THRESHOLD) {
       rising = true;
       peak = value;
     }
+  }
+  // A recording can stop on the climb or descent. The final extremum never reversed, but it is still
+  // ground the walker covered: a route that only climbs must not report zero ascent.
+  if (rising) ascent += Math.max(0, peak - committed);
+  else descent += Math.max(0, committed - valley);
+  return { ascent, descent };
+}
+
+/** Unfiltered cumulative changes, kept only to explain how much noise the displayed ascent removed. */
+export function rawElevationGain(values) {
+  let ascent = 0;
+  let descent = 0;
+  for (let i = 1; i < values.length; i += 1) {
+    const change = values[i] - values[i - 1];
+    if (change > 0) ascent += change;
+    else descent -= change;
   }
   return { ascent, descent };
 }
@@ -105,6 +127,35 @@ function resample(samples, step) {
   return out;
 }
 
+/**
+ * Keep the shape of a profile while bounding its SVG to the pixels that can show it. Each one-pixel column
+ * contributes its lowest and highest samples, so spikes survive; consecutive columns stay in route order.
+ */
+export function profileSamples(samples, width = 600) {
+  if (samples.length <= width * 2 + 2) return samples;
+  const total = samples[samples.length - 1].along || 1;
+  const buckets = new Array(width);
+  for (let i = 0; i < samples.length; i += 1) {
+    const bucket = Math.min(width - 1, Math.max(0, Math.floor((samples[i].along / total) * width)));
+    const current = buckets[bucket];
+    if (!current) {
+      buckets[bucket] = { low: i, high: i };
+    } else {
+      if (samples[i].ele < samples[current.low].ele) current.low = i;
+      if (samples[i].ele > samples[current.high].ele) current.high = i;
+    }
+  }
+
+  const kept = new Set([0, samples.length - 1]);
+  for (const bucket of buckets) {
+    if (!bucket) continue;
+    kept.add(bucket.low);
+    kept.add(bucket.high);
+  }
+  return [...kept].sort((a, b) => a - b).map((index) => samples[index]);
+}
+
+/** @returns {GroundCell['grade']} */
 function gradeOf(slope) {
   if (Math.abs(slope) < FLAT) return 'flat';
   if (slope >= STEEP) return 'steepUp';
@@ -181,21 +232,27 @@ function runsFrom(cells, minRun = MIN_RUN) {
 
 /** Folds short runs into a neighbour, then joins neighbours that ended up the same kind. */
 function tidy(runs, minRun) {
-  const out = runs.map((run) => ({ ...run }));
-  let changed = true;
-  while (changed && out.length > 1) {
-    changed = false;
-    for (let i = 0; i < out.length; i += 1) {
-      if (out[i].to - out[i].from >= minRun) continue;
-      // The first run has no neighbour before it, so it goes into the one after; everything else goes back.
-      const into = i > 0 ? out[i - 1] : out[i + 1];
-      into.from = Math.min(into.from, out[i].from);
-      into.to = Math.max(into.to, out[i].to);
-      out.splice(i, 1);
-      changed = true;
-      break;
+  const out = [];
+  let leading = null;
+  for (const source of runs) {
+    const run = { ...source };
+    if (leading) {
+      run.from = leading.from;
+      leading = null;
     }
+
+    if (out.length === 0) {
+      // A short first run has no previous neighbour; fold it into the following run instead.
+      if (run.to - run.from < minRun) leading = run;
+      else out.push(run);
+      continue;
+    }
+
+    if (run.to - run.from < minRun) out[out.length - 1].to = run.to;
+    else out.push(run);
   }
+  if (leading) out.push(leading);
+
   const joined = [];
   for (const run of out) {
     const last = joined[joined.length - 1];
@@ -206,6 +263,7 @@ function tidy(runs, minRun) {
 }
 
 /** Everything the profile and the summary need, from samples that carry a height. */
+/** @param {ElevationSample[]} samples @returns {Omit<ProfileData, 'points' | 'samples'>} */
 export function analyse(samples) {
   let min = Infinity;
   let max = -Infinity;
@@ -215,6 +273,7 @@ export function analyse(samples) {
   }
   const total = samples[samples.length - 1].along || 1;
   const gain = elevationGain(smooth(samples.map((sample) => sample.ele)));
+  const rawGain = rawElevationGain(samples.map((sample) => sample.ele));
   // Laid out once and shared: the fill, the stretches and the summary all read these same cells, so the
   // legend cannot claim a gradient the picture does not show.
   const cells = groundCells(samples);
@@ -224,9 +283,12 @@ export function analyse(samples) {
     total,
     ascent: Math.round(gain.ascent),
     descent: Math.round(gain.descent),
+    rawAscent: Math.round(rawGain.ascent),
+    rawDescent: Math.round(rawGain.descent),
     cells,
     runs: runsFrom(cells),
     steep: steepSummary(cells),
+    slopeBins: slopeBins(cells),
   };
 }
 
@@ -248,10 +310,34 @@ export function steepSummary(cells) {
   return { metres, maxSlope };
 }
 
+/** Vertical ascent/descent in the slope bands used by the grade-aware walking estimate. */
+export function slopeBins(cells) {
+  const bins = {
+    flatUp: 0,
+    gentleUp: 0,
+    steepUp: 0,
+    flatDown: 0,
+    gentleDown: 0,
+    steepDown: 0,
+  };
+  const toDegrees = 180 / Math.PI;
+  for (const cell of cells) {
+    const length = cell.to - cell.from;
+    if (!(length > 0)) continue;
+    const vertical = length * Math.abs(cell.slope);
+    const angle = Math.atan(Math.abs(cell.slope)) * toDegrees;
+    const direction = cell.slope >= 0 ? 'Up' : 'Down';
+    const band = angle < 5 ? 'flat' : angle <= 12 ? 'gentle' : 'steep';
+    bins[band + direction] += vertical;
+  }
+  return bins;
+}
+
 // The colour scale. One band, not two: the curve already says which way the ground goes, so the colour is
 // free to say how much it costs, which is the thing the eye cannot measure from a stretched drawing. It
 // runs from the blue that has always meant level, through green and yellow, to the red of a wall -- cold to
 // warm, in one direction of the wheel, so neighbouring cells never meet at a seam.
+/** @type {Array<[number, [number, number, number]]>} */
 const SCALE_STOPS = [
   [0, [58, 160, 110]], // level: a calm green, the one colour that never means "go harder"
   [0.04, [102, 181, 82]], // most of a real route lives between here and eight percent, so the ramp gives
@@ -262,6 +348,7 @@ const SCALE_STOPS = [
   [SLOPE_FULL, [201, 58, 122]], // the end of the scale, and past it
 ];
 
+/** @returns {[number, number, number]} */
 function mix(a, b, t) {
   return [
     Math.round(a[0] + (b[0] - a[0]) * t),
@@ -286,6 +373,7 @@ export function slopeColor(slope) {
 
 /** The scale itself, as stops for a gradient strip: level at one end, the wall at the other. */
 export function slopeScale() {
+  /** @type {Array<[number, string]>} */
   const stops = [];
   for (const [slope, colour] of SCALE_STOPS) {
     stops.push([slope / SLOPE_FULL, `rgb(${colour[0]},${colour[1]},${colour[2]})`]);

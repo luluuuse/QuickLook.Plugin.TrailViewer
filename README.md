@@ -32,15 +32,45 @@ The upstream copyright notice is kept verbatim in [LICENSE](LICENSE), next to th
 - Tracks (`trk` in GPX; `LineString` and `gx:Track` in KML, including inside `MultiGeometry`) as lines, each
   segment in its own colour, with the start (green) and end (red) marked and a dot for every recorded point
   (up to 20,000 points, see [Large files](#large-files)). Click a dot for its time, coordinates and
-  elevation.
+  elevation. Direction arrows and distance labels adapt to the route's projected screen length: long overviews
+  use coarser 5/10/20 km milestones and zooming in returns to 1 km detail; a shorter route still gets a midpoint
+  arrow.
 - Routes (`rte`) as dashed lines and waypoints (`wpt`) as pins; in KML a `Point` placemark is a pin and a
   `Polygon` is drawn as a faint blue area beneath the track, with its name on hover.
 - Waypoint photos: a placemark whose description carries an `<img>` gets a camera badge, and its pin opens
   a small card of thumbnails first — the full-size picture is one click further, so a photo never fills the
   screen unasked.
-- A summary box: name, date and time of the first and last point, number of points, distance, duration,
-  average speed, total ascent and descent, and what the file contains. The climb is measured after a short
-  moving average and only counts reversals of ten metres or more, so GPS wobble is not sold as climbing.
+- Waypoint overview: the **List** button orders every waypoint by track distance and shows its name, cumulative
+  distance, elevation, photo count and description snippet. Click a row to select and locate its pin while the
+  list stays open for scanning camps, junctions, water sources and photo stops. Phase-one local insights tint
+  danger, water, camp, junction and summit/pass rows in different colours, with text badges, multi-label support,
+  Chinese/English negation handling, evidence and filters. Phase two reads complete descriptions sentence by
+  sentence, uses KML/GPX icon hints, adds rescue/bailout/supply/crossing/access/viewpoint categories and merges
+  points within 25 m in the overview. A single Filter menu in the header replaces both horizontal strips, while
+  a pencil button opens each row's correction menu only when needed; corrections remain local and persistent.
+  Colour is never the only cue.
+- Long routes use 24×27 px yellow waypoint pins thinned by screen distance. Ordinary pins closer than about
+  34 px are not drawn together at the current zoom and appear progressively as the map is enlarged. Important
+  semantic points and the current keyboard selection always remain visible. Raw stops, photos and the overview
+  list are unchanged. W also hides gap icons and GPS anomaly labels together with the pins, while dashed gap
+  connectors and cyan anomaly line overlays remain in the track layer.
+- A summary box: name, date, point count, distance, moving average speed, total time, ascent, descent, recording
+  breaks and file contents. Hovering **Total time** shows both moving time and the grade-aware estimate. KML
+  `TimeUsed` / `PauseTime` metadata is used directly for moving time; other files fall back to movement
+  estimation. The estimate uses a Naismith base, Langmuir gentle/steep descents, and a 10-minute / 300 m
+  penalty for ascents steeper than 12 degrees. The climb is measured after a short moving average and only
+  counts reversals of ten metres or more; its tooltip also reports the raw total. Compact is the default card
+  mode and shows only the title plus six basic figures. More/Less reveals date, track anomalies, contents and
+  photos; the choice persists. The redundant file-name line is removed, with the route name and full file name in
+  the title tooltip. GPS and data-gap icons expose counts and distance on hover; click or press Enter to zoom
+  to the event. The route opens inside the measured map area that is not covered by the summary, toolbars or
+  profile, and pin navigation recentres only when the selected card approaches an edge.
+- Data gaps between recorded track parts use red warnings and, where large enough, a dashed connector. Implausible
+  speed or position jumps inside one part use a cyan-on-white dashed overlay with a `GPS ×N` badge, so a
+  continuous-looking line is not misreported as broken. A single bad point is counted once, nearby episodes
+  cluster at the current zoom, and the summary keeps data-gap distance separate from affected sample distance.
+  At low zoom nearby anomalies consolidate into GPS bands with only a few plain `GPS` labels; data gaps and speed
+  anomalies share one Track anomalies row as two lines. The summary card is capped at 310 px.
 - An elevation profile across the bottom when the track has elevation (`<ele>`): a translucent panel floating
   over the map, which runs to the bottom edge of the window behind it. The area under the curve is coloured
   by the gradient itself -- green at level ground, yellow around 10 %, orange-red past 20 %, capped at 25 % --
@@ -75,10 +105,10 @@ The upstream copyright notice is kept verbatim in [LICENSE](LICENSE), next to th
 - An English or Chinese interface, following the system language on first use and switched by one button
   next to the backgrounds. The choice is remembered, and switching repaints what is already on screen -
   the summary, an open card, the profile and the photo bar - without reloading the page.
-- A layout that folds up in a portrait window (as tall as it is wide or taller, or narrower than 960 px): the
-  zoom buttons and the corner switches step down onto a line of their own beneath the summary -- but only once
-  they no longer fit beside it, since the summary is only as wide as its longest line and the corner is usually
-  free.
+- A measured three-state layout for narrow windows: `inline` keeps everything in the top band, `wrapped` lets
+  the right-hand tools use a second row while zoom stays beside the summary, and `docked` gives both groups
+  their own band below it. A full summary scrolls internally when height is scarce, and very narrow windows
+  collapse the marker and list switches to labelled icons.
 
 GPX 1.0 and 1.1, KML 2.2 (including `gx:Track` and `MultiGeometry`) and zipped `.kmz` archives are supported;
 only the KML document inside a `.kmz` is unpacked, into a temporary folder that lives exactly as long as the
@@ -99,6 +129,10 @@ ringed in blue, the map keeps it in view and its card opens, so the placemark's 
 one after another without touching the mouse. While a full-size photo is open the same keys walk the photos
 and continue into the neighbouring pin at the end of an album. If the pins were hidden with the switch, a key
 press brings them back first.
+
+The directional keys and A/D still step through waypoints. The **List** button complements them by showing the
+whole route in distance order; clicking a row selects and locates its pin while leaving the list open for
+comparison with the next place.
 
 QuickLook keeps <kbd>Space</kbd> and <kbd>Esc</kbd> for itself, so the viewer does not close on <kbd>Esc</kbd>:
 click the × or outside the picture. If arrow keys happen to be taken by something else on your machine,
@@ -171,8 +205,10 @@ without height data falls back to a single colour and drops the two height rows.
 - **More than 20,000 track points** in a file: the tracks are drawn as lines with the start and end marked,
   but without a clickable dot for every point. Far more dots than that slow the preview down, and around
   200,000 crash it.
-- **Tested up to 30,000 points**, which load in about 3.5 seconds. Larger files have not been tested and
-  may take longer than the preview's 20-second limit. The preview then shows *Timed out while loading the
+- **Tested up to 30,000 points**, which load in about a second on the current test machine. The elevation
+  drawing is reduced to the pixels the 600-unit plot can show while keeping each column's low and high sample,
+  and export simplifies the projected path below sub-pixel detail. Larger files have not been tested and may
+  take longer than the preview's 20-second limit. The preview then shows *Timed out while loading the
   preview.* Open such files in a map app instead.
 
 ## Privacy
@@ -208,7 +244,8 @@ already have.
 ## Troubleshooting
 
 Each preview adds one line to `%LOCALAPPDATA%\GpxViewer\log.txt` with the file, the number of points and
-the distance, how long it took, or the error.
+the distance, how long it took, or the error. Remembered interface choices live in
+`%LOCALAPPDATA%\GpxViewer\viewer-settings.txt`, outside the versioned WebView2 origin.
 
 ## Building
 
@@ -216,8 +253,11 @@ The plugin is a .NET Framework 4.6.2 class library (WPF, WebView2) and builds on
 this repository:
 
 ```
+npm ci
+npm run check
 pwsh scripts/get-quicklook-common.ps1
 dotnet build src/QuickLook.Plugin.TrailViewer.csproj -c Release
+npm test
 node scripts/pack.cjs
 ```
 
@@ -226,25 +266,37 @@ so the plugin is built against the same library QuickLook ships. The version liv
 `<Version>` in the project file. `QuickLook.Plugin.Metadata.config` is a template whose `@VERSION@` the build
 fills in, because QuickLook reads a plugin's version from that file rather than from the assembly, and a
 number kept by hand in two places drifts. GitHub Actions does the same on every pull request, checks the
-file detection against the test files and uploads the `.qlplugin`. A monthly workflow opens an issue when
-QuickLook or Leaflet has a newer version than the one used here.
+file detection against the test files, runs every browser suite and uploads the `.qlplugin`. A monthly
+workflow opens an issue when QuickLook or Leaflet has a newer version than the one used here.
+
+`npm run check` runs ESLint over the viewer, tests, scripts and tools, then TypeScript's `checkJs` over the
+browser modules. The same command gates CI before the Windows build.
+
+The regular `npm test` first runs 34 Node-only unit tests, then 17 browser suites, the failure-bundle self-test
+and the version checks. The static server, browser launcher, assertions and diagnostics live in
+`tests/support/`; failures write a screenshot, result JSON and Playwright `trace.zip` under
+`test-results/<suite>/`. After building the Harness, `npm run test:host` adds 43 C# assertions for host-side
+file boundaries, preferences, the overlay transfer state machine and atomic publication. The main test path
+never contacts a live map service. CyclOSM availability is checked separately by the weekly/manual
+`live-smoke` workflow.
 
 The web viewer in `viewer/` can be opened in any browser through a local web server, for example
 `viewer/index.html?src=../tests/fixtures/track-time-ele.gpx`. The scripts under `tests/` drive it in Chromium
 with [Playwright](https://playwright.dev/), one file per area: `viewer-test.cjs` holds the numbers against
-`tests/fixtures/expected.json`, and the rest cover photos, waypoint navigation, the pin switch, the terrain
-layer, the keyboard shortcuts, the two languages, the profile and its cursor readout, the profile's height
-and vertical scale, the locating button, the overlay export, the portrait layout and the version numbers. All
-of them are plain Node scripts and print one `PASS` or `FAIL` line per check. In a cmd window:
+`tests/fixtures/expected.json`, and the rest cover photos, waypoint navigation and overview, direction/kilometre
+markers, moving time and recording gaps, the pin switch, the terrain layer, the keyboard shortcuts, the two
+languages, the profile and its cursor readout, the profile's height and vertical scale, the locating button, the
+overlay export, the portrait layout, measured map focus and the version numbers. All
+of them are plain Node scripts and print one `PASS` or `FAIL` line per check. After `npm ci`, set Edge as the
+browser and run the same aggregate command CI uses:
 
 ```
-set NODE_PATH=<path to playwright-core>\node_modules
 set CHROMIUM=<path to chrome or msedge.exe>
-for %f in (tests\*-test.cjs) do node %f
+npm test
 ```
 
-`version-test.cjs` needs no browser: it only reads the changelog, the project file and the built metadata, so
-it can be run on its own to catch a version that drifted out of step. The test files are synthetic and
+`npm run test:version` needs no browser: it only reads the changelog, the project file and the built metadata,
+so it can be run on its own to catch a version that drifted out of step. The test files are synthetic and
 generated by `tools/make-fixtures.py`.
 
 ## Third-party components

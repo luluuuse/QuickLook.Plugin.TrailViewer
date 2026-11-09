@@ -23,6 +23,8 @@ internal static class Program
             return HookKey(args[1], args.Length > 2 ? args[2] : "w");
         if (args.Length >= 2 && args[0] == "hookprobe")
             return HookProbe(args[1]);
+        if (args.Length >= 1 && args[0] == "selftest")
+            return SelfTests.Run();
 
         Console.WriteLine("Usage: TrailViewer.Harness detect <file>...");
         Console.WriteLine("       TrailViewer.Harness render <file> <out.png> [timeoutSeconds] [layer]");
@@ -30,6 +32,7 @@ internal static class Program
         Console.WriteLine("       TrailViewer.Harness wpfkey <file> [w|q|e|z]");
         Console.WriteLine("       TrailViewer.Harness hookkey <file> [w|q|e|z]");
         Console.WriteLine("       TrailViewer.Harness hookprobe <file>");
+        Console.WriteLine("       TrailViewer.Harness selftest");
         return 2;
     }
 

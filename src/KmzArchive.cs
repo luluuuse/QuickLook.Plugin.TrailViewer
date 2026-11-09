@@ -14,8 +14,10 @@ internal static class KmzArchive
 {
     private const string PreferredEntryName = "doc.kml";
 
-    // A compressed track of 20 MB that claims to hold half a gigabyte is not a track; refuse before filling the disk.
-    private const long MaxDocumentBytes = 256L * 1024 * 1024;
+    // The browser parses the whole KML into a DOM. Keep the document well below the point where that work
+    // exhausts WebView2 or the 20-second preview budget.
+    private const long MaxDocumentBytes = 64L * 1024 * 1024;
+    private const long MaxCompressedDocumentBytes = 64L * 1024 * 1024;
 
     private const string RootFolderName = "GpxViewer";
 
@@ -50,15 +52,42 @@ internal static class KmzArchive
         var entry = FindDocument(archive)
             ?? throw new InvalidDataException("the archive holds no .kml file");
 
-        if (entry.Length > MaxDocumentBytes)
+        if (entry.Length > MaxDocumentBytes || entry.CompressedLength > MaxCompressedDocumentBytes)
             throw new InvalidDataException($"the .kml inside is {entry.Length / (1024 * 1024)} MB, too large to draw");
 
         var target = Path.Combine(folder, DocumentFileName(kmzPath));
-        using (var source = entry.Open())
-        using (var destination = File.Create(target))
-            source.CopyTo(destination);
+        try
+        {
+            using (var source = entry.Open())
+            using (var destination = File.Create(target))
+                CopyBounded(source, destination);
+        }
+        catch
+        {
+            try { File.Delete(target); }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+            throw;
+        }
 
         return target;
+    }
+
+    /// <summary>
+    /// Zip metadata can lie. Count the bytes that actually leave the decompressor so a crafted archive cannot
+    /// turn a small header into an unbounded temporary file before the browser ever sees it.
+    /// </summary>
+    private static void CopyBounded(Stream source, Stream destination)
+    {
+        var buffer = new byte[81920];
+        long total = 0;
+        int read;
+        while ((read = source.Read(buffer, 0, buffer.Length)) > 0)
+        {
+            total += read;
+            if (total > MaxDocumentBytes)
+                throw new InvalidDataException("the .kml expands past the 64 MB preview limit");
+            destination.Write(buffer, 0, read);
+        }
     }
 
     /// <summary>Creates a fresh folder to unpack into, cleaning up folders left behind by earlier runs.</summary>

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2" xmlns:gx="http://www.google.com/kml/ext/2.2">
+  <Document>
+    <name>Recorded pause totals</name>
+    <ExtendedData>
+      <Data name="TimeUsed"><value>3600000</value></Data>
+      <Data name="PauseTime"><value>1200000</value></Data>
+    </ExtendedData>
+    <Placemark>
+      <name>Recorded walk</name>
+      <gx:Track>
+        <when>2026-01-01T09:00:00Z</when>
+        <when>2026-01-01T09:30:00Z</when>
+        <when>2026-01-01T10:00:00Z</when>
+        <gx:coord>100.0000 30.0000 1000</gx:coord>
+        <gx:coord>100.0010 30.0000 1010</gx:coord>
+        <gx:coord>100.0020 30.0000 1020</gx:coord>
+      </gx:Track>
+    </Placemark>
+  </Document>
+</kml>

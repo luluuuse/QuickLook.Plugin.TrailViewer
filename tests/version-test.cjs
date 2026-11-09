@@ -51,6 +51,13 @@ const metadata = read('src/QuickLook.Plugin.Metadata.config');
 check('the metadata takes its version from the build', metadata.includes('<Version>@VERSION@</Version>'),
   (metadata.match(/<Version>.*<\/Version>/) || ['missing'])[0]);
 check('the csproj fills that placeholder in', /WritePluginMetadata/.test(csproj) && csproj.includes('@VERSION@'));
+const packageJson = JSON.parse(read('package.json'));
+check('the npm test package carries the same version', packageJson.version === current,
+  `${packageJson.version} vs ${current}`);
+const lock = JSON.parse(read('package-lock.json'));
+check('the lockfile carries the same version',
+  lock.version === current && lock.packages?.['']?.version === current,
+  `${lock.version}/${lock.packages?.['']?.version} vs ${current}`);
 const built = path.join(root, 'bin', 'Release', 'QuickLook.Plugin.Metadata.config');
 if (fs.existsSync(built)) {
   const shipped = (fs.readFileSync(built, 'utf8').match(/<Version>([\d.]+)<\/Version>/) || [])[1];

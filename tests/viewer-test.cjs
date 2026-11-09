@@ -5,28 +5,18 @@
 // Set CHROMIUM to a Chromium/Chrome executable if Playwright's own browser is not installed.
 // Map mode needs internet access for the tiles; everything else runs offline.
 const fs = require('fs');
-const http = require('http');
 const path = require('path');
-const { chromium } = require('playwright-core');
+const {
+  launchBrowser,
+  waitForTiles,
+} = require('./support/browser.cjs');
+const { createArtifacts } = require('./support/artifacts.cjs');
+const { startStaticServer } = require('./support/server.cjs');
 
 const root = path.resolve(__dirname, '..');
 const expected = JSON.parse(fs.readFileSync(path.join(root, 'tests/fixtures/expected.json'), 'utf8')).viewer;
 const shots = process.argv[2] ? path.resolve(process.argv[2]) : null;
-const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.gpx': 'application/gpx+xml' };
-
-function serve() {
-  const server = http.createServer((req, res) => {
-    const file = path.join(root, decodeURIComponent(new URL(req.url, 'http://x').pathname));
-    if (!file.startsWith(root + path.sep) || !fs.existsSync(file) || !fs.statSync(file).isFile()) {
-      res.writeHead(404).end();
-      return;
-    }
-    res.writeHead(200, { 'Content-Type': types[path.extname(file)] || 'application/octet-stream' });
-    fs.createReadStream(file).pipe(res);
-  });
-  return new Promise((resolve) => server.listen(0, '127.0.0.1', () => resolve(server)));
-}
-
+const artifacts = createArtifacts('viewer');
 function iso(value) {
   return value ? new Date(value).toISOString().replace('.000Z', 'Z') : null;
 }
@@ -37,19 +27,19 @@ async function open(page, base, fixture) {
 }
 
 async function main() {
-  const server = await serve();
-  const base = `http://127.0.0.1:${server.address().port}`;
-  const browser = await chromium.launch({ executablePath: process.env.CHROMIUM || undefined });
+  const { server, base } = await startStaticServer(root);
+  const browser = await launchBrowser();
   // Pinned to en-US: the assertions below read English labels, and the viewer follows the system language.
   const context = await browser.newContext({ viewport: { width: 1200, height: 800 }, locale: 'en-US' });
   const page = await context.newPage();
+  await artifacts.start(page);
   const pageErrors = [];
   page.on('pageerror', (e) => pageErrors.push(e.message));
   if (shots) fs.mkdirSync(shots, { recursive: true });
 
   const failures = [];
-  const check = (fixture, what, got, want) => {
-    if (got !== want) failures.push(`${fixture}: ${what} is ${got}, expected ${want}`);
+  const check = (fixture, what, got, want, detail) => {
+    if (got !== want) failures.push(`${fixture}: ${what} is ${got}, expected ${want}${detail ? ` (${detail})` : ''}`);
   };
 
   for (const [fixture, want] of Object.entries(expected)) {
@@ -105,7 +95,8 @@ async function main() {
       for (const layer of ['map', 'none']) {
         await page.evaluate((key) => window.gpxViewer.selectLayer(key), layer);
         await page.waitForLoadState('networkidle');
-        await page.waitForTimeout(layer === 'map' ? 1500 : 200);
+        if (layer === 'map') await waitForTiles(page);
+        else await page.waitForFunction(() => document.querySelectorAll('.leaflet-tile-pane img').length === 0);
         const tiles = await page.evaluate(() => document.querySelectorAll('img.leaflet-tile-loaded').length);
         if (layer === 'map' && tiles === 0) failures.push(`${fixture}: no map tiles loaded`);
         if (layer === 'none' && tiles !== 0) failures.push(`${fixture}: ${tiles} map tiles in "No map" mode`);
@@ -129,8 +120,14 @@ async function main() {
     await open(page, base, `generated-${n}.gpx`);
     const seconds = (Date.now() - started) / 1000;
     const points = await page.evaluate(() => window.gpxViewer?.summary.points);
+    const curveVertices = await page.evaluate(() => {
+      const d = document.querySelector('#profile .line')?.getAttribute('d') || '';
+      return (d.match(/[ML]/g) || []).length;
+    });
     console.log(`generated-${n}.gpx: ${points} points loaded in ${seconds.toFixed(1)} s`);
     check(`generated-${n}.gpx`, 'points', points, n);
+    if (n === 30000) check('generated-30000.gpx', 'profile path is pixel bounded', curveVertices <= 1202,
+      true, `${curveVertices} vertices`);
     if (seconds > 10) failures.push(`generated-${n}.gpx: took ${seconds.toFixed(1)} s (limit 10 s)`);
   }
 
@@ -141,7 +138,84 @@ async function main() {
   check('layer choice', 'after reload', await page.evaluate(() => window.gpxViewer.layer()), 'none');
   await page.evaluate(() => window.gpxViewer.selectLayer('map'));
 
+  // The viewer origin changes with each plugin release, so the host passes durable preferences in the URL.
+  // Query values must win over whatever localStorage the current test origin contains.
+  const preferencePage = await context.newPage();
+  await preferencePage.goto(`${base}/viewer/index.html?src=../tests/fixtures/track-time-ele.gpx`
+    + '&lang=zh&layer=none&pins=0&exportSize=1:1&exportInk=white&exportScrim=soft');
+  await preferencePage.waitForFunction(() => document.body.classList.contains('loaded'));
+  const preferences = await preferencePage.evaluate(() => ({
+    lang: document.documentElement.lang,
+    layer: window.gpxViewer.layer(),
+    pins: window.gpxViewer.pins.visible(),
+    settings: window.gpxViewer.exportSettings(),
+    tiles: document.querySelectorAll('.leaflet-tile-pane img').length,
+  }));
+  check('host preferences', 'language', preferences.lang, 'zh-CN');
+  check('host preferences', 'layer', preferences.layer, 'none');
+  check('host preferences', 'pins', preferences.pins, false);
+  check('host preferences', 'no-map downloads no tiles', preferences.tiles, 0);
+  check('host preferences', 'export',
+    JSON.stringify(preferences.settings), '{"size":"1:1","ink":"white","scrim":"soft"}');
+  await preferencePage.close();
+
+  // Parse-only regressions that do not need another fixture on disk.
+  const parserChecks = await page.evaluate(async () => {
+    const gpx = await import('./gpx.js');
+    const kml = await import('./kml.js');
+    const summary = gpx.summarize(gpx.parseGpx(
+      '<?xml version="1.0"?><gpx><trk><trkseg>'
+      + '<trkpt lat="46" lon="8"><time>2026-01-01T09:00:00Z</time></trkpt>'
+      + '<trkpt lat="46.01" lon="8.01"><time>2026-01-01T10:00:00Z</time></trkpt>'
+      + '</trkseg></trk><wpt lat="46" lon="8"><time>2027-01-01T00:00:00Z</time></wpt></gpx>'));
+    const track = kml.parseKml(
+      '<kml xmlns="http://www.opengis.net/kml/2.2">'
+      + '<Placemark><gx:Track xmlns:gx="http://www.google.com/kml/ext/2.2">'
+      + '<when>2026-01-01T09:00:00Z</when><when>2026-01-01T09:01:00Z</when>'
+      + '<gx:coord>not-a-point</gx:coord><gx:coord>8 46 10</gx:coord>'
+      + '</gx:Track></Placemark></kml>');
+    return {
+      duration: summary.durationSeconds,
+      trackTime: track.tracks[0].segments[0][0].time.toISOString(),
+    };
+  });
+  check('parser regression', 'waypoint times do not extend a recorded trip', parserChecks.duration, 3600);
+  check('parser regression', 'an invalid gx:Track point does not shift the next time',
+    parserChecks.trackTime, '2026-01-01T09:01:00.000Z');
+
+  // The k-d tree must be an optimisation only: every nearest sample has to match the old linear scan,
+  // including duplicate points and equal-distance ties.
+  const indexCheck = await page.evaluate(async () => {
+    const m = await import('./spatial.js');
+    let seed = 123456789;
+    const random = () => {
+      seed = (seed * 1664525 + 1013904223) >>> 0;
+      return seed / 2 ** 32;
+    };
+    const points = Array.from({ length: 2000 }, (_, i) => ({
+      lat: 46 + random() * 0.2,
+      lon: 8 + random() * 0.2,
+      i,
+    }));
+    points.push({ ...points[0] });
+    const index = m.createPointIndex(points);
+    let mismatch = -1;
+    for (let q = 0; q < 100 && mismatch < 0; q += 1) {
+      const target = { lat: 46 + random() * 0.2, lon: 8 + random() * 0.2 };
+      let best = 0;
+      let distance = Infinity;
+      for (let i = 0; i < points.length; i += 1) {
+        const d = (points[i].lat - target.lat) ** 2 + (points[i].lon - target.lon) ** 2;
+        if (d < distance) { best = i; distance = d; }
+      }
+      if (index.nearest(target) !== points[best]) mismatch = q;
+    }
+    return mismatch;
+  });
+  check('spatial index', 'matches the linear nearest-point result', indexCheck, -1);
+
   for (const e of pageErrors) failures.push(`page error: ${e}`);
+  await artifacts.capture(page, failures, pageErrors);
   await browser.close();
   server.close();
 

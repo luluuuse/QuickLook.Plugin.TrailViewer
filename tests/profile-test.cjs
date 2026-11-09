@@ -5,42 +5,28 @@
 //
 // Set CHROMIUM to a Chromium/Chrome executable if Playwright's own browser is not installed.
 const fs = require('fs');
-const http = require('http');
 const path = require('path');
-const { chromium } = require('playwright-core');
+const {
+  launchBrowser,
+  settlePopup,
+  waitForLayout,
+} = require('./support/browser.cjs');
+const { createChecker } = require('./support/assertions.cjs');
+const { createArtifacts } = require('./support/artifacts.cjs');
+const { startStaticServer } = require('./support/server.cjs');
 
 const root = path.resolve(__dirname, '..');
 const shot = process.argv[2] ? path.resolve(process.argv[2]) : null;
-const types = {
-  '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png',
-  '.gpx': 'application/gpx+xml', '.kml': 'application/vnd.google-earth.kml+xml',
-};
-
-function serve() {
-  const server = http.createServer((req, res) => {
-    const file = path.join(root, decodeURIComponent(new URL(req.url, 'http://x').pathname));
-    if (!file.startsWith(root + path.sep) || !fs.existsSync(file) || !fs.statSync(file).isFile()) {
-      res.writeHead(404).end();
-      return;
-    }
-    res.writeHead(200, { 'Content-Type': types[path.extname(file)] || 'application/octet-stream' });
-    fs.createReadStream(file).pipe(res);
-  });
-  return new Promise((resolve) => server.listen(0, '127.0.0.1', () => resolve(server)));
-}
-
-const failures = [];
-function check(what, ok, detail) {
-  console.log(`${ok ? 'PASS' : 'FAIL'}  ${what}${detail ? `  (${detail})` : ''}`);
-  if (!ok) failures.push(what);
-}
+const { check, failures, finish } = createChecker('profile');
+const artifacts = createArtifacts('profile');
 
 async function main() {
-  const server = await serve();
-  const base = `http://127.0.0.1:${server.address().port}`;
-  const browser = await chromium.launch({ executablePath: process.env.CHROMIUM || undefined });
+  const { server, base } = await startStaticServer(root);
+  const browser = await launchBrowser();
   // Pinned to en-US: the assertions below read English labels, and the viewer follows the system language.
   const page = await browser.newPage({ viewport: { width: 1200, height: 800 }, locale: 'en-US' });
+  await page.addInitScript(() => localStorage.setItem('gpxviewer.infoDetails', 'full'));
+  await artifacts.start(page);
   const pageErrors = [];
   page.on('pageerror', (e) => pageErrors.push(e.message));
 
@@ -114,16 +100,17 @@ async function main() {
   await open('track-time-ele.gpx');
   let s = await shape();
   let r = await rows();
-  let cells = await stats();
-  check('the summary gains an average speed', r['Avg speed'] === '15.8 km/h', r['Avg speed']);
-  check('the summary gains the climb', r.Ascent === '284 m', r.Ascent);
+  const cells = await stats();
+  check('the summary gains a moving average speed', r['Moving avg'] === '15.8 km/h', r['Moving avg']);
+  // 283 m of the walk used to disappear because the recording stopped while still climbing.
+  check('the summary gains the climb', r.Ascent === '567 m', r.Ascent);
   check('the summary gains the drop', r.Descent === '598 m', r.Descent);
   check('speed, climb and drop share one row',
-    cells.slice(0, 3).map((c) => c.label).join(',') === 'Avg speed,Ascent,Descent'
+    cells.slice(0, 3).map((c) => c.label).join(',') === 'Moving avg,Ascent,Descent'
       && cells[0].top === cells[1].top && cells[1].top === cells[2].top,
     cells.slice(0, 3).map((c) => `${c.label}@${c.top}`).join(' '));
   check('distance, time and points share the next row',
-    cells.slice(3).map((c) => c.label).join(',') === 'Distance,Time,Points'
+    cells.slice(3).map((c) => c.label).join(',') === 'Distance,Total time,Points'
       && cells[3].top === cells[4].top && cells[4].top === cells[5].top && cells[3].top > cells[2].top,
     cells.slice(3).map((c) => `${c.label}@${c.top}`).join(' '));
   // The duration moved up into that row, so the list below must not say it twice.
@@ -137,7 +124,7 @@ async function main() {
     cells.every((c, i) => i === 0 || c.top !== cells[i - 1].top || c.left >= cells[i - 1].right),
     cells.map((c) => `${c.left}-${c.right}`).join(' '));
   check('the profile agrees with the summary',
-    s.profile.ascent === 284 && s.profile.descent === 598, `${s.profile.ascent}/${s.profile.descent}`);
+    s.profile.ascent === 567 && s.profile.descent === 598, `${s.profile.ascent}/${s.profile.descent}`);
   check('the axis covers the whole route', Math.abs(s.profile.total - 15784) < 20, `${Math.round(s.profile.total)} m`);
 
   // 2. The legend says how hard the route is: the length that is steep, and the worst gradient on it. The
@@ -208,6 +195,54 @@ async function main() {
   check('a steep gradient is warmer than level ground',
     heat(ramp.climb)[0] > heat(ramp.level)[0] && heat(ramp.climb)[2] < heat(ramp.level)[2],
     `${ramp.level} -> ${ramp.climb}`);
+
+  // A recording can end on either side of a climb. Existing fixtures reverse direction; these monotonic
+  // cases guard the final, uncommitted stretch that used to be dropped entirely.
+  const closed = await page.evaluate(async () => {
+    const m = await import('./profile.js');
+    return [
+      m.elevationGain([0, 100]),
+      m.elevationGain([100, 0]),
+      m.elevationGain([0, 15, 1700]),
+      m.elevationGain([1700, 15, 0]),
+    ];
+  });
+  check('a route that only climbs records its ascent', closed[0].ascent === 100, JSON.stringify(closed[0]));
+  check('a route that only descends records its descent', closed[1].descent === 100, JSON.stringify(closed[1]));
+  check('and the same holds at the end of a larger climb or descent',
+    closed[2].ascent === 1700 && closed[3].descent === 1700, JSON.stringify(closed.slice(2)));
+
+  // The SVG viewBox is only 600 units wide. Keeping every raw sample adds path text and DOM work below one
+  // pixel, while a regular stride can erase a single-pixel summit. Each pixel keeps its low and high sample.
+  const sampled = await page.evaluate(async () => {
+    const m = await import('./profile.js');
+    const samples = Array.from({ length: 10000 }, (_, i) => ({
+      along: i,
+      ele: i === 5123 ? 9999 : i % 17,
+    }));
+    const kept = m.profileSamples(samples, 600);
+    return {
+      count: kept.length,
+      first: kept[0].along,
+      last: kept[kept.length - 1].along,
+      peak: kept.some((sample) => sample.ele === 9999),
+    };
+  });
+  check('a dense SVG profile is bounded to its pixels', sampled.count <= 1202, `${sampled.count}`);
+  check('pixel sampling keeps both ends', sampled.first === 0 && sampled.last === 9999,
+    `${sampled.first}..${sampled.last}`);
+  check('pixel sampling keeps a one-sample summit', sampled.peak);
+
+  const tidied = await page.evaluate(async () => {
+    const m = await import('./profile.js');
+    const samples = Array.from({ length: 81 }, (_, i) => ({
+      along: i * 25,
+      ele: i % 2 === 0 ? 0 : 20,
+    }));
+    return m.groundRuns(samples).map((run) => [run.from, run.to]);
+  });
+  check('short alternating runs collapse in one linear pass',
+    tidied.length === 1 && tidied[0][0] === 0 && tidied[0][1] === 2000, JSON.stringify(tidied));
   check('the legend carries the scale it refers to',
     /^linear-gradient/.test(s.scaleBar || '') && /#3aa06e|rgb\(58, 160, 110\)/.test(s.scaleBar || ''), s.scaleBar);
 
@@ -251,7 +286,7 @@ async function main() {
 
   // 6. The language switch carries the axis and the legend with it.
   await page.locator('.lang-switch button').click();
-  await page.waitForTimeout(200);
+  await waitForLayout(page);
   s = await shape();
   check('the axis speaks Chinese and keeps the unit', s.axis[0].text === '1800 m', s.axis[0].text);
   check('the legend speaks Chinese', /^陡坡\s*.*\s*·\s*最陡\s*\d+%$/.test(s.legend.text), String(s.legend.text));
@@ -259,7 +294,7 @@ async function main() {
   // English and the date still said 2026年1月1日.
   check('the date is written in Chinese', s.facts.some((v) => /年.*月.*日/.test(v)), s.facts.join(' | '));
   await page.locator('.lang-switch button').click();
-  await page.waitForTimeout(200);
+  await waitForLayout(page);
   s = await shape();
   check('and the date goes back to English', !s.facts.some((v) => /[年月日]/.test(v)),
     s.facts.join(' | '));
@@ -280,7 +315,7 @@ async function main() {
   check('a dot is placed along the plot', s.pins.every((pin) => pin.left.endsWith('%') && pin.top.endsWith('%')), s.pins[0].left);
   // A dot that nothing covers takes a real click.
   await page.locator('#profile .pin').last().click();
-  await page.waitForTimeout(300);
+  await settlePopup(page, '.leaflet-popup', 1);
   const popup = await page.evaluate(() => {
     const open = document.querySelector('.leaflet-popup');
     return { open: Boolean(open), title: open ? open.querySelector('strong')?.textContent : null };
@@ -290,8 +325,9 @@ async function main() {
   // A ringed dot opens the photo card. Dispatched rather than clicked: this fixture stacks three waypoints
   // within a few metres of each other, so a real click would always land on whichever dot is on top.
   await page.evaluate(() => window.gpxViewer.map.closePopup());
+  await settlePopup(page, '.leaflet-popup', 0);
   await page.evaluate(() => document.querySelector('#profile .pin.photo').dispatchEvent(new MouseEvent('click', { bubbles: true })));
-  await page.waitForTimeout(300);
+  await settlePopup(page, '.leaflet-popup', 1);
   const photoCard = await page.evaluate(() => {
     const open = document.querySelector('.leaflet-popup');
     return { open: Boolean(open), images: open ? open.querySelectorAll('img').length : 0 };
@@ -310,18 +346,18 @@ async function main() {
 
   if (shot) {
     await open('track-time-ele.gpx');
-    await page.waitForTimeout(300);
+    await waitForLayout(page);
     await page.screenshot({ path: shot });
   }
 
+  await artifacts.capture(page, failures, pageErrors);
   await browser.close();
   server.close();
 
   if (failures.length > 0) {
-    console.error(`\n${failures.length} failed: ${failures.join(', ')}`);
-    process.exit(1);
+    process.exit(finish());
   }
-  console.log('\nall checks passed');
+  process.exit(finish());
 }
 
 main().catch((e) => {

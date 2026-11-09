@@ -5,36 +5,16 @@
 //   NODE_PATH=<folder containing playwright-core> node tests/portrait-test.cjs [screenshot.png]
 //
 // Set CHROMIUM to a Chromium/Chrome executable if Playwright's own browser is not installed.
-const fs = require('fs');
-const http = require('http');
 const path = require('path');
-const { chromium } = require('playwright-core');
+const { launchBrowser, waitForLayout } = require('./support/browser.cjs');
+const { createChecker } = require('./support/assertions.cjs');
+const { createArtifacts } = require('./support/artifacts.cjs');
+const { startStaticServer } = require('./support/server.cjs');
 
 const root = path.resolve(__dirname, '..');
 const shot = process.argv[2] ? path.resolve(process.argv[2]) : null;
-const types = {
-  '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png',
-  '.gpx': 'application/gpx+xml', '.kml': 'application/vnd.google-earth.kml+xml',
-};
-
-function serve() {
-  const server = http.createServer((req, res) => {
-    const file = path.join(root, decodeURIComponent(new URL(req.url, 'http://x').pathname));
-    if (!file.startsWith(root + path.sep) || !fs.existsSync(file) || !fs.statSync(file).isFile()) {
-      res.writeHead(404).end();
-      return;
-    }
-    res.writeHead(200, { 'Content-Type': types[path.extname(file)] || 'application/octet-stream' });
-    fs.createReadStream(file).pipe(res);
-  });
-  return new Promise((resolve) => server.listen(0, '127.0.0.1', () => resolve(server)));
-}
-
-const failures = [];
-function check(what, ok, detail) {
-  console.log(`${ok ? 'PASS' : 'FAIL'}  ${what}${detail ? `  (${detail})` : ''}`);
-  if (!ok) failures.push(what);
-}
+const { check, failures } = createChecker('portrait');
+const artifacts = createArtifacts('portrait');
 
 /** Every floating piece of chrome, with the space it occupies. Missing or zero-sized ones are left out. */
 const measure = (page) => page.evaluate(() => {
@@ -55,7 +35,15 @@ const measure = (page) => page.evaluate(() => {
   add('profile', '#profile');
   add('scale', '.leaflet-control-scale');
   add('credit', '.leaflet-control-attribution');
-  return { w: innerWidth, h: innerHeight, stepped: document.body.classList.contains('stepped'), parts };
+  const layout = ['inline', 'wrapped', 'docked']
+    .find((name) => document.body.classList.contains(`layout-${name}`)) || '';
+  return {
+    w: innerWidth,
+    h: innerHeight,
+    stepped: document.body.classList.contains('stepped'),
+    layout,
+    parts,
+  };
 });
 
 const overlap = (a, b) => {
@@ -79,24 +67,25 @@ function clashes(parts) {
 }
 
 async function main() {
-  const server = await serve();
-  const base = `http://127.0.0.1:${server.address().port}`;
-  const browser = await chromium.launch({ executablePath: process.env.CHROMIUM || undefined });
+  const { server, base } = await startStaticServer(root);
+  const browser = await launchBrowser();
   const pageErrors = [];
 
   const openAt = async (width, height, file = 'track-time-ele.gpx') => {
     const page = await browser.newPage({ viewport: { width, height }, locale: 'en-US' });
+    await page.addInitScript(() => localStorage.setItem('gpxviewer.infoDetails', 'full'));
     page.on('pageerror', (e) => pageErrors.push(e.message));
     await page.goto(`${base}/viewer/index.html?src=../tests/fixtures/${encodeURIComponent(file)}`);
     await page.waitForFunction(() => document.body.classList.contains('loaded'));
-    await page.waitForTimeout(120);
+    await waitForLayout(page);
     return page;
   };
 
   // 1. A phone-shaped window (664x1111, the shape of the report that started this).
-  let page = await openAt(664, 1111);
-  let m = await measure(page);
-  let p = m.parts;
+  const page = await openAt(664, 1111);
+  await artifacts.start(page);
+  const m = await measure(page);
+  const p = m.parts;
 
   // The card hugs its own text: a portrait window is no reason to stretch it across the map.
   check('the summary keeps its own width', p.info.l === 10 && p.info.r < m.w * 0.65,
@@ -120,14 +109,12 @@ async function main() {
     pairs[3].left === pairs[0].left && pairs[4].left === pairs[1].left && pairs[5].left === pairs[2].left,
     pairs.map((x) => `${x.label}@${x.left}`).join(' '));
 
-  // The English switches are wide enough that this corner cannot hold them beside the card, so the controls step
-  // down and take a line of their own: the zoom against the left edge, the three switches against the right.
-  check('this window leaves no room up top, so the controls step down', m.stepped);
-  check('the zoom buttons sit below the card', p.zoom.t >= p.info.b, `${p.zoom.t} vs ${p.info.b}`);
-  check('so do the three switches',
-    p.layers.t >= p.info.b && p.pins.t >= p.info.b && p.lang.t >= p.info.b,
-    `${p.layers.t}/${p.pins.t}/${p.lang.t} vs ${p.info.b}`);
-  check('and all of it shares one line', p.zoom.t === p.layers.t && p.layers.t === p.pins.t,
+  // The three layout states are measured. This English card still leaves room for the controls in the top band,
+  // so the new wrapped/docked states must not fire merely because the window is portrait.
+  check('the measured top-band layout is used before docking', ['inline', 'wrapped'].includes(m.layout), m.layout);
+  check('the zoom buttons sit beside the card', Math.abs(p.zoom.l - p.info.r - 8) <= 1,
+    `${p.zoom.l} vs ${p.info.r}`);
+  check('the switches share the top band', p.zoom.t === p.layers.t && p.layers.t === p.pins.t,
     `${p.zoom.t}/${p.layers.t}/${p.pins.t}`);
 
   check('nothing overlaps anything', clashes(p).length === 0, clashes(p).join(' ') || 'clean');
@@ -200,17 +187,20 @@ async function main() {
   const tiny = await openAt(360, 740);
   const tm = await measure(tiny);
   check('a 360 px window still has no overlaps', clashes(tm.parts).length === 0, clashes(tm.parts).join(' ') || 'clean');
+  check('and it uses the docked tool band', tm.layout === 'docked', tm.layout);
   check('the credit clears the scale bar',
     overlap(tm.parts.scale, tm.parts.credit) === 0,
     `${JSON.stringify(tm.parts.scale)} vs ${JSON.stringify(tm.parts.credit)}`);
 
   if (shot) await page.screenshot({ path: shot });
+  check('the page raised no errors', pageErrors.length === 0, pageErrors.join(' | '));
+  await artifacts.capture(page, failures, pageErrors);
+
   await tiny.close();
   await page.close();
   await browser.close();
   server.close();
 
-  check('the page raised no errors', pageErrors.length === 0, pageErrors.join(' | '));
   console.log(failures.length === 0 ? '\nall checks passed' : `\n${failures.length} failed`);
   process.exit(failures.length === 0 ? 0 : 1);
 }

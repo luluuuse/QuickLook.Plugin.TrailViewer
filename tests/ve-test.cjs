@@ -9,48 +9,28 @@
 // of ground). A profile has one free scale -- the width is spent fitting the whole route across the panel --
 // so the height is what sets it. A fixed height made it the window's business; these assertions pin it to
 // the route instead.
-const fs = require('fs');
-const http = require('http');
 const path = require('path');
-const { chromium } = require('playwright-core');
+const { launchBrowser, waitForLayout } = require('./support/browser.cjs');
+const { createChecker } = require('./support/assertions.cjs');
+const { createArtifacts } = require('./support/artifacts.cjs');
+const { startStaticServer } = require('./support/server.cjs');
 
 const root = path.resolve(__dirname, '..');
-const types = {
-  '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png',
-  '.gpx': 'application/gpx+xml', '.kml': 'application/vnd.google-earth.kml+xml',
-};
-
-function serve() {
-  const server = http.createServer((req, res) => {
-    const file = path.join(root, decodeURIComponent(new URL(req.url, 'http://x').pathname));
-    if (!file.startsWith(root + path.sep) || !fs.existsSync(file) || !fs.statSync(file).isFile()) {
-      res.writeHead(404).end();
-      return;
-    }
-    res.writeHead(200, { 'Content-Type': types[path.extname(file)] || 'application/octet-stream' });
-    fs.createReadStream(file).pipe(res);
-  });
-  return new Promise((resolve) => server.listen(0, '127.0.0.1', () => resolve(server)));
-}
-
-const failures = [];
-function check(what, ok, detail) {
-  console.log(`${ok ? 'PASS' : 'FAIL'}  ${what}${detail ? `  (${detail})` : ''}`);
-  if (!ok) failures.push(what);
-}
+const { check, failures } = createChecker('ve');
+const artifacts = createArtifacts('ve');
 
 async function main() {
-  const server = await serve();
-  const base = `http://127.0.0.1:${server.address().port}`;
-  const browser = await chromium.launch({ executablePath: process.env.CHROMIUM || undefined });
+  const { server, base } = await startStaticServer(root);
+  const browser = await launchBrowser();
   const page = await browser.newPage({ viewport: { width: 1200, height: 800 }, locale: 'zh-CN' });
+  await artifacts.start(page);
   const pageErrors = [];
   page.on('pageerror', (e) => pageErrors.push(e.message));
 
   async function open(file) {
     await page.goto(`${base}/viewer/index.html?src=../tests/fixtures/${encodeURIComponent(file)}`);
     await page.waitForFunction(() => document.body.classList.contains('loaded'));
-    await page.waitForTimeout(250);
+    await waitForLayout(page);
   }
 
   // Everything the assertions need, read off the page rather than assumed: the plot's height, the width the
@@ -80,7 +60,8 @@ async function main() {
 
   async function widen(width) {
     await page.setViewportSize({ width, height: 800 });
-    await page.waitForTimeout(350);
+    await page.waitForFunction((wanted) => innerWidth === wanted, width);
+    await waitForLayout(page);
     return measure();
   }
 
@@ -122,7 +103,8 @@ async function main() {
 
   // ---- the caption is part of the page language ----
   await page.click('.lang-switch button');
-  await page.waitForTimeout(250);
+  await page.waitForFunction(() => document.documentElement.lang === 'en');
+  await waitForLayout(page);
   const english = await measure();
   check('the caption follows the language', /Vertical/.test(english.note || ''), english.note);
 
@@ -149,6 +131,7 @@ async function main() {
 
   check('the page raised no errors', pageErrors.length === 0, pageErrors.join(' | '));
 
+  await artifacts.capture(page, failures, pageErrors);
   await browser.close();
   server.close();
 

@@ -57,6 +57,8 @@ def pt_xml(tag, p, indent):
         inner += f'<time>{iso(p["time"])}</time>'
     if 'name' in p:
         inner += f'<name>{p["name"]}</name>'
+    if 'description' in p:
+        inner += f'<desc><![CDATA[{p["description"]}]]></desc>'
     return f'{indent}<{tag} lat="{p["lat"]}" lon="{p["lon"]}">{inner}</{tag}>\n'
 
 
@@ -80,7 +82,9 @@ def expected(tracks=(), routes=(), waypoints=()):
     if not segments:
         dist = sum(haversine((a['lat'], a['lon']), (b['lat'], b['lon']))
                    for _, rte in routes for a, b in zip(rte, rte[1:]))
-    times = sorted(p['time'] for p in track_pts + [p for _, r in routes for p in r] + list(waypoints) if 'time' in p)
+    route_pts = [p for _, r in routes for p in r]
+    timeline = track_pts if track_pts else route_pts if route_pts else list(waypoints)
+    times = sorted(p['time'] for p in timeline if 'time' in p)
     return {
         'tracks': len(tracks),
         'segments': len(segments),
@@ -116,6 +120,66 @@ def main():
     multi = [('Morning', [seg_a, seg_b]), ('Afternoon', [seg_c])]
     files['multi-segment.gpx'] = gpx_doc(NS11, '1.1', '', ''.join(track_xml(n, s) for n, s in multi))
     exp['multi-segment.gpx'] = expected(tracks=multi)
+
+    # A continuous trail with one bad GPS sample. The two surrounding edges are implausible jumps, but the
+    # viewer should collapse them into one sampling anomaly rather than call the line a data break.
+    anomaly_time = START + timedelta(days=1, hours=8)
+    anomaly = line(46.70, 8.10, 46.71, 8.14, 12, anomaly_time, 20)
+    anomaly[5] = {**anomaly[5], 'lat': anomaly[5]['lat'] + 0.01}
+    files['gps-anomaly.gpx'] = gpx_doc(NS11, '1.1', '', track_xml('GPS anomaly', [anomaly]))
+    exp['gps-anomaly.gpx'] = expected(tracks=[('GPS anomaly', [anomaly])])
+
+    # Three time-continuous spikes along one route. At overview zoom their GPS labels should merge into one
+    # anomaly-band label while keeping the cyan line overlays and the full anomaly count in the summary.
+    anomaly_band = line(46.80, 8.20, 46.82, 8.24, 30, anomaly_time + timedelta(hours=1), 20)
+    for index in (5, 14, 23):
+        anomaly_band[index] = {
+            **anomaly_band[index],
+            'lat': anomaly_band[index]['lat'] + 0.01,
+        }
+    files['gps-anomaly-band.gpx'] = gpx_doc(
+        NS11, '1.1', '', track_xml('GPS anomaly band', [anomaly_band]))
+    exp['gps-anomaly-band.gpx'] = expected(tracks=[('GPS anomaly band', [anomaly_band])])
+
+    # One real recording break plus one in-segment speed spike. Both measurements belong to the same
+    # "track anomalies" summary cell.
+    mixed = line(46.90, 8.30, 46.92, 8.34, 20, anomaly_time + timedelta(hours=2), 20)
+    mixed[6] = {**mixed[6], 'lat': mixed[6]['lat'] + 0.01}
+    second_half = [{**point, 'lat': point['lat'] + 0.02} for point in mixed[10:]]
+    mixed_segments = [mixed[:10], second_half]
+    files['mixed-anomalies.gpx'] = gpx_doc(
+        NS11, '1.1', '', track_xml('Mixed anomalies', mixed_segments))
+    exp['mixed-anomalies.gpx'] = expected(tracks=[('Mixed anomalies', mixed_segments)])
+
+    # A dense group of photo stops. All ordinary pins should cluster at a whole-route zoom, while the semantic
+    # danger point stays readable as an individual pin and keyboard selection can surface any raw stop.
+    dense_wpts = []
+    for i in range(60):
+        angle = 2 * math.pi * i / 60
+        point = {
+            'lat': round(30.0 + 0.00025 * math.sin(angle), 8),
+            'lon': round(100.0 + 0.00025 * math.cos(angle), 8),
+            'name': f'Photo stop {i + 1}',
+        }
+        if i % 3 == 0:
+            point['description'] = '<img src="photo.png">'
+        dense_wpts.append(point)
+    dense_wpts[0] = {'lat': 30.0, 'lon': 100.0, 'name': '危险陡崖'}
+    dense_placemarks = ''
+    for point in dense_wpts:
+        description = (f'<description><![CDATA[{point["description"]}]]></description>'
+                       if 'description' in point else '')
+        dense_placemarks += ('    <Placemark>'
+                             f'<name>{point["name"]}</name>{description}'
+                             '<Point><coordinates>'
+                             f'{point["lon"]},{point["lat"]},0'
+                             '</coordinates></Point></Placemark>\n')
+    files['dense-waypoints.kml'] = (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<kml xmlns="http://www.opengis.net/kml/2.2"><Document>'
+        '<name>Dense waypoints</name>\n'
+        f'{dense_placemarks}</Document></kml>\n')
+    exp['dense-waypoints.kml'] = expected(waypoints=dense_wpts)
 
     # Waypoints and a planned route, no track and no timestamps.
     wpts = [{'lat': 46.57, 'lon': 7.95, 'name': 'Start'},

@@ -18,6 +18,8 @@ const { execFileSync } = require('child_process');
 const root = path.resolve(__dirname, '..');
 const CSPROJ = 'src/QuickLook.Plugin.TrailViewer.csproj';
 const LOG = 'CHANGELOG.md';
+const PACKAGE = 'package.json';
+const LOCK = 'package-lock.json';
 const DASH = '\u2014'; // em dash: version-test parses "## 1.2.3 — 2026-11-07" literally
 
 const argv = process.argv.slice(2);
@@ -76,12 +78,20 @@ const nextLog = (() => {
   return renamed.slice(0, at) + entry + renamed.slice(at);
 })();
 const nextCsproj = csproj.replace(`<Version>${old}</Version>`, `<Version>${version}</Version>`);
+const beforePackage = read(PACKAGE);
+const beforeLock = read(LOCK);
+const nextPackage = beforePackage.split(`"version": "${old}"`).join(`"version": "${version}"`);
+const nextLock = beforeLock.split(`"version": "${old}"`).join(`"version": "${version}"`);
 
 // 4. Say what changed. The preview is the point of --dry, so it shows the real lines, not just "ok".
 const report = [];
 report.push(`${CSPROJ}`);
 report.push(`  - <Version>${old}</Version>`);
 report.push(`  + <Version>${version}</Version>`);
+report.push('');
+report.push(`${PACKAGE} / ${LOCK}`);
+report.push(`  - "version": "${old}"`);
+report.push(`  + "version": "${version}"`);
 report.push('');
 report.push(`${LOG}  (${occurrences} host name${occurrences === 1 ? '' : 's'})`);
 lines(log).forEach((line, i) => {
@@ -103,6 +113,8 @@ if (dry) {
 
 fs.writeFileSync(path.join(root, CSPROJ), nextCsproj);
 fs.writeFileSync(path.join(root, LOG), nextLog);
+fs.writeFileSync(path.join(root, PACKAGE), nextPackage);
+fs.writeFileSync(path.join(root, LOCK), nextLock);
 console.log(`\ncut ${version}: ${oldHost} -> ${newHost}`);
 console.log(`fill in the entry in ${LOG}, then build and pack.`);
 

@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2" xmlns:gx="http://www.google.com/kml/ext/2.2">
+  <Document>
+    <name>Waypoint insights phase two</name>
+    <Style id="water-icon">
+      <Icon><href>https://example.test/icons/water-source.png</href></Icon>
+    </Style>
+    <Style id="track-line">
+      <LineStyle><color>ff1034e8</color><width>4</width></LineStyle>
+    </Style>
+    <Placemark>
+      <name>Recorded route</name>
+      <gx:Track>
+        <when>2026-01-01T08:00:00Z</when>
+        <when>2026-01-01T08:30:00Z</when>
+        <when>2026-01-01T09:00:00Z</when>
+        <when>2026-01-01T09:30:00Z</when>
+        <when>2026-01-01T10:00:00Z</when>
+        <gx:coord>100.0000 30.0000 1000</gx:coord>
+        <gx:coord>100.0030 30.0000 1080</gx:coord>
+        <gx:coord>100.0060 30.0000 1100</gx:coord>
+        <gx:coord>100.0090 30.0000 1080</gx:coord>
+        <gx:coord>100.0120 30.0000 1050</gx:coord>
+      </gx:Track>
+    </Placemark>
+    <Placemark>
+      <name>图标点</name>
+      <styleUrl>#water-icon</styleUrl>
+      <Point><coordinates>100.0010,30.0000,1020</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>补给站</name>
+      <description>商店可以补充食物</description>
+      <Point><coordinates>100.0020,30.0000,1050</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>下撤口</name>
+      <description>可以撤离到公路</description>
+      <Point><coordinates>100.0030,30.0000,1080</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>长文字提示</name>
+      <description>这里是一段用于测试完整描述保留的说明。这里是一段用于测试完整描述保留的说明。这里是一段用于测试完整描述保留的说明。这里是一段用于测试完整描述保留的说明。这里是一段用于测试完整描述保留的说明。这里是一段用于测试完整描述保留的说明。这里是一段用于测试完整描述保留的说明。这里是一段用于测试完整描述保留的说明。这里是一段用于测试完整描述保留的说明。这里是一段用于测试完整描述保留的说明。前方禁止通行，请下撤。</description>
+      <Point><coordinates>100.0040,30.0000,1100</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>水源</name>
+      <description>泉眼可补水</description>
+      <Point><coordinates>100.0050,30.0000,1050</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>营地</name>
+      <description>适合扎营</description>
+      <Point><coordinates>100.00505,30.0000,1050</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>木桥</name>
+      <description>仅限单人通过</description>
+      <Point><coordinates>100.0070,30.0000,1090</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>救援点</name>
+      <description>应急求助点</description>
+      <Point><coordinates>100.0080,30.0000,1080</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>观景台</name>
+      <description>拍照点</description>
+      <Point><coordinates>100.0100,30.0000,1060</coordinates></Point>
+    </Placemark>
+  </Document>
+</kml>

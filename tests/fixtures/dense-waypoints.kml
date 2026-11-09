@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Dense waypoints</name>
+    <Placemark><name>危险陡崖</name><Point><coordinates>100.0,30.0,0</coordinates></Point></Placemark>
+    <Placemark><name>Photo stop 2</name><Point><coordinates>100.00024863,30.00002613,0</coordinates></Point></Placemark>
+    <Placemark><name>Photo stop 3</name><Point><coordinates>100.00024454,30.00005198,0</coordinates></Point></Placemark>
+    <Placemark><name>Photo stop 4</name><description><![CDATA[<img src="photo.png">]]></description><Point><coordinates>100.00023776,30.00007725,0</coordinates></Point></Placemark>
+    <Placemark><name>Photo stop 5</name><Point><coordinates>100.00022839,30.00010168,0</coordinates></Point></Placemark>
+    <Placemark><name>Photo stop 6</name><Point><coordinates>100.00021651,30.000125,0</coordinates></Point></Placemark>
+    <Placemark><name>Photo stop 7</name><description><![CDATA[<img src="photo.png">]]></description><Point><coordinates>100.00020225,30.00014695,0</coordinates></Point></Placemark>
+    <Placemark><name>Photo stop 8</name><Point><coordinates>100.00018579,30.00016728,0</coordinates></Point></Placemark>
+    <Placemark><name>Photo stop 9</name><Point><coordinates>100.00016728,30.00018579,0</coordinates></Point></Placemark>
+    <Placemark><name>Photo stop 10</name><description><![CDATA[<img src="photo.png">]]></description><Point><coordinates>100.00014695,30.00020225,0</coordinates></Point></Placemark>
+    <Placemark><name>Photo stop 11</name><Point><coordinates>100.000125,30.00021651,0</coordinates></Point></Placemark>
+    <Placemark><name>Photo stop 12</name><Point><coordinates>100.00010168,30.00022839,0</coordinates></Point></Placemark>
+    <Placemark><name>Photo stop 13</name><description><![CDATA[<img src="photo.png">]]></description><Point><coordinates>100.00007725,30.00023776,0</coordinates></Point></Placemark>
+    <Placemark><name>Photo stop 14</name><Point><coordinates>100.00005198,30.00024454,0</coordinates></Point></Placemark>
+    <Placemark><name>Photo stop 15</name><Point><coordinates>100.00002613,30.00024863,0</coordinates></Point></Placemark>
+    <Placemark><name>Photo stop 16</name><description><![CDATA[<img src="photo.png">]]></description><Point><coordinates>100.0,30.00025,0</coordinates></Point></Placemark>
+    <Placemark><name>Photo stop 17</name><Point><coordinates>99.99997387,30.00024863,0</coordinates></Point></Placemark>
+    <Placemark><name>Photo stop 18</name><Point><coordinates>99.99994802,30.00024454,0</coordinates></Point></Placemark>
+    <Placemark><name>Photo stop 19</name><description><![CDATA[<img src="photo.png">]]></description><Point><coordinates>99.99992275,30.00023776,0</coordinates></Point></Placemark>
+    <Placemark><name>Photo stop 20</name><Point><coordinates>99.99989832,30.00022839,0</coordinates></Point></Placemark>
+    <Placemark><name>Photo stop 21</name><Point><coordinates>99.999875,30.00021651,0</coordinates></Point></Placemark>
+    <Placemark><name>Photo stop 22</name><description><![CDATA[<img src="photo.png">]]></description><Point><coordinates>99.99985305,30.00020225,0</coordinates></Point></Placemark>
+    <Placemark><name>Photo stop 23</name><Point><coordinates>99.99983272,30.00018579,0</coordinates></Point></Placemark>
+    <Placemark><name>Photo stop 24</name><Point><coordinates>99.99981421,30.00016728,0</coordinates></Point></Placemark>
+    <Placemark><name>Photo stop 25</name><description><![CDATA[<img src="photo.png">]]></description><Point><coordinates>99.99979775,30.00014695,0</coordinates></Point></Placemark>
+    <Placemark><name>Photo stop 26</name><Point><coordinates>99.99978349,30.000125,0</coordinates></Point></Placemark>
+    <Placemark><name>Photo stop 27</name><Point><coordinates>99.99977161,30.00010168,0</coordinates></Point></Placemark>
+    <Placemark><name>Photo stop 28</name><description><![CDATA[<img src="photo.png">]]></description><Point><coordinates>99.99976224,30.00007725,0</coordinates></Point></Placemark>
+    <Placemark><name>Photo stop 29</name><Point><coordinates>99.99975546,30.00005198,0</coordinates></Point></Placemark>
+    <Placemark><name>Photo stop 30</name><Point><coordinates>99.99975137,30.00002613,0</coordinates></Point></Placemark>
+    <Placemark><name>Photo stop 31</name><description><![CDATA[<img src="photo.png">]]></description><Point><coordinates>99.99975,30.0,0</coordinates></Point></Placemark>
+    <Placemark><name>Photo stop 32</name><Point><coordinates>99.99975137,29.99997387,0</coordinates></Point></Placemark>
+    <Placemark><name>Photo stop 33</name><Point><coordinates>99.99975546,29.99994802,0</coordinates></Point></Placemark>
+    <Placemark><name>Photo stop 34</name><description><![CDATA[<img src="photo.png">]]></description><Point><coordinates>99.99976224,29.99992275,0</coordinates></Point></Placemark>
+    <Placemark><name>Photo stop 35</name><Point><coordinates>99.99977161,29.99989832,0</coordinates></Point></Placemark>
+    <Placemark><name>Photo stop 36</name><Point><coordinates>99.99978349,29.999875,0</coordinates></Point></Placemark>
+    <Placemark><name>Photo stop 37</name><description><![CDATA[<img src="photo.png">]]></description><Point><coordinates>99.99979775,29.99985305,0</coordinates></Point></Placemark>
+    <Placemark><name>Photo stop 38</name><Point><coordinates>99.99981421,29.99983272,0</coordinates></Point></Placemark>
+    <Placemark><name>Photo stop 39</name><Point><coordinates>99.99983272,29.99981421,0</coordinates></Point></Placemark>
+    <Placemark><name>Photo stop 40</name><description><![CDATA[<img src="photo.png">]]></description><Point><coordinates>99.99985305,29.99979775,0</coordinates></Point></Placemark>
+    <Placemark><name>Photo stop 41</name><Point><coordinates>99.999875,29.99978349,0</coordinates></Point></Placemark>
+    <Placemark><name>Photo stop 42</name><Point><coordinates>99.99989832,29.99977161,0</coordinates></Point></Placemark>
+    <Placemark><name>Photo stop 43</name><description><![CDATA[<img src="photo.png">]]></description><Point><coordinates>99.99992275,29.99976224,0</coordinates></Point></Placemark>
+    <Placemark><name>Photo stop 44</name><Point><coordinates>99.99994802,29.99975546,0</coordinates></Point></Placemark>
+    <Placemark><name>Photo stop 45</name><Point><coordinates>99.99997387,29.99975137,0</coordinates></Point></Placemark>
+    <Placemark><name>Photo stop 46</name><description><![CDATA[<img src="photo.png">]]></description><Point><coordinates>100.0,29.99975,0</coordinates></Point></Placemark>
+    <Placemark><name>Photo stop 47</name><Point><coordinates>100.00002613,29.99975137,0</coordinates></Point></Placemark>
+    <Placemark><name>Photo stop 48</name><Point><coordinates>100.00005198,29.99975546,0</coordinates></Point></Placemark>
+    <Placemark><name>Photo stop 49</name><description><![CDATA[<img src="photo.png">]]></description><Point><coordinates>100.00007725,29.99976224,0</coordinates></Point></Placemark>
+    <Placemark><name>Photo stop 50</name><Point><coordinates>100.00010168,29.99977161,0</coordinates></Point></Placemark>
+    <Placemark><name>Photo stop 51</name><Point><coordinates>100.000125,29.99978349,0</coordinates></Point></Placemark>
+    <Placemark><name>Photo stop 52</name><description><![CDATA[<img src="photo.png">]]></description><Point><coordinates>100.00014695,29.99979775,0</coordinates></Point></Placemark>
+    <Placemark><name>Photo stop 53</name><Point><coordinates>100.00016728,29.99981421,0</coordinates></Point></Placemark>
+    <Placemark><name>Photo stop 54</name><Point><coordinates>100.00018579,29.99983272,0</coordinates></Point></Placemark>
+    <Placemark><name>Photo stop 55</name><description><![CDATA[<img src="photo.png">]]></description><Point><coordinates>100.00020225,29.99985305,0</coordinates></Point></Placemark>
+    <Placemark><name>Photo stop 56</name><Point><coordinates>100.00021651,29.999875,0</coordinates></Point></Placemark>
+    <Placemark><name>Photo stop 57</name><Point><coordinates>100.00022839,29.99989832,0</coordinates></Point></Placemark>
+    <Placemark><name>Photo stop 58</name><description><![CDATA[<img src="photo.png">]]></description><Point><coordinates>100.00023776,29.99992275,0</coordinates></Point></Placemark>
+    <Placemark><name>Photo stop 59</name><Point><coordinates>100.00024454,29.99994802,0</coordinates></Point></Placemark>
+    <Placemark><name>Photo stop 60</name><Point><coordinates>100.00024863,29.99997387,0</coordinates></Point></Placemark>
+</Document></kml>

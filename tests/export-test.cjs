@@ -3,32 +3,15 @@
 //   NODE_PATH=<folder containing playwright-core> node tests/export-test.cjs
 //
 // Set CHROMIUM to a Chromium/Chrome executable if Playwright's own browser is not installed.
-const fs = require('fs');
-const http = require('http');
 const path = require('path');
-const { chromium } = require('playwright-core');
+const { launchBrowser } = require('./support/browser.cjs');
+const { createChecker } = require('./support/assertions.cjs');
+const { createArtifacts } = require('./support/artifacts.cjs');
+const { startStaticServer } = require('./support/server.cjs');
 
 const root = path.resolve(__dirname, '..');
-const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.gpx': 'application/gpx+xml' };
-
-function serve() {
-  const server = http.createServer((req, res) => {
-    const file = path.join(root, decodeURIComponent(new URL(req.url, 'http://x').pathname));
-    if (!file.startsWith(root + path.sep) || !fs.existsSync(file) || !fs.statSync(file).isFile()) {
-      res.writeHead(404).end();
-      return;
-    }
-    res.writeHead(200, { 'Content-Type': types[path.extname(file)] || 'application/octet-stream' });
-    fs.createReadStream(file).pipe(res);
-  });
-  return new Promise((resolve) => server.listen(0, '127.0.0.1', () => resolve(server)));
-}
-
-let failures = 0;
-function check(what, ok, detail) {
-  if (!ok) failures += 1;
-  console.log(`${ok ? 'PASS' : 'FAIL'}  ${what}${detail ? `  (${detail})` : ''}`);
-}
+const { check, failures, finish } = createChecker('export');
+const artifacts = createArtifacts('export');
 
 // Everything is measured on the canvas itself: the ink's own bounding box says where the drawing went,
 // which is the one thing a screenshot or a file size cannot tell us. The split between track and column is
@@ -181,10 +164,10 @@ async function rowOf(page, base, fixture, options) {
 }
 
 async function main() {
-  const server = await serve();
-  const base = `http://127.0.0.1:${server.address().port}`;
-  const browser = await chromium.launch({ executablePath: process.env.CHROMIUM });
+  const { server, base } = await startStaticServer(root);
+  const browser = await launchBrowser();
   const page = await browser.newPage({ viewport: { width: 1200, height: 800 } });
+  await artifacts.start(page);
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
 
@@ -270,6 +253,34 @@ async function main() {
     { ink: 'white', scrim: 'soft' });
   check('the backing goes dark behind white ink', paleBacking.shade > 20, `alpha ${paleBacking.shade}`);
 
+  // GPX accepts +/-90 degrees although Web Mercator does not. A valid polar point must not poison the
+  // whole export, and a route crossing the date line must use the short way around the globe.
+  const projection = await page.evaluate(async () => {
+    const m = await import('./export.js');
+    return {
+      north: m.mercator({ lat: 90, lon: 0 }),
+      south: m.mercator({ lat: -90, lon: 0 }),
+      east: m.unwrapLongitude(-179, 179),
+      west: m.unwrapLongitude(179, -179),
+    };
+  });
+  check('polar export coordinates stay finite',
+    Number.isFinite(projection.north.y) && Number.isFinite(projection.south.y), JSON.stringify(projection));
+  check('the date line wraps the short way', projection.east === 181 && projection.west === -181,
+    JSON.stringify(projection));
+
+  const simplified = await page.evaluate(async () => {
+    const m = await import('./export.js');
+    const points = Array.from({ length: 100 }, (_, i) => ({
+      xy: [i, i < 50 ? 0 : 100],
+    }));
+    const kept = m.simplifyPath(points, 0.35);
+    return { count: kept.length, first: kept[0].xy, last: kept[kept.length - 1].xy, corner: kept[1].xy };
+  });
+  check('pixel simplification keeps the ends and a real corner',
+    simplified.count === 4 && simplified.first[0] === 0 && simplified.last[0] === 99
+      && (simplified.corner[0] === 49 || simplified.corner[0] === 50), JSON.stringify(simplified));
+
   // A straight, flat route: no heights to colour by, so the ramp collapses to one colour and the column loses
   // the rows that would have shown a height. It still has to draw.
   const flat = await overlayOf(page, base, 'flat-city.gpx');
@@ -288,6 +299,11 @@ async function main() {
   await page.evaluate(() => window.gpxViewer.pressKey('X'));
   check('shift+X opens it', await page.evaluate(() => window.gpxViewer.panelOpen()) === true);
   check('and it is on screen', await page.locator('#export').isVisible());
+  check('opening the panel moves focus to its action',
+    await page.evaluate(() => document.activeElement?.classList.contains('go')) === true);
+  check('the export panel is a labelled dialog',
+    await page.locator('#export').getAttribute('role') === 'dialog'
+      && await page.locator('#export').getAttribute('aria-labelledby') === 'export-title');
 
   const shapes = await page.locator('#export .pick').first().locator('.option').allTextContents();
   check('the panel offers three shapes, named for what they are',
@@ -297,6 +313,9 @@ async function main() {
 
   await page.click('#export .pick .option[data-value="1:1"]');
   check('a click chooses a shape', await page.evaluate(() => window.gpxViewer.exportSettings().size) === '1:1');
+  check('the chosen shape exposes its pressed state',
+    await page.locator('#export .option[data-value="1:1"]').getAttribute('aria-pressed') === 'true'
+      && await page.locator('#export .option[data-value="9:16"]').getAttribute('aria-pressed') === 'false');
   check('the chosen cell is the marked one',
     await page.locator('#export .pick .option[data-value="1:1"]').evaluate((n) => n.classList.contains('on')));
 
@@ -325,10 +344,10 @@ async function main() {
 
   check('no page errors', errors.length === 0, errors.join(' | '));
 
+  await artifacts.capture(page, failures, errors);
   await browser.close();
   server.close();
-  console.log(failures === 0 ? '\noverlay OK' : `\n${failures} failed`);
-  process.exit(failures === 0 ? 0 : 1);
+  process.exit(finish('overlay OK'));
 }
 
 main().catch((e) => {

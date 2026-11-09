@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2" xmlns:gx="http://www.google.com/kml/ext/2.2">
+  <Document>
+    <name>Waypoint insights</name>
+    <Placemark>
+      <name>Recorded route</name>
+      <gx:Track>
+        <when>2026-01-01T08:00:00Z</when>
+        <when>2026-01-01T08:20:00Z</when>
+        <when>2026-01-01T08:40:00Z</when>
+        <when>2026-01-01T09:00:00Z</when>
+        <gx:coord>100.0000 30.0000 1000</gx:coord>
+        <gx:coord>100.0040 30.0000 1100</gx:coord>
+        <gx:coord>100.0080 30.0000 1000</gx:coord>
+        <gx:coord>100.0120 30.0000 1050</gx:coord>
+      </gx:Track>
+    </Placemark>
+    <Placemark>
+      <name>危险冰坡</name>
+      <description>陡崖和冰裂缝，注意安全</description>
+      <Point><coordinates>100.0010,30.0000,1020</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>无名水源</name>
+      <description>泉眼，可补水</description>
+      <Point><coordinates>100.0020,30.0000,1050</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>草甸营地</name>
+      <description>平坦开阔，适合扎营</description>
+      <Point><coordinates>100.0030,30.0000,1080</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>岔路口</name>
+      <description>向右转进入防火带</description>
+      <Point><coordinates>100.0050,30.0000,1120</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>主峰</name>
+      <description>山顶视野开阔</description>
+      <Point><coordinates>100.0060,30.0000,1150</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>危险水源</name>
+      <description>落石区，附近有泉水</description>
+      <Point><coordinates>100.0070,30.0000,1100</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>干涸水源</name>
+      <description>无水源，不要补水</description>
+      <Point><coordinates>100.0090,30.0000,1030</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>旧营地</name>
+      <description>禁止扎营</description>
+      <Point><coordinates>100.0100,30.0000,1040</coordinates></Point>
+    </Placemark>
+  </Document>
+</kml>

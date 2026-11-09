@@ -7,42 +7,31 @@
 // Set CHROMIUM to a Chromium/Chrome executable if Playwright's own browser is not installed.
 // Remote photos are intercepted, so this runs offline.
 const fs = require('fs');
-const http = require('http');
 const path = require('path');
-const { chromium } = require('playwright-core');
+const {
+  launchBrowser,
+  settlePopup,
+  waitForFocus,
+  waitForLayout,
+  waitForPhoto,
+} = require('./support/browser.cjs');
+const { createChecker } = require('./support/assertions.cjs');
+const { createArtifacts } = require('./support/artifacts.cjs');
+const { startStaticServer } = require('./support/server.cjs');
 
 const root = path.resolve(__dirname, '..');
 const shot = process.argv[2] ? path.resolve(process.argv[2]) : null;
 const fixture = 'kml-photos.kml';
-const types = {
-  '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.gpx': 'application/gpx+xml',
-};
-
-function serve() {
-  const server = http.createServer((req, res) => {
-    const file = path.join(root, decodeURIComponent(new URL(req.url, 'http://x').pathname));
-    if (!file.startsWith(root + path.sep) || !fs.existsSync(file) || !fs.statSync(file).isFile()) {
-      res.writeHead(404).end();
-      return;
-    }
-    res.writeHead(200, { 'Content-Type': types[path.extname(file)] || 'application/octet-stream' });
-    fs.createReadStream(file).pipe(res);
-  });
-  return new Promise((resolve) => server.listen(0, '127.0.0.1', () => resolve(server)));
-}
-
-const failures = [];
-function check(what, ok, detail) {
-  console.log(`${ok ? 'PASS' : 'FAIL'}  ${what}${detail ? `  (${detail})` : ''}`);
-  if (!ok) failures.push(what);
-}
+const { check, failures } = createChecker('photo');
+const artifacts = createArtifacts('photo');
 
 async function main() {
-  const server = await serve();
-  const base = `http://127.0.0.1:${server.address().port}`;
-  const browser = await chromium.launch({ executablePath: process.env.CHROMIUM || undefined });
+  const { server, base } = await startStaticServer(root);
+  const browser = await launchBrowser();
   // Pinned to en-US: the assertions below read English labels, and the viewer follows the system language.
   const page = await browser.newPage({ viewport: { width: 1200, height: 800 }, locale: 'en-US' });
+  await page.addInitScript(() => localStorage.setItem('gpxviewer.infoDetails', 'full'));
+  await artifacts.start(page);
   const pageErrors = [];
   page.on('pageerror', (e) => pageErrors.push(e.message));
   const cspViolations = [];
@@ -80,18 +69,16 @@ async function main() {
       const img = document.querySelector('.photo-popup .photo-thumb img');
       return img && img.complete && img.naturalWidth > 0;
     });
-    // The click must leave the card open. Leaflet fades a closed popup out over ~200 ms, so a check made
-    // right after the click cannot tell "open" from "opened and immediately toggled shut": settle first.
-    await page.waitForTimeout(400);
+    // The click must leave the card open. Waiting for the popup transition distinguishes an open card from
+    // one that Leaflet has already started fading out.
+    await settlePopup(page, '.photo-popup', 1);
     const open = await page.locator('.photo-popup').count();
     check(`the card for "${name}" stays open after the click`, open === 1, `${open} cards`);
   };
   const openFromCard = async (index) => {
     await page.locator('.photo-popup .photo-thumb').nth(index).click();
-    await page.waitForFunction(() => {
-      const img = document.querySelector('.photo-image');
-      return img && !img.hidden && img.complete && img.naturalWidth > 0;
-    });
+    await waitForPhoto(page);
+    await waitForFocus(page, '.photo-close');
   };
   const viewer = async () => page.evaluate(() => ({
     open: window.gpxViewer.photos.isOpen(),
@@ -135,8 +122,12 @@ async function main() {
   check('meta shows coordinates', /\d+\.\d{6}, \d+\.\d{6}/.test(state.meta), state.meta);
   check('meta shows the description text', state.meta.includes('Standing on the bridge'), state.meta);
   check('single photo hides the counter', state.counterHidden === true);
-  // Leaflet fades a closed popup out before dropping the element, so give the transition a moment.
-  await page.waitForTimeout(400);
+  check('opening the photo moves focus to its close button',
+    await page.evaluate(() => document.activeElement?.classList.contains('photo-close')) === true);
+  await page.keyboard.press('Tab');
+  check('a single-photo dialog traps Tab on its only control',
+    await page.evaluate(() => document.activeElement?.classList.contains('photo-close')) === true);
+  await settlePopup(page, '.leaflet-popup', 0);
   const cardLeft = await page.locator('.photo-popup').isVisible().catch(() => false);
   check('the card is closed behind the viewer', cardLeft === false);
 
@@ -161,6 +152,12 @@ async function main() {
   check('second thumbnail opens the second photo', /photo2\.png$/.test(state.src), state.src);
   check('counter starts at the clicked photo', state.counter === '2 / 2', state.counter);
   check('two arrows appear', state.arrows === 2, `${state.arrows}`);
+  await page.keyboard.press('Shift+Tab');
+  check('Shift+Tab wraps to the last dialog action',
+    await page.evaluate(() => document.activeElement?.classList.contains('next')) === true);
+  await page.keyboard.press('Tab');
+  check('Tab from the last action wraps to close',
+    await page.evaluate(() => document.activeElement?.classList.contains('photo-close')) === true);
 
   // 8. Stepping through the album and wrapping around.
   await page.locator('.photo-arrow.next').click();
@@ -178,6 +175,8 @@ async function main() {
   // 10. Clicking the backdrop closes.
   await page.mouse.click(20, 780);
   check('backdrop click closes', (await page.evaluate(() => window.gpxViewer.photos.isOpen())) === false);
+  check('closing restores focus to the map',
+    await page.evaluate(() => document.activeElement?.id) === 'map');
 
   // 11. An inline data URI loads without any network.
   await openCard('Inline');
@@ -206,13 +205,14 @@ async function main() {
 
   if (shot) {
     await openCard('Album');
-    await page.waitForTimeout(400);
+    await waitForLayout(page);
     await page.screenshot({ path: shot });
   }
 
   check('no page errors', pageErrors.length === 0, pageErrors.join('; '));
   check('no CSP violations', cspViolations.length === 0, cspViolations.join('; ').slice(0, 300));
 
+  await artifacts.capture(page, failures, pageErrors);
   await browser.close();
   server.close();
   console.log(failures.length === 0 ? '\nall checks passed' : `\n${failures.length} failed: ${failures.join(', ')}`);

@@ -25,7 +25,9 @@ const skip = new Set(['.pdb', '.xml']);
 
 function walk(dir, prefix = '') {
   const entries = [];
-  for (const item of fs.readdirSync(dir, { withFileTypes: true })) {
+  const items = fs.readdirSync(dir, { withFileTypes: true })
+    .sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+  for (const item of items) {
     const name = prefix ? `${prefix}/${item.name}` : item.name;
     if (item.isDirectory()) entries.push(...walk(path.join(dir, item.name), name));
     else if (!skip.has(path.extname(item.name)) && !item.name.endsWith('.deps.json')) {
@@ -33,6 +35,18 @@ function walk(dir, prefix = '') {
     }
   }
   return entries;
+}
+
+function relativeFiles(dir, prefix = '') {
+  const names = [];
+  const items = fs.readdirSync(dir, { withFileTypes: true })
+    .sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+  for (const item of items) {
+    const name = prefix ? `${prefix}/${item.name}` : item.name;
+    if (item.isDirectory()) names.push(...relativeFiles(path.join(dir, item.name), name));
+    else names.push(name);
+  }
+  return names;
 }
 
 // CRC-32, the checksum a zip entry needs; Node has no built-in.
@@ -127,19 +141,36 @@ if (entries.length === 0) {
   process.exit(1);
 }
 
+// CopyToOutputDirectory=PreserveNewest updates files but never removes ones deleted from viewer/. Packing
+// the whole output folder would therefore publish stale JavaScript after a refactor. Compare the viewer tree
+// to the source before accepting the build.
+const builtViewer = entries.filter((entry) => entry.name.startsWith('viewer/')).map((entry) => entry.name)
+  .sort();
+const sourceViewer = relativeFiles(path.join(root, 'viewer')).map((name) => `viewer/${name}`).sort();
+if (JSON.stringify(builtViewer) !== JSON.stringify(sourceViewer)) {
+  console.error('bin/Release/viewer does not match viewer/; clean and rebuild before packing');
+  const extra = builtViewer.filter((name) => !sourceViewer.includes(name));
+  const missing = sourceViewer.filter((name) => !builtViewer.includes(name));
+  if (extra.length) console.error(`extra: ${extra.join(', ')}`);
+  if (missing.length) console.error(`missing: ${missing.join(', ')}`);
+  process.exit(1);
+}
+
 // A file name carrying one version over a binary carrying another is worse than no version at all: it
 // survives review, gets published, and misleads everyone who downloads it. Catch a stale build here.
 const builtConfig = path.join(release, 'QuickLook.Plugin.Metadata.config');
-if (fs.existsSync(builtConfig)) {
-  const built = fs.readFileSync(builtConfig, 'utf8').match(/<Version>\s*([^<\s]+)\s*<\/Version>/);
-  if (!built) {
-    console.error(`${builtConfig} has no <Version>`);
-    process.exit(1);
-  }
-  if (built[1] !== version) {
-    console.error(`build output is ${built[1]} but the csproj says ${version}; rebuild before packing`);
-    process.exit(1);
-  }
+if (!fs.existsSync(builtConfig)) {
+  console.error(`${builtConfig} is missing; rebuild before packing`);
+  process.exit(1);
+}
+const built = fs.readFileSync(builtConfig, 'utf8').match(/<Version>\s*([^<\s]+)\s*<\/Version>/);
+if (!built) {
+  console.error(`${builtConfig} has no <Version>`);
+  process.exit(1);
+}
+if (built[1] !== version) {
+  console.error(`build output is ${built[1]} but the csproj says ${version}; rebuild before packing`);
+  process.exit(1);
 }
 // The upstream MIT notice has to travel with the binary: this is a fork of McBenac's plugin.
 entries.unshift({ name: 'LICENSE', data: fs.readFileSync(path.join(root, 'LICENSE')) });

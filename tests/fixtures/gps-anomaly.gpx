@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="make-fixtures" xmlns="http://www.topografix.com/GPX/1/1">
+  <trk>
+    <name>GPS anomaly</name>
+    <trkseg>
+      <trkpt lat="46.7" lon="8.1"><time>2026-01-02T17:00:00Z</time></trkpt>
+      <trkpt lat="46.700909" lon="8.103636"><time>2026-01-02T17:00:20Z</time></trkpt>
+      <trkpt lat="46.701818" lon="8.107273"><time>2026-01-02T17:00:40Z</time></trkpt>
+      <trkpt lat="46.702727" lon="8.110909"><time>2026-01-02T17:01:00Z</time></trkpt>
+      <trkpt lat="46.703636" lon="8.114545"><time>2026-01-02T17:01:20Z</time></trkpt>
+      <trkpt lat="46.714545" lon="8.118182"><time>2026-01-02T17:01:40Z</time></trkpt>
+      <trkpt lat="46.705455" lon="8.121818"><time>2026-01-02T17:02:00Z</time></trkpt>
+      <trkpt lat="46.706364" lon="8.125455"><time>2026-01-02T17:02:20Z</time></trkpt>
+      <trkpt lat="46.707273" lon="8.129091"><time>2026-01-02T17:02:40Z</time></trkpt>
+      <trkpt lat="46.708182" lon="8.132727"><time>2026-01-02T17:03:00Z</time></trkpt>
+      <trkpt lat="46.709091" lon="8.136364"><time>2026-01-02T17:03:20Z</time></trkpt>
+      <trkpt lat="46.71" lon="8.14"><time>2026-01-02T17:03:40Z</time></trkpt>
+    </trkseg>
+  </trk>
+</gpx>

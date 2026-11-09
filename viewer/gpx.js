@@ -2,8 +2,12 @@
 // Elements are matched by local name, so files with or without the GPX namespace both work.
 
 import { t } from './i18n.js';
+import { distanceMeters } from './geo.js';
+import { findTrackGaps, movementSummary } from './track-analysis.js';
 
-const EARTH_RADIUS_M = 6371008.8; // mean Earth radius, same as tools/make-fixtures.py
+/** @typedef {import('./types.js').TrackPoint} TrackPoint */
+/** @typedef {import('./types.js').ParsedTrack} ParsedTrack */
+/** @typedef {import('./types.js').TrackSummary} TrackSummary */
 
 export class GpxError extends Error {}
 
@@ -17,6 +21,7 @@ function childText(parent, name) {
   return text || null;
 }
 
+/** @returns {TrackPoint | null} */
 function readPoint(el) {
   const lat = Number(el.getAttribute('lat'));
   const lon = Number(el.getAttribute('lon'));
@@ -31,6 +36,13 @@ function readPoint(el) {
   if (time !== null && !Number.isNaN(Date.parse(time))) point.time = new Date(time);
   const name = childText(el, 'name');
   if (name !== null) point.name = name;
+  const description = childText(el, 'desc') || childText(el, 'cmt');
+  if (description !== null) {
+    point.description = description;
+    point.insightText = description;
+  }
+  const symbol = childText(el, 'sym');
+  if (symbol !== null) point.icon = symbol;
   return point;
 }
 
@@ -38,13 +50,7 @@ function readPoints(parent, name) {
   return children(parent, name).map(readPoint).filter(Boolean);
 }
 
-export function distanceMeters(a, b) {
-  const rad = Math.PI / 180;
-  const dLat = (b.lat - a.lat) * rad;
-  const dLon = (b.lon - a.lon) * rad;
-  const h = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * rad) * Math.cos(b.lat * rad) * Math.sin(dLon / 2) ** 2;
-  return 2 * EARTH_RADIUS_M * Math.asin(Math.min(1, Math.sqrt(h)));
-}
+export { distanceMeters } from './geo.js';
 
 function pathLength(points) {
   let total = 0;
@@ -70,6 +76,7 @@ export function parseGpx(text) {
 }
 
 /** Parses an already parsed GPX document. */
+/** @returns {ParsedTrack} */
 export function parseGpxDocument(doc) {
   const root = doc?.documentElement;
   if (!root || root.localName !== 'gpx') throw new GpxError(t('error.notGpx'));
@@ -97,43 +104,79 @@ export function parseGpxDocument(doc) {
 }
 
 /** Totals for the info box. Distance is the track length, or the route length when there are no tracks. */
+/** @param {ParsedTrack} gpx @returns {TrackSummary} */
 export function summarize(gpx) {
-  const segments = gpx.tracks.flatMap((t) => t.segments);
-  const trackPoints = segments.flat();
-  const routePoints = gpx.routes.flatMap((r) => r.points);
-  const distance = segments.length > 0
-    ? segments.reduce((sum, seg) => sum + pathLength(seg), 0)
-    : gpx.routes.reduce((sum, rte) => sum + pathLength(rte.points), 0);
-
-  let start = null;
-  let end = null;
-  for (const p of [...trackPoints, ...routePoints, ...gpx.waypoints]) {
-    if (!p.time) continue;
-    if (!start || p.time < start) start = p.time;
-    if (!end || p.time > end) end = p.time;
-  }
-
-  // An elevation profile only says something when the heights actually differ: KML often carries a
-  // constant 0 altitude, which would draw a flat line and an "Elevation 0-0 m" label.
+  let segmentCount = 0;
+  let trackPointCount = 0;
+  let trackDistance = 0;
+  let routeDistance = 0;
   let lowest = Infinity;
   let highest = -Infinity;
-  for (const p of trackPoints) {
-    if (p.ele === undefined) continue;
-    lowest = Math.min(lowest, p.ele);
-    highest = Math.max(highest, p.ele);
+  for (const track of gpx.tracks) {
+    for (const segment of track.segments) {
+      segmentCount += 1;
+      trackPointCount += segment.length;
+      trackDistance += pathLength(segment);
+      for (const point of segment) {
+        if (point.ele === undefined) continue;
+        if (point.ele < lowest) lowest = point.ele;
+        if (point.ele > highest) highest = point.ele;
+      }
+    }
   }
+  for (const route of gpx.routes) routeDistance += pathLength(route.points);
+
+  const distance = segmentCount > 0 ? trackDistance : routeDistance;
+
+  // Use the measured route first, without flattening its points into temporary arrays. Waypoint timestamps
+  // often describe a planned stop and can sit outside the recording.
+  let start = null;
+  let end = null;
+  const timeline = trackPointCount > 0 ? 'track' : gpx.routes.some((route) => route.points.length > 0) ? 'route' : 'waypoint';
+  const consider = (point) => {
+    if (!point.time) return;
+    if (!start || point.time < start) start = point.time;
+    if (!end || point.time > end) end = point.time;
+  };
+  if (timeline === 'track') {
+    for (const track of gpx.tracks) for (const segment of track.segments) for (const point of segment) consider(point);
+  } else if (timeline === 'route') {
+    for (const route of gpx.routes) for (const point of route.points) consider(point);
+  } else {
+    for (const point of gpx.waypoints) consider(point);
+  }
+  const movement = movementSummary(gpx.tracks);
+  const gaps = findTrackGaps(gpx.tracks);
+  const measuredDuration = start && end ? Math.round((end - start) / 1000) : null;
+  const duration = Number.isFinite(gpx.timeUsedSeconds)
+    ? Math.round(gpx.timeUsedSeconds)
+    : measuredDuration;
+  const metadataPause = Number.isFinite(gpx.pauseSeconds) && duration !== null
+    ? Math.min(duration, Math.max(0, Math.round(gpx.pauseSeconds)))
+    : null;
+  const movingDuration = metadataPause !== null ? duration - metadataPause : movement.movingDurationSeconds;
 
   return {
     tracks: gpx.tracks.length,
-    segments: segments.length,
+    segments: segmentCount,
     routes: gpx.routes.length,
     waypoints: gpx.waypoints.length,
     areas: gpx.areas?.length || 0,
-    points: trackPoints.length,
+    points: trackPointCount,
     distanceMeters: distance,
     start,
     end,
-    durationSeconds: start ? Math.round((end - start) / 1000) : null,
-    elevation: highest - lowest >= 1,
+    durationSeconds: duration,
+    movingDurationSeconds: movingDuration,
+    pausedSeconds: metadataPause ?? movement.pausedSeconds,
+    movingTimeSource: metadataPause !== null ? 'metadata' : 'estimated',
+    stops: movement.stops + movement.timeGaps,
+    gaps: gaps.segmentCount,
+    gapEvents: gaps.items.filter((item) => item.kind === 'segment').length,
+    gapDistanceMeters: gaps.segmentDistanceMeters,
+    anomalies: gaps.jumpCount,
+    anomalyEvents: gaps.items.filter((item) => item.kind === 'jump').length,
+    anomalyDistanceMeters: gaps.jumpDistanceMeters,
+    elevation: Number.isFinite(lowest) && Number.isFinite(highest) && highest - lowest >= 1,
   };
 }

@@ -36,8 +36,7 @@ internal sealed class GpxPanel : UserControl, IDisposable
     private string _path;
     private string _name;
     private string _unpackedFolder;
-    private MemoryStream _export;
-    private string _exportName;
+    private readonly OverlayTransfer _overlay = new();
     private WebView2 _webView;
     private GlobalKeys _keys;
     private volatile bool _onScreen;
@@ -90,7 +89,7 @@ internal sealed class GpxPanel : UserControl, IDisposable
             CreationProperties = new CoreWebView2CreationProperties
             {
                 // Also keeps the chosen map layer (localStorage) between previews.
-                UserDataFolder = Path.Combine(SettingHelper.LocalDataPath, "GpxViewer_WebView2"),
+                UserDataFolder = UserDataFolder,
             },
             DefaultBackgroundColor = System.Drawing.Color.FromArgb(255, 24, 24, 24),
         };
@@ -114,6 +113,21 @@ internal sealed class GpxPanel : UserControl, IDisposable
         _timeout.Start();
         Trace("WebView2 runtime " + CoreWebView2Environment.GetAvailableBrowserVersionString());
         _ = _webView.EnsureCoreWebView2Async();
+    }
+
+    /// <summary>
+    /// A harness can point WebView2 at its own profile, rather than contending with a running QuickLook instance
+    /// for the normal browser cache and lock files.
+    /// </summary>
+    private static string UserDataFolder
+    {
+        get
+        {
+            var overridden = Environment.GetEnvironmentVariable("GPXVIEWER_USER_DATA");
+            return string.IsNullOrWhiteSpace(overridden)
+                ? Path.Combine(SettingHelper.LocalDataPath, "GpxViewer_WebView2")
+                : Path.GetFullPath(overridden);
+        }
     }
 
     private void OnInitialized(object sender, CoreWebView2InitializationCompletedEventArgs e)
@@ -181,7 +195,10 @@ internal sealed class GpxPanel : UserControl, IDisposable
         var file = Path.GetFileName(path);
         var name = displayName ?? file;
         var source = $"https://{FileHost}/{Uri.EscapeDataString(file)}{VersionStamp(path)}";
-        return $"https://{AppHost}/index.html?src={Uri.EscapeDataString(source)}&name={Uri.EscapeDataString(name)}";
+        var preferences = ViewerPreferences.Query();
+        var suffix = string.IsNullOrEmpty(preferences) ? string.Empty : "&" + preferences;
+        return $"https://{AppHost}/index.html?src={Uri.EscapeDataString(source)}"
+            + $"&name={Uri.EscapeDataString(name)}{suffix}";
     }
 
     /// <summary>
@@ -338,62 +355,67 @@ internal sealed class GpxPanel : UserControl, IDisposable
         else if (message.StartsWith("exportchunk\t", StringComparison.Ordinal))
             AppendExport(message.Substring("exportchunk\t".Length));
         else if (message.StartsWith("exportdone\t", StringComparison.Ordinal))
-            FinishExport();
+            FinishExport(message.Substring("exportdone\t".Length));
         else if (message == "ready" || message.StartsWith("ready\t", StringComparison.Ordinal))
             Finish(null, message.Length > 6 ? message.Substring(6) : "");
         else if (message.StartsWith("error:", StringComparison.Ordinal))
             Finish(message.Substring("error:".Length), "");
+        else if (message.StartsWith("settings\t", StringComparison.Ordinal))
+            ViewerPreferences.SaveFromQuery(message.Substring("settings\t".Length));
     }
 
     /// <summary>The trace is read by a person watching the harness: a chunk of base64 is not worth a line.</summary>
     private static string Summarise(string message) =>
         message.StartsWith("exportchunk\t", StringComparison.Ordinal) ? "exportchunk ..." : message;
 
-    // The overlay arrives as base64 in pieces, because a 2160x2880 PNG is close to the size where one
-    // postMessage starts to be unreliable. Each piece is written straight into the stream: no string is
-    // ever built out of the whole picture.
-    private void BeginExport(string name)
+    // The overlay arrives as base64 in pieces, because a large PNG is close to the size where one
+    // postMessage starts to be unreliable. The id, sequence and count make a lost or duplicated piece visible
+    // instead of publishing a plausible-looking but corrupt PNG.
+    private void BeginExport(string body)
     {
-        _export?.Dispose();
-        _export = new MemoryStream();
-        _exportName = Sanitise(name);
+        try
+        {
+            _overlay.Begin(body);
+        }
+        catch (InvalidDataException ex)
+        {
+            FailExport(ex.Message);
+        }
     }
 
     private void AppendExport(string body)
     {
-        if (_export == null)
-            return;
-        var split = body.IndexOf('\t');
-        if (split < 0)
-            return;
         try
         {
-            var bytes = Convert.FromBase64String(body.Substring(split + 1));
-            _export.Write(bytes, 0, bytes.Length);
+            _overlay.Append(body);
         }
-        catch (FormatException ex)
+        catch (Exception ex) when (ex is FormatException or InvalidDataException or IOException)
         {
-            Trace("export chunk was not base64: " + ex.Message);
-            _export.Dispose();
-            _export = null;
+            FailExport(ex.Message);
         }
     }
 
     /// <summary>Writes the picture beside the track, or into the plugin's own folder when that one is read-only.</summary>
-    private void FinishExport()
+    private void FinishExport(string body)
     {
-        if (_export == null || _export.Length == 0)
+        OverlayTransferResult picture;
+        try
+        {
+            picture = _overlay.Complete(body);
+        }
+        catch (InvalidDataException ex)
+        {
+            FailExport(ex.Message);
             return;
-
-        var bytes = _export.ToArray();
-        _export.Dispose();
-        _export = null;
+        }
+        if (picture == null)
+            return;
 
         string target;
         try
         {
-            target = Path.Combine(Path.GetDirectoryName(_path) ?? "", _exportName);
-            File.WriteAllBytes(target, bytes);
+            target = Path.Combine(Path.GetDirectoryName(_path) ?? "", picture.Name);
+            AtomicFile.Write(target, picture.Picture);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException)
         {
@@ -402,8 +424,8 @@ internal sealed class GpxPanel : UserControl, IDisposable
             {
                 var fallback = Path.Combine(SettingHelper.LocalDataPath, "exports");
                 Directory.CreateDirectory(fallback);
-                target = Path.Combine(fallback, _exportName);
-                File.WriteAllBytes(target, bytes);
+                target = Path.Combine(fallback, picture.Name);
+                AtomicFile.Write(target, picture.Picture);
             }
             catch (Exception inner)
             {
@@ -412,21 +434,26 @@ internal sealed class GpxPanel : UserControl, IDisposable
                 return;
             }
         }
+        finally
+        {
+            picture.Dispose();
+        }
 
         Trace($"exported overlay to {target}");
         _ = SendToViewer($"exported('{Escape(target)}')");
     }
 
-    private static string Sanitise(string name)
+    private void FailExport(string detail)
     {
-        var leaf = Path.GetFileName(name ?? "");
-        foreach (var bad in Path.GetInvalidFileNameChars())
-            leaf = leaf.Replace(bad, '_');
-        return string.IsNullOrWhiteSpace(leaf) ? "overlay.png" : leaf;
+        _overlay.Reset();
+        Trace("export failed: " + detail);
+        _ = SendToViewer($"exportFailed('{Escape(detail)}')");
     }
 
     private static string Escape(string text) =>
-        (text ?? "").Replace("\\", "\\\\").Replace("'", "\\'");
+        (text ?? "").Replace("\\", "\\\\").Replace("'", "\\'")
+            .Replace("\r", "\\r").Replace("\n", "\\n")
+            .Replace("\u2028", "\\u2028").Replace("\u2029", "\\u2029");
 
     private async System.Threading.Tasks.Task SendToViewer(string call)
     {
@@ -531,8 +558,7 @@ internal sealed class GpxPanel : UserControl, IDisposable
         InputManager.Current.PreProcessInput -= OnPreProcessInput;
         _keys?.Dispose();
         _keys = null;
-        _export?.Dispose();
-        _export = null;
+        _overlay.Dispose();
         if (_webView != null)
         {
             _webView.CoreWebView2InitializationCompleted -= OnInitialized;

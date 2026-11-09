@@ -5,9 +5,13 @@
 import { parseXml } from './gpx.js';
 import { t } from './i18n.js';
 
+/** @typedef {import('./types.js').TrackPoint} TrackPoint */
+/** @typedef {import('./types.js').ParsedTrack} ParsedTrack */
+
 export class KmlError extends Error {}
 
 const MAX_DESCRIPTION = 200;
+const MAX_INSIGHT_TEXT = 12000;
 // Enough for an album, few enough that a pathological description cannot queue hundreds of requests.
 const MAX_IMAGES = 9;
 // Two pins closer than this are the same place: several apps write an automatic start/end pin next to the named one.
@@ -30,11 +34,23 @@ function childText(parent, name) {
   return textOf(child(parent, name));
 }
 
+/** Some exporters carry measured totals beside the geometry. TwoBulu uses milliseconds for these values. */
+function metricSeconds(container, name) {
+  if (!container) return undefined;
+  for (const data of Array.from(container.getElementsByTagName('Data'))) {
+    if (data.getAttribute('name') !== name) continue;
+    const value = Number(childText(data, 'value'));
+    if (Number.isFinite(value) && value >= 0) return value / 1000;
+  }
+  return undefined;
+}
+
 function isLatLon(lat, lon) {
   return Number.isFinite(lat) && Number.isFinite(lon) && Math.abs(lat) <= 90 && Math.abs(lon) <= 180;
 }
 
 /** <coordinates> holds "lon,lat[,alt]" tuples separated by whitespace. */
+/** @returns {TrackPoint[]} */
 export function parseCoordinates(raw) {
   const points = [];
   for (const tuple of (raw || '').trim().split(/\s+/)) {
@@ -80,10 +96,14 @@ function readTime(placemark) {
  */
 function readDescription(placemark) {
   const raw = childText(placemark, 'description');
-  if (!raw) return { text: undefined, images: [] };
+  if (!raw) return { text: undefined, insightText: undefined, images: [] };
   const plain = raw.replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
+  const insightText = plain.length > MAX_INSIGHT_TEXT
+    ? `${plain.slice(0, MAX_INSIGHT_TEXT - 1)}…`
+    : plain;
   return {
     text: plain ? (plain.length > MAX_DESCRIPTION ? `${plain.slice(0, MAX_DESCRIPTION - 1)}…` : plain) : undefined,
+    insightText: insightText || undefined,
     images: readImages(raw),
   };
 }
@@ -110,11 +130,16 @@ function readImages(raw) {
 /** A gx:Track keeps its times and its coordinates in two parallel lists that are matched by index. */
 function readTrack(track) {
   const times = children(track, 'when').map((when) => Date.parse(when.textContent.trim()));
-  const coords = children(track, 'coord').map((coord) => parseGxCoord(coord.textContent)).filter(Boolean);
+  const coords = [];
   let lastTime = null;
-  coords.forEach((point, i) => {
+  // Keep the time index tied to the original coordinate. Filtering invalid coordinates first shifted every
+  // later time by one when a malformed point appeared in the middle of the track.
+  children(track, 'coord').forEach((coord, i) => {
     if (Number.isFinite(times[i])) lastTime = times[i];
+    const point = parseGxCoord(coord.textContent);
+    if (!point) return;
     if (lastTime !== null) point.time = new Date(lastTime);
+    coords.push(point);
   });
   return coords;
 }
@@ -148,10 +173,14 @@ function addWaypoint(waypoints, seen, point) {
   }
 }
 
-function readPlacemark(placemark, out) {
+function readPlacemark(placemark, out, styles) {
   const name = childText(placemark, 'name');
   const time = readTime(placemark);
-  const { text: description, images } = readDescription(placemark);
+  const { text: description, insightText, images } = readDescription(placemark);
+  const styleUrl = childText(placemark, 'styleUrl');
+  const inlineStyle = child(placemark, 'Style');
+  const inlineIcon = inlineStyle && child(child(inlineStyle, 'Icon'), 'href');
+  const icon = textOf(inlineIcon) || styles.get((styleUrl || '').replace(/^#/, '')) || styleUrl;
 
   const collect = (node) => {
     for (const geometry of node.children) {
@@ -182,7 +211,17 @@ function readPlacemark(placemark, out) {
         }
         case 'Point': {
           const point = parseCoordinates(childText(geometry, 'coordinates') || '')[0];
-          if (point) out.points.push({ ...point, name: name || undefined, time, description, images });
+          if (point) {
+            out.points.push({
+              ...point,
+              name: name || undefined,
+              time,
+              description,
+              insightText,
+              images,
+              icon: icon || undefined,
+            });
+          }
           break;
         }
         default:
@@ -195,6 +234,7 @@ function readPlacemark(placemark, out) {
 }
 
 /** Parses an already parsed KML document. Throws KmlError with a readable message. */
+/** @returns {ParsedTrack} */
 export function parseKmlDocument(doc) {
   const root = doc?.documentElement;
   if (!root || root.localName !== 'kml') throw new KmlError(t('error.notKml'));
@@ -203,12 +243,19 @@ export function parseKmlDocument(doc) {
   const areas = [];
   const waypoints = [];
   const seen = new Map();
+  const styles = new Map();
+  for (const style of Array.from(doc.getElementsByTagName('Style'))) {
+    if (!style.id) continue;
+    const icon = child(style, 'Icon');
+    const href = icon && child(icon, 'href');
+    if (href) styles.set(style.id, textOf(href));
+  }
 
   const visit = (node) => {
     for (const element of node.children) {
       if (element.localName === 'Placemark') {
         const found = { segments: [], areas: [], points: [] };
-        readPlacemark(element, found);
+        readPlacemark(element, found, styles);
         if (found.segments.length > 0) {
           tracks.push({ name: childText(element, 'name'), segments: found.segments });
         }
@@ -223,6 +270,7 @@ export function parseKmlDocument(doc) {
 
   const documentNode = child(root, 'Document');
   const documentName = documentNode ? childText(documentNode, 'name') : null;
+  const extended = documentNode || root;
 
   return {
     version: '2.2',
@@ -234,6 +282,8 @@ export function parseKmlDocument(doc) {
     routes: [],
     waypoints,
     areas,
+    timeUsedSeconds: metricSeconds(extended, 'TimeUsed'),
+    pauseSeconds: metricSeconds(extended, 'PauseTime'),
   };
 }
 

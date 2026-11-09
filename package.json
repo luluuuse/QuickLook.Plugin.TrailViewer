@@ -1,0 +1,27 @@
+{
+  "name": "quicklook-plugin-trailviewer",
+  "version": "1.16.22",
+  "type": "module",
+  "private": true,
+  "description": "Browser tests for QuickLook.Plugin.TrailViewer",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "lint": "eslint viewer scripts tests tools",
+    "typecheck": "tsc -p jsconfig.json",
+    "check": "npm run lint && npm run typecheck",
+    "test": "npm run test:unit && node scripts/test.cjs",
+    "test:unit": "node --test \"tests/unit/*.test.mjs\"",
+    "test:host": "node scripts/host-test.cjs",
+    "test:live": "node tests/smoke/terrain-live.cjs",
+    "test:version": "node tests/version-test.cjs"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "eslint": "^9.39.4",
+    "globals": "^16.5.0",
+    "playwright-core": "1.64.1",
+    "typescript": "^5.9.3"
+  }
+}

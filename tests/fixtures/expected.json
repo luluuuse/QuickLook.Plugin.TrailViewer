@@ -24,7 +24,11 @@
     "track-time-ele.gpx": true,
     "truncated.gpx": true,
     "waypoints-route.gpx": true,
-    "2026-02-01-alpine-snow-traverse-1793781751910.gpx": true
+    "2026-02-01-alpine-snow-traverse-1793781751910.gpx": true,
+    "gps-anomaly.gpx": true,
+    "dense-waypoints.kml": true,
+    "gps-anomaly-band.gpx": true,
+    "mixed-anomalies.gpx": true
   },
   "viewer": {
     "gpx10.gpx": {
@@ -185,6 +189,58 @@
       "end": "2026-01-05T11:00:00Z",
       "durationSeconds": 7200,
       "elevation": true
+    },
+    "gps-anomaly.gpx": {
+      "tracks": 1,
+      "segments": 1,
+      "routes": 0,
+      "waypoints": 0,
+      "areas": 0,
+      "points": 12,
+      "distanceMeters": 4948.6,
+      "start": "2026-01-02T17:00:00Z",
+      "end": "2026-01-02T17:03:40Z",
+      "durationSeconds": 220,
+      "elevation": false
+    },
+    "dense-waypoints.kml": {
+      "tracks": 0,
+      "segments": 0,
+      "routes": 0,
+      "waypoints": 60,
+      "areas": 0,
+      "points": 0,
+      "distanceMeters": 0,
+      "start": null,
+      "end": null,
+      "durationSeconds": null,
+      "elevation": false
+    },
+    "gps-anomaly-band.gpx": {
+      "tracks": 1,
+      "segments": 1,
+      "routes": 0,
+      "waypoints": 0,
+      "areas": 0,
+      "points": 30,
+      "distanceMeters": 9691.2,
+      "start": "2026-01-02T18:00:00Z",
+      "end": "2026-01-02T18:09:40Z",
+      "durationSeconds": 580,
+      "elevation": false
+    },
+    "mixed-anomalies.gpx": {
+      "tracks": 1,
+      "segments": 2,
+      "routes": 0,
+      "waypoints": 0,
+      "areas": 0,
+      "points": 20,
+      "distanceMeters": 5417.5,
+      "start": "2026-01-02T19:00:00Z",
+      "end": "2026-01-02T19:06:20Z",
+      "durationSeconds": 380,
+      "elevation": false
     }
   }
 }

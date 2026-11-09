@@ -22,7 +22,9 @@
 // short edge of a 12 MP photo, the size the picture actually occupies when it sits in one half of the frame,
 // and still double what a share leaves it. Larger only costs bytes and gets resampled on the way in.
 
-const MAX_POINTS = 6000; // past this, more points land in the same pixel; dropping them costs nothing
+// The RDP pass below does the real pixel-aware reduction. This is only a ceiling for pathologically long
+// inputs, high enough that every file in the documented 30k-point range reaches RDP intact.
+const MAX_POINTS = 30000;
 
 // Three shapes: a square, a phone screen, and the landscape page. The key is the shape's own proportion and is
 // what the file name carries; what the panel calls it is the i18n layer's business.
@@ -64,6 +66,7 @@ const PENS = {
 
 // Green at the lowest point, red at the highest, yellow and orange in between: the ramp a topographic print
 // uses, and the one that still reads once the overlay lands on a dark photo.
+/** @type {Array<[number, [number, number, number]]>} */
 const RAMP = [
   [0.0, [46, 204, 64]],
   [0.28, [143, 212, 0]],
@@ -148,11 +151,19 @@ function landscape(width, height) {
   };
 }
 
-function mercator(p) {
+export function mercator(p) {
+  // Web Mercator is undefined at the poles. Latitude 90 is valid in GPX/KML, so clamp to the same limit as
+  // map tiles rather than letting one point turn the whole export into NaN or Infinity.
+  const lat = Math.max(-85.05112878, Math.min(85.05112878, p.lat));
   const x = (p.lon + 180) / 360;
-  const s = Math.sin((p.lat * Math.PI) / 180);
+  const s = Math.sin((lat * Math.PI) / 180);
   const y = 0.5 - Math.log((1 + s) / (1 - s)) / (4 * Math.PI);
   return { x, y };
+}
+
+/** Put a longitude on the same world copy as the reference, choosing the short way across 180 degrees. */
+export function unwrapLongitude(lon, reference) {
+  return reference + ((((lon - reference + 540) % 360) + 360) % 360 - 180);
 }
 
 /** Every point kept, or a regular sample of them, always including the last one. */
@@ -165,18 +176,22 @@ function decimate(points) {
   return kept;
 }
 
-/** Maps a point to page pixels, fitting the whole route into `box` without stretching it. */
-function projector(points, box) {
+/** Maps points to page pixels, fitting every line into `box` without stretching it. */
+function projector(lines, box) {
+  const anchorLon = lines.find((line) => line.length > 0)?.[0]?.lon ?? 0;
+  const project = (p) => mercator({ lat: p.lat, lon: unwrapLongitude(p.lon, anchorLon) });
   let minX = Infinity;
   let maxX = -Infinity;
   let minY = Infinity;
   let maxY = -Infinity;
-  for (const p of points) {
-    const q = mercator(p);
-    if (q.x < minX) minX = q.x;
-    if (q.x > maxX) maxX = q.x;
-    if (q.y < minY) minY = q.y;
-    if (q.y > maxY) maxY = q.y;
+  for (const line of lines) {
+    for (const p of line) {
+      const q = project(p);
+      if (q.x < minX) minX = q.x;
+      if (q.x > maxX) maxX = q.x;
+      if (q.y < minY) minY = q.y;
+      if (q.y > maxY) maxY = q.y;
+    }
   }
   // A route that runs dead north or is a single point has a zero span: a tiny floor keeps the scale finite.
   const spanX = Math.max(maxX - minX, 1e-9);
@@ -187,9 +202,50 @@ function projector(points, box) {
   const mx = (minX + maxX) / 2;
   const my = (minY + maxY) / 2;
   return (p) => {
-    const q = mercator(p);
+    const q = project(p);
     return [cx + (q.x - mx) * scale, cy + (q.y - my) * scale];
   };
+}
+
+function distanceToSegmentSquared(point, a, b) {
+  const dx = b[0] - a[0];
+  const dy = b[1] - a[1];
+  if (dx === 0 && dy === 0) return (point[0] - a[0]) ** 2 + (point[1] - a[1]) ** 2;
+  const t = Math.max(0, Math.min(1,
+    ((point[0] - a[0]) * dx + (point[1] - a[1]) * dy) / (dx * dx + dy * dy)));
+  const x = a[0] + t * dx;
+  const y = a[1] + t * dy;
+  return (point[0] - x) ** 2 + (point[1] - y) ** 2;
+}
+
+/**
+ * Ramer-Douglas-Peucker in output pixels, with an iterative stack so a long track cannot overflow the call
+ * stack. It keeps corners and spikes rather than blindly dropping every nth point.
+ */
+export function simplifyPath(points, tolerance = 0.35) {
+  if (points.length <= 2) return points;
+  const keep = new Uint8Array(points.length);
+  const limit = tolerance * tolerance;
+  keep[0] = 1;
+  keep[points.length - 1] = 1;
+  const stack = [[0, points.length - 1]];
+  while (stack.length > 0) {
+    const [from, to] = stack.pop();
+    let farthest = -1;
+    let farthestDistance = limit;
+    for (let i = from + 1; i < to; i += 1) {
+      const d = distanceToSegmentSquared(points[i].xy, points[from].xy, points[to].xy);
+      if (d > farthestDistance) {
+        farthestDistance = d;
+        farthest = i;
+      }
+    }
+    if (farthest >= 0) {
+      keep[farthest] = 1;
+      stack.push([from, farthest], [farthest, to]);
+    }
+  }
+  return points.filter((_, index) => keep[index] === 1);
 }
 
 function ramp(stop) {
@@ -521,10 +577,11 @@ export function drawOverlay({ segments, rows, ends, size, scrim, ink }) {
 
   if (scrim && scrim !== 'none') paintScrim(ctx, box, pen.wash);
 
-  const lines = segments.map(decimate).filter((line) => line.length > 0);
+  const fullLines = segments.filter((line) => line.length > 0);
+  const lines = fullLines.map(decimate);
   let minEle = Infinity;
   let maxEle = -Infinity;
-  for (const line of lines) {
+  for (const line of fullLines) {
     for (const p of line) {
       if (p.ele === undefined) continue;
       if (p.ele < minEle) minEle = p.ele;
@@ -534,8 +591,10 @@ export function drawOverlay({ segments, rows, ends, size, scrim, ink }) {
   const flat = !Number.isFinite(minEle) || !Number.isFinite(maxEle);
 
   if (lines.length > 0) {
-    const to = projector(lines.flat(), box.track);
-    const placed = lines.map((line) => line.map((p) => ({ ...p, xy: to(p) })));
+    const to = projector(fullLines, box.track);
+    const placed = lines
+      .map((line) => simplifyPath(line.map((p) => ({ ...p, xy: to(p) }))))
+      .filter((line) => line.length > 0);
     paintRoute(ctx, placed, minEle, maxEle, flat);
     const firstLine = placed[0].map((p) => p.xy);
     const lastLine = placed[placed.length - 1].map((p) => p.xy);

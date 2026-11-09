@@ -4,46 +4,31 @@
 //   NODE_PATH=<folder containing playwright-core> node tests/locate-test.cjs
 //
 // Set CHROMIUM to a Chromium/Chrome executable if Playwright's own browser is not installed.
-const fs = require('fs');
-const http = require('http');
 const path = require('path');
-const { chromium } = require('playwright-core');
+const {
+  launchBrowser,
+  waitForLayout,
+  waitForMapIdle,
+} = require('./support/browser.cjs');
+const { createChecker } = require('./support/assertions.cjs');
+const { createArtifacts } = require('./support/artifacts.cjs');
+const { startStaticServer } = require('./support/server.cjs');
 
 const root = path.resolve(__dirname, '..');
-const types = {
-  '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.gpx': 'application/gpx+xml',
-};
-
-function serve() {
-  const server = http.createServer((req, res) => {
-    const file = path.join(root, decodeURIComponent(new URL(req.url, 'http://x').pathname));
-    if (!file.startsWith(root + path.sep) || !fs.existsSync(file) || !fs.statSync(file).isFile()) {
-      res.writeHead(404).end();
-      return;
-    }
-    res.writeHead(200, { 'Content-Type': types[path.extname(file)] || 'application/octet-stream' });
-    fs.createReadStream(file).pipe(res);
-  });
-  return new Promise((resolve) => server.listen(0, '127.0.0.1', () => resolve(server)));
-}
-
-const failures = [];
-function check(what, ok, detail) {
-  console.log(`${ok ? 'PASS' : 'FAIL'}  ${what}${detail ? `  (${detail})` : ''}`);
-  if (!ok) failures.push(what);
-}
+const { check, failures } = createChecker('locate');
+const artifacts = createArtifacts('locate');
 
 async function main() {
-  const server = await serve();
-  const base = `http://127.0.0.1:${server.address().port}`;
-  const browser = await chromium.launch({ executablePath: process.env.CHROMIUM || undefined });
+  const { server, base } = await startStaticServer(root);
+  const browser = await launchBrowser();
   const page = await browser.newPage({ viewport: { width: 1200, height: 800 }, locale: 'zh-CN' });
+  await artifacts.start(page);
   const pageErrors = [];
   page.on('pageerror', (e) => pageErrors.push(e.message));
 
   await page.goto(`${base}/viewer/index.html?src=../tests/fixtures/track-time-ele.gpx`);
   await page.waitForFunction(() => document.body.classList.contains('loaded'));
-  await page.waitForTimeout(600);
+  await waitForMapIdle(page);
 
   // The frame the file opened with, and the ground the track actually covers.
   const view = () => page.evaluate(() => {
@@ -93,7 +78,7 @@ async function main() {
   check('the corner carries a locate button', button !== null, button ? `"${button.label}"` : 'missing');
   check('the button is an icon, not a word', button?.icon === true);
   check('it is labelled for screen readers', /轨迹|track/.test(button?.label || ''), button?.label);
-  check('the button never keeps focus', button?.tab === -1, `tabindex ${button?.tab}`);
+  check('the button can be reached with Tab', button?.tab === 0, `tabindex ${button?.tab}`);
   check('the tooltip names the key', /C/.test(button?.title || ''), button?.title);
   check('it sits in the zoom column', button?.belowZoom === true && Math.abs(button?.dx ?? 99) <= 1,
     `${button?.width}x${button?.height}, ${button?.dx} px sideways, ${button?.dy} px under`);
@@ -101,15 +86,28 @@ async function main() {
   // Somewhere else entirely -- a different continent and a different zoom.
   const away = async () => {
     await page.evaluate(() => { window.gpxViewer.map.setView([0, 0], 4, { animate: false }); });
-    await page.waitForTimeout(200);
+    await waitForMapIdle(page);
     return view();
+  };
+  const waitForHome = async () => {
+    await page.waitForFunction(({ zoom, lat, lng }) => {
+      const map = window.gpxViewer.map;
+      const center = map.getCenter();
+      return map.getZoom() === zoom && Math.abs(center.lat - lat) < 0.002
+        && Math.abs(center.lng - lng) < 0.002;
+    }, opening);
+    await waitForMapIdle(page);
+  };
+  const setChromeHidden = async (hidden) => {
+    await page.waitForFunction((wanted) => document.body.classList.contains('chrome-hidden') === wanted, hidden);
+    await waitForLayout(page);
   };
 
   // 1. The page's own keydown.
   const parked = await away();
   check('the map can be parked away from the track', !coversTrack(parked), `zoom ${parked.zoom}`);
   await page.keyboard.press('c');
-  await page.waitForTimeout(700);
+  await waitForHome();
   const afterKey = await view();
   check('C brings the whole track back', coversTrack(afterKey), `zoom ${afterKey.zoom}`);
   check('C lands on the same zoom the file opened with', afterKey.zoom === opening.zoom,
@@ -121,7 +119,7 @@ async function main() {
   // 2. The host's road -- the same call QuickLook makes when it holds the keyboard.
   await away();
   await page.evaluate(() => window.gpxViewer.pressKey('c'));
-  await page.waitForTimeout(700);
+  await waitForHome();
   const afterHost = await view();
   check('pressKey("c") does what the key does', coversTrack(afterHost)
     && Math.abs(afterHost.lat - opening.lat) < 0.002 && afterHost.zoom === opening.zoom,
@@ -130,7 +128,7 @@ async function main() {
   // 3. The button.
   await away();
   await page.evaluate(() => document.querySelector('.locate-switch button').click());
-  await page.waitForTimeout(700);
+  await waitForHome();
   const afterButton = await view();
   check('the button does what the key does', coversTrack(afterButton)
     && Math.abs(afterButton.lat - opening.lat) < 0.002 && afterButton.zoom === opening.zoom,
@@ -139,23 +137,28 @@ async function main() {
   // 4. Pressing it while already home must not wander.
   const beforeAgain = await view();
   await page.evaluate(() => window.gpxViewer.pressKey('c'));
-  await page.waitForTimeout(600);
+  await waitForMapIdle(page);
   const again = await view();
   check('pressing it at home changes nothing', Math.abs(again.lat - beforeAgain.lat) < 1e-6
     && again.zoom === beforeAgain.zoom, `zoom ${again.zoom}`);
 
   // 5. With the interface away (S) the panel is display:none; the frame must not shrink into its stale rect.
   await page.keyboard.press('s');
-  await page.waitForTimeout(300);
+  await setChromeHidden(true);
   const hidden = await page.evaluate(() => document.body.classList.contains('chrome-hidden'));
   check('S takes the interface away', hidden === true);
   await away();
   await page.keyboard.press('c');
-  await page.waitForTimeout(700);
+  await page.waitForFunction(({ s, n, w, e }) => {
+    const bounds = window.gpxViewer.map.getBounds();
+    return bounds.getSouth() <= s + 1e-6 && bounds.getNorth() >= n - 1e-6
+      && bounds.getWest() <= w + 1e-6 && bounds.getEast() >= e - 1e-6;
+  }, track);
+  await waitForMapIdle(page);
   const afterHidden = await view();
   check('C still works with the interface hidden', coversTrack(afterHidden), `zoom ${afterHidden.zoom}`);
   await page.keyboard.press('s');
-  await page.waitForTimeout(300);
+  await setChromeHidden(false);
 
   // 6. The export button follows it down the same column: the top band belongs to the summary, and the right
   //    corner already carries three switches, so anything else about "the route as a whole" stacks here.
@@ -175,6 +178,7 @@ async function main() {
 
   check('the page threw nothing', pageErrors.length === 0, pageErrors.join(' | ') || 'clean');
 
+  await artifacts.capture(page, failures, pageErrors);
   await browser.close();
   server.close();
   console.log(failures.length ? `\n${failures.length} FAILED` : '\nall checks passed');

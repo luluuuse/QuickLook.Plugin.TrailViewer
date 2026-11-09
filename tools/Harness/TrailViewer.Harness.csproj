@@ -16,4 +16,9 @@
     <ProjectReference Include="..\..\QuickLook.Common\QuickLook.Common.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Reference Include="System.IO.Compression" />
+    <Reference Include="System.IO.Compression.FileSystem" />
+  </ItemGroup>
+
 </Project>

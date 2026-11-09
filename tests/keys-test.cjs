@@ -6,41 +6,27 @@
 //
 // Set CHROMIUM to a Chromium/Chrome executable if Playwright's own browser is not installed.
 const fs = require('fs');
-const http = require('http');
 const path = require('path');
-const { chromium } = require('playwright-core');
+const {
+  launchBrowser,
+  waitForLayout,
+  waitForPhoto,
+} = require('./support/browser.cjs');
+const { createChecker } = require('./support/assertions.cjs');
+const { createArtifacts } = require('./support/artifacts.cjs');
+const { startStaticServer } = require('./support/server.cjs');
 
 const root = path.resolve(__dirname, '..');
 const shot = process.argv[2] ? path.resolve(process.argv[2]) : null;
-const types = {
-  '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.gpx': 'application/gpx+xml',
-};
-
-function serve() {
-  const server = http.createServer((req, res) => {
-    const file = path.join(root, decodeURIComponent(new URL(req.url, 'http://x').pathname));
-    if (!file.startsWith(root + path.sep) || !fs.existsSync(file) || !fs.statSync(file).isFile()) {
-      res.writeHead(404).end();
-      return;
-    }
-    res.writeHead(200, { 'Content-Type': types[path.extname(file)] || 'application/octet-stream' });
-    fs.createReadStream(file).pipe(res);
-  });
-  return new Promise((resolve) => server.listen(0, '127.0.0.1', () => resolve(server)));
-}
-
-const failures = [];
-function check(what, ok, detail) {
-  console.log(`${ok ? 'PASS' : 'FAIL'}  ${what}${detail ? `  (${detail})` : ''}`);
-  if (!ok) failures.push(what);
-}
+const { check, failures, finish } = createChecker('keys');
+const artifacts = createArtifacts('keys');
 
 async function main() {
-  const server = await serve();
-  const base = `http://127.0.0.1:${server.address().port}`;
-  const browser = await chromium.launch({ executablePath: process.env.CHROMIUM || undefined });
+  const { server, base } = await startStaticServer(root);
+  const browser = await launchBrowser();
   // en-US so the assertions can read the tooltips; the Chinese side is checked at the end by switching.
   const page = await browser.newPage({ viewport: { width: 1200, height: 800 }, locale: 'en-US' });
+  await artifacts.start(page);
   const pageErrors = [];
   page.on('pageerror', (e) => pageErrors.push(e.message));
 
@@ -55,10 +41,12 @@ async function main() {
   const state = async () => page.evaluate(() => ({
     layer: window.gpxViewer.layer(),
     activeLayer: document.querySelector('.layer-switch button.active')?.dataset.layer || '',
+    activePressed: document.querySelector('.layer-switch button.active')?.getAttribute('aria-pressed') || '',
     pins: document.querySelectorAll('.gpx-pin').length,
     marks: window.gpxViewer.pins.count(),
     pinsVisible: window.gpxViewer.pins.visible(),
     pinsActive: document.querySelector('.pins-switch button')?.classList.contains('active'),
+    pinsPressed: document.querySelector('.pins-switch button')?.getAttribute('aria-pressed') || '',
     hasControl: window.gpxViewer.pins.hasControl(),
     photo: window.gpxViewer.photos.isOpen(),
     bar: !!document.getElementById('keys'),
@@ -66,12 +54,13 @@ async function main() {
     pinsTitle: document.querySelector('.pins-switch button')?.title || '',
     fitTitle: document.querySelector('.locate-switch button')?.title || '',
     exportTitle: document.querySelector('.export-switch button')?.title || '',
+    infoLive: document.getElementById('info')?.getAttribute('aria-live') || '',
     summaryKeys: document.querySelectorAll('#info .keys').length,
   }));
 
   const press = async (key) => {
     await page.keyboard.press(key);
-    await page.waitForTimeout(180);
+    await waitForLayout(page);
   };
 
   await page.goto(`${base}/viewer/index.html`);
@@ -90,13 +79,30 @@ async function main() {
   check('the fit button names C', /\(C\)/.test(s.fitTitle), s.fitTitle);
   check('and the export button names X', /\(X\)/.test(s.exportTitle), s.exportTitle);
   check('the summary does not carry them either', s.summaryKeys === 0, `${s.summaryKeys}`);
+  check('the summary announces changes politely', s.infoLive === 'polite', s.infoLive);
   check('the background starts on the map', s.layer === 'map', s.layer);
+  check('the active background exposes its pressed state', s.activePressed === 'true', s.activePressed);
+
+  // Buttons are now reachable with Tab. Space must still belong to QuickLook, while Enter activates the focused
+  // control normally.
+  await page.locator('.pins-switch button').focus();
+  await page.keyboard.press('Space');
+  await waitForLayout(page);
+  s = await state();
+  check('Space does not activate a focused viewer button', s.pinsVisible === true);
+  await page.keyboard.press('Enter');
+  await waitForLayout(page);
+  s = await state();
+  check('Enter activates the focused viewer button', s.pinsVisible === false);
+  await page.keyboard.press('Enter');
+  await waitForLayout(page);
 
   // 2. W is the marker switch: the same hide/show the button does, with the same state.
   await press('w');
   s = await state();
   check('W hides the markers', s.pins === 0 && s.pinsVisible === false, `${s.pins}/${s.pinsVisible}`);
   check('and the button follows', s.pinsActive === false);
+  check('and its pressed state follows', s.pinsPressed === 'false', s.pinsPressed);
   check('the markers are still loaded for the keyboard', s.marks === 8, `${s.marks}`);
 
   await press('w');
@@ -114,7 +120,7 @@ async function main() {
   // 4. A photo covers the map: the three keys stand down until it is closed.
   await page.locator('.gpx-pin[title="Album"]').click();
   await page.locator('.photo-popup .photo-thumb').first().click();
-  await page.waitForFunction(() => window.gpxViewer.photos.isOpen());
+  await waitForPhoto(page);
   s = await state();
   const before = { layer: s.layer, pins: s.pins };
   await press('w');
@@ -138,24 +144,24 @@ async function main() {
 
   // 5. A repeat is one press: holding W must not make the markers blink at thirty hertz.
   await page.locator('.pins-switch button').click(); // back to hidden, a known state
-  await page.waitForTimeout(150);
+  await waitForLayout(page);
   await page.evaluate(() => {
     for (let i = 0; i < 5; i++) {
       document.dispatchEvent(new KeyboardEvent('keydown', { key: 'w', repeat: true, bubbles: true, cancelable: true }));
     }
   });
-  await page.waitForTimeout(200);
+  await waitForLayout(page);
   s = await state();
   check('a held key is ignored', s.pinsVisible === false, `${s.pinsVisible}`);
   // A modifier belongs to the host: Ctrl+W must not be read as ours.
   await page.evaluate(() => {
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'w', ctrlKey: true, bubbles: true, cancelable: true }));
   });
-  await page.waitForTimeout(150);
+  await waitForLayout(page);
   s = await state();
   check('Ctrl+W is not ours', s.pinsVisible === false, `${s.pinsVisible}`);
   await page.locator('.pins-switch button').click();
-  await page.waitForTimeout(150);
+  await waitForLayout(page);
 
   // 6. A pure track has no waypoints but does have dots: W still clears them.
   await page.evaluate(() => localStorage.removeItem('gpxviewer.pins'));
@@ -171,16 +177,16 @@ async function main() {
   // 7. When the host catches the key itself it calls pressKey: it has to mean exactly the same thing.
   const startLayer = (await state()).layer;
   await page.evaluate(() => window.gpxViewer.pressKey('e'));
-  await page.waitForTimeout(150);
+  await waitForLayout(page);
   s = await state();
   check('pressKey steps the background like the key does', s.layer !== startLayer, s.layer);
   await page.evaluate(() => window.gpxViewer.pressKey('q'));
-  await page.waitForTimeout(150);
+  await waitForLayout(page);
   s = await state();
   check('and steps back', s.layer === startLayer, s.layer);
   const startPins = s.pinsVisible;
   await page.evaluate(() => window.gpxViewer.pressKey('w'));
-  await page.waitForTimeout(150);
+  await waitForLayout(page);
   s = await state();
   check('pressKey flips the markers like the key does', s.pinsVisible === !startPins, `${s.pinsVisible}`);
   await page.evaluate(() => window.gpxViewer.pressKey('w'));
@@ -201,12 +207,12 @@ async function main() {
 
   // 9. The tooltips follow the interface language.
   await page.locator('.lang-switch button').click();
-  await page.waitForTimeout(200);
+  await waitForLayout(page);
   s = await state();
   check('the tooltips speak Chinese', /切换/.test(s.layerTitle) && /（C）/.test(s.fitTitle),
     `${s.layerTitle} | ${s.fitTitle}`);
   await page.locator('.lang-switch button').click();
-  await page.waitForTimeout(200);
+  await waitForLayout(page);
 
   // 10. S clears the map: the summary, the key bar, both top corners and the profile go, the route stays. The
   //     scale and the map credit are not interface -- one says how big the picture is, the other is a term of use.
@@ -255,10 +261,10 @@ async function main() {
 
   // The host sends the same key through pressKey when QuickLook is holding the keyboard.
   await page.evaluate(() => window.gpxViewer.pressKey('s'));
-  await page.waitForTimeout(150);
+  await waitForLayout(page);
   check('pressKey clears the interface like the key does', (await chrome()).info === false);
   await page.evaluate(() => window.gpxViewer.pressKey('s'));
-  await page.waitForTimeout(150);
+  await waitForLayout(page);
 
   // A photo card over the map does not take the key away -- W, Q and E keep working through it. The full-screen
   // viewer does: the map is behind it, and a change nobody can see is a change nobody asked for.
@@ -267,7 +273,7 @@ async function main() {
   await press('s');
   check('the key works through a photo card', (await chrome()).hidden === true);
   await page.locator('.photo-popup .photo-thumb').nth(0).click();
-  await page.waitForFunction(() => document.querySelector('.photo-image')?.naturalWidth > 0);
+  await waitForPhoto(page);
   await press('s');
   check('but not while the viewer is full screen', (await chrome()).hidden === true);
 
@@ -285,16 +291,16 @@ async function main() {
 
   if (shot) {
     await open('kml-photos.kml');
-    await page.waitForTimeout(300);
+    await waitForLayout(page);
     await page.screenshot({ path: shot });
   }
 
   check('no page errors', pageErrors.length === 0, pageErrors.join('; '));
 
+  await artifacts.capture(page, failures, pageErrors);
   await browser.close();
   server.close();
-  console.log(failures.length === 0 ? '\nall checks passed' : `\n${failures.length} failed: ${failures.join(', ')}`);
-  process.exit(failures.length === 0 ? 0 : 1);
+  process.exit(finish());
 }
 
 main().catch((e) => {

@@ -95,8 +95,7 @@ internal sealed class GlobalKeys : IDisposable
         }
 
         Dispatcher.Run(); // pumps the messages the hook is delivered through; ends on Dispose
-        UnhookWindowsHookEx(_hook);
-        _hook = IntPtr.Zero;
+        ReleaseHook();
     }
 
     private IntPtr Filter(int code, IntPtr wParam, IntPtr lParam)
@@ -249,6 +248,13 @@ internal sealed class GlobalKeys : IDisposable
 
     private static void Trace(string message) => GpxPanel.Trace("[keys] " + message);
 
+    private void ReleaseHook()
+    {
+        var hook = Interlocked.Exchange(ref _hook, IntPtr.Zero);
+        if (hook != IntPtr.Zero)
+            UnhookWindowsHookEx(hook);
+    }
+
     public void Dispose()
     {
         if (_disposed)
@@ -256,15 +262,24 @@ internal sealed class GlobalKeys : IDisposable
         _disposed = true;
         try
         {
-            _dispatcher?.InvokeShutdown();
+            // Unhook on the thread that installed the hook, before its dispatcher stops. Clearing the handle
+            // from the UI thread after a short timeout could otherwise lose the only reference to a live global
+            // hook while the callback thread was still winding down.
+            _dispatcher?.BeginInvoke(new Action(() =>
+            {
+                ReleaseHook();
+                _dispatcher.InvokeShutdown();
+            }));
         }
-        catch (Exception ex) when (ex is InvalidOperationException or ObjectDisposedException)
+        catch (Exception ex) when (ex is InvalidOperationException or ObjectDisposedException
+            or System.Threading.Tasks.TaskCanceledException)
         {
             // Already shut down.
         }
-        _thread?.Join(500);
-        _hook = IntPtr.Zero;
-        _ready.Dispose();
+
+        var stopped = _thread == null || _thread.Join(2000);
+        if (stopped)
+            _ready.Dispose();
     }
 
     [StructLayout(LayoutKind.Sequential)]

@@ -6,41 +6,26 @@
 //
 // Set CHROMIUM to a Chromium/Chrome executable if Playwright's own browser is not installed.
 const fs = require('fs');
-const http = require('http');
 const path = require('path');
-const { chromium } = require('playwright-core');
+const {
+  launchBrowser,
+  settlePopup,
+  waitForLayout,
+  waitForPhoto,
+} = require('./support/browser.cjs');
+const { createChecker } = require('./support/assertions.cjs');
+const { createArtifacts } = require('./support/artifacts.cjs');
+const { startStaticServer } = require('./support/server.cjs');
 
 const root = path.resolve(__dirname, '..');
 const shot = process.argv[2] ? path.resolve(process.argv[2]) : null;
 const fixture = 'kml-photos.kml';
-const types = {
-  '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png',
-  '.gpx': 'application/gpx+xml', '.kml': 'application/vnd.google-earth.kml+xml',
-};
-
-function serve() {
-  const server = http.createServer((req, res) => {
-    const file = path.join(root, decodeURIComponent(new URL(req.url, 'http://x').pathname));
-    if (!file.startsWith(root + path.sep) || !fs.existsSync(file) || !fs.statSync(file).isFile()) {
-      res.writeHead(404).end();
-      return;
-    }
-    res.writeHead(200, { 'Content-Type': types[path.extname(file)] || 'application/octet-stream' });
-    fs.createReadStream(file).pipe(res);
-  });
-  return new Promise((resolve) => server.listen(0, '127.0.0.1', () => resolve(server)));
-}
-
-const failures = [];
-function check(what, ok, detail) {
-  console.log(`${ok ? 'PASS' : 'FAIL'}  ${what}${detail ? `  (${detail})` : ''}`);
-  if (!ok) failures.push(what);
-}
+const { check, failures } = createChecker('lang');
+const artifacts = createArtifacts('lang');
 
 async function main() {
-  const server = await serve();
-  const base = `http://127.0.0.1:${server.address().port}`;
-  const browser = await chromium.launch({ executablePath: process.env.CHROMIUM || undefined });
+  const { server, base } = await startStaticServer(root);
+  const browser = await launchBrowser();
   const remote = fs.readFileSync(path.join(root, 'tests/fixtures/photo2.png'));
 
   // Everything the switch has to touch, read straight off the page.
@@ -83,7 +68,9 @@ async function main() {
 
   const options = { viewport: { width: 1200, height: 800 }, locale: 'zh-CN' };
   const context = await browser.newContext(options);
+  await context.addInitScript(() => localStorage.setItem('gpxviewer.infoDetails', 'full'));
   const page = await context.newPage();
+  await artifacts.start(page);
   const pageErrors = [];
   page.on('pageerror', (e) => pageErrors.push(e.message));
   await page.route('https://example.test/**', (route) => route.fulfill({ body: remote, contentType: 'image/png' }));
@@ -123,7 +110,8 @@ async function main() {
 
   // 3. The switch repaints what is open and keeps the selection.
   await page.locator('.lang-switch button').click();
-  await page.waitForTimeout(300);
+  await page.waitForFunction(() => document.documentElement.lang === 'en');
+  await waitForLayout(page);
   s = await snapshot(page);
   check('the switch turns the page English', s.lang === 'en' && s.title === 'Track viewer', `${s.lang} ${s.title}`);
   check('the labels follow', s.labels.includes('Points') && s.labels.includes('Contents'), s.labels.join('/'));
@@ -163,12 +151,12 @@ async function main() {
 
   // 5. Photos carry the language into the full-size viewer.
   await page.locator('.lang-switch button').click();
-  await page.waitForTimeout(200);
+  await page.waitForFunction(() => document.documentElement.lang === 'zh-CN');
   await page.locator('.gpx-pin[title="Album"]').click();
   await page.waitForSelector('.photo-popup .photo-thumb');
   await page.locator('.photo-popup .photo-thumb').nth(0).click();
-  await page.waitForFunction(() => document.querySelector('.photo-image')?.naturalWidth > 0);
-  await page.waitForTimeout(300); // the card behind the viewer fades out
+  await waitForPhoto(page);
+  await settlePopup(page, '.leaflet-popup', 0);
   s = await snapshot(page);
   check('the close button explains itself in Chinese', s.photoClose === '关闭（点击空白处亦可）', s.photoClose);
   check('the arrows are named in Chinese', s.photoArrows.join('/') === '上一张/下一张', s.photoArrows.join('/'));
@@ -178,29 +166,30 @@ async function main() {
   // 6. The keys and the map are untouched by any of this: Album has two photos, so the second press is the
   // one that crosses over to the next pin.
   await page.keyboard.press('ArrowRight');
-  await page.waitForTimeout(200);
+  await waitForPhoto(page);
   await page.keyboard.press('ArrowRight');
-  await page.waitForTimeout(400);
+  await waitForPhoto(page);
+  await page.waitForFunction(() => document.querySelector('.photo-titles strong')?.textContent === 'Inline');
   s = await snapshot(page);
   check('the keys still walk the photos', s.selected === 'Inline', s.selected);
   await page.locator('.photo-close').click();
 
   if (shot) {
-    await page.waitForTimeout(300);
+    await waitForLayout(page);
     await page.screenshot({ path: shot });
   }
   check('no page errors', pageErrors.length === 0, pageErrors.join('; '));
-  await context.close();
 
   // 7. An English system starts in English, and the switch goes the other way.
   const enContext = await browser.newContext({ viewport: { width: 1200, height: 800 }, locale: 'en-US' });
+  await enContext.addInitScript(() => localStorage.setItem('gpxviewer.infoDetails', 'full'));
   const enPage = await enContext.newPage();
   await open(enPage, `${base}/viewer/index.html?src=../tests/fixtures/${fixture}`);
   s = await snapshot(enPage);
   check('an English system starts in English', s.lang === 'en' && s.langButton === 'EN', `${s.lang} ${s.langButton}`);
   check('the switch offers Chinese there', s.langTitle === 'Switch to Chinese', s.langTitle);
   await enPage.locator('.lang-switch button').click();
-  await enPage.waitForTimeout(200);
+  await enPage.waitForFunction(() => document.documentElement.lang === 'zh-CN');
   s = await snapshot(enPage);
   check('the switch turns an English page Chinese', s.lang === 'zh-CN' && s.langTitle === 'Switch to English',
     `${s.lang} / ${s.langTitle}`);
@@ -216,6 +205,8 @@ async function main() {
   check('the parse error is phrased in Chinese', errorPage.detail.startsWith('文件不是合法的 XML'), errorPage.detail);
   await enContext.close();
 
+  await artifacts.capture(page, failures, pageErrors);
+  await context.close();
   await browser.close();
   server.close();
 

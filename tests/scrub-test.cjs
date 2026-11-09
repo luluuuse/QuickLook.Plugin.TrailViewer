@@ -4,42 +4,23 @@
 //   NODE_PATH=<folder containing playwright-core> node tests/scrub-test.cjs [screenshot.png]
 //
 // Set CHROMIUM to a Chromium/Chrome executable if Playwright's own browser is not installed.
-const fs = require('fs');
-const http = require('http');
 const path = require('path');
-const { chromium } = require('playwright-core');
+const { launchBrowser, waitForLayout } = require('./support/browser.cjs');
+const { createChecker } = require('./support/assertions.cjs');
+const { createArtifacts } = require('./support/artifacts.cjs');
+const { startStaticServer } = require('./support/server.cjs');
 
 const root = path.resolve(__dirname, '..');
 const shot = process.argv[2] ? path.resolve(process.argv[2]) : null;
-const types = {
-  '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.gpx': 'application/gpx+xml',
-};
-
-function serve() {
-  const server = http.createServer((req, res) => {
-    const file = path.join(root, decodeURIComponent(new URL(req.url, 'http://x').pathname));
-    if (!file.startsWith(root + path.sep) || !fs.existsSync(file) || !fs.statSync(file).isFile()) {
-      res.writeHead(404).end();
-      return;
-    }
-    res.writeHead(200, { 'Content-Type': types[path.extname(file)] || 'application/octet-stream' });
-    fs.createReadStream(file).pipe(res);
-  });
-  return new Promise((resolve) => server.listen(0, '127.0.0.1', () => resolve(server)));
-}
-
-const failures = [];
-function check(what, ok, detail) {
-  console.log(`${ok ? 'PASS' : 'FAIL'}  ${what}${detail ? `  (${detail})` : ''}`);
-  if (!ok) failures.push(what);
-}
+const { check, failures } = createChecker('scrub');
+const artifacts = createArtifacts('scrub');
 
 async function main() {
-  const server = await serve();
-  const base = `http://127.0.0.1:${server.address().port}`;
-  const browser = await chromium.launch({ executablePath: process.env.CHROMIUM || undefined });
+  const { server, base } = await startStaticServer(root);
+  const browser = await launchBrowser();
   // Pinned to en-US: the assertions below read English labels, and the viewer follows the system language.
   const page = await browser.newPage({ viewport: { width: 1200, height: 800 }, locale: 'en-US' });
+  await artifacts.start(page);
   const pageErrors = [];
   page.on('pageerror', (e) => pageErrors.push(e.message));
 
@@ -52,11 +33,18 @@ async function main() {
   const total = await page.evaluate(() => window.gpxViewer.summary.distanceMeters);
   const plot = await page.locator('#profile .plot svg').boundingBox();
   const at = (ratio) => ({ x: plot.x + plot.width * ratio, y: plot.y + plot.height / 2 });
+  const waitForScrub = async ({ exists = true, min = -Infinity, max = Infinity }) => {
+    await page.waitForFunction(({ exists: wanted, min: lower, max: upper }) => {
+      const point = window.gpxViewer.scrub.point();
+      if (!wanted) return point === null;
+      return point && point.along >= lower && point.along <= upper;
+    }, { exists, min, max });
+  };
   console.log(`plot ${Math.round(plot.width)}x${Math.round(plot.height)}, track ${total.toFixed(0)} m`);
 
   // Hovering the middle of the plot reports roughly half the track and drops a marker on the map.
   await page.mouse.move(at(0.5).x, at(0.5).y);
-  await page.waitForTimeout(120);
+  await waitForScrub({ min: total * 0.45, max: total * 0.55 });
   const half = await page.evaluate(() => {
     const p = window.gpxViewer.scrub.point();
     return p && { along: p.along };
@@ -73,7 +61,7 @@ async function main() {
       meta: node.querySelector('.meta').textContent,
       left: box.left,
       width: box.width,
-      alpha: Number((getComputedStyle(node).backgroundColor.match(/([\d.]+)\)\s*$/) || [, '1'])[1]),
+      alpha: Number((getComputedStyle(node).backgroundColor.match(/([\d.]+)\)\s*$/) || ['', '1'])[1]),
     };
   });
   check('readout shows the height first', /^\d+ m$/.test(readout.ele), readout.ele);
@@ -100,35 +88,35 @@ async function main() {
   // Clicking pins the point; moving afterwards must not change it.
   await page.mouse.down();
   await page.mouse.up();
-  await page.waitForTimeout(60);
+  await page.waitForFunction(() => window.gpxViewer.scrub.pinned());
   check('click pins the point', await page.evaluate(() => window.gpxViewer.scrub.pinned()));
   check('plot shows the pinned state', /pinned/.test(await page.locator('#profile .plot').getAttribute('class') || ''));
 
   const before = await page.evaluate(() => window.gpxViewer.scrub.point().along);
   await page.mouse.move(at(0.15).x, at(0.15).y);
-  await page.waitForTimeout(120);
+  await waitForLayout(page);
   check('pinned point ignores the mouse', before === (await page.evaluate(() => window.gpxViewer.scrub.point().along)));
   check('readout stays while pinned', (await tipText()) === pinnedTip, await tipText());
 
   await page.mouse.move(plot.x + plot.width / 2, plot.y - 120);
-  await page.waitForTimeout(100);
+  await waitForLayout(page);
   check('pinned point survives pointerleave', await page.evaluate(() => !!window.gpxViewer.scrub.point()));
 
   // Clicking again releases it and the cursor follows the mouse once more.
   await page.mouse.move(at(0.8).x, at(0.8).y);
   await page.mouse.down();
   await page.mouse.up();
-  await page.waitForTimeout(80);
+  await page.waitForFunction(() => !window.gpxViewer.scrub.pinned());
   check('second click releases the pin', !(await page.evaluate(() => window.gpxViewer.scrub.pinned())));
   await page.mouse.move(at(0.2).x, at(0.2).y);
-  await page.waitForTimeout(120);
+  await waitForScrub({ min: total * 0.15, max: total * 0.25 });
   const near = await page.evaluate(() => window.gpxViewer.scrub.point().along);
   check('follows again after release', Math.abs(near - total * 0.2) < 300, `${Math.round(near)} m`);
 
   // The numbers ride with the cursor: the whole point of the change is that they are where the eye is.
   const tipLeft = await tipBox();
   await page.mouse.move(at(0.62).x, at(0.62).y);
-  await page.waitForTimeout(120);
+  await waitForScrub({ min: total * 0.57, max: total * 0.67 });
   const tipRight = await tipBox();
   check('the readout follows the cursor', tipRight.left > tipLeft.left + 100,
     `${Math.round(tipLeft.left)} -> ${Math.round(tipRight.left)}`);
@@ -137,22 +125,22 @@ async function main() {
     `${Math.round(tipRight.left)}-${Math.round(tipRight.right)} in ${Math.round(tipRight.chartLeft)}-${Math.round(tipRight.chartRight)}`);
   // At either end it is clamped rather than hanging off the panel.
   await page.mouse.move(at(0).x, at(0).y);
-  await page.waitForTimeout(120);
+  await waitForScrub({ min: 0, max: 0 });
   const tipStart = await tipBox();
   check('the readout is clamped at the start', tipStart.left >= tipStart.chartLeft - 1, `${Math.round(tipStart.left)}`);
 
   // Leaving unpinned clears the cursor and the marker.
   await page.mouse.move(plot.x + plot.width / 2, plot.y - 120);
-  await page.waitForTimeout(100);
+  await waitForScrub({ exists: false });
   check('leaving clears the cursor', await page.evaluate(() => !window.gpxViewer.scrub.point()));
   check('leaving removes the map marker', (await page.locator('.scrub-marker').count()) === 0);
 
   // The extreme edges clamp to the track instead of running past it.
   await page.mouse.move(plot.x + 1, plot.y + 20);
-  await page.waitForTimeout(100);
+  await waitForScrub({ min: 0, max: 0 });
   check('left edge is the start', (await page.evaluate(() => window.gpxViewer.scrub.point().along)) === 0);
   await page.mouse.move(plot.x + plot.width - 1, plot.y + 20);
-  await page.waitForTimeout(100);
+  await waitForScrub({ min: total * 0.98 });
   const high = await page.evaluate(() => window.gpxViewer.scrub.point().along);
   // One point short of the end: the cursor reports where you had got to, not the point still to come.
   check('right edge lands on the last point', high > total * 0.98, `${high.toFixed(0)} of ${total.toFixed(0)} m`);
@@ -164,7 +152,7 @@ async function main() {
   } else {
     const box = await page.locator('#profile .plot svg').boundingBox();
     await page.mouse.move(box.x + box.width * 0.5, box.y + box.height / 2);
-    await page.waitForTimeout(120);
+    await waitForScrub({});
     const text = await page.evaluate(() => {
       const node = document.querySelector('#profile .readout');
       return { ele: node.querySelector('.ele').textContent, meta: node.querySelector('.meta').textContent };
@@ -196,7 +184,7 @@ async function main() {
 
   const longBox = await page.locator('#profile .plot svg').boundingBox();
   await page.mouse.move(longBox.x + longBox.width * 0.42, longBox.y + longBox.height / 2);
-  await page.waitForTimeout(150);
+  await waitForScrub({});
   const long = await page.evaluate(() => {
     const p = window.gpxViewer.scrub.point();
     return { along: p && p.along, marker: !!document.querySelector('.scrub-marker') };
@@ -207,6 +195,7 @@ async function main() {
   if (shot) await page.screenshot({ path: shot });
   for (const e of pageErrors) failures.push(`page error: ${e}`);
 
+  await artifacts.capture(page, failures, pageErrors);
   await browser.close();
   server.close();
 

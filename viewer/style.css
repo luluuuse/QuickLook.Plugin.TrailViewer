@@ -22,6 +22,17 @@ html, body {
   background: var(--bg);
 }
 
+button:focus-visible,
+a:focus-visible,
+[role="button"]:focus-visible {
+  outline: 2px solid #8fc7ff;
+  outline-offset: 2px;
+}
+
+#export .pick .option:focus-visible {
+  outline-offset: -3px;
+}
+
 body.no-map #map {
   background: #20242a;
 }
@@ -41,14 +52,15 @@ body.no-map #map {
   /* border-box, or the padding rides on top of the ceiling: a long name then measured 368 px against a
      max-width of 340. The card is as wide as its longest line, but never wider than this. */
   box-sizing: border-box;
-  max-width: min(340px, calc(100% - 180px));
-  padding: 10px 14px;
+  max-width: min(310px, calc(100% - 180px));
+  padding: 10px 12px;
 }
 
 /* The zoom buttons stand against the right edge of the summary rather than in the far corner: the eye is on the
    card, and the card's width depends on the file name and the language, so script sets --zoom-left from the
-   measured card. Leaflet's own 10 px margin is cancelled so the gap is exactly the one written there. */
+   measured card. Leaflet's own 10 px side margin is cancelled so the gap is exactly the one written there. */
 #map .leaflet-top.leaflet-left {
+  top: var(--zoom-top, 0);
   left: var(--zoom-left, 10px);
 }
 
@@ -56,7 +68,18 @@ body.no-map #map {
   margin-left: 0;
 }
 
+/* The right-hand tools have their own measured rectangle. In wrapped and docked layouts they may use two rows
+   without dragging the zoom column along with them. */
+#map .leaflet-top.leaflet-right {
+  top: var(--tools-top, 0);
+  right: var(--tools-right, 0);
+  left: var(--tools-left, auto);
+  max-width: var(--tools-max-width, calc(100% - 20px));
+}
+
 #info h1 {
+  flex: 1 1 auto;
+  min-width: 0;
   margin: 0;
   font-size: 15px;
   font-weight: 600;
@@ -70,13 +93,30 @@ body.no-map #map {
   overflow-wrap: anywhere;
 }
 
-#info .file {
-  margin: 2px 0 0;
+#info .info-heading {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.info-details-toggle {
+  flex: none;
+  min-width: 34px;
+  padding: 1px 5px;
+  border: 1px solid #4a4a4a;
+  border-radius: 9px;
+  background: #252525;
   color: var(--muted);
-  /* A file name does not wrap: one line, cut at the card's edge, the rest on the tooltip. */
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  cursor: pointer;
+  font: inherit;
+  font-size: 9.5px;
+  line-height: 15px;
+}
+
+.info-details-toggle:hover,
+.info-details-toggle[aria-expanded="true"] {
+  border-color: #777;
+  color: #fff;
 }
 
 /* The headline numbers: three across, then the pair that says how big the route is. A rule above the first
@@ -87,7 +127,7 @@ body.no-map #map {
   display: grid;
   grid-template-columns: repeat(3, max-content);
   justify-content: start;
-  column-gap: 14px;
+  column-gap: 9px;
   row-gap: 7px;
   margin: 9px 0 0;
   padding-top: 8px;
@@ -113,7 +153,7 @@ body.no-map #map {
 
 #info .stats dd {
   margin: 0;
-  font-size: 13.5px;
+  font-size: 13px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -123,7 +163,7 @@ body.no-map #map {
 #info .facts {
   display: grid;
   grid-template-columns: auto 1fr;
-  gap: 2px 12px;
+  gap: 2px 10px;
   margin: 9px 0 0;
 }
 
@@ -139,6 +179,13 @@ body.no-map #map {
 
 #info .facts dd {
   margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+#info .anomaly-values {
+  display: grid;
+  gap: 1px;
 }
 
 #info .empty {
@@ -152,37 +199,17 @@ body.no-map #map {
 
 
 /* Portrait -- taller than it is wide, whatever the window size -- and narrow landscape, where the same shortage
-   of width bites. Here the card's old ceiling of half the window minus a fixed gap collapses, stacking the three
-   headline numbers into a column and growing the card taller than the map it describes; the top line of chrome is
-   also longer than the window is wide. The card takes the width, the controls step down to a line of their own,
-   and the key bar stands aside. */
+   of width bites. Script chooses inline, wrapped or docked from measured control widths, so a long title or a
+   translated label cannot force the wrong arrangement. */
 @media (max-aspect-ratio: 1/1), (max-width: 959px) {
-  /* The card keeps its own width -- the shape of the window is no reason to stretch it across the map -- and
-     only gives way when the window is narrower than the card itself. */
   #info {
-    max-width: calc(100% - 20px);
-  }
-
-  /* Only when the card and both corners cannot share the top band do the controls step down to a line beneath
-     it: the zoom against the left edge, the three switches against the right. Whether they have to is measured
-     rather than guessed -- placeZoom in app.js writes body.stepped -- because the card is only as wide as its
-     longest line, so a tall window with a short name has room for all of it up top, and dropping the switches
-     halfway down the map there just leaves them hanging in the middle of nowhere. */
-  body.stepped #map .leaflet-top.leaflet-left,
-  body.stepped #map .leaflet-top.leaflet-right {
-    top: var(--tools-top, 150px);
-  }
-
-  body.stepped #map .leaflet-top.leaflet-left {
-    left: 0;
+    max-width: min(310px, calc(100% - 20px));
   }
 
   body.stepped #map .leaflet-top.leaflet-left .leaflet-control {
     margin-left: 10px;
   }
 
-  /* The credit line names every layer and is longer than a narrow window: it wraps to a second line and stays
-     off the scale bar instead of running underneath it. */
   .leaflet-container .leaflet-control-attribution {
     max-width: 64%;
     white-space: normal;
@@ -190,13 +217,31 @@ body.no-map #map {
   }
 }
 
-/* Too narrow even for one control line -- the three switches would sit on top of the zoom buttons. They take a
-   second line, still against the right edge. */
+/* The complete summary can be taller than a short map. It scrolls inside its own panel, keeping the profile and
+   navigation area visible instead of letting the card cover the whole preview. */
+body.layout-wrapped #info[data-details="full"],
+body.layout-docked #info[data-details="full"] {
+  max-height: var(--info-max-height, 48vh);
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+/* Very narrow windows keep the two compact switches recognisable without repeating their labels. Their tooltip
+   and aria-label carry the meaning, while the layer choice stays legible as short text. */
 @media (max-width: 419px) {
-  #map .leaflet-top.leaflet-right {
-    flex-wrap: wrap;
-    justify-content: flex-end;
-    max-width: calc(100% - 54px);
+  .pins-switch button,
+  .waypoint-overview-switch button {
+    padding-inline: 8px;
+  }
+
+  .pins-switch button > span:not(.dot),
+  .waypoint-overview-switch button > span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
 }
 
@@ -683,14 +728,14 @@ body.failed #map {
 
 /* Leaflet controls in the dark theme */
 .leaflet-bar a, .layer-switch button, .locate-switch button, .export-switch button, .pins-switch button,
-.lang-switch button {
+.lang-switch button, .waypoint-overview-switch button {
   background: #2a2a2a;
   color: var(--text);
   border-color: #444;
 }
 
 .leaflet-bar a:hover, .layer-switch button:hover, .locate-switch button:hover, .export-switch button:hover,
-.pins-switch button:hover, .lang-switch button:hover {
+.pins-switch button:hover, .lang-switch button:hover, .waypoint-overview-switch button:hover {
   background: #383838;
   color: #fff;
 }
@@ -747,10 +792,14 @@ body.failed #map {
   color: #fff;
 }
 
-/* The top-right corner holds three controls; one line keeps them together and out of the map. */
+/* The top-right corner keeps its controls together, but wraps them instead of running off a narrow map once a
+   waypoint overview button adds another bar. */
 .leaflet-top.leaflet-right {
   display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   align-items: flex-start;
+  max-width: calc(100% - 20px);
 }
 
 /* Show/hide the waypoint pins. The dot says whether they are on: hollow when hidden, filled when shown,
@@ -798,6 +847,499 @@ body.failed #map {
   color: #fff;
 }
 
+/* A waypoint list lets the whole route be scanned before opening any one pin. It occupies the right side on a
+   desktop preview and the strip above the profile on a narrow window. */
+.waypoint-overview-switch button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 29px;
+  padding: 0 9px;
+  border: 0;
+  font: inherit;
+  cursor: pointer;
+}
+
+.waypoint-overview-switch svg {
+  flex: none;
+}
+
+.waypoint-overview {
+  position: absolute;
+  z-index: 1200;
+  top: 60px;
+  right: 10px;
+  display: flex;
+  width: min(320px, calc(100% - 20px));
+  max-height: calc(100vh - 270px);
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid #444;
+  border-radius: 5px;
+  background: var(--panel);
+  box-shadow: 0 3px 16px rgba(0, 0, 0, 0.55);
+}
+
+.waypoint-overview[hidden] {
+  display: none;
+}
+
+.waypoint-overview-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 9px 10px 8px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.waypoint-overview-header strong {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 14px;
+}
+
+.waypoint-overview-header-actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+}
+
+.waypoint-overview-header .close {
+  width: 25px;
+  height: 25px;
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 20px;
+}
+
+.waypoint-overview-header .close:hover {
+  background: #383838;
+  color: #fff;
+}
+
+.waypoint-filter-trigger {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  max-width: 172px;
+  padding: 3px 6px;
+  border: 1px solid #4a4a4a;
+  border-radius: 4px;
+  background: #222;
+  color: var(--muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 10px;
+}
+
+.waypoint-filter-trigger:hover,
+.waypoint-filter-trigger[aria-expanded="true"] {
+  border-color: #777;
+  color: #fff;
+}
+
+.waypoint-filter-trigger[hidden] {
+  display: none;
+}
+
+.waypoint-filter-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.waypoint-filter-chevron {
+  flex: none;
+  font-size: 8px;
+}
+
+.waypoint-popover {
+  position: fixed;
+  z-index: 1400;
+  width: min(248px, calc(100vw - 16px));
+  box-sizing: border-box;
+  padding: 7px;
+  border: 1px solid #555;
+  border-radius: 5px;
+  background: #202020;
+  box-shadow: 0 5px 20px rgba(0, 0, 0, 0.65);
+}
+
+.waypoint-popover[hidden] {
+  display: none;
+}
+
+.waypoint-popover-title {
+  display: block;
+  grid-column: 1 / -1;
+  margin: 1px 3px 6px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.waypoint-filter-menu,
+.waypoint-correct-menu {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.insight-filter {
+  min-width: 0;
+  padding: 5px 7px;
+  border: 1px solid #4a4a4a;
+  border-radius: 3px;
+  background: #262626;
+  color: var(--muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 10px;
+  overflow: hidden;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.insight-filter:hover {
+  color: #fff;
+  border-color: #777;
+}
+
+.insight-filter.active,
+.waypoint-correct-option.selected {
+  border-color: var(--accent);
+  background: rgba(47, 155, 255, 0.2);
+  color: #fff;
+}
+
+.waypoint-correct-option {
+  min-width: 0;
+  padding: 5px 7px;
+  border: 1px solid #4a4a4a;
+  border-radius: 3px;
+  background: #262626;
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  font-size: 10px;
+  overflow: hidden;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.waypoint-correct-option:hover {
+  border-color: #777;
+  background: #343434;
+}
+
+.waypoint-overview-list {
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.waypoint-overview-item {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 11px 9px;
+  border: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.waypoint-overview-item:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.waypoint-overview-item:hover {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.waypoint-overview-item.insight-danger {
+  background: rgba(216, 64, 64, 0.16);
+  box-shadow: inset 3px 0 #df5151;
+}
+
+.waypoint-overview-item.insight-water {
+  background: rgba(47, 127, 211, 0.15);
+  box-shadow: inset 3px 0 #4c91dd;
+}
+
+.waypoint-overview-item.insight-camp {
+  background: rgba(47, 158, 98, 0.15);
+  box-shadow: inset 3px 0 #43ad72;
+}
+
+.waypoint-overview-item.insight-rescue {
+  background: rgba(205, 63, 151, 0.15);
+  box-shadow: inset 3px 0 #d44b9d;
+}
+
+.waypoint-overview-item.insight-exit {
+  background: rgba(225, 122, 53, 0.15);
+  box-shadow: inset 3px 0 #e07a35;
+}
+
+.waypoint-overview-item.insight-supply {
+  background: rgba(126, 170, 58, 0.15);
+  box-shadow: inset 3px 0 #87b34b;
+}
+
+.waypoint-overview-item.insight-crossing {
+  background: rgba(46, 169, 194, 0.14);
+  box-shadow: inset 3px 0 #39abc3;
+}
+
+.waypoint-overview-item.insight-junction {
+  background: rgba(211, 155, 34, 0.14);
+  box-shadow: inset 3px 0 #d6a329;
+}
+
+.waypoint-overview-item.insight-summit {
+  background: rgba(144, 105, 199, 0.15);
+  box-shadow: inset 3px 0 #9a72d3;
+}
+
+.waypoint-overview-item.insight-access {
+  background: rgba(121, 143, 180, 0.14);
+  box-shadow: inset 3px 0 #8198bb;
+}
+
+.waypoint-overview-item.insight-viewpoint {
+  background: rgba(75, 152, 142, 0.14);
+  box-shadow: inset 3px 0 #55a99c;
+}
+
+.waypoint-overview-item.selected {
+  background: rgba(47, 155, 255, 0.18);
+  box-shadow: inset 3px 0 var(--accent);
+}
+
+.waypoint-overview-item.current-pinned {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  border-bottom-color: rgba(47, 155, 255, 0.45);
+}
+
+.waypoint-current-label {
+  display: block;
+  margin-top: 2px;
+  color: #8fc7ff;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.waypoint-overview-item.insight-danger.selected {
+  background: rgba(47, 155, 255, 0.18);
+  box-shadow: inset 3px 0 #df5151;
+}
+
+.waypoint-overview-item.insight-water.selected {
+  background: rgba(47, 155, 255, 0.18);
+  box-shadow: inset 3px 0 #4c91dd;
+}
+
+.waypoint-overview-item.insight-camp.selected {
+  background: rgba(47, 155, 255, 0.18);
+  box-shadow: inset 3px 0 #43ad72;
+}
+
+.waypoint-overview-item.insight-rescue.selected,
+.waypoint-overview-item.insight-exit.selected,
+.waypoint-overview-item.insight-supply.selected,
+.waypoint-overview-item.insight-crossing.selected,
+.waypoint-overview-item.insight-access.selected,
+.waypoint-overview-item.insight-viewpoint.selected {
+  background: rgba(47, 155, 255, 0.18);
+}
+
+.waypoint-overview-item.insight-junction.selected {
+  background: rgba(47, 155, 255, 0.18);
+  box-shadow: inset 3px 0 #d6a329;
+}
+
+.waypoint-overview-item.insight-summit.selected {
+  background: rgba(47, 155, 255, 0.18);
+  box-shadow: inset 3px 0 #9a72d3;
+}
+
+.waypoint-overview-item .heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.waypoint-overview-item .heading strong {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.waypoint-heading-actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 5px;
+}
+
+.waypoint-overview-item .number {
+  flex: none;
+  min-width: 18px;
+  padding: 1px 4px;
+  border-radius: 9px;
+  background: #3a3a3a;
+  color: var(--muted);
+  font-size: 9.5px;
+  text-align: center;
+}
+
+.waypoint-correct-button {
+  width: 21px;
+  height: 20px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.waypoint-correct-button:hover,
+.waypoint-correct-button[aria-expanded="true"] {
+  border-color: #555;
+  background: #343434;
+  color: #fff;
+}
+
+.waypoint-correct-button.manual {
+  color: var(--accent);
+}
+
+.waypoint-overview-item .meta,
+.waypoint-overview-item .waypoint-evidence,
+.waypoint-overview-item .description {
+  display: block;
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.waypoint-insight-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 5px;
+}
+
+.waypoint-insight-badge {
+  padding: 1px 6px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  color: #ddd;
+  font-size: 9.5px;
+  line-height: 1.4;
+}
+
+.waypoint-insight-badge.possible {
+  border-style: dashed;
+  opacity: 0.78;
+}
+
+.waypoint-insight-badge.insight-danger {
+  color: #ff8c8c;
+}
+
+.waypoint-insight-badge.insight-water {
+  color: #75b5ff;
+}
+
+.waypoint-insight-badge.insight-camp {
+  color: #6fd49a;
+}
+
+.waypoint-insight-badge.insight-rescue {
+  color: #f18bc4;
+}
+
+.waypoint-insight-badge.insight-exit {
+  color: #f5a36b;
+}
+
+.waypoint-insight-badge.insight-supply {
+  color: #b3d879;
+}
+
+.waypoint-insight-badge.insight-crossing {
+  color: #73d0e3;
+}
+
+.waypoint-insight-badge.insight-junction {
+  color: #e5bd5b;
+}
+
+.waypoint-insight-badge.insight-summit {
+  color: #c49aef;
+}
+
+.waypoint-insight-badge.insight-access {
+  color: #a9bddc;
+}
+
+.waypoint-insight-badge.insight-viewpoint {
+  color: #81cabe;
+}
+
+.waypoint-overview-empty {
+  margin: 0;
+  padding: 14px 12px;
+  color: var(--muted);
+}
+
+.waypoint-overview-item .description {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+@media (max-width: 700px) {
+  .waypoint-overview {
+    top: auto;
+    right: 10px;
+    bottom: calc(var(--profile-height, 180px) + 22px);
+    left: 10px;
+    width: auto;
+    max-height: 45vh;
+  }
+}
+
 /* One button, one job: it shows the language the page is in and flips to the other one. */
 .lang-switch {
   display: flex;
@@ -841,6 +1383,103 @@ body.failed #map {
   border: 0;
 }
 
+/* Distance samples are passive map furniture: an arrow gives the direction at each kilometre, and the label
+   names the ground already covered. Neither takes a click away from the track beneath it. */
+.gpx-distance {
+  pointer-events: none;
+}
+
+.gpx-direction {
+  display: block;
+  width: 0;
+  height: 0;
+  margin: 8px auto 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-bottom: 11px solid #fff;
+  filter: drop-shadow(0 0 2px #111) drop-shadow(0 0 1px #111);
+  transform: rotate(var(--bearing));
+  transform-origin: 50% 65%;
+}
+
+.gpx-km {
+  position: absolute;
+  top: 24px;
+  left: 50%;
+  padding: 1px 3px;
+  border-radius: 3px;
+  background: rgba(24, 24, 24, 0.78);
+  color: #fff;
+  font-size: 10px;
+  line-height: 1.2;
+  white-space: nowrap;
+  transform: translateX(-50%);
+}
+
+/* A break in the recording is not joined as if it were walked ground: the connector is dashed and the warning
+   sits at the discontinuity. */
+.gpx-gap {
+  pointer-events: none;
+}
+
+.gpx-gap-marker {
+  border: 0;
+  background: none;
+  cursor: help;
+}
+
+.gpx-gap-marker span {
+  display: block;
+  width: 18px;
+  height: 18px;
+  box-sizing: border-box;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: #e54638;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 15px;
+  text-align: center;
+  box-shadow: 0 0 5px rgba(0, 0, 0, 0.8);
+}
+
+.gpx-gap-marker.clustered span {
+  width: auto;
+  min-width: 27px;
+  padding: 0 4px;
+  border-radius: 10px;
+  font-size: 10px;
+}
+
+.gpx-anomaly-segment {
+  pointer-events: none;
+}
+
+.gpx-anomaly-marker {
+  border: 0;
+  background: none;
+  cursor: help;
+}
+
+.gpx-anomaly-marker span {
+  display: block;
+  box-sizing: border-box;
+  min-width: 29px;
+  height: 18px;
+  padding: 0 4px;
+  border: 2px solid #fff;
+  border-radius: 9px;
+  background: #1bc4d3;
+  color: #07191c;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 14px;
+  text-align: center;
+  white-space: nowrap;
+  box-shadow: 0 0 5px rgba(0, 0, 0, 0.8);
+}
+
 /* ---------- waypoint photos ---------- */
 
 .point-popup .point-text {
@@ -856,15 +1495,11 @@ body.failed #map {
 }
 
 .gpx-pin.has-photo svg {
-  filter: drop-shadow(0 0 5px rgba(245, 196, 0, 0.5));
+  filter: drop-shadow(0 0 4px rgba(245, 196, 0, 0.45));
 }
 
-/* The pin the keyboard is on. Blue, the accent the rest of the UI uses for "this one"; it also replaces
-   the photo pin's yellow glow, so the selected pin is the only one that stands out. */
 .gpx-pin.selected svg {
-  filter: drop-shadow(0 0 6px rgba(47, 155, 255, 0.95));
-  transform: scale(1.25);
-  transform-origin: 50% 100%;
+  filter: drop-shadow(0 0 5px rgba(47, 155, 255, 0.95));
 }
 
 /* The small card a photo pin opens first. Sized to the pin, not to the window: the window is for the

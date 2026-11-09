@@ -15,11 +15,11 @@
 </head>
 <body>
   <div id="map"></div>
-  <section id="info" hidden></section>
+  <section id="info" aria-live="polite" hidden></section>
   <section id="profile" hidden></section>
   <section id="export" hidden></section>
-  <div id="message" hidden></div>
-  <div id="toast" hidden></div>
+  <div id="message" role="alert" hidden></div>
+  <div id="toast" role="status" aria-live="polite" aria-atomic="true" hidden></div>
   <script type="module" src="app.js"></script>
 </body>
 </html>

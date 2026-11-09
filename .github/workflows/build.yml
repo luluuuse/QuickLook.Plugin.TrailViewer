@@ -12,8 +12,20 @@ permissions:
 jobs:
   build:
     runs-on: windows-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install browser test dependencies
+        run: npm ci
+
+      - name: Static checks
+        run: npm run check
 
       - name: Fixtures match tools/make-fixtures.py
         shell: pwsh
@@ -27,11 +39,18 @@ jobs:
         shell: pwsh
         run: ./scripts/get-quicklook-common.ps1
 
+      - name: Remove stale build output
+        shell: pwsh
+        run: if (Test-Path bin) { Remove-Item bin -Recurse -Force }
+
       - name: Build plugin
         run: dotnet build src/QuickLook.Plugin.TrailViewer.csproj -c Release
 
       - name: Build test harness
         run: dotnet build tools/Harness/TrailViewer.Harness.csproj -c Release
+
+      - name: Host boundary and file-format tests
+        run: npm run test:host
 
       - name: Detection test on fixtures
         shell: pwsh
@@ -48,6 +67,22 @@ jobs:
           }
           if ($failed) { throw "$failed detection result(s) wrong" }
           "All $($names.Count) fixtures detected as expected"
+
+      - name: Browser and version tests
+        shell: pwsh
+        run: |
+          $edge = "${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe"
+          if (!(Test-Path $edge)) { throw "Microsoft Edge not found at $edge" }
+          $env:CHROMIUM = $edge
+          npm test
+
+      - name: Upload browser diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: browser-failure-artifacts
+          path: test-results/
+          if-no-files-found: ignore
 
       - name: Check that QuickLook.Common is not shipped
         shell: pwsh
