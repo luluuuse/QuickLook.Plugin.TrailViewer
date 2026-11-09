@@ -95,11 +95,12 @@ Windows：在文件上按 <kbd>Space</kbd> 就能预览。没有插件时，它�
 <kbd>←</kbd> <kbd>→</kbd> 或 <kbd>A</kbd> <kbd>D</kbd> 在标记点之间走：选中的图钉描蓝边，地图跟着
 它，卡片同时打开；点还在舒适区时地图不晃，接近边缘或被信息卡、工具栏、剖面挡住时才平滑回中。原图打开时，
 同样的键在相册里翻页，
-翻到头会接着走进相邻的标记点。如果图钉被开关藏起来了，按一下键会先把它叫回来。
+翻到头会接着走进相邻的标记点。导航始终按轨迹累计里程排列，不依赖文件里 placemark 的原始顺序；与黄色图钉
+重合的绿色起点或红色终点会合并成同一个导航节点。如果图钉被开关藏起来了，按一下键会先把它叫回来。
 
-Waypoint 速览保留方向键和 A/D 的逐点浏览，同时把整条路线的标记点按里程集中到一个可滚动列表；列表里点击
-任意一行会选中对应图钉，并保持列表打开，方便继续比较下一个位置。“筛选”菜单和每行的铅笔纠正菜单都只在
-需要时展开，不占固定的列表空间。
+Waypoint 速览保留方向键和 A/D 的逐点浏览，同时把整条路线的标记点按同一里程顺序集中到一个可滚动列表；
+列表里点击任意一行会选中对应图钉，并保持列表打开，方便继续比较下一个位置。“筛选”菜单和每行的铅笔纠正
+菜单都只在需要时展开，不占固定的列表空间。
 
 <kbd>Space</kbd> 和 <kbd>Esc</kbd> 归 QuickLook 管，所以预览不会因为 <kbd>Esc</kbd> 而关掉：点 × 或者点
 图片外面。如果方向键在你机器上被别的东西占了，<kbd>A</kbd> <kbd>D</kbd> 效果一样。
@@ -205,18 +206,18 @@ node scripts/pack.cjs
 ```
 
 `get-quicklook-common.ps1` 会按 `quicklook-version.txt` 里记的版本号从 QuickLook 的 release 拉取
-`QuickLook.Common`，这样插件和 QuickLook 本身是用同一份库编译的。版本号只有一处——项目文件里的
-`<Version>`。`QuickLook.Plugin.Metadata.config` 是模板，`@VERSION@` 由构建填进去，因为 QuickLook 是从这个
-文件读插件版本、而不是从程序集读，手工在两处维护必然漂移。GitHub Actions 在每次 PR 上做同样的事：跑文件
-识别测试和全部浏览器测试、产出 `.qlplugin`；另有一个每月的工作流，发现 QuickLook 或 Leaflet 有新版本就开
-一个 issue。
+`QuickLook.Common`，这样插件和 QuickLook 本身是用同一份库编译的。产品版本只有一处——根目录
+`Directory.Build.props`，并使用 Semantic Versioning；`QuickLook.Plugin.Metadata.config` 的 `@VERSION@`
+由构建填进去。WebView2 虚拟主机不再带发布版本，而是由 `viewer/` 文件内容哈希和页面协议版本生成，
+因此修前端不需要为了刷新缓存制造新版本。GitHub Actions 在每次 PR 上跑文件识别和全部浏览器测试、产出
+`.qlplugin`。
 
 `npm run check` 会用 ESLint 检查 viewer、测试、脚本和工具，再用 TypeScript 的 `checkJs` 检查浏览器模块。
 CI 在 Windows 构建前执行同一门禁。
 
-常规 `npm test` 先运行 34 个 Node 纯单元测试，再运行 17 个浏览器套件、失败产物自测和版本检查。测试服务器、
+常规 `npm test` 先运行 53 个 Node 纯单元测试，再运行 22 个浏览器套件、失败产物自测和版本检查。测试服务器、
 浏览器启动、断言与诊断由 `tests/support/` 共享；失败产物写到 `test-results/<套件>/`，包含截图、结果 JSON
-和 Playwright `trace.zip`。构建 Harness 后，`npm run test:host` 再运行 43 项 C# 宿主断言，覆盖文件边界、
+和 Playwright `trace.zip`。构建 Harness 后，`npm run test:host` 再运行 50 项 C# 宿主断言，覆盖文件边界、
 偏好文件、导出分块状态机和原子替换。主测试不访问真实地图服务，CyclOSM 实时端点的可用性由独立的每周/手动
 `live-smoke` workflow 检查。
 
@@ -233,8 +234,11 @@ set CHROMIUM=<chrome 或 msedge.exe 的路径>
 npm test
 ```
 
-`npm run test:version` 不需要浏览器：它只读 changelog、项目文件和构建出来的元数据，可以单独跑，用来抓
-版本漂移。测试样本由 `tools/make-fixtures.py` 生成，全部是公式算出来的合成数据，不含任何真实轨迹。
+正式版本用 `node scripts/release.cjs patch`、`minor` 或 `major` 准备；预发布加 `--pre beta.1` 或
+`--pre rc.1`。脚本只改唯一版本源和 CHANGELOG。推送 annotated tag（如 `v1.17.0`）后，release workflow 会
+校验 tag/版本一致、跑全量测试、打包并发布安装包与 SHA256。`npm run test:version` 不需要浏览器，会检查
+SemVer、日志顺序、构建元数据、页面协议/偏好结构版本和内容哈希缓存主机。测试样本由
+`tools/make-fixtures.py` 生成，全部是公式算出来的合成数据，不含任何真实轨迹。
 
 ## 第三方组件
 

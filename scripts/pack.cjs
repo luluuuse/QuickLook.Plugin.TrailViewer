@@ -1,5 +1,5 @@
 // Packs bin\Release into QuickLook.Plugin.TrailViewer-<version>.qlplugin, the zip QuickLook installs on Space.
-// The version in the name comes from the csproj, so downloads of different releases never collide in a folder.
+// The version in the name comes from Directory.Build.props, so downloads never collide in a folder.
 //
 //   node scripts/pack.cjs
 //
@@ -8,18 +8,12 @@
 const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
+const { readVersion } = require('./version.cjs');
 
 const root = path.resolve(__dirname, '..');
 const release = path.join(root, 'bin', 'Release');
 
-// The csproj is the one place a version is written down; everything else derives from it.
-const csproj = fs.readFileSync(path.join(root, 'src', 'QuickLook.Plugin.TrailViewer.csproj'), 'utf8');
-const versionTag = csproj.match(/<Version>\s*([^<\s]+)\s*<\/Version>/);
-if (!versionTag) {
-  console.error('no <Version> in src/QuickLook.Plugin.TrailViewer.csproj');
-  process.exit(1);
-}
-const version = versionTag[1];
+const version = readVersion().version;
 const out = path.join(root, `QuickLook.Plugin.TrailViewer-${version}.qlplugin`);
 const skip = new Set(['.pdb', '.xml']);
 
@@ -169,7 +163,7 @@ if (!built) {
   process.exit(1);
 }
 if (built[1] !== version) {
-  console.error(`build output is ${built[1]} but the csproj says ${version}; rebuild before packing`);
+  console.error(`build output is ${built[1]} but Directory.Build.props says ${version}; rebuild before packing`);
   process.exit(1);
 }
 // The upstream MIT notice has to travel with the binary: this is a fork of McBenac's plugin.

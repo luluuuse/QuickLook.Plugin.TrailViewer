@@ -256,7 +256,7 @@ async function main() {
   mapViewController = createMapView({ map, isChromeHidden: uiFeedback.isHidden });
   const tracks = trackLayer.draw(map, gpx);
   activeTrackLayer = tracks;
-  const waypointBounds = waypointController.draw(map, gpx, tracks.segments);
+  const waypointBounds = waypointController.draw(map, gpx, tracks.segments, tracks.navigationMarks);
   tracks.bounds.extend(waypointBounds);
   const bounds = tracks.bounds;
   mapViewController.setRoute(bounds);
@@ -341,6 +341,13 @@ async function main() {
       index: waypointController.index,
       stops: waypointController.stops,
       photoStops: waypointController.photoStops,
+      nodes: () => waypointController.navigation().map((node) => ({
+        kind: [...node.kinds, ...(node.stop ? ['waypoint'] : [])].join('+'),
+        name: node.point.name || '',
+        along: node.along,
+        stop: node.stop?.sourceIndex ?? null,
+      })),
+      nodeIndex: waypointController.nodeIndex,
       hasOverview: waypointController.hasOverview,
       overviewOpen: waypointController.overviewOpen,
       openOverview: waypointController.openOverview,

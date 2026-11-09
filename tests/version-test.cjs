@@ -1,72 +1,68 @@
-// One version, in every place that names it. Three files can carry a version number -- the changelog, the csproj
-// and the plugin metadata QuickLook actually reads -- and they drifted once: the metadata sat at 1.7.0 while the
-// code was at 1.15.x, so the plugin list was eight releases behind. This is the cheapest guard against that.
+// Product version and cache identity are deliberately different. This test keeps the release version in one
+// source, checks the changelog and built metadata against it, and proves the WebView host is content-derived.
 //
 //   node tests/version-test.cjs
-//
-// No browser involved: it only reads the files.
 const fs = require('fs');
 const path = require('path');
+const { compare, parse, readVersion } = require('../scripts/version.cjs');
 
 const root = path.resolve(__dirname, '..');
 const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
-
 const failures = [];
 function check(what, ok, detail) {
   console.log(`${ok ? 'PASS' : 'FAIL'}  ${what}${detail ? `  (${detail})` : ''}`);
   if (!ok) failures.push(what);
 }
 
-// 1. The log. 1.16.6 is the baseline entry, describing the plugin as it first shipped; every release since is
-//    a new entry on top of it saying only what that version changed. Entries are appended, never rewritten, so
-//    what this guard has to catch is an entry that does not match the version being built, an entry inserted
-//    out of order, and one left without a date.
+const current = readVersion();
 const changelog = read('CHANGELOG.md');
-const parse = (text) => [...text.matchAll(/^## (\d+\.\d+\.\d+)(?: — (\d{4}-\d{2}-\d{2}))?/gm)]
-  .map((m) => ({ version: m[1], date: m[2] || null }));
-const release = parse(changelog);
-const older = (a, b) => {
-  const x = a.split('.').map(Number);
-  const y = b.split('.').map(Number);
-  for (let i = 0; i < 3; i += 1) if (x[i] !== y[i]) return x[i] - y[i];
-  return 0;
-};
+const releases = [...changelog.matchAll(
+  /^## ((?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:-[0-9A-Za-z.-]+)?) \u2014 (\d{4}-\d{2}-\d{2})/gm,
+)].map((match) => ({ version: match[1], date: match[2] }));
 
-check('the log has a release note', release.length >= 1,
-  release.map((v) => v.version).join(' ') || 'none');
-check('every entry carries a date', release.every((v) => v.date),
-  release.filter((v) => !v.date).map((v) => v.version).join(' ') || 'all dated');
-check('and they run newest first, nothing inserted out of order',
-  release.every((v, i) => i === 0 || older(release[i - 1].version, v.version) > 0),
-  release.map((v) => v.version).join(' '));
+check('the version source is valid semantic versioning', Boolean(parse(current.version)), current.version);
+check('the log has a release note', releases.length >= 1,
+  releases.map((release) => release.version).join(' ') || 'none');
+check('every entry carries a date', releases.every((release) => release.date), 'all dated');
+check('entries follow semantic-version precedence',
+  releases.every((release, index) => index === 0 || compare(releases[index - 1].version, release.version) > 0),
+  releases.map((release) => release.version).join(' '));
+check('the release version is the newest log entry', releases[0]?.version === current.version,
+  `${current.version} vs ${releases[0]?.version}`);
 
-// 2. The csproj carries the version this build will be: it must be the newest entry in the log.
 const csproj = read('src/QuickLook.Plugin.TrailViewer.csproj');
-const current = (csproj.match(/<Version>([\d.]+)<\/Version>/) || [])[1];
-check('the build version is the newest entry in the log', release[0]?.version === current,
-  `${current} vs ${release[0]?.version}`);
+check('the project derives Version from Directory.Build.props',
+  csproj.includes('$(TrailViewerVersionPrefix)') && csproj.includes('$(TrailViewerVersionSuffix)'));
+check('the assembly keeps a numeric version independent of the prerelease suffix',
+  csproj.includes('<AssemblyVersion>$(TrailViewerVersionPrefix).0</AssemblyVersion>'));
+check('protocol and preference schemas have independent versions',
+  current.protocol > 0 && current.preferences > 0, `${current.protocol}/${current.preferences}`);
 
-// 3. The metadata is a template now: a hard-coded version there is the bug this test exists for.
 const metadata = read('src/QuickLook.Plugin.Metadata.config');
-check('the metadata takes its version from the build', metadata.includes('<Version>@VERSION@</Version>'),
-  (metadata.match(/<Version>.*<\/Version>/) || ['missing'])[0]);
-check('the csproj fills that placeholder in', /WritePluginMetadata/.test(csproj) && csproj.includes('@VERSION@'));
+check('the metadata takes its version from the build', metadata.includes('<Version>@VERSION@</Version>'));
+check('the project fills that placeholder in', /WritePluginMetadata/.test(csproj) && csproj.includes('@VERSION@'));
+
 const packageJson = JSON.parse(read('package.json'));
-check('the npm test package carries the same version', packageJson.version === current,
-  `${packageJson.version} vs ${current}`);
 const lock = JSON.parse(read('package-lock.json'));
-check('the lockfile carries the same version',
-  lock.version === current && lock.packages?.['']?.version === current,
-  `${lock.version}/${lock.packages?.['']?.version} vs ${current}`);
+check('npm tooling no longer claims to be the product version',
+  packageJson.version === undefined && lock.version === undefined && lock.packages?.['']?.version === undefined,
+  `${packageJson.version}/${lock.version}/${lock.packages?.['']?.version}`);
+
 const built = path.join(root, 'bin', 'Release', 'QuickLook.Plugin.Metadata.config');
 if (fs.existsSync(built)) {
-  const shipped = (fs.readFileSync(built, 'utf8').match(/<Version>([\d.]+)<\/Version>/) || [])[1];
-  check('the built metadata carries the same number', shipped === current, `${shipped} vs ${current}`);
+  const shipped = (fs.readFileSync(built, 'utf8').match(/<Version>([^<]+)<\/Version>/) || [])[1];
+  check('the built metadata carries the same number', shipped === current.version,
+    `${shipped} vs ${current.version}`);
 }
 
-// 4. The virtual host QuickLook is pointed at is the one this version derives to: 1.16.6 -> app-1-16-6.
-const host = current.replace(/\./g, '-');
-check('the changelog names the current virtual host', changelog.includes(`app-${host}.gpxviewer.example`), `app-${host}`);
+const panel = read('src/GpxPanel.cs');
+check('the WebView host is derived from viewer content, not the release version',
+  panel.includes('ViewerBuildId.Compute(ViewerFolder, BuildInfo.ViewerProtocolVersion)')
+  && !panel.includes('Assembly.GetName().Version.ToString(3)'));
+check('viewer build identity includes the page protocol',
+  read('src/ViewerBuildId.cs').includes('protocolVersion'));
+check('the changelog no longer pretends a release version is the cache host',
+  !/app-\d+-\d+-\d+\.gpxviewer\.example/.test(changelog));
 
 console.log(failures.length === 0 ? '\nversion checks OK' : `\n${failures.length} failed`);
 process.exit(failures.length === 0 ? 0 : 1);

@@ -1,0 +1,86 @@
+name: release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Verify tag and version source agree
+        shell: pwsh
+        run: |
+          if ((git cat-file -t $env:GITHUB_REF_NAME) -ne 'tag') {
+            throw "$env:GITHUB_REF_NAME must be an annotated tag"
+          }
+          $version = node -e "process.stdout.write(require('./scripts/version.cjs').readVersion().version)"
+          if ($env:GITHUB_REF_NAME -ne "v$version") {
+            throw "tag $env:GITHUB_REF_NAME does not match product version v$version"
+          }
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Static checks
+        run: npm run check
+
+      - name: Fixtures are reproducible
+        shell: pwsh
+        run: |
+          python -B tools/make-fixtures.py
+          git diff --exit-code --stat -- tests/fixtures
+
+      - name: Fetch QuickLook.Common
+        shell: pwsh
+        run: ./scripts/get-quicklook-common.ps1
+
+      - name: Build plugin
+        run: dotnet build src/QuickLook.Plugin.TrailViewer.csproj -c Release
+
+      - name: Build Harness
+        run: dotnet build tools/Harness/TrailViewer.Harness.csproj -c Release
+
+      - name: Host tests
+        run: npm run test:host
+
+      - name: Full test suite
+        shell: pwsh
+        run: |
+          $edge = "${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe"
+          if (!(Test-Path $edge)) { throw "Microsoft Edge not found at $edge" }
+          $env:CHROMIUM = $edge
+          npm test
+
+      - name: Pack release
+        shell: pwsh
+        run: |
+          node scripts/pack.cjs
+          $package = Get-ChildItem QuickLook.Plugin.TrailViewer-*.qlplugin | Select-Object -First 1
+          $hash = (Get-FileHash $package.FullName -Algorithm SHA256).Hash
+          "$hash  $($package.Name)" | Set-Content "$($package.FullName).sha256"
+
+      - name: Publish GitHub release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $package = Get-ChildItem QuickLook.Plugin.TrailViewer-*.qlplugin | Select-Object -First 1
+          $sha = "$($package.FullName).sha256"
+          $arguments = @('release', 'create', $env:GITHUB_REF_NAME, $package.FullName, $sha, '--verify-tag', '--generate-notes')
+          if ($env:GITHUB_REF_NAME.Contains('-')) { $arguments += '--prerelease' }
+          gh @arguments

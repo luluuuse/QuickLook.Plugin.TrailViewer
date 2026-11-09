@@ -3,7 +3,9 @@ using System;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
+using System.Reflection;
 using System.Text;
+using System.Text.RegularExpressions;
 
 internal static class SelfTests
 {
@@ -22,6 +24,7 @@ internal static class SelfTests
             TestKmzTraversal(temporary);
             TestKmzLimit(root, temporary);
             TestPreferences(temporary);
+            TestViewerBuildId(temporary);
             TestOverlayTransfer();
             TestAtomicFile(temporary);
         }
@@ -162,6 +165,32 @@ internal static class SelfTests
         Check("no temporary preference files are left",
             !Directory.GetFiles(Path.GetDirectoryName(path), "*.tmp").Any()
             && !Directory.GetFiles(Path.GetDirectoryName(path), "*.old").Any());
+    }
+
+    private static void TestViewerBuildId(string temporary)
+    {
+        var folder = Path.Combine(temporary, "viewer-build-id");
+        Directory.CreateDirectory(Path.Combine(folder, "nested"));
+        File.WriteAllText(Path.Combine(folder, "app.js"), "alpha");
+        File.WriteAllText(Path.Combine(folder, "nested", "style.css"), "beta");
+        var first = ViewerBuildId.Compute(folder, 1);
+        var again = ViewerBuildId.Compute(folder, 1);
+        Check("viewer build id is stable", first == again, first);
+        Check("viewer build id is a short lowercase hash",
+            first.Length == 12 && first.All(c => (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')), first);
+        File.WriteAllText(Path.Combine(folder, "app.js"), "changed");
+        Check("viewer content invalidates its cache id", ViewerBuildId.Compute(folder, 1) != first);
+        Check("viewer protocol participates in the cache id",
+            ViewerBuildId.Compute(folder, 2) != ViewerBuildId.Compute(folder, 1));
+        var host = (string)typeof(GpxPanel)
+            .GetField("AppHost", BindingFlags.NonPublic | BindingFlags.Static)
+            .GetValue(null);
+        Check("the live WebView host is a content hash",
+            Regex.IsMatch(host, "^app-[0-9a-f]{12}\\.gpxviewer\\.example$"), host);
+        Check("the live WebView host does not contain the release version", !host.Contains("1-17-0"), host);
+        Check("protocol and preference schema versions stay independent",
+            BuildInfo.ViewerProtocolVersion > 0 && BuildInfo.PreferencesSchemaVersion > 0,
+            $"{BuildInfo.ViewerProtocolVersion}/{BuildInfo.PreferencesSchemaVersion}");
     }
 
     private static void TestOverlayTransfer()

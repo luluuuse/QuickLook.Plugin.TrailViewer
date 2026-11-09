@@ -11,7 +11,10 @@
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
     <OutputPath>..\bin\$(Configuration)\</OutputPath>
-    <Version>1.16.22</Version>
+    <Version Condition="'$(TrailViewerVersionSuffix)' == ''">$(TrailViewerVersionPrefix)</Version>
+    <Version Condition="'$(TrailViewerVersionSuffix)' != ''">$(TrailViewerVersionPrefix)-$(TrailViewerVersionSuffix)</Version>
+    <AssemblyVersion>$(TrailViewerVersionPrefix).0</AssemblyVersion>
+    <FileVersion>$(TrailViewerVersionPrefix).0</FileVersion>
     <Product>QuickLook.Plugin.TrailViewer</Product>
     <Description>Previews GPX, KML and KMZ tracks, routes, areas and waypoints on a map, with photos on waypoints and an English/Chinese interface.</Description>
   </PropertyGroup>
@@ -41,6 +44,8 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="TrailViewer.Harness" />
+    <AssemblyMetadata Include="TrailViewerViewerProtocolVersion" Value="$(TrailViewerViewerProtocolVersion)" />
+    <AssemblyMetadata Include="TrailViewerPreferencesSchemaVersion" Value="$(TrailViewerPreferencesSchemaVersion)" />
   </ItemGroup>
 
   <!-- QuickLook reads a plugin's version from this file, not from the assembly, so the number in its plugin list

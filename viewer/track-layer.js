@@ -153,6 +153,7 @@ export function createTrackLayer({ L, el, localized, t, pointPopup, onFocusBound
     draw(map, gpx) {
       const bounds = L.latLngBounds([]);
       const segments = [];
+      const navigationMarks = [];
       const distancePaths = [];
       const distanceLayer = L.layerGroup().addTo(map);
       const anomalyLineLayer = L.layerGroup().addTo(map);
@@ -339,7 +340,7 @@ export function createTrackLayer({ L, el, localized, t, pointPopup, onFocusBound
         const lastSegment = track.segments[track.segments.length - 1];
         const last = lastSegment?.[lastSegment.length - 1];
         if (last && showEnds) {
-          L.circleMarker([last.lat, last.lon], {
+          const marker = L.circleMarker([last.lat, last.lon], {
             radius: 8,
             color: '#ffffff',
             weight: 3,
@@ -347,9 +348,10 @@ export function createTrackLayer({ L, el, localized, t, pointPopup, onFocusBound
             fillOpacity: 1,
             className: 'gpx-end',
           }).bindPopup(() => pointPopup(last, t('label.end'))).addTo(map);
+          navigationMarks.push({ kind: 'end', marker, point: last });
         }
         if (first && showEnds) {
-          L.circleMarker([first.lat, first.lon], {
+          const marker = L.circleMarker([first.lat, first.lon], {
             radius: 5,
             color: '#ffffff',
             weight: 2,
@@ -357,6 +359,7 @@ export function createTrackLayer({ L, el, localized, t, pointPopup, onFocusBound
             fillOpacity: 1,
             className: 'gpx-start',
           }).bindPopup(() => pointPopup(first, t('label.start'))).addTo(map);
+          navigationMarks.push({ kind: 'start', marker, point: first });
         }
       });
 
@@ -382,6 +385,7 @@ export function createTrackLayer({ L, el, localized, t, pointPopup, onFocusBound
       return {
         bounds,
         segments,
+        navigationMarks,
         refreshDistanceMarks: renderMapMarks,
         setAnnotationMarkersVisible(visible) {
           if (visible) {

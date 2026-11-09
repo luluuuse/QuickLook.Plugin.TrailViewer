@@ -5,8 +5,8 @@
 
 版本号沿用上游编号：`1.0.0` 是上游基线（只支持 GPX），`1.1.0` 起的开发都发生在这里。
 
-版本号同时决定前端所在的虚拟主机名（当前 `app-1-16-22.gpxviewer.example`），用于绕开 WebView2 的磁盘
-缓存，所以**每次升级都需要从托盘退出 QuickLook 再启动**。
+产品版本使用 Semantic Versioning。WebView2 缓存由 `viewer/` 文件内容哈希单独决定，因此日常修复不再为了
+刷新缓存制造新的发布版本。安装新的发布包后仍需从托盘退出 QuickLook 再启动。
 
 **1.16.6 is where this repository starts**: the entry below says what the plugin could do at that point, and
 is the baseline every later entry is read against. From the next version on, each release gets its own entry
@@ -15,10 +15,57 @@ at the top saying only what it changed; entries already written are left alone.
 The numbering continues upstream (`1.0.0` is McBenac's baseline, GPX only); everything from `1.1.0` on was
 written here.
 
-The version number is also the WebView2 virtual host (`app-1-16-22.gpxviewer.example` today), which defeats the
-browser cache -- so restart QuickLook from the tray after every upgrade.
+The product version follows Semantic Versioning. WebView2 cache identity is derived independently from the
+content of `viewer/`, so unrelated releases do not exist merely to defeat the cache. Restart QuickLook from the
+tray after installing a new release.
 
 ---
+
+## 1.17.0 — 2026-11-09 · 版本规划与沿线导航 / Versioning and route-ordered navigation
+
+### Added / 新增
+
+- 新增统一沿线导航模型：方向键、`A/D`、速览、剖面航点和相册跨点切换统一按累计里程排序；绿色起点和红色
+  终点与重合的黄色标记点合并为同一节点。
+- 新增独立的页面协议版本和偏好结构版本，为后续兼容与迁移提供明确边界。
+
+### Changed / 变更
+
+- 产品版本改用 Semantic Versioning，根目录 `Directory.Build.props` 成为唯一版本源；npm 配置不再伪装成
+  插件产品版本。
+- WebView2 虚拟主机改为 `viewer/` 内容哈希，不再依赖程序集版本。只有前端内容或页面协议改变时才刷新缓存。
+- 发布准备脚本支持 `major / minor / patch`、`beta.N / rc.N` 和显式语义版本，并按 SemVer 优先级检查。
+
+### Fixed / 修复
+
+- 修复从起点向右切换时先跳终点、再回起点的循环；到达路线终点后向右正常回到起点。
+
+- A unified route-ordered navigation model now drives arrow keys, `A/D`, the overview, profile waypoint dots
+  and cross-pin photo navigation. Green starts and red ends merge with coincident yellow waypoints.
+- Viewer protocol and preference-schema versions are now independent from the product version.
+
+- The product uses Semantic Versioning with `Directory.Build.props` as its only source; npm tooling no longer
+  claims the plugin's release number.
+- The WebView2 virtual host is derived from a hash of `viewer/` content and the page protocol instead of the
+  assembly version. Release preparation supports patch/minor/major and beta/rc versions.
+
+- Fixed the start loop where Right jumped to the end, back to the start, then forward; Right from the end wraps
+  to the start.
+
+## 1.16.23 — 2026-11-09 · 统一沿线标记点导航 / Along-route waypoint navigation
+
+- 修复从起点向右切换时先跳到终点、再回到起点的循环。方向键和 `A/D` 现在按轨迹累计里程排序，不再沿用 KML/GPX
+  文件里 placemark 的原始顺序。
+- 绿色起点、红色终点与位置重合的黄色标记点合并为同一个导航节点；点击任一可见标记都选中同一位置，不再重复
+  经过起点或终点。
+- 速览列表、方向键、剖面航点和相册跨点切换共用这条沿线序列；到终点后向右正常回绕起点。
+
+- Fixed the start-point loop where Right jumped to the end, back to the start, then to the following point.
+  Arrow keys and `A/D` now use cumulative route distance instead of the source file's placemark order.
+- Green start and red end anchors merge with coincident yellow waypoints into one navigation node, so the same
+  location is not visited twice.
+- The overview, arrow keys, profile waypoint dots and cross-pin photo navigation all share the same route-ordered
+  sequence. Right from the route end wraps to its start.
 
 ## 1.16.22 — 2026-11-09 · 信息聚焦与窄窗三态布局 / Focused map framing and three-state layout
 

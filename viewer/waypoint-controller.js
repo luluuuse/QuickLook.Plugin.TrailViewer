@@ -10,6 +10,7 @@ const PHOTO_BADGE = '<circle cx="23" cy="7.5" r="5.6" fill="#ffffff" stroke="#1b
 const PINS_KEY = 'gpxviewer.pins';
 const MAX_DOTS = 20000;
 const OVERVIEW_MERGE_METERS = 25;
+const NAVIGATION_MERGE_METERS = 5;
 const WAYPOINT_SPACING_PIXELS = 34;
 
 function pinIcon(L, withPhoto) {
@@ -70,13 +71,16 @@ export function createWaypointController({
   let listControl = null;
   let stops = [];
   let photoStops = [];
+  let navigation = [];
+  let photoNodes = [];
+  let selectedNodeIndex = -1;
   let stopIndex = -1;
   let halo = null;
   let trackMarkCount = 0;
   let pendingPinRender = 0;
   const overview = createWaypointOverview({
     el,
-    onSelect: (index) => select(index),
+    onSelect: (index) => selectNode(index),
     onLayoutChange,
   });
   let overviewCache = null;
@@ -134,13 +138,17 @@ export function createWaypointController({
     if (marker) marker.style.display = 'none';
   }
 
+  function selectedNode() {
+    return navigation[selectedNodeIndex] || null;
+  }
+
   function renderWaypointPins() {
     if (!map) return;
     if (!shown || stops.length === 0) return;
 
     for (const stop of stops) hideStop(stop);
     const protectedStops = new Set();
-    const selected = stops[stopIndex];
+    const selected = selectedNode()?.stop || stops[stopIndex];
     if (selected) protectedStops.add(selected);
     for (const stop of stops) if (stop.important) protectedStops.add(stop);
     for (const stop of protectedStops) {
@@ -193,45 +201,62 @@ export function createWaypointController({
     halo.setLatLng(at).bringToFront();
   }
 
-  function focus(index) {
-    if (stops.length === 0) return null;
+  function paintNavigationSelection(node) {
+    const selected = new Set(node?.markers || []);
+    for (const candidate of navigation) {
+      for (const marker of candidate.markers) {
+        marker.getElement()?.classList.toggle('selected', selected.has(marker));
+      }
+    }
+  }
+
+  function focusNode(index) {
+    if (navigation.length === 0) return null;
     if (!shown) set(true, true);
-    const next = ((index % stops.length) + stops.length) % stops.length;
-    const previous = stops[stopIndex];
-    const stop = stops[next];
-    if (previous && previous !== stop) previous.marker.getElement()?.classList.remove('selected');
-    stopIndex = next;
+    const next = ((index % navigation.length) + navigation.length) % navigation.length;
+    selectedNodeIndex = next;
+    const node = navigation[next];
+    stopIndex = node.stop ? stops.indexOf(node.stop) : -1;
     renderWaypointPins();
-    stop.marker.getElement()?.classList.add('selected');
-    paintHalo(stop);
+    paintNavigationSelection(node);
+    paintHalo(node);
     overview.refresh(overviewItems(), stopIndex);
-    onFocus?.(stop, stop.marker.isPopupOpen());
-    return stop;
+    onFocus?.(node, node.markers.some((marker) => marker.isPopupOpen()));
+    return node;
+  }
+
+  function focus(index) {
+    const stop = stops[index];
+    return stop ? focusNode(stop.navigationIndex) : null;
+  }
+
+  function selectNode(index) {
+    const node = focusNode(index);
+    if (node && !node.marker.isPopupOpen()) node.marker.openPopup();
+    return node;
   }
 
   function select(index) {
-    const stop = focus(index);
-    if (stop && !stop.marker.isPopupOpen()) stop.marker.openPopup();
-    return stop;
+    return selectNode(stops[index]?.navigationIndex ?? -1);
   }
 
   function stepPhoto(delta) {
-    if (photoStops.length === 0) return;
-    const stop = photoStops.find((candidate) => candidate.point === photoViewer.current());
-    if (!stop) {
-      const edge = photoStops[delta > 0 ? 0 : photoStops.length - 1];
-      photoViewer.show(edge.photos, edge.point.name || t('label.photo'), edge.point, 0);
+    if (photoNodes.length === 0) return;
+    const node = photoNodes.find((candidate) => candidate.point === photoViewer.current());
+    if (!node) {
+      const edge = photoNodes[delta > 0 ? 0 : photoNodes.length - 1];
+      photoViewer.show(edge.stop.photos, edge.point.name || t('label.photo'), edge.point, 0);
       return;
     }
     if (photoViewer.stepWithin(delta)) return;
-    const index = photoStops.indexOf(stop);
-    const neighbour = photoStops[(index + delta + photoStops.length) % photoStops.length];
-    select(stops.indexOf(neighbour));
+    const index = photoNodes.indexOf(node);
+    const neighbour = photoNodes[(index + delta + photoNodes.length) % photoNodes.length];
+    selectNode(neighbour.navIndex);
     photoViewer.show(
-      neighbour.photos,
+      neighbour.stop.photos,
       neighbour.point.name || t('label.photo'),
       neighbour.point,
-      delta > 0 ? 0 : neighbour.photos.length - 1,
+      delta > 0 ? 0 : neighbour.stop.photos.length - 1,
     );
   }
 
@@ -240,14 +265,20 @@ export function createWaypointController({
       stepPhoto(delta);
       return;
     }
-    if (stops.length === 0) return;
-    select(stopIndex < 0 ? (delta > 0 ? 0 : stops.length - 1) : stopIndex + delta);
+    if (navigation.length === 0) return;
+    if (selectedNodeIndex < 0) {
+      const waypoints = navigation.filter((node) => node.stop);
+      const target = waypoints[delta > 0 ? 0 : waypoints.length - 1] || navigation[delta > 0 ? 0 : navigation.length - 1];
+      if (target) selectNode(target.navIndex);
+      return;
+    }
+    selectNode(selectedNodeIndex + delta);
   }
 
   function overviewItems() {
     if (overviewCache) return overviewCache;
     const sorted = stops
-      .map((stop, index) => ({ stop, index }))
+      .map((stop, index) => ({ stop, index, navIndex: stop.navigationIndex }))
       .sort((a, b) => {
         const left = Number.isFinite(a.stop.along) ? a.stop.along : Infinity;
         const right = Number.isFinite(b.stop.along) ? b.stop.along : Infinity;
@@ -264,7 +295,7 @@ export function createWaypointController({
     }
     overviewCache = groups.map((group) => {
       const first = group[0];
-      if (group.length === 1) return { ...first, members: [first.index] };
+      if (group.length === 1) return { ...first, members: [first.index], navIndex: first.navIndex };
       const unique = (values) => [...new Set(values.filter(Boolean))];
       const point = { ...first.stop.point };
       const names = unique(group.map(({ stop }) => stop.point.name));
@@ -284,9 +315,82 @@ export function createWaypointController({
           mergedCount: group.length,
         },
         members: group.map(({ index }) => index),
+        navIndex: first.navIndex,
       };
     });
     return overviewCache;
+  }
+
+  function orderValue(stop) {
+    return Number.isFinite(stop.along) ? stop.along : Infinity;
+  }
+
+  function sortStops() {
+    stops.sort((a, b) => orderValue(a) - orderValue(b) || a.sourceIndex - b.sourceIndex);
+  }
+
+  function buildNavigation(anchorMarks, routeIndex) {
+    const waypointGroups = stops.map((stop) => ({ stop, anchors: [] }));
+    const anchorGroups = [];
+    for (const anchor of anchorMarks) {
+      const withAlong = {
+        ...anchor,
+        along: routeIndex.nearest(anchor.point)?.along,
+      };
+      const candidates = [...waypointGroups, ...anchorGroups]
+        .map((group) => ({
+          group,
+          distance: distanceMeters(group.stop?.point || group.anchors[0].point, withAlong.point),
+        }))
+        .filter(({ distance }) => distance <= NAVIGATION_MERGE_METERS)
+        .sort((a, b) => a.distance - b.distance);
+      if (candidates[0]) candidates[0].group.anchors.push(withAlong);
+      else anchorGroups.push({ stop: null, anchors: [withAlong] });
+    }
+
+    const groups = [...waypointGroups, ...anchorGroups].sort((a, b) => {
+      const left = a.stop ? orderValue(a.stop) : Math.min(...a.anchors.map((anchor) => anchor.along));
+      const right = b.stop ? orderValue(b.stop) : Math.min(...b.anchors.map((anchor) => anchor.along));
+      return left - right || (a.stop ? 1 : 0) - (b.stop ? 1 : 0);
+    });
+
+    navigation = groups.map((group, navIndex) => {
+      const stop = group.stop;
+      const anchor = group.anchors[0] || null;
+      const point = stop?.point || anchor.point;
+      const marker = stop?.marker || anchor.marker;
+      const markers = [...group.anchors.map((item) => item.marker), ...(stop ? [stop.marker] : [])];
+      const node = {
+        navIndex,
+        stop,
+        point,
+        marker,
+        markers,
+        anchors: group.anchors,
+        kinds: group.anchors.map((item) => item.kind),
+        along: stop ? orderValue(stop) : Math.min(...group.anchors.map((item) => item.along)),
+      };
+      if (stop) stop.navigationIndex = navIndex;
+      return node;
+    });
+
+    for (const node of navigation) {
+      for (const marker of node.markers) {
+        marker.on('click', () => focusNode(node.navIndex));
+        marker.on('popupopen', () => {
+          requestAnimationFrame(() => onFocus?.(node, true));
+        });
+      }
+      if (node.stop && node.anchors.length > 0) {
+        for (const anchor of node.anchors) {
+          const element = anchor.marker.getElement();
+          if (element) element.style.pointerEvents = 'none';
+        }
+      }
+    }
+    photoNodes = navigation.filter((node) => node.stop?.photos.length > 0);
+    photoStops = photoNodes.map((node) => node.stop);
+    overviewCache = null;
   }
 
   function createControl(targetMap) {
@@ -363,10 +467,13 @@ export function createWaypointController({
   }
 
   return {
-    draw(targetMap, gpx, segments) {
+    draw(targetMap, gpx, segments, anchorMarks = []) {
       map = targetMap;
       stops = [];
       photoStops = [];
+      navigation = [];
+      photoNodes = [];
+      selectedNodeIndex = -1;
       stopIndex = -1;
       overviewCache = null;
       halo = null;
@@ -411,10 +518,9 @@ export function createWaypointController({
           along: routeIndex.nearest(waypoint)?.along,
           pinIcon: pin,
           important,
+          sourceIndex: stops.length,
         };
-        const index = stops.push(stop) - 1;
-        if (photos.length > 0) photoStops.push(stop);
-        marker.on('click', () => focus(index));
+        stops.push(stop);
         if (photos.length > 0) {
           const label = localized(
             el('span'),
@@ -433,11 +539,10 @@ export function createWaypointController({
             { autoPan: false },
           );
         }
-        marker.on('popupopen', () => {
-          requestAnimationFrame(() => onFocus?.(stop, true));
-        });
         bounds.extend([waypoint.lat, waypoint.lon]);
       }
+      sortStops();
+      buildNavigation(anchorMarks, routeIndex);
       map.on('zoomend', scheduleWaypointPins);
       map.on('moveend', scheduleWaypointPins);
       map.on('resize', scheduleWaypointPins);
@@ -460,6 +565,8 @@ export function createWaypointController({
     stops: () => stops,
     photoStops: () => photoStops,
     index: () => stopIndex,
+    navigation: () => navigation,
+    nodeIndex: () => selectedNodeIndex,
     hasControl: () => pinControl !== null,
     hasOverview: () => listControl !== null,
     overviewOpen: () => overview.isOpen(),
@@ -467,6 +574,10 @@ export function createWaypointController({
     closeOverview: () => overview.close(),
     refreshMapMarks: renderWaypointPins,
     relabel,
-    openStop: () => stops.find((stop) => stop.marker.isPopupOpen()) || null,
+    openStop() {
+      const node = selectedNode();
+      const marker = node?.markers.find((candidate) => candidate.isPopupOpen());
+      return marker ? { marker, point: node.point } : null;
+    },
   };
 }

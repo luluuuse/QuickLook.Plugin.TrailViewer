@@ -271,7 +271,7 @@ export function createWaypointOverview({ el, onSelect, onLayoutChange }) {
     const selectedVisible = selectedItem && visible.includes(selectedItem);
     currentRow = null;
 
-    function makeRow(item, { pinned = false, selectIndex = item.index } = {}) {
+    function makeRow(item, { pinned = false } = {}) {
       const { stop, index } = item;
       const insight = insightOf(item);
       const row = el('div', 'waypoint-overview-item');
@@ -339,13 +339,12 @@ export function createWaypointOverview({ el, onSelect, onLayoutChange }) {
         currentRow = row;
       }
       const activate = () => {
-        selectedIndex = selectIndex;
         for (const node of list.querySelectorAll('.waypoint-overview-item')) {
           node.classList.toggle('selected', node === row);
           if (node === row) node.setAttribute('aria-current', 'true');
           else node.removeAttribute('aria-current');
         }
-        onSelect(selectIndex);
+        onSelect(item.navIndex);
       };
       row.addEventListener('click', (event) => {
         if (!(event.target instanceof Element) || !event.target.closest('.waypoint-correct-button')) activate();
@@ -360,7 +359,7 @@ export function createWaypointOverview({ el, onSelect, onLayoutChange }) {
     }
 
     if (selectedItem && !selectedVisible) {
-      makeRow(selectedItem, { pinned: true, selectIndex: selectedIndex });
+      makeRow(selectedItem, { pinned: true });
     }
     for (const item of visible) makeRow(item);
     if (visible.length === 0 && !selectedItem) {

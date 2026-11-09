@@ -1502,6 +1502,13 @@ body.failed #map {
   filter: drop-shadow(0 0 5px rgba(47, 155, 255, 0.95));
 }
 
+.gpx-start.selected,
+.gpx-end.selected {
+  stroke: #2f9bff;
+  stroke-width: 4;
+  filter: drop-shadow(0 0 4px rgba(47, 155, 255, 0.95));
+}
+
 /* The small card a photo pin opens first. Sized to the pin, not to the window: the window is for the
    second click, when the original is actually wanted. */
 .photo-popup .leaflet-popup-close-button {

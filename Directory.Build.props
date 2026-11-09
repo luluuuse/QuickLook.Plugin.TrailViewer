@@ -1,6 +1,10 @@
 <Project>
-  <ItemGroup>
-    <!-- Build net462 without a locally installed targeting pack (CI runners, any machine). -->
-    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
-  </ItemGroup>
+  <!-- Product versioning is independent from WebView2 cache invalidation. The latter is computed from the
+       files under viewer/ at runtime. Keep only one release version here. -->
+  <PropertyGroup>
+    <TrailViewerVersionPrefix>1.17.0</TrailViewerVersionPrefix>
+    <TrailViewerVersionSuffix></TrailViewerVersionSuffix>
+    <TrailViewerViewerProtocolVersion>1</TrailViewerViewerProtocolVersion>
+    <TrailViewerPreferencesSchemaVersion>1</TrailViewerPreferencesSchemaVersion>
+  </PropertyGroup>
 </Project>

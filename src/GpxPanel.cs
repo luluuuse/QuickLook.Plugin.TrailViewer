@@ -19,17 +19,16 @@ namespace QuickLook.Plugin.TrailViewer;
 /// </summary>
 internal sealed class GpxPanel : UserControl, IDisposable
 {
-    // WebView2 serves a virtual host through an on-disk cache keyed by URL, and it happily hands back the
-    // previous release's app.js after an upgrade. A host name that carries the version makes every upgrade
-    // a new origin, so the viewer files are fetched once per version instead of never again.
+    private static readonly string ViewerFolder =
+        Path.Combine(Path.GetDirectoryName(typeof(GpxPanel).Assembly.Location), "viewer");
+
+    // WebView2 caches by origin. Hash the files actually shipped under viewer/, plus the page protocol
+    // version, so a content change invalidates the cache without inventing another product version.
     private static readonly string AppHost =
-        $"app-{typeof(GpxPanel).Assembly.GetName().Version.ToString(3).Replace('.', '-')}.gpxviewer.example";
+        $"app-{ViewerBuildId.Compute(ViewerFolder, BuildInfo.ViewerProtocolVersion)}.gpxviewer.example";
 
     private const string FileHost = "file.gpxviewer.example";
     private static readonly TimeSpan LoadTimeout = TimeSpan.FromSeconds(20);
-
-    private static readonly string ViewerFolder =
-        Path.Combine(Path.GetDirectoryName(typeof(GpxPanel).Assembly.Location), "viewer");
 
     private readonly Stopwatch _clock = Stopwatch.StartNew();
     private readonly DispatcherTimer _timeout;
