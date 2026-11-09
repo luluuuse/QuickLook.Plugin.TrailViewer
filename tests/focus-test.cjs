@@ -23,7 +23,7 @@ const inside = (safe, rect, tolerance = 1) => rect.l >= safe.left - tolerance
 
 async function routeFrame(page) {
   return page.evaluate(() => {
-    const viewer = window.gpxViewer;
+    const viewer = window.trailViewer;
     const safe = viewer.mapLayout().safe;
     const points = viewer.gpx.tracks.flatMap((track) => track.segments.flat())
       .concat(viewer.gpx.routes.flatMap((route) => route.points))
@@ -48,7 +48,7 @@ async function routeFrame(page) {
 
 async function selectedFrame(page) {
   return page.evaluate(() => {
-    const safe = window.gpxViewer.mapLayout().safe;
+    const safe = window.trailViewer.mapLayout().safe;
     const pin = document.querySelector('.gpx-pin.selected')?.getBoundingClientRect();
     const popup = document.querySelector('.leaflet-popup')?.getBoundingClientRect();
     return {
@@ -81,7 +81,7 @@ async function main() {
 
   for (const [width, height, locale, details, fixture] of matrix) {
     const page = await browser.newPage({ viewport: { width, height }, locale });
-    await page.addInitScript((mode) => localStorage.setItem('gpxviewer.infoDetails', mode), details);
+    await page.addInitScript((mode) => localStorage.setItem('trailviewer.infoDetails', mode), details);
     page.on('pageerror', (error) => pageErrors.push(error.message));
     await openViewer(page, base, fixture);
     await waitForLayout(page);
@@ -109,7 +109,7 @@ async function main() {
 
   // A selected pin at the far corner, including its popup, is brought back into the usable map.
   await openViewer(firstPage, base, 'kml-photos.kml');
-  await firstPage.evaluate(() => window.gpxViewer.nav.select(0));
+  await firstPage.evaluate(() => window.trailViewer.nav.select(0));
   await settlePopup(firstPage, '.leaflet-popup', 1);
   await waitForMapIdle(firstPage);
   let frame = await selectedFrame(firstPage);
@@ -118,14 +118,14 @@ async function main() {
     JSON.stringify(frame));
 
   await firstPage.evaluate(() => {
-    const viewer = window.gpxViewer;
+    const viewer = window.trailViewer;
     const point = viewer.nav.stops()[1].point;
     const at = viewer.map.latLngToContainerPoint([point.lat, point.lon]);
     viewer.map.closePopup();
     viewer.map.panBy([at.x - 8, at.y - 8], { animate: false });
   });
   await waitForMapIdle(firstPage);
-  await firstPage.evaluate(() => window.gpxViewer.nav.select(1));
+  await firstPage.evaluate(() => window.trailViewer.nav.select(1));
   await settlePopup(firstPage, '.leaflet-popup', 1);
   await waitForMapIdle(firstPage);
   frame = await selectedFrame(firstPage);
@@ -144,7 +144,7 @@ async function main() {
   await firstPage.setViewportSize({ width: 760, height: 560 });
   await waitForLayout(firstPage);
   await firstPage.waitForFunction(() => {
-    const safe = window.gpxViewer.mapLayout().safe;
+    const safe = window.trailViewer.mapLayout().safe;
     const popup = document.querySelector('.leaflet-popup')?.getBoundingClientRect();
     return Boolean(popup) && popup.left >= safe.left - 1 && popup.top >= safe.top - 1
       && popup.right <= safe.right + 1 && popup.bottom <= safe.bottom + 1;
@@ -159,10 +159,10 @@ async function main() {
   profilePage.on('pageerror', (error) => pageErrors.push(error.message));
   await openViewer(profilePage, base, 'track-time-ele.gpx');
   await waitForLayout(profilePage);
-  await profilePage.evaluate(() => window.gpxViewer.scrub.at(window.gpxViewer.profile.total));
+  await profilePage.evaluate(() => window.trailViewer.scrub.at(window.trailViewer.profile.total));
   await waitForMapIdle(profilePage);
   const scrub = await profilePage.evaluate(() => {
-    const safe = window.gpxViewer.mapLayout().safe;
+    const safe = window.trailViewer.mapLayout().safe;
     const rect = document.querySelector('.scrub-marker').getBoundingClientRect();
     const profile = document.getElementById('profile').getBoundingClientRect();
     return {
@@ -179,7 +179,7 @@ async function main() {
   const overviewPage = await browser.newPage({ viewport: { width: 1000, height: 760 }, locale: 'en-US' });
   overviewPage.on('pageerror', (error) => pageErrors.push(error.message));
   await openViewer(overviewPage, base, 'kml-insights.kml');
-  await overviewPage.evaluate(() => window.gpxViewer.nav.select(5));
+  await overviewPage.evaluate(() => window.trailViewer.nav.select(5));
   await settlePopup(overviewPage, '.leaflet-popup', 1);
   await overviewPage.locator('.waypoint-overview-switch button').click();
   await overviewPage.locator('.waypoint-filter-trigger').click();
@@ -190,7 +190,7 @@ async function main() {
       name: row?.querySelector('.heading strong')?.textContent,
       selected: row?.classList.contains('selected'),
       label: row?.querySelector('.waypoint-current-label')?.textContent,
-      index: window.gpxViewer.nav.index(),
+      index: window.trailViewer.nav.index(),
     };
   });
   check('a filter that hides the current pin keeps a pinned current row',
@@ -202,8 +202,8 @@ async function main() {
   scrollPage.on('pageerror', (error) => pageErrors.push(error.message));
   await openViewer(scrollPage, base, 'dense-waypoints.kml');
   await scrollPage.locator('.waypoint-overview-switch button').click();
-  const last = await scrollPage.evaluate(() => window.gpxViewer.nav.stops().length - 1);
-  await scrollPage.evaluate((index) => window.gpxViewer.nav.select(index), last);
+  const last = await scrollPage.evaluate(() => window.trailViewer.nav.stops().length - 1);
+  await scrollPage.evaluate((index) => window.trailViewer.nav.select(index), last);
   await settlePopup(scrollPage, '.leaflet-popup', 1);
   await waitForLayout(scrollPage);
   const scrolled = await scrollPage.evaluate(() => {
@@ -225,21 +225,21 @@ async function main() {
   await openViewer(anomalyPage, base, 'gps-anomaly.gpx');
   await anomalyPage.waitForSelector('.gpx-anomaly-marker');
   await waitForLayout(anomalyPage);
-  const beforeZoom = await anomalyPage.evaluate(() => window.gpxViewer.map.getZoom());
+  const beforeZoom = await anomalyPage.evaluate(() => window.trailViewer.map.getZoom());
   await anomalyPage.locator('.gpx-anomaly-marker').first().click();
-  await anomalyPage.waitForFunction((zoom) => window.gpxViewer.map.getZoom() > zoom, beforeZoom);
+  await anomalyPage.waitForFunction((zoom) => window.trailViewer.map.getZoom() > zoom, beforeZoom);
   await waitForMapIdle(anomalyPage);
-  const clickedZoom = await anomalyPage.evaluate(() => window.gpxViewer.map.getZoom());
+  const clickedZoom = await anomalyPage.evaluate(() => window.trailViewer.map.getZoom());
   check('clicking a GPS anomaly zooms into it', clickedZoom > beforeZoom, `${beforeZoom} -> ${clickedZoom}`);
-  await anomalyPage.evaluate(() => window.gpxViewer.locate());
+  await anomalyPage.evaluate(() => window.trailViewer.locate());
   await waitForMapIdle(anomalyPage);
   await waitForLayout(anomalyPage);
   await anomalyPage.locator('.gpx-anomaly-marker').first().focus();
   const tab = await anomalyPage.locator('.gpx-anomaly-marker').first().getAttribute('tabindex');
   await anomalyPage.keyboard.press('Enter');
-  await anomalyPage.waitForFunction((zoom) => window.gpxViewer.map.getZoom() > zoom, beforeZoom);
+  await anomalyPage.waitForFunction((zoom) => window.trailViewer.map.getZoom() > zoom, beforeZoom);
   await waitForMapIdle(anomalyPage);
-  const keyZoom = await anomalyPage.evaluate(() => window.gpxViewer.map.getZoom());
+  const keyZoom = await anomalyPage.evaluate(() => window.trailViewer.map.getZoom());
   check('an anomaly label is keyboard focusable and Enter zooms it',
     tab === '0' && keyZoom > beforeZoom, `tab=${tab}, zoom ${keyZoom}`);
   await anomalyPage.close();

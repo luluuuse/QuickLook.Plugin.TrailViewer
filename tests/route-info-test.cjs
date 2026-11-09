@@ -22,20 +22,20 @@ async function main() {
   const { server, base } = await startStaticServer(root);
   const browser = await launchBrowser();
   const page = await browser.newPage({ viewport: { width: 1200, height: 800 }, locale: 'en-US' });
-  await page.addInitScript(() => localStorage.setItem('gpxviewer.infoDetails', 'full'));
+  await page.addInitScript(() => localStorage.setItem('trailviewer.infoDetails', 'full'));
   await artifacts.start(page);
   const pageErrors = [];
   page.on('pageerror', (error) => pageErrors.push(error.message));
 
   await openViewer(page, base, 'track-time-ele.gpx');
   const route = await page.evaluate(() => ({
-    distance: window.gpxViewer.summary.distanceMeters,
-    duration: window.gpxViewer.summary.durationSeconds,
-    moving: window.gpxViewer.summary.movingDurationSeconds,
-    estimate: window.gpxViewer.hikeEstimate,
-    gaps: window.gpxViewer.summary.gaps,
-    ascent: window.gpxViewer.profile.ascent,
-    rawAscent: window.gpxViewer.profile.rawAscent,
+    distance: window.trailViewer.summary.distanceMeters,
+    duration: window.trailViewer.summary.durationSeconds,
+    moving: window.trailViewer.summary.movingDurationSeconds,
+    estimate: window.trailViewer.hikeEstimate,
+    gaps: window.trailViewer.summary.gaps,
+    ascent: window.trailViewer.profile.ascent,
+    rawAscent: window.trailViewer.profile.rawAscent,
     stats: [...document.querySelectorAll('#info .stats dt')].map((node) => node.textContent),
     ascentTitle: [...document.querySelectorAll('#info .stats .pair')]
       .find((node) => node.querySelector('dt')?.textContent === 'Ascent')?.title || '',
@@ -82,7 +82,7 @@ async function main() {
     route.ascentTitle);
   if (shot) await page.screenshot({ path: shot });
 
-  await page.evaluate(() => { window.gpxViewer.map.setZoom(10); });
+  await page.evaluate(() => { window.trailViewer.map.setZoom(10); });
   await waitForZoom(page, 10);
   await waitForLayout(page);
   const overviewScale = await page.evaluate(() => ({
@@ -96,7 +96,7 @@ async function main() {
     overviewScale.arrows >= 3 && overviewScale.arrows < route.arrows,
     `${overviewScale.arrows} arrows`);
 
-  await page.evaluate(() => { window.gpxViewer.map.setZoom(15); });
+  await page.evaluate(() => { window.trailViewer.map.setZoom(15); });
   await waitForZoom(page, 15);
   await waitForLayout(page);
   const zoomedIn = await page.evaluate(() => ({
@@ -112,9 +112,9 @@ async function main() {
 
   await openViewer(page, base, 'multi-segment.gpx');
   const gaps = await page.evaluate(() => ({
-    regions: window.gpxViewer.summary.gaps,
-    events: window.gpxViewer.summary.gapEvents,
-    distance: window.gpxViewer.summary.gapDistanceMeters,
+    regions: window.trailViewer.summary.gaps,
+    events: window.trailViewer.summary.gapEvents,
+    distance: window.trailViewer.summary.gapDistanceMeters,
     markers: document.querySelectorAll('.gpx-gap-marker').length,
     clustered: document.querySelectorAll('.gpx-gap-marker.clustered').length,
     connectors: document.querySelectorAll('.gpx-gap').length,
@@ -145,7 +145,7 @@ async function main() {
     /data-gap event/.test(gapHint || '') && /missing/.test(gapHint || '')
       && /click to zoom/.test(gapHint || ''),
     gapHint);
-  await page.evaluate(() => window.gpxViewer.pins.hide());
+  await page.evaluate(() => window.trailViewer.pins.hide());
   await waitForLayout(page);
   const hiddenGapMarks = await page.evaluate(() => ({
     markers: document.querySelectorAll('.gpx-gap-marker').length,
@@ -154,10 +154,10 @@ async function main() {
   check('the marker switch hides gap icons but keeps their track connectors',
     hiddenGapMarks.markers === 0 && hiddenGapMarks.connectors === gaps.connectors,
     JSON.stringify(hiddenGapMarks));
-  await page.evaluate(() => window.gpxViewer.pins.show());
+  await page.evaluate(() => window.trailViewer.pins.show());
   await waitForLayout(page);
 
-  await page.evaluate(() => { window.gpxViewer.map.setZoom(4); });
+  await page.evaluate(() => { window.trailViewer.map.setZoom(4); });
   await waitForZoom(page, 4);
   await waitForLayout(page);
   const clusteredGaps = await page.evaluate(() => ({
@@ -170,9 +170,9 @@ async function main() {
 
   await openViewer(page, base, 'gps-anomaly.gpx');
   const anomaly = await page.evaluate(() => ({
-    dataGaps: window.gpxViewer.summary.gaps,
-    anomalyRegions: window.gpxViewer.summary.anomalies,
-    anomalyEvents: window.gpxViewer.summary.anomalyEvents,
+    dataGaps: window.trailViewer.summary.gaps,
+    anomalyRegions: window.trailViewer.summary.anomalies,
+    anomalyEvents: window.trailViewer.summary.anomalyEvents,
     redWarnings: document.querySelectorAll('.gpx-gap-marker').length,
     gpsMarkers: [...document.querySelectorAll('.gpx-anomaly-marker span')].map((node) => node.textContent),
     overlays: document.querySelectorAll('.gpx-anomaly-segment').length,
@@ -196,7 +196,7 @@ async function main() {
     /GPS anomaly band/.test(anomalyHint || '') && /affected/.test(anomalyHint || '')
       && /click to zoom/.test(anomalyHint || ''),
     anomalyHint);
-  await page.evaluate(() => window.gpxViewer.pins.hide());
+  await page.evaluate(() => window.trailViewer.pins.hide());
   await waitForLayout(page);
   const hiddenAnomalyMarks = await page.evaluate(() => ({
     markers: document.querySelectorAll('.gpx-anomaly-marker').length,
@@ -205,14 +205,14 @@ async function main() {
   check('the marker switch hides GPS labels but keeps anomaly lines',
     hiddenAnomalyMarks.markers === 0 && hiddenAnomalyMarks.overlays === anomaly.overlays,
     JSON.stringify(hiddenAnomalyMarks));
-  await page.evaluate(() => window.gpxViewer.pins.show());
+  await page.evaluate(() => window.trailViewer.pins.show());
 
   await openViewer(page, base, 'gps-anomaly-band.gpx');
-  await page.evaluate(() => { window.gpxViewer.map.setZoom(10); });
+  await page.evaluate(() => { window.trailViewer.map.setZoom(10); });
   await waitForZoom(page, 10);
   await waitForLayout(page);
   const anomalyBand = await page.evaluate(() => ({
-    regions: window.gpxViewer.summary.anomalies,
+    regions: window.trailViewer.summary.anomalies,
     labels: [...document.querySelectorAll('.gpx-anomaly-marker span')].map((node) => node.textContent),
     overlays: document.querySelectorAll('.gpx-anomaly-segment').length,
     summaryRows: [...document.querySelectorAll('#info .fact dt')]
@@ -233,8 +233,8 @@ async function main() {
       rows: rows.length,
       text: rows[0]?.querySelector('dd')?.textContent || '',
       title: rows[0]?.title || '',
-      gaps: window.gpxViewer.summary.gaps,
-      anomalies: window.gpxViewer.summary.anomalies,
+      gaps: window.trailViewer.summary.gaps,
+      anomalies: window.trailViewer.summary.anomalies,
     };
   });
   check('data gaps and speed anomalies occupy the same summary column',
@@ -244,10 +244,10 @@ async function main() {
 
   await openViewer(page, base, 'kml-pause.kml');
   const recorded = await page.evaluate(() => ({
-    total: window.gpxViewer.summary.durationSeconds,
-    moving: window.gpxViewer.summary.movingDurationSeconds,
-    paused: window.gpxViewer.summary.pausedSeconds,
-    source: window.gpxViewer.summary.movingTimeSource,
+    total: window.trailViewer.summary.durationSeconds,
+    moving: window.trailViewer.summary.movingDurationSeconds,
+    paused: window.trailViewer.summary.pausedSeconds,
+    source: window.trailViewer.summary.movingTimeSource,
     totalTitle: [...document.querySelectorAll('#info .stats .pair')]
       .find((node) => node.querySelector('dt')?.textContent === 'Total time')?.title || '',
     speedTitle: [...document.querySelectorAll('#info .stats .pair')]
@@ -265,8 +265,8 @@ async function main() {
   await openViewer(page, base, 'kml-photos.kml');
   const overviewButton = page.locator('.waypoint-overview-switch button');
   let overview = await page.evaluate(() => ({
-    present: window.gpxViewer.nav.hasOverview(),
-    open: window.gpxViewer.nav.overviewOpen(),
+    present: window.trailViewer.nav.hasOverview(),
+    open: window.trailViewer.nav.overviewOpen(),
     title: document.querySelector('.waypoint-overview-switch button')?.title,
     searchRemoved: document.querySelector('.waypoint-search') === null,
   }));
@@ -289,7 +289,7 @@ async function main() {
       return value.endsWith('km') ? number * 1000 : number;
     };
     return {
-      open: window.gpxViewer.nav.overviewOpen(),
+      open: window.trailViewer.nav.overviewOpen(),
       title: document.querySelector('.waypoint-overview-header strong')?.textContent,
       rows,
       sorted: rows.every((row, index) => index === 0
@@ -313,10 +313,10 @@ async function main() {
   await page.locator('.waypoint-overview-item[data-waypoint="1"]').click();
   await settlePopup(page, '.leaflet-popup', 1);
   let found = await page.evaluate(() => ({
-    index: window.gpxViewer.nav.index(),
+    index: window.trailViewer.nav.index(),
     selected: document.querySelector('.gpx-pin.selected')?.title,
     highlighted: document.querySelector('.waypoint-overview-item.selected')?.dataset.waypoint,
-    stillOpen: window.gpxViewer.nav.overviewOpen(),
+    stillOpen: window.trailViewer.nav.overviewOpen(),
   }));
   check('clicking a row locates its waypoint', found.index === 1 && found.selected === 'Album',
     `${found.index}/${found.selected}`);
@@ -357,7 +357,7 @@ async function main() {
 
   await page.locator('.waypoint-overview-header .close').click();
   found = await page.evaluate(() => ({
-    open: window.gpxViewer.nav.overviewOpen(),
+    open: window.trailViewer.nav.overviewOpen(),
     expanded: document.querySelector('.waypoint-overview-switch button')?.getAttribute('aria-expanded'),
   }));
   check('the overview closes cleanly', found.open === false && found.expanded === 'false',

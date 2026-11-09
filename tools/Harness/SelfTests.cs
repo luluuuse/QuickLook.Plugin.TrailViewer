@@ -24,6 +24,7 @@ internal static class SelfTests
             TestKmzTraversal(temporary);
             TestKmzLimit(root, temporary);
             TestPreferences(temporary);
+            TestProductIdentity(temporary);
             TestViewerBuildId(temporary);
             TestOverlayTransfer();
             TestAtomicFile(temporary);
@@ -182,15 +183,48 @@ internal static class SelfTests
         Check("viewer content invalidates its cache id", ViewerBuildId.Compute(folder, 1) != first);
         Check("viewer protocol participates in the cache id",
             ViewerBuildId.Compute(folder, 2) != ViewerBuildId.Compute(folder, 1));
-        var host = (string)typeof(GpxPanel)
+        var host = (string)typeof(TrailViewerPanel)
             .GetField("AppHost", BindingFlags.NonPublic | BindingFlags.Static)
             .GetValue(null);
         Check("the live WebView host is a content hash",
-            Regex.IsMatch(host, "^app-[0-9a-f]{12}\\.gpxviewer\\.example$"), host);
+            Regex.IsMatch(host, "^app-[0-9a-f]{12}\\.trailviewer\\.example$"), host);
         Check("the live WebView host does not contain the release version", !host.Contains("1-17-0"), host);
         Check("protocol and preference schema versions stay independent",
             BuildInfo.ViewerProtocolVersion > 0 && BuildInfo.PreferencesSchemaVersion > 0,
             $"{BuildInfo.ViewerProtocolVersion}/{BuildInfo.PreferencesSchemaVersion}");
+    }
+
+    private static void TestProductIdentity(string temporary)
+    {
+        Check("current identity is TrailViewer", PluginIdentity.Name == "TrailViewer");
+        Check("legacy identity is isolated for migration", PluginIdentity.LegacyName == "GpxViewer");
+
+        var legacyPreferences = Path.Combine(temporary, "legacy-preferences", "viewer-settings.txt");
+        var currentPreferences = Path.Combine(temporary, "current-preferences", "viewer-settings.txt");
+        Directory.CreateDirectory(Path.GetDirectoryName(legacyPreferences));
+        File.WriteAllLines(legacyPreferences, new[] { "layer=terrain", "pins=0" });
+        Check("legacy preferences migrate to the current product directory",
+            ViewerPreferences.MigrateLegacyFile(legacyPreferences, currentPreferences)
+            && File.Exists(currentPreferences) && !File.Exists(legacyPreferences),
+            currentPreferences);
+        Check("migrated preference values remain valid",
+            ViewerPreferences.QueryFromFile(currentPreferences) == "layer=terrain&pins=0");
+
+        var legacyProfile = Path.Combine(temporary, "legacy-profile");
+        var currentProfile = Path.Combine(temporary, "current-profile");
+        Directory.CreateDirectory(legacyProfile);
+        File.WriteAllText(Path.Combine(legacyProfile, "marker"), "kept");
+        Check("legacy WebView profile moves to the current name",
+            TrailViewerPanel.MigrateLegacyProfile(legacyProfile, currentProfile)
+            && Directory.Exists(currentProfile) && !Directory.Exists(legacyProfile));
+
+        var legacyLog = Path.Combine(temporary, "legacy-log", "log.txt");
+        var currentLog = Path.Combine(temporary, "current-log", "log.txt");
+        Directory.CreateDirectory(Path.GetDirectoryName(legacyLog));
+        File.WriteAllText(legacyLog, "old log");
+        Check("legacy log moves to the current product directory",
+            Log.MigrateLegacyFile(legacyLog, currentLog)
+            && File.Exists(currentLog) && !File.Exists(legacyLog));
     }
 
     private static void TestOverlayTransfer()

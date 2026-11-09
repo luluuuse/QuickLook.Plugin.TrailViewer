@@ -57,7 +57,7 @@ async function main() {
     }
 
     const got = await page.evaluate(() => {
-      const s = window.gpxViewer.summary;
+      const s = window.trailViewer.summary;
       return {
         ...s,
         start: s.start && s.start.toISOString(),
@@ -93,7 +93,7 @@ async function main() {
 
     if (shots) {
       for (const layer of ['map', 'none']) {
-        await page.evaluate((key) => window.gpxViewer.selectLayer(key), layer);
+        await page.evaluate((key) => window.trailViewer.selectLayer(key), layer);
         await page.waitForLoadState('networkidle');
         if (layer === 'map') await waitForTiles(page);
         else await page.waitForFunction(() => document.querySelectorAll('.leaflet-tile-pane img').length === 0);
@@ -119,7 +119,7 @@ async function main() {
     const started = Date.now();
     await open(page, base, `generated-${n}.gpx`);
     const seconds = (Date.now() - started) / 1000;
-    const points = await page.evaluate(() => window.gpxViewer?.summary.points);
+    const points = await page.evaluate(() => window.trailViewer?.summary.points);
     const curveVertices = await page.evaluate(() => {
       const d = document.querySelector('#profile .line')?.getAttribute('d') || '';
       return (d.match(/[ML]/g) || []).length;
@@ -133,10 +133,10 @@ async function main() {
 
   // The chosen layer is remembered for the next preview.
   await open(page, base, 'track-time-ele.gpx');
-  await page.evaluate(() => window.gpxViewer.selectLayer('none'));
+  await page.evaluate(() => window.trailViewer.selectLayer('none'));
   await open(page, base, 'track-time-ele.gpx');
-  check('layer choice', 'after reload', await page.evaluate(() => window.gpxViewer.layer()), 'none');
-  await page.evaluate(() => window.gpxViewer.selectLayer('map'));
+  check('layer choice', 'after reload', await page.evaluate(() => window.trailViewer.layer()), 'none');
+  await page.evaluate(() => window.trailViewer.selectLayer('map'));
 
   // The viewer origin changes with each plugin release, so the host passes durable preferences in the URL.
   // Query values must win over whatever localStorage the current test origin contains.
@@ -146,9 +146,9 @@ async function main() {
   await preferencePage.waitForFunction(() => document.body.classList.contains('loaded'));
   const preferences = await preferencePage.evaluate(() => ({
     lang: document.documentElement.lang,
-    layer: window.gpxViewer.layer(),
-    pins: window.gpxViewer.pins.visible(),
-    settings: window.gpxViewer.exportSettings(),
+    layer: window.trailViewer.layer(),
+    pins: window.trailViewer.pins.visible(),
+    settings: window.trailViewer.exportSettings(),
     tiles: document.querySelectorAll('.leaflet-tile-pane img').length,
   }));
   check('host preferences', 'language', preferences.lang, 'zh-CN');

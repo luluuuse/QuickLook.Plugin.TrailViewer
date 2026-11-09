@@ -42,13 +42,13 @@ async function main() {
   await page.waitForFunction(() => document.body.classList.contains('loaded'));
 
   const state = async () => page.evaluate(() => ({
-    index: window.gpxViewer.nav.index(),
-    stops: window.gpxViewer.nav.stops().length,
-    photoStops: window.gpxViewer.nav.photoStops().length,
+    index: window.trailViewer.nav.index(),
+    stops: window.trailViewer.nav.stops().length,
+    photoStops: window.trailViewer.nav.photoStops().length,
     selected: document.querySelector('.gpx-pin.selected')?.getAttribute('title') || '',
     card: document.querySelector('.leaflet-popup-content')?.textContent || '',
     thumbs: document.querySelectorAll('.photo-popup .photo-thumb').length,
-    viewing: window.gpxViewer.photos.isOpen(),
+    viewing: window.trailViewer.photos.isOpen(),
     caption: document.querySelector('.photo-titles strong')?.textContent || '',
     counter: document.querySelector('.photo-counter')?.hidden === false
       ? document.querySelector('.photo-counter').textContent : '',
@@ -59,12 +59,12 @@ async function main() {
   // closed, so those wait for the next image instead of assuming that every key opens a Leaflet popup.
   const press = async (key) => {
     await page.keyboard.press(key);
-    if (await page.evaluate(() => window.gpxViewer.photos.isOpen())) await waitForLayout(page);
+    if (await page.evaluate(() => window.trailViewer.photos.isOpen())) await waitForLayout(page);
     else await settlePopup(page, '.leaflet-popup', 1);
   };
 
   check('five markers and three of them with photos',
-    (await page.evaluate(() => [window.gpxViewer.nav.stops().length, window.gpxViewer.nav.photoStops().length]))
+    (await page.evaluate(() => [window.trailViewer.nav.stops().length, window.trailViewer.nav.photoStops().length]))
       .join('/') === '5/3');
 
   // 1. Nothing selected until a key is pressed; the key grabs the first marker, not the second.

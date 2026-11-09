@@ -30,7 +30,7 @@ async function main() {
   const browser = await launchBrowser();
   // Pinned to en-US: the assertions below read English labels, and the viewer follows the system language.
   const page = await browser.newPage({ viewport: { width: 1200, height: 800 }, locale: 'en-US' });
-  await page.addInitScript(() => localStorage.setItem('gpxviewer.infoDetails', 'full'));
+  await page.addInitScript(() => localStorage.setItem('trailviewer.infoDetails', 'full'));
   await artifacts.start(page);
   const pageErrors = [];
   page.on('pageerror', (e) => pageErrors.push(e.message));
@@ -47,7 +47,7 @@ async function main() {
   await page.waitForFunction(() => document.body.classList.contains('loaded'));
 
   // 1. The model keeps the image links and throws away the unusable ones.
-  const model = await page.evaluate(() => window.gpxViewer.gpx.waypoints.map((w) => ({
+  const model = await page.evaluate(() => window.trailViewer.gpx.waypoints.map((w) => ({
     name: w.name || '', images: w.images || [], description: w.description || '',
   })));
   const byName = Object.fromEntries(model.map((w) => [w.name, w.images.length]));
@@ -81,7 +81,7 @@ async function main() {
     await waitForFocus(page, '.photo-close');
   };
   const viewer = async () => page.evaluate(() => ({
-    open: window.gpxViewer.photos.isOpen(),
+    open: window.trailViewer.photos.isOpen(),
     src: document.querySelector('.photo-image')?.getAttribute('src') || '',
     caption: document.querySelector('.photo-titles strong')?.textContent || '',
     meta: document.querySelector('.photo-meta')?.textContent || '',
@@ -99,7 +99,7 @@ async function main() {
     hint: document.querySelector('.photo-popup .photo-hint')?.textContent || '',
     thumbSrc: document.querySelector('.photo-popup .photo-thumb img')?.getAttribute('src') || '',
     thumbLoaded: (document.querySelector('.photo-popup .photo-thumb img')?.naturalWidth || 0) > 0,
-    viewerOpen: window.gpxViewer.photos.isOpen(),
+    viewerOpen: window.trailViewer.photos.isOpen(),
     bigLoaded: Boolean(document.querySelector('.photo-image')?.getAttribute('src')),
   }));
   check('card opens instead of the full viewer', card.viewerOpen === false);
@@ -133,7 +133,7 @@ async function main() {
 
   // 5. Closing works with the close button, and the map keeps working afterwards.
   await page.locator('.photo-close').click();
-  check('close button hides the viewer', (await page.evaluate(() => window.gpxViewer.photos.isOpen())) === false);
+  check('close button hides the viewer', (await page.evaluate(() => window.trailViewer.photos.isOpen())) === false);
 
   // 6. A relative path resolves against the document it came from; a card of two shows two thumbnails.
   await openCard('Album');
@@ -174,7 +174,7 @@ async function main() {
 
   // 10. Clicking the backdrop closes.
   await page.mouse.click(20, 780);
-  check('backdrop click closes', (await page.evaluate(() => window.gpxViewer.photos.isOpen())) === false);
+  check('backdrop click closes', (await page.evaluate(() => window.trailViewer.photos.isOpen())) === false);
   check('closing restores focus to the map',
     await page.evaluate(() => document.activeElement?.id) === 'map');
 
@@ -185,7 +185,7 @@ async function main() {
     (await page.evaluate(() => document.querySelector('.photo-image').getAttribute('src'))).startsWith('data:image/png;base64,'));
   await page.locator('.photo-close').click();
   check('close button also closes a single data URI photo',
-    (await page.evaluate(() => window.gpxViewer.photos.isOpen())) === false);
+    (await page.evaluate(() => window.trailViewer.photos.isOpen())) === false);
 
   // 12. Pins without photos keep the old popup and get no thumbnails.
   await page.locator('.gpx-pin[title="Plain"]').click();
@@ -193,7 +193,7 @@ async function main() {
   const popup = await page.evaluate(() => ({
     text: document.querySelector('.leaflet-popup-content').textContent,
     thumbs: document.querySelectorAll('.photo-thumb').length,
-    open: window.gpxViewer.photos.isOpen(),
+    open: window.trailViewer.photos.isOpen(),
   }));
   check('plain pin opens the usual popup', popup.text.includes('Plain'), popup.text);
   check('plain pin has no thumbnails', popup.thumbs === 0, `${popup.thumbs}`);

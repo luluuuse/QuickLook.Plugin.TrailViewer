@@ -59,7 +59,7 @@ async function settlePopup(page, selector = '.leaflet-popup', count = 1) {
  */
 async function waitForMapIdle(page) {
   await page.waitForFunction(() => {
-    const map = window.gpxViewer?.map;
+    const map = window.trailViewer?.map;
     if (!map) return false;
     if (map._animatingZoom || map._panAnim?._inProgress) return false;
     const pane = map.getPanes().mapPane;
@@ -70,7 +70,7 @@ async function waitForMapIdle(page) {
 
 async function waitForZoom(page, wanted, tolerance = 1e-9) {
   await page.waitForFunction(({ wanted: target, tolerance: allowed }) => {
-    const map = window.gpxViewer?.map;
+    const map = window.trailViewer?.map;
     return Boolean(map) && Math.abs(map.getZoom() - target) <= allowed;
   }, { wanted, tolerance });
   await waitForMapIdle(page);

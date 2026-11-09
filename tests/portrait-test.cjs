@@ -73,7 +73,7 @@ async function main() {
 
   const openAt = async (width, height, file = 'track-time-ele.gpx') => {
     const page = await browser.newPage({ viewport: { width, height }, locale: 'en-US' });
-    await page.addInitScript(() => localStorage.setItem('gpxviewer.infoDetails', 'full'));
+    await page.addInitScript(() => localStorage.setItem('trailviewer.infoDetails', 'full'));
     page.on('pageerror', (e) => pageErrors.push(e.message));
     await page.goto(`${base}/viewer/index.html?src=../tests/fixtures/${encodeURIComponent(file)}`);
     await page.waitForFunction(() => document.body.classList.contains('loaded'));

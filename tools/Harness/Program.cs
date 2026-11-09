@@ -50,10 +50,10 @@ internal static class Program
         }
 
         var clock = System.Diagnostics.Stopwatch.StartNew();
-        GpxPanel.Trace = line => Console.WriteLine($"[{clock.ElapsedMilliseconds,6} ms] {line}");
+        TrailViewerPanel.Trace = line => Console.WriteLine($"[{clock.ElapsedMilliseconds,6} ms] {line}");
         var exitCode = 1;
         var app = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
-        var panel = new GpxPanel();
+        var panel = new TrailViewerPanel();
         var window = new Window { Width = 1200, Height = 800, Title = "TrailViewer harness", Content = panel };
         var timeout = new DispatcherTimer { Interval = TimeSpan.FromSeconds(60) };
         timeout.Tick += (_, _) =>
@@ -76,7 +76,7 @@ internal static class Program
             panel.MarkOnScreen(true);
             await Task.Delay(300); // let the window actually become the foreground one
             var before = await panel.RunScriptAsync(
-                "JSON.stringify({pins: window.gpxViewer.pins.visible(), layer: window.gpxViewer.layer(),"
+                "JSON.stringify({pins: window.trailViewer.pins.visible(), layer: window.trailViewer.layer(),"
                 + " chrome: document.body.classList.contains('chrome-hidden')})");
 
             var swallowed = panel.HandleGlobalKeyForTest(name[0]);
@@ -85,7 +85,7 @@ internal static class Program
             await Task.Delay(400);
 
             var after = await panel.RunScriptAsync(
-                "JSON.stringify({pins: window.gpxViewer.pins.visible(), layer: window.gpxViewer.layer(),"
+                "JSON.stringify({pins: window.trailViewer.pins.visible(), layer: window.trailViewer.layer(),"
                 + " chrome: document.body.classList.contains('chrome-hidden')})");
 
             // The guard in the other direction: with no preview on screen the same key must be let through.
@@ -124,10 +124,10 @@ internal static class Program
         }
 
         var clock = System.Diagnostics.Stopwatch.StartNew();
-        GpxPanel.Trace = line => Console.WriteLine($"[{clock.ElapsedMilliseconds,6} ms] {line}");
+        TrailViewerPanel.Trace = line => Console.WriteLine($"[{clock.ElapsedMilliseconds,6} ms] {line}");
         var exitCode = 1;
         var app = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
-        var panel = new GpxPanel();
+        var panel = new TrailViewerPanel();
         var rival = new System.Windows.Controls.Button { Width = 12, Height = 12, Opacity = 0.01 };
         var host = new System.Windows.Controls.Grid();
         host.Children.Add(panel);
@@ -151,7 +151,7 @@ internal static class Program
             }
 
             var before = await panel.RunScriptAsync(
-                "JSON.stringify({pins: window.gpxViewer.pins.visible(), layer: window.gpxViewer.layer(),"
+                "JSON.stringify({pins: window.trailViewer.pins.visible(), layer: window.trailViewer.layer(),"
                 + " focus: document.hasFocus()})");
             Console.WriteLine("FOCUS before " + panel.FocusReport);
 
@@ -176,7 +176,7 @@ internal static class Program
             await Task.Delay(400);
 
             var after = await panel.RunScriptAsync(
-                "JSON.stringify({pins: window.gpxViewer.pins.visible(), layer: window.gpxViewer.layer(),"
+                "JSON.stringify({pins: window.trailViewer.pins.visible(), layer: window.trailViewer.layer(),"
                 + " chrome: document.body.classList.contains('chrome-hidden')})");
             Console.WriteLine($"WPFKEY {key} handled={args.Handled} rival={rival.IsKeyboardFocused}"
                 + $" before={before} after={after}");
@@ -210,10 +210,10 @@ internal static class Program
         }
 
         var clock = System.Diagnostics.Stopwatch.StartNew();
-        GpxPanel.Trace = line => Console.WriteLine($"[{clock.ElapsedMilliseconds,6} ms] {line}");
+        TrailViewerPanel.Trace = line => Console.WriteLine($"[{clock.ElapsedMilliseconds,6} ms] {line}");
         var exitCode = 1;
         var app = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
-        var panel = new GpxPanel();
+        var panel = new TrailViewerPanel();
         var window = new Window { Width = 1200, Height = 800, Title = "TrailViewer harness", Content = panel };
         var timeout = new DispatcherTimer { Interval = TimeSpan.FromSeconds(60) };
         timeout.Tick += (_, _) =>
@@ -272,10 +272,10 @@ internal static class Program
         }
 
         var clock = System.Diagnostics.Stopwatch.StartNew();
-        GpxPanel.Trace = line => Console.WriteLine($"[{clock.ElapsedMilliseconds,6} ms] {line}");
+        TrailViewerPanel.Trace = line => Console.WriteLine($"[{clock.ElapsedMilliseconds,6} ms] {line}");
         var exitCode = 1;
         var app = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
-        var panel = new GpxPanel();
+        var panel = new TrailViewerPanel();
         var window = new Window { Width = 1200, Height = 800, Title = "TrailViewer harness", Content = panel };
         var timeout = new DispatcherTimer { Interval = TimeSpan.FromSeconds(60) };
         timeout.Tick += (_, _) =>
@@ -324,9 +324,9 @@ internal static class Program
             // hasFocus is the whole point of the keys check: a page that never got the keyboard still passes a
             // CDP-dispatched key, so the handler can look fine while a real user presses keys into nothing.
             Console.WriteLine("KEYS " + await panel.RunScriptAsync(
-                "JSON.stringify({seen: window.__seen, pins: window.gpxViewer.pins.visible(),"
-                + " layer: window.gpxViewer.layer(), focus: document.hasFocus(),"
-                + " panel: window.gpxViewer.panelOpen(),"
+                "JSON.stringify({seen: window.__seen, pins: window.trailViewer.pins.visible(),"
+                + " layer: window.trailViewer.layer(), focus: document.hasFocus(),"
+                + " panel: window.trailViewer.panelOpen(),"
                 + " active: document.activeElement && document.activeElement.tagName})"));
             exitCode = 0;
             app.Shutdown();
@@ -357,16 +357,16 @@ internal static class Program
             return 3;
         }
 
-        // The narrow window is where the layout has to fold, so the size is a parameter: GPXVIEWER_SIZE=1600x900.
-        var size = (Environment.GetEnvironmentVariable("GPXVIEWER_SIZE") ?? "1200x800").Split('x');
+        // The narrow window is where the layout has to fold, so the size is a parameter: TRAILVIEWER_SIZE=1600x900.
+        var size = (Env("TRAILVIEWER_SIZE", "GPXVIEWER_SIZE") ?? "1200x800").Split('x');
         var width = int.Parse(size[0]);
         var height = size.Length > 1 ? int.Parse(size[1]) : 800;
 
         var clock = System.Diagnostics.Stopwatch.StartNew();
-        GpxPanel.Trace = line => Console.WriteLine($"[{clock.ElapsedMilliseconds,6} ms] {line}");
+        TrailViewerPanel.Trace = line => Console.WriteLine($"[{clock.ElapsedMilliseconds,6} ms] {line}");
         var exitCode = 1;
         var app = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
-        var panel = new GpxPanel();
+        var panel = new TrailViewerPanel();
         var window = new Window { Width = width, Height = height, Title = "TrailViewer harness", Content = panel };
         var timeout = new DispatcherTimer { Interval = TimeSpan.FromSeconds(timeoutSeconds) };
         timeout.Tick += (_, _) =>
@@ -388,11 +388,11 @@ internal static class Program
             if (layer != null)
             {
                 // Same path a click takes, so the capture shows what the button would have produced.
-                var result = await panel.RunScriptAsync($"window.gpxViewer.selectLayer('{layer}')");
-                GpxPanel.Trace($"layer {layer} -> {result}");
+                var result = await panel.RunScriptAsync($"window.trailViewer.selectLayer('{layer}')");
+                TrailViewerPanel.Trace($"layer {layer} -> {result}");
             }
 
-            if (Environment.GetEnvironmentVariable("GPXVIEWER_CDP") == "1")
+            if (Env("TRAILVIEWER_CDP", "GPXVIEWER_CDP") == "1")
             {
                 // Every failed request with its Chromium error code, then the layer is re-selected so the
                 // listener sees a fresh round. "The map is black" has several causes and this is the only
@@ -404,41 +404,41 @@ internal static class Program
                         Console.WriteLine("CDP " + e.ParameterObjectAsJson);
                 };
                 await panel.Core.CallDevToolsProtocolMethodAsync("Network.enable", "{}");
-                await panel.RunScriptAsync("window.gpxViewer.selectLayer('none')");
+                await panel.RunScriptAsync("window.trailViewer.selectLayer('none')");
                 await Task.Delay(800);
-                await panel.RunScriptAsync($"window.gpxViewer.selectLayer('{layer ?? "map"}')");
+                await panel.RunScriptAsync($"window.trailViewer.selectLayer('{layer ?? "map"}')");
                 await Task.Delay(8000);
             }
 
             // Tiles arrive over a second or three, and a shot taken on a fixed delay catches the black
             // squares of the ones still in flight. Wait until every tile image in the pane has settled,
-            // with a cap so a slow network cannot hang the capture. GPXVIEWER_WAIT overrides the cap.
-            var wait = int.TryParse(Environment.GetEnvironmentVariable("GPXVIEWER_WAIT"), out var w) ? w : 0;
+            // with a cap so a slow network cannot hang the capture. TRAILVIEWER_WAIT overrides the cap.
+            var wait = int.TryParse(Env("TRAILVIEWER_WAIT", "GPXVIEWER_WAIT"), out var w) ? w : 0;
             await SettleTiles(panel, wait > 0 ? wait : (layer == null ? 20000 : 30000));
 
             // How many tiles actually arrived: a black map and a slow map look the same in a screenshot.
             var stats = await panel.RunScriptAsync(
                 "JSON.stringify({total: document.querySelectorAll('.leaflet-tile-pane img').length,"
                 + " ok: [...document.querySelectorAll('.leaflet-tile-pane img')].filter(i => i.complete && i.naturalWidth > 0).length})");
-            GpxPanel.Trace($"tiles {stats}");
+            TrailViewerPanel.Trace($"tiles {stats}");
 
-            // A key pressed before the shot, through the same entry point the hook calls: GPXVIEWER_KEY=s
+            // A key pressed before the shot, through the same entry point the hook calls: TRAILVIEWER_KEY=s
             // photographs the cleared screen. The wait outlasts the tip, so the picture shows the end state.
-            var key = Environment.GetEnvironmentVariable("GPXVIEWER_KEY");
+            var key = Env("TRAILVIEWER_KEY", "GPXVIEWER_KEY");
             if (!string.IsNullOrEmpty(key))
             {
-                await panel.RunScriptAsync($"window.gpxViewer && window.gpxViewer.pressKey('{key}')");
+                await panel.RunScriptAsync($"window.trailViewer && window.trailViewer.pressKey('{key}')");
                 await Task.Delay(2400);
             }
 
-            // GPXVIEWER_SCRIPT runs one expression in the page before the shutter -- opening a pin's photo
+            // TRAILVIEWER_SCRIPT runs one expression in the page before the shutter -- opening a pin's photo
             // card, hovering the profile, switching the language. The map is settled again afterwards,
             // because whatever it did may have panned or changed the layer.
-            var script = Environment.GetEnvironmentVariable("GPXVIEWER_SCRIPT");
+            var script = Env("TRAILVIEWER_SCRIPT", "GPXVIEWER_SCRIPT");
             if (!string.IsNullOrEmpty(script))
             {
                 var result = await panel.RunScriptAsync(script);
-                GpxPanel.Trace($"script -> {result}");
+                TrailViewerPanel.Trace($"script -> {result}");
                 await Task.Delay(600);
                 await SettleTiles(panel, 8000);
             }
@@ -457,7 +457,7 @@ internal static class Program
 
         window.Loaded += (_, _) =>
         {
-            GpxPanel.Trace("window loaded");
+            TrailViewerPanel.Trace("window loaded");
             timeout.Start();
             panel.Load(Path.GetFullPath(file));
         };
@@ -472,7 +472,7 @@ internal static class Program
     /// asked for, so "none pending" is the moment the map is as complete as it is going to get -- the fixed
     /// delay this replaces used to photograph the black squares of tiles still in flight.
     /// </summary>
-    private static async Task SettleTiles(GpxPanel panel, int capMilliseconds)
+    private static async Task SettleTiles(TrailViewerPanel panel, int capMilliseconds)
     {
         var deadline = DateTime.UtcNow.AddMilliseconds(capMilliseconds);
         while (DateTime.UtcNow < deadline)
@@ -483,4 +483,7 @@ internal static class Program
             await Task.Delay(300);
         }
     }
+
+    private static string Env(string current, string legacy)
+        => Environment.GetEnvironmentVariable(current) ?? Environment.GetEnvironmentVariable(legacy);
 }

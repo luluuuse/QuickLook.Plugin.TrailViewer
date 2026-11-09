@@ -35,7 +35,7 @@ server.listen(0, '127.0.0.1', async () => {
   await page.waitForTimeout(300);
 
   const data = await page.evaluate(async ({ photo, options }) => {
-    const canvas = await window.gpxViewer.overlayCanvas(options);
+    const canvas = await window.trailViewer.overlayCanvas(options);
     if (!photo) return canvas.toDataURL('image/png');
     const flat = document.createElement('canvas');
     flat.width = canvas.width;

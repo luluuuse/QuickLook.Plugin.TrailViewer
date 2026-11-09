@@ -39,16 +39,16 @@ async function main() {
   };
 
   const state = async () => page.evaluate(() => ({
-    layer: window.gpxViewer.layer(),
+    layer: window.trailViewer.layer(),
     activeLayer: document.querySelector('.layer-switch button.active')?.dataset.layer || '',
     activePressed: document.querySelector('.layer-switch button.active')?.getAttribute('aria-pressed') || '',
     pins: document.querySelectorAll('.gpx-pin').length,
-    marks: window.gpxViewer.pins.count(),
-    pinsVisible: window.gpxViewer.pins.visible(),
+    marks: window.trailViewer.pins.count(),
+    pinsVisible: window.trailViewer.pins.visible(),
     pinsActive: document.querySelector('.pins-switch button')?.classList.contains('active'),
     pinsPressed: document.querySelector('.pins-switch button')?.getAttribute('aria-pressed') || '',
-    hasControl: window.gpxViewer.pins.hasControl(),
-    photo: window.gpxViewer.photos.isOpen(),
+    hasControl: window.trailViewer.pins.hasControl(),
+    photo: window.trailViewer.photos.isOpen(),
     bar: !!document.getElementById('keys'),
     layerTitle: document.querySelector('.layer-switch button')?.title || '',
     pinsTitle: document.querySelector('.pins-switch button')?.title || '',
@@ -65,8 +65,8 @@ async function main() {
 
   await page.goto(`${base}/viewer/index.html`);
   await page.evaluate(() => {
-    localStorage.removeItem('gpxviewer.pins');
-    localStorage.removeItem('gpxviewer.layer');
+    localStorage.removeItem('trailviewer.pins');
+    localStorage.removeItem('trailviewer.layer');
   });
   await open('kml-photos.kml');
 
@@ -131,8 +131,8 @@ async function main() {
   check('Q and E do not change the background behind a photo', s.layer === before.layer, s.layer);
   // The host route (pressKey) has to obey the same rule: it is what QuickLook-side keys go through.
   await page.evaluate(() => {
-    window.gpxViewer.pressKey('w');
-    window.gpxViewer.pressKey('e');
+    window.trailViewer.pressKey('w');
+    window.trailViewer.pressKey('e');
   });
   s = await state();
   check('the host route is quiet behind a photo too', s.pins === before.pins && s.layer === before.layer,
@@ -164,7 +164,7 @@ async function main() {
   await waitForLayout(page);
 
   // 6. A pure track has no waypoints but does have dots: W still clears them.
-  await page.evaluate(() => localStorage.removeItem('gpxviewer.pins'));
+  await page.evaluate(() => localStorage.removeItem('trailviewer.pins'));
   await open('gpx10.gpx');
   s = await state();
   check('a pure track gets the switch', s.hasControl === true && s.marks === 30, `${s.marks}`);
@@ -176,20 +176,20 @@ async function main() {
 
   // 7. When the host catches the key itself it calls pressKey: it has to mean exactly the same thing.
   const startLayer = (await state()).layer;
-  await page.evaluate(() => window.gpxViewer.pressKey('e'));
+  await page.evaluate(() => window.trailViewer.pressKey('e'));
   await waitForLayout(page);
   s = await state();
   check('pressKey steps the background like the key does', s.layer !== startLayer, s.layer);
-  await page.evaluate(() => window.gpxViewer.pressKey('q'));
+  await page.evaluate(() => window.trailViewer.pressKey('q'));
   await waitForLayout(page);
   s = await state();
   check('and steps back', s.layer === startLayer, s.layer);
   const startPins = s.pinsVisible;
-  await page.evaluate(() => window.gpxViewer.pressKey('w'));
+  await page.evaluate(() => window.trailViewer.pressKey('w'));
   await waitForLayout(page);
   s = await state();
   check('pressKey flips the markers like the key does', s.pinsVisible === !startPins, `${s.pinsVisible}`);
-  await page.evaluate(() => window.gpxViewer.pressKey('w'));
+  await page.evaluate(() => window.trailViewer.pressKey('w'));
 
   // 8. A file that draws nothing but an area has no switch: the key is quiet, not an error.
   await open('kml-polygon-only.kml');
@@ -260,10 +260,10 @@ async function main() {
   check('and the class is gone', c.hidden === false);
 
   // The host sends the same key through pressKey when QuickLook is holding the keyboard.
-  await page.evaluate(() => window.gpxViewer.pressKey('s'));
+  await page.evaluate(() => window.trailViewer.pressKey('s'));
   await waitForLayout(page);
   check('pressKey clears the interface like the key does', (await chrome()).info === false);
-  await page.evaluate(() => window.gpxViewer.pressKey('s'));
+  await page.evaluate(() => window.trailViewer.pressKey('s'));
   await waitForLayout(page);
 
   // A photo card over the map does not take the key away -- W, Q and E keep working through it. The full-screen

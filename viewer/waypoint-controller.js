@@ -3,11 +3,12 @@ import { createPointIndex } from './spatial.js';
 import { createWaypointOverview } from './waypoint-overview.js';
 import { classifyWaypoint } from './waypoint-insights.js';
 import { sampleScreenPoints } from './waypoint-sampling.js';
+import { readStored, writeStored } from './storage.js';
 
 const PHOTO_BADGE = '<circle cx="23" cy="7.5" r="5.6" fill="#ffffff" stroke="#1b1b1b" stroke-width="1.2"/>'
   + '<rect x="20.4" y="6.4" width="5.4" height="3.7" rx="0.8" fill="#1b1b1b"/>'
   + '<circle cx="23" cy="8.25" r="1.15" fill="#ffffff"/>';
-const PINS_KEY = 'gpxviewer.pins';
+const PINS_KEY = 'pins';
 const MAX_DOTS = 20000;
 const OVERVIEW_MERGE_METERS = 25;
 const NAVIGATION_MERGE_METERS = 5;
@@ -90,11 +91,7 @@ export function createWaypointController({
     const fromHost = params.get('pins');
     if (fromHost === '0') return false;
     if (fromHost === '1') return true;
-    try {
-      return localStorage.getItem(PINS_KEY) !== '0';
-    } catch {
-      return true;
-    }
+    return readStored(PINS_KEY) !== '0';
   }
 
   function relabel() {
@@ -120,8 +117,7 @@ export function createWaypointController({
     setProfilePinsVisible(show);
     onVisibilityChange?.(show);
     if (remember) {
-      try { localStorage.setItem(PINS_KEY, show ? '1' : '0'); }
-      catch { /* Private mode or storage disabled. */ }
+      writeStored(PINS_KEY, show ? '1' : '0');
       onPreferenceChange?.();
     }
     relabel();

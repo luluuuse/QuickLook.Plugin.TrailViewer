@@ -327,7 +327,7 @@ async function main() {
     requestAnimationFrame(() => mapViewController.refreshControls());
   });
 
-  window.gpxViewer = {
+  const api = {
     gpx, summary, map, scrub, photos: photoViewer, hikeEstimate,
     // The worked-out route shape, without the point arrays a test does not need.
     profile: elevations && {
@@ -371,7 +371,7 @@ async function main() {
     }),
     focusBounds: (bounds, options) => mapViewController.focusBounds(bounds, options),
     revealPoint: (latlng, options) => mapViewController.revealPoint(latlng, options),
-    // For the host: it owns the keys until the page gets the keyboard (see GpxPanel).
+    // For the host: it owns the keys until the page gets the keyboard (see TrailViewerPanel).
     pressKey,
     // The overlay export: the canvas is exposed for the tests, the toast callbacks for the host.
     overlayCanvas: (options) => overlayExport.build(options),
@@ -381,6 +381,8 @@ async function main() {
     exported: (path) => showToast(t('export.done', { name: String(path).split(/[\\/]/).pop() }), 4000),
     exportFailed: (detail) => showToast(t('export.failed', { detail }), 4000),
   };
+  window.trailViewer = api;
+  window.gpxViewer = api; // Remove after one compatibility release.
   document.body.classList.add('loaded');
   post(`ready\t${summary.points} points, ${distanceLog(summary.distanceMeters)}`);
 }

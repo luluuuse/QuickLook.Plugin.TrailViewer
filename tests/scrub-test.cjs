@@ -30,12 +30,12 @@ async function main() {
   };
 
   await open('track-time-ele.gpx');
-  const total = await page.evaluate(() => window.gpxViewer.summary.distanceMeters);
+  const total = await page.evaluate(() => window.trailViewer.summary.distanceMeters);
   const plot = await page.locator('#profile .plot svg').boundingBox();
   const at = (ratio) => ({ x: plot.x + plot.width * ratio, y: plot.y + plot.height / 2 });
   const waitForScrub = async ({ exists = true, min = -Infinity, max = Infinity }) => {
     await page.waitForFunction(({ exists: wanted, min: lower, max: upper }) => {
-      const point = window.gpxViewer.scrub.point();
+      const point = window.trailViewer.scrub.point();
       if (!wanted) return point === null;
       return point && point.along >= lower && point.along <= upper;
     }, { exists, min, max });
@@ -46,7 +46,7 @@ async function main() {
   await page.mouse.move(at(0.5).x, at(0.5).y);
   await waitForScrub({ min: total * 0.45, max: total * 0.55 });
   const half = await page.evaluate(() => {
-    const p = window.gpxViewer.scrub.point();
+    const p = window.trailViewer.scrub.point();
     return p && { along: p.along };
   });
   check('hover reports a point', !!half);
@@ -88,29 +88,29 @@ async function main() {
   // Clicking pins the point; moving afterwards must not change it.
   await page.mouse.down();
   await page.mouse.up();
-  await page.waitForFunction(() => window.gpxViewer.scrub.pinned());
-  check('click pins the point', await page.evaluate(() => window.gpxViewer.scrub.pinned()));
+  await page.waitForFunction(() => window.trailViewer.scrub.pinned());
+  check('click pins the point', await page.evaluate(() => window.trailViewer.scrub.pinned()));
   check('plot shows the pinned state', /pinned/.test(await page.locator('#profile .plot').getAttribute('class') || ''));
 
-  const before = await page.evaluate(() => window.gpxViewer.scrub.point().along);
+  const before = await page.evaluate(() => window.trailViewer.scrub.point().along);
   await page.mouse.move(at(0.15).x, at(0.15).y);
   await waitForLayout(page);
-  check('pinned point ignores the mouse', before === (await page.evaluate(() => window.gpxViewer.scrub.point().along)));
+  check('pinned point ignores the mouse', before === (await page.evaluate(() => window.trailViewer.scrub.point().along)));
   check('readout stays while pinned', (await tipText()) === pinnedTip, await tipText());
 
   await page.mouse.move(plot.x + plot.width / 2, plot.y - 120);
   await waitForLayout(page);
-  check('pinned point survives pointerleave', await page.evaluate(() => !!window.gpxViewer.scrub.point()));
+  check('pinned point survives pointerleave', await page.evaluate(() => !!window.trailViewer.scrub.point()));
 
   // Clicking again releases it and the cursor follows the mouse once more.
   await page.mouse.move(at(0.8).x, at(0.8).y);
   await page.mouse.down();
   await page.mouse.up();
-  await page.waitForFunction(() => !window.gpxViewer.scrub.pinned());
-  check('second click releases the pin', !(await page.evaluate(() => window.gpxViewer.scrub.pinned())));
+  await page.waitForFunction(() => !window.trailViewer.scrub.pinned());
+  check('second click releases the pin', !(await page.evaluate(() => window.trailViewer.scrub.pinned())));
   await page.mouse.move(at(0.2).x, at(0.2).y);
   await waitForScrub({ min: total * 0.15, max: total * 0.25 });
-  const near = await page.evaluate(() => window.gpxViewer.scrub.point().along);
+  const near = await page.evaluate(() => window.trailViewer.scrub.point().along);
   check('follows again after release', Math.abs(near - total * 0.2) < 300, `${Math.round(near)} m`);
 
   // The numbers ride with the cursor: the whole point of the change is that they are where the eye is.
@@ -132,16 +132,16 @@ async function main() {
   // Leaving unpinned clears the cursor and the marker.
   await page.mouse.move(plot.x + plot.width / 2, plot.y - 120);
   await waitForScrub({ exists: false });
-  check('leaving clears the cursor', await page.evaluate(() => !window.gpxViewer.scrub.point()));
+  check('leaving clears the cursor', await page.evaluate(() => !window.trailViewer.scrub.point()));
   check('leaving removes the map marker', (await page.locator('.scrub-marker').count()) === 0);
 
   // The extreme edges clamp to the track instead of running past it.
   await page.mouse.move(plot.x + 1, plot.y + 20);
   await waitForScrub({ min: 0, max: 0 });
-  check('left edge is the start', (await page.evaluate(() => window.gpxViewer.scrub.point().along)) === 0);
+  check('left edge is the start', (await page.evaluate(() => window.trailViewer.scrub.point().along)) === 0);
   await page.mouse.move(plot.x + plot.width - 1, plot.y + 20);
   await waitForScrub({ min: total * 0.98 });
-  const high = await page.evaluate(() => window.gpxViewer.scrub.point().along);
+  const high = await page.evaluate(() => window.trailViewer.scrub.point().along);
   // One point short of the end: the cursor reports where you had got to, not the point still to come.
   check('right edge lands on the last point', high > total * 0.98, `${high.toFixed(0)} of ${total.toFixed(0)} m`);
 
@@ -175,9 +175,9 @@ async function main() {
   await open('long-track.gpx');
 
   const cost = await page.evaluate(() => {
-    const span = window.gpxViewer.summary.distanceMeters;
+    const span = window.trailViewer.summary.distanceMeters;
     const started = performance.now();
-    for (let i = 0; i < 200; i += 1) window.gpxViewer.scrub.at((i / 200) * span);
+    for (let i = 0; i < 200; i += 1) window.trailViewer.scrub.at((i / 200) * span);
     return performance.now() - started;
   });
   check('long track scrubs cheaply', cost / 200 < 4, `${(cost / 200).toFixed(2)} ms per move`);
@@ -186,7 +186,7 @@ async function main() {
   await page.mouse.move(longBox.x + longBox.width * 0.42, longBox.y + longBox.height / 2);
   await waitForScrub({});
   const long = await page.evaluate(() => {
-    const p = window.gpxViewer.scrub.point();
+    const p = window.trailViewer.scrub.point();
     return { along: p && p.along, marker: !!document.querySelector('.scrub-marker') };
   });
   check('long track reports a point', long.along > 0, `${Math.round(long.along)} m`);

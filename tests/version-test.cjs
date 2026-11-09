@@ -55,14 +55,14 @@ if (fs.existsSync(built)) {
     `${shipped} vs ${current.version}`);
 }
 
-const panel = read('src/GpxPanel.cs');
+const panel = read('src/TrailViewerPanel.cs');
 check('the WebView host is derived from viewer content, not the release version',
   panel.includes('ViewerBuildId.Compute(ViewerFolder, BuildInfo.ViewerProtocolVersion)')
   && !panel.includes('Assembly.GetName().Version.ToString(3)'));
 check('viewer build identity includes the page protocol',
   read('src/ViewerBuildId.cs').includes('protocolVersion'));
 check('the changelog no longer pretends a release version is the cache host',
-  !/app-\d+-\d+-\d+\.gpxviewer\.example/.test(changelog));
+  !/app-\d+-\d+-\d+\.trailviewer\.example/.test(changelog));
 
 console.log(failures.length === 0 ? '\nversion checks OK' : `\n${failures.length} failed`);
 process.exit(failures.length === 0 ? 0 : 1);

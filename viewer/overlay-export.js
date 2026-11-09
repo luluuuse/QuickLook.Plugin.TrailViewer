@@ -1,27 +1,23 @@
 import { createExportPanel } from './export-panel.js';
 import { clock, formatDistance, splitUnit } from './format.js';
+import { readStored, writeStored } from './storage.js';
 
-const SIZE_KEY = 'gpxviewer.exportSize';
-const INK_KEY = 'gpxviewer.exportInk';
-const SCRIM_KEY = 'gpxviewer.exportScrim';
+const SIZE_KEY = 'exportSize';
+const INK_KEY = 'exportInk';
+const SCRIM_KEY = 'exportScrim';
 const SIZES = ['1:1', '9:16', '4:3'];
 const INKS = ['black', 'white'];
 const SCRIMS = ['none', 'soft'];
 
 function remembered(params, key, allowed, fallback) {
-  const fromHost = params.get(key.replace(/^gpxviewer\./, ''));
+  const fromHost = params.get(key);
   if (allowed.includes(fromHost)) return fromHost;
-  try {
-    const value = localStorage.getItem(key);
-    return allowed.includes(value) ? value : fallback;
-  } catch {
-    return fallback;
-  }
+  const value = readStored(key);
+  return allowed.includes(value) ? value : fallback;
 }
 
 function remember(key, value) {
-  try { localStorage.setItem(key, value); }
-  catch { /* Not remembered, still applied to this preview. */ }
+  writeStored(key, value);
 }
 
 function base64Of(bytes) {

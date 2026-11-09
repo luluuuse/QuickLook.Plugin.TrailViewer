@@ -77,7 +77,7 @@ internal sealed class GlobalKeys : IDisposable
     {
         // Its own thread on purpose: the hook callback runs wherever the hook was installed, and the UI thread
         // is busy laying out four thousand track points exactly when a key arrives.
-        _thread = new Thread(Pump) { IsBackground = true, Name = "GpxViewer keys" };
+        _thread = new Thread(Pump) { IsBackground = true, Name = "TrailViewer keys" };
         _thread.Start();
         _ready.Wait(2000);
     }
@@ -246,7 +246,7 @@ internal sealed class GlobalKeys : IDisposable
         }
     }
 
-    private static void Trace(string message) => GpxPanel.Trace("[keys] " + message);
+    private static void Trace(string message) => TrailViewerPanel.Trace("[keys] " + message);
 
     private void ReleaseHook()
     {

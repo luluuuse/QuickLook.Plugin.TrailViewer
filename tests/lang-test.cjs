@@ -68,7 +68,7 @@ async function main() {
 
   const options = { viewport: { width: 1200, height: 800 }, locale: 'zh-CN' };
   const context = await browser.newContext(options);
-  await context.addInitScript(() => localStorage.setItem('gpxviewer.infoDetails', 'full'));
+  await context.addInitScript(() => localStorage.setItem('trailviewer.infoDetails', 'full'));
   const page = await context.newPage();
   await artifacts.start(page);
   const pageErrors = [];
@@ -103,7 +103,7 @@ async function main() {
   check('a thumbnail names its place in Chinese', s.thumbs[1] === '打开第 2/2 张', s.thumbs.join(' | '));
   check('the elevation line is Chinese but the unit is not', s.card.includes('海拔 26 m'), s.card.slice(0, 40));
 
-  await page.evaluate(() => window.gpxViewer.scrub.at(200));
+  await page.evaluate(() => window.trailViewer.scrub.at(200));
   const zhReadout = (await snapshot(page)).readout;
   check('the scrubber readout keeps the international unit',
     /^(?:\d+ m)?\|\d+(?:\.\d+)? (?:m|km)(?: · \d{1,2}:\d{2}(?::\d{2})?)?$/.test(zhReadout), zhReadout);
@@ -182,7 +182,7 @@ async function main() {
 
   // 7. An English system starts in English, and the switch goes the other way.
   const enContext = await browser.newContext({ viewport: { width: 1200, height: 800 }, locale: 'en-US' });
-  await enContext.addInitScript(() => localStorage.setItem('gpxviewer.infoDetails', 'full'));
+  await enContext.addInitScript(() => localStorage.setItem('trailviewer.infoDetails', 'full'));
   const enPage = await enContext.newPage();
   await open(enPage, `${base}/viewer/index.html?src=../tests/fixtures/${fixture}`);
   s = await snapshot(enPage);

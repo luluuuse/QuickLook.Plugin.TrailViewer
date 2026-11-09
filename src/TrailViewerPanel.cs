@@ -17,17 +17,17 @@ namespace QuickLook.Plugin.TrailViewer;
 /// the GPX/KML file - or of the .kml unpacked from a KMZ - are exposed on two virtual hosts;
 /// the page reports back "ready\t&lt;summary&gt;" or "error:&lt;text&gt;".
 /// </summary>
-internal sealed class GpxPanel : UserControl, IDisposable
+internal sealed class TrailViewerPanel : UserControl, IDisposable
 {
     private static readonly string ViewerFolder =
-        Path.Combine(Path.GetDirectoryName(typeof(GpxPanel).Assembly.Location), "viewer");
+        Path.Combine(Path.GetDirectoryName(typeof(TrailViewerPanel).Assembly.Location), "viewer");
 
     // WebView2 caches by origin. Hash the files actually shipped under viewer/, plus the page protocol
     // version, so a content change invalidates the cache without inventing another product version.
     private static readonly string AppHost =
-        $"app-{ViewerBuildId.Compute(ViewerFolder, BuildInfo.ViewerProtocolVersion)}.gpxviewer.example";
+        $"app-{ViewerBuildId.Compute(ViewerFolder, BuildInfo.ViewerProtocolVersion)}.{PluginIdentity.VirtualHostSuffix}";
 
-    private const string FileHost = "file.gpxviewer.example";
+    private static readonly string FileHost = $"file.{PluginIdentity.VirtualHostSuffix}";
     private static readonly TimeSpan LoadTimeout = TimeSpan.FromSeconds(20);
 
     private readonly Stopwatch _clock = Stopwatch.StartNew();
@@ -41,7 +41,7 @@ internal sealed class GpxPanel : UserControl, IDisposable
     private volatile bool _onScreen;
     private bool _finished;
 
-    public GpxPanel()
+    public TrailViewerPanel()
     {
         Background = new SolidColorBrush(Color.FromRgb(24, 24, 24));
         _timeout = new DispatcherTimer { Interval = LoadTimeout };
@@ -122,10 +122,29 @@ internal sealed class GpxPanel : UserControl, IDisposable
     {
         get
         {
-            var overridden = Environment.GetEnvironmentVariable("GPXVIEWER_USER_DATA");
-            return string.IsNullOrWhiteSpace(overridden)
-                ? Path.Combine(SettingHelper.LocalDataPath, "GpxViewer_WebView2")
-                : Path.GetFullPath(overridden);
+            var overridden = Environment.GetEnvironmentVariable(PluginIdentity.UserDataEnvironment)
+                ?? Environment.GetEnvironmentVariable(PluginIdentity.LegacyUserDataEnvironment);
+            if (!string.IsNullOrWhiteSpace(overridden)) return Path.GetFullPath(overridden);
+
+            var current = Path.Combine(SettingHelper.LocalDataPath, PluginIdentity.WebViewProfile);
+            var legacy = Path.Combine(SettingHelper.LocalDataPath, PluginIdentity.LegacyWebViewProfile);
+            MigrateLegacyProfile(legacy, current);
+            return current;
+        }
+    }
+
+    internal static bool MigrateLegacyProfile(string legacy, string current)
+    {
+        try
+        {
+            if (!Directory.Exists(legacy) || Directory.Exists(current)) return false;
+            Directory.Move(legacy, current);
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
+        {
+            // A locked legacy profile is disposable; WebView2 will create the new profile.
+            return false;
         }
     }
 
@@ -325,7 +344,7 @@ internal sealed class GpxPanel : UserControl, IDisposable
         {
             var core = _webView?.CoreWebView2;
             if (core != null)
-                await core.ExecuteScriptAsync($"window.gpxViewer && window.gpxViewer.pressKey('{name}')");
+                await core.ExecuteScriptAsync($"window.trailViewer && window.trailViewer.pressKey('{name}')");
         }
         catch (Exception ex) when (ex is InvalidOperationException or ObjectDisposedException)
         {
@@ -460,7 +479,7 @@ internal sealed class GpxPanel : UserControl, IDisposable
         {
             var core = _webView?.CoreWebView2;
             if (core != null)
-                await core.ExecuteScriptAsync($"window.gpxViewer && window.gpxViewer.{call}");
+                await core.ExecuteScriptAsync($"window.trailViewer && window.trailViewer.{call}");
         }
         catch (Exception ex) when (ex is InvalidOperationException or ObjectDisposedException)
         {

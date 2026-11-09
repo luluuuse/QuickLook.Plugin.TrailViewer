@@ -30,11 +30,11 @@ async function main() {
   await page.waitForFunction(() => document.body.classList.contains('loaded'));
   await waitForMapIdle(page);
 
-  const zoom = () => page.evaluate(() => window.gpxViewer.map.getZoom());
-  const step = () => page.evaluate(() => window.gpxViewer.map.options.zoomSnap);
+  const zoom = () => page.evaluate(() => window.trailViewer.map.getZoom());
+  const step = () => page.evaluate(() => window.trailViewer.map.options.zoomSnap);
   // Every measurement starts from the same place, with no animation left running.
   const reset = async () => {
-    await page.evaluate(() => { window.gpxViewer.map.setZoom(15, { animate: false }); });
+    await page.evaluate(() => { window.trailViewer.map.setZoom(15, { animate: false }); });
     await waitForZoom(page, 15);
   };
   const notch = async (wanted) => {
@@ -44,10 +44,10 @@ async function main() {
   };
 
   const limits = await page.evaluate(() => ({
-    min: window.gpxViewer.map.getMinZoom(),
-    max: window.gpxViewer.map.getMaxZoom(),
-    snap: window.gpxViewer.map.options.zoomSnap,
-    delta: window.gpxViewer.map.options.zoomDelta,
+    min: window.trailViewer.map.getMinZoom(),
+    max: window.trailViewer.map.getMaxZoom(),
+    snap: window.trailViewer.map.options.zoomSnap,
+    delta: window.trailViewer.map.options.zoomDelta,
   }));
   check('the map stops at level 19', limits.max === 19, `max ${limits.max}`);
   check('the wheel moves a whole level by default', limits.snap === 1, `zoomSnap ${limits.snap}`);
@@ -80,7 +80,7 @@ async function main() {
 
   // The step goes back on its own, so the next plain notch is a whole level again -- and the pixels that
   // belonged to the fine notch are not re-read at the coarse one, which would overshoot.
-  await page.waitForFunction(() => window.gpxViewer.map.options.zoomSnap === 1);
+  await page.waitForFunction(() => window.trailViewer.map.options.zoomSnap === 1);
   const restored = await step();
   check('the fine step is put back after the gesture', restored === 1, `zoomSnap ${restored}`);
   const beforeBack = await zoom();

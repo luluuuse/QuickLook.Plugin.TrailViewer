@@ -2,6 +2,7 @@ using QuickLook.Common.Helpers;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text;
 
 namespace QuickLook.Plugin.TrailViewer;
@@ -27,11 +28,16 @@ internal static class ViewerPreferences
     };
 
     private static readonly string FilePath = Path.Combine(
-        SettingHelper.LocalDataPath, "GpxViewer", "viewer-settings.txt");
+        SettingHelper.LocalDataPath, PluginIdentity.Name, "viewer-settings.txt");
+    private static readonly string LegacyFilePath = Path.Combine(
+        SettingHelper.LocalDataPath, PluginIdentity.LegacyName, "viewer-settings.txt");
 
     /// <summary>A stable query string for BuildViewerUrl; empty on first use or when the file is unreadable.</summary>
     public static string Query()
-        => QueryFromFile(FilePath);
+    {
+        MigrateLegacyFile(LegacyFilePath, FilePath);
+        return QueryFromFile(FilePath);
+    }
 
     /// <summary>Test seam: the same reader and ordering against a caller-owned settings file.</summary>
     internal static string QueryFromFile(string path)
@@ -50,7 +56,45 @@ internal static class ViewerPreferences
 
     /// <summary>Merges one settings message. Invalid keys and values are ignored rather than trusted.</summary>
     public static void SaveFromQuery(string query)
-        => SaveFromQueryToFile(query, FilePath);
+    {
+        MigrateLegacyFile(LegacyFilePath, FilePath);
+        SaveFromQueryToFile(query, FilePath);
+    }
+
+    internal static bool MigrateLegacyFile(string legacy, string current)
+    {
+        lock (Gate)
+        {
+            if (!File.Exists(legacy) || File.Exists(current)) return false;
+            string temporary = null;
+            try
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(current) ?? string.Empty);
+                temporary = current + "." + Guid.NewGuid().ToString("n") + ".tmp";
+                File.Copy(legacy, temporary);
+                File.Move(temporary, current);
+                temporary = null;
+                File.Delete(legacy);
+                var legacyDirectory = Path.GetDirectoryName(legacy);
+                if (!string.IsNullOrEmpty(legacyDirectory) && Directory.Exists(legacyDirectory)
+                    && !Directory.EnumerateFileSystemEntries(legacyDirectory).Any())
+                    Directory.Delete(legacyDirectory);
+                return true;
+            }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
+            {
+                return false;
+            }
+            finally
+            {
+                if (temporary != null)
+                {
+                    try { File.Delete(temporary); }
+                    catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
+                }
+            }
+        }
+    }
 
     /// <summary>Test seam: exercises the production parser and atomic writer without touching user settings.</summary>
     internal static void SaveFromQueryToFile(string query, string path)

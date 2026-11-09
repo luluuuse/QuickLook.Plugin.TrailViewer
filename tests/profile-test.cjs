@@ -25,7 +25,7 @@ async function main() {
   const browser = await launchBrowser();
   // Pinned to en-US: the assertions below read English labels, and the viewer follows the system language.
   const page = await browser.newPage({ viewport: { width: 1200, height: 800 }, locale: 'en-US' });
-  await page.addInitScript(() => localStorage.setItem('gpxviewer.infoDetails', 'full'));
+  await page.addInitScript(() => localStorage.setItem('trailviewer.infoDetails', 'full'));
   await artifacts.start(page);
   const pageErrors = [];
   page.on('pageerror', (e) => pageErrors.push(e.message));
@@ -58,13 +58,13 @@ async function main() {
   }));
 
   const shape = () => page.evaluate(() => ({
-    profile: window.gpxViewer.profile && {
-      min: window.gpxViewer.profile.min,
-      max: window.gpxViewer.profile.max,
-      ascent: window.gpxViewer.profile.ascent,
-      descent: window.gpxViewer.profile.descent,
-      total: window.gpxViewer.profile.total,
-      runs: window.gpxViewer.profile.runs,
+    profile: window.trailViewer.profile && {
+      min: window.trailViewer.profile.min,
+      max: window.trailViewer.profile.max,
+      ascent: window.trailViewer.profile.ascent,
+      descent: window.trailViewer.profile.descent,
+      total: window.trailViewer.profile.total,
+      runs: window.trailViewer.profile.runs,
     },
     areas: [...document.querySelectorAll('#profile .area')].map((a) => a.getAttribute('fill')),
     spans: [...document.querySelectorAll('#profile .area')].map((a) => {
@@ -83,7 +83,7 @@ async function main() {
       text: document.querySelector('#profile .legend .item')?.textContent,
       title: document.querySelector('#profile .legend .item')?.title,
       values: [...document.querySelectorAll('#profile .legend .item .value')].map((n) => n.textContent),
-      steep: window.gpxViewer.profile?.steep,
+      steep: window.trailViewer.profile?.steep,
     },
     axis: [...document.querySelectorAll('#profile .axis')].map((n) => ({ text: n.textContent, box: n.getBoundingClientRect().toJSON() })),
     facts: [...document.querySelectorAll('#info .facts dd')].map((n) => n.textContent),
@@ -324,7 +324,7 @@ async function main() {
 
   // A ringed dot opens the photo card. Dispatched rather than clicked: this fixture stacks three waypoints
   // within a few metres of each other, so a real click would always land on whichever dot is on top.
-  await page.evaluate(() => window.gpxViewer.map.closePopup());
+  await page.evaluate(() => window.trailViewer.map.closePopup());
   await settlePopup(page, '.leaflet-popup', 0);
   await page.evaluate(() => document.querySelector('#profile .pin.photo').dispatchEvent(new MouseEvent('click', { bubbles: true })));
   await settlePopup(page, '.leaflet-popup', 1);

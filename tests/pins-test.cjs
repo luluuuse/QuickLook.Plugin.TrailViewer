@@ -44,7 +44,7 @@ async function main() {
   };
 
   await page.goto(`${base}/viewer/index.html`);
-  await page.evaluate(() => localStorage.removeItem('gpxviewer.pins'));
+  await page.evaluate(() => localStorage.removeItem('trailviewer.pins'));
   await open(fixture);
 
   const state = async () => page.evaluate(() => {
@@ -53,11 +53,11 @@ async function main() {
     const prof = [...document.querySelectorAll('#profile .pin')];
     return {
       pins: document.querySelectorAll('.gpx-pin').length,
-      stops: window.gpxViewer.nav.stops().length,
-      marks: window.gpxViewer.pins.count(),
+      stops: window.trailViewer.nav.stops().length,
+      marks: window.trailViewer.pins.count(),
       ends: document.querySelectorAll('.gpx-start, .gpx-end').length,
-      hasControl: window.gpxViewer.pins.hasControl(),
-      visible: window.gpxViewer.pins.visible(),
+      hasControl: window.trailViewer.pins.hasControl(),
+      visible: window.trailViewer.pins.visible(),
       active: button ? button.classList.contains('active') : false,
       pressed: button ? button.getAttribute('aria-pressed') : '',
       accessibleName: button ? button.getAttribute('aria-label') : '',
@@ -66,7 +66,7 @@ async function main() {
       dot: button ? getComputedStyle(button.querySelector('.dot')).backgroundColor : '',
       selected: document.querySelectorAll('.gpx-pin.selected').length,
       cards: document.querySelectorAll('.leaflet-popup').length,
-      index: window.gpxViewer.nav.index(),
+      index: window.trailViewer.nav.index(),
       tracks: document.querySelectorAll('.gpx-track').length,
       profilePins: prof.length,
       profileHidden: prof.filter((p) => getComputedStyle(p).display === 'none').length,
@@ -159,7 +159,7 @@ async function main() {
   await waitForLayout(page);
 
   // 8. A pure track has no waypoints, but its dots are marks too: the switch must still be there.
-  await page.evaluate(() => localStorage.removeItem('gpxviewer.pins'));
+  await page.evaluate(() => localStorage.removeItem('trailviewer.pins'));
   await open('gpx10.gpx');
   s = await state();
   check('a track without waypoints still gets the switch', s.hasControl === true && s.stops === 0,
@@ -172,12 +172,12 @@ async function main() {
   check('hiding a pure track takes every dot off the map', s.visible === false && s.pins === 0, `${s.visible}`);
   check('and leaves the line and the two flags alone', s.tracks === 1 && s.ends === 2, `${s.tracks}/${s.ends}`);
 
-  await page.evaluate(() => localStorage.removeItem('gpxviewer.pins'));
+  await page.evaluate(() => localStorage.removeItem('trailviewer.pins'));
   await open('dense-waypoints.kml');
   await waitForLayout(page);
   const dense = await page.evaluate(() => ({
-    stops: window.gpxViewer.nav.stops().length,
-    marks: window.gpxViewer.pins.count(),
+    stops: window.trailViewer.nav.stops().length,
+    marks: window.trailViewer.pins.count(),
     visiblePins: [...document.querySelectorAll('.gpx-pin')]
       .filter((node) => getComputedStyle(node).display !== 'none').length,
     clusters: document.querySelectorAll('.gpx-waypoint-cluster').length,
@@ -202,9 +202,9 @@ async function main() {
     selectedDense.selected === 1 && selectedDense.visiblePins === 2,
     JSON.stringify(selectedDense));
 
-  await page.evaluate(() => localStorage.removeItem('gpxviewer.pins'));
+  await page.evaluate(() => localStorage.removeItem('trailviewer.pins'));
   await open('dense-waypoints.kml');
-  await page.evaluate(() => { window.gpxViewer.map.setZoom(19); });
+  await page.evaluate(() => { window.trailViewer.map.setZoom(19); });
   await waitForZoom(page, 19);
   await waitForLayout(page);
   const zoomedPins = await page.evaluate(() =>
@@ -222,7 +222,7 @@ async function main() {
 
   if (shot) {
     await open(fixture);
-    await page.evaluate(() => window.gpxViewer.pins.hide());
+    await page.evaluate(() => window.trailViewer.pins.hide());
     await waitForLayout(page);
     await page.screenshot({ path: shot });
   }

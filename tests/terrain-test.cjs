@@ -50,7 +50,7 @@ async function main() {
   };
 
   await page.goto(`${base}/viewer/index.html`);
-  await page.evaluate(() => localStorage.removeItem('gpxviewer.layer'));
+  await page.evaluate(() => localStorage.removeItem('trailviewer.layer'));
 
   // --- the switch itself -------------------------------------------------------------------------
   await page.goto(`${base}/viewer/index.html?src=../tests/fixtures/${fixture}`);
@@ -60,14 +60,14 @@ async function main() {
   check('four layer buttons', labels.length === 4, labels.join('/'));
   check('terrain sits second, before the satellite', labels.join('/') === 'Map/Terrain/Satellite/No map', labels.join('/'));
 
-  check('the map is still the default', await page.evaluate(() => window.gpxViewer.layer()) === 'map');
+  check('the map is still the default', await page.evaluate(() => window.trailViewer.layer()) === 'map');
   check('no terrain tile before it is asked for', tileRequests.length === 0, `${tileRequests.length} requests`);
 
   // --- switching to the terrain ------------------------------------------------------------------
   await page.locator('.layer-switch button[data-layer="terrain"]').click();
   await waitForTiles(page, 'cyclosm');
 
-  check('the chosen layer is remembered', await page.evaluate(() => window.gpxViewer.layer()) === 'terrain');
+  check('the chosen layer is remembered', await page.evaluate(() => window.trailViewer.layer()) === 'terrain');
   check('the button carries the active state', await page.evaluate(
     () => document.querySelector('.layer-switch button[data-layer="terrain"]').classList.contains('active'),
   ));
@@ -94,7 +94,7 @@ async function main() {
   // --- it must not disturb the other layers --------------------------------------------------------
   check('the grid mode is off', await page.evaluate(() => !document.body.classList.contains('no-map')));
 
-  await page.evaluate(() => window.gpxViewer.selectLayer('map'));
+  await page.evaluate(() => window.trailViewer.selectLayer('map'));
   await page.waitForFunction(() => ![...document.querySelectorAll('.leaflet-tile-pane img')]
     .some((node) => node.src.includes('cyclosm')));
   const leftover = await page.evaluate(
@@ -102,15 +102,15 @@ async function main() {
   );
   check('switching back leaves no terrain tile behind', leftover === 0, `${leftover} tiles`);
 
-  await page.evaluate(() => window.gpxViewer.selectLayer('none'));
+  await page.evaluate(() => window.trailViewer.selectLayer('none'));
   await page.waitForFunction(() => document.body.classList.contains('no-map'));
   check('the grid still works alongside it', await page.evaluate(() => document.body.classList.contains('no-map')));
 
   // --- remembered across a reload -------------------------------------------------------------------
-  await page.evaluate(() => window.gpxViewer.selectLayer('terrain'));
+  await page.evaluate(() => window.trailViewer.selectLayer('terrain'));
   await waitForTiles(page, 'cyclosm');
   await open();
-  check('the choice survives a reload', await page.evaluate(() => window.gpxViewer.layer()) === 'terrain');
+  check('the choice survives a reload', await page.evaluate(() => window.trailViewer.layer()) === 'terrain');
 
   // --- wording ---------------------------------------------------------------------------------------
   await page.locator('.lang-switch button').click();

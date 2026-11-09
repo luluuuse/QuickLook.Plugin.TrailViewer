@@ -1,6 +1,8 @@
 // Leaflet controls and layer definitions. Dependencies are injected so this module does not reach into the map
 // application's globals.
 
+import { readStored, writeStored } from './storage.js';
+
 export const LAYERS = {
   map: {
     label: 'layer.map',
@@ -41,7 +43,7 @@ export const LAYERS = {
   },
 };
 
-const LAYER_KEY = 'gpxviewer.layer';
+const LAYER_KEY = 'layer';
 
 function graticule(L, map) {
   const group = L.layerGroup();
@@ -70,16 +72,11 @@ function graticule(L, map) {
   group.on('remove', () => map.off('moveend', redraw));
   return group;
 }
-
 export function savedLayer(params) {
   const fromHost = params.get('layer');
   if (fromHost in LAYERS) return fromHost;
-  try {
-    const value = localStorage.getItem(LAYER_KEY);
-    return value in LAYERS ? value : 'map';
-  } catch {
-    return 'map';
-  }
+  const value = readStored(LAYER_KEY);
+  return value in LAYERS ? value : 'map';
 }
 
 export function createLayerSwitcher({ L, map, el, t, initial, onRemember }) {
@@ -101,8 +98,7 @@ export function createLayerSwitcher({ L, map, el, t, initial, onRemember }) {
       button.setAttribute('aria-pressed', String(active));
     }
     if (remember) {
-      try { localStorage.setItem(LAYER_KEY, key); }
-      catch { /* Private mode or storage disabled: the choice just is not remembered. */ }
+      writeStored(LAYER_KEY, key);
       onRemember?.();
     }
   }

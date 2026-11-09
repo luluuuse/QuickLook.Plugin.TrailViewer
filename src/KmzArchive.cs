@@ -19,7 +19,7 @@ internal static class KmzArchive
     private const long MaxDocumentBytes = 64L * 1024 * 1024;
     private const long MaxCompressedDocumentBytes = 64L * 1024 * 1024;
 
-    private const string RootFolderName = "GpxViewer";
+    private static readonly string RootFolderName = PluginIdentity.Name;
 
     public static bool IsKmz(string path) =>
         path.EndsWith(".kmz", StringComparison.OrdinalIgnoreCase);
@@ -93,6 +93,7 @@ internal static class KmzArchive
     /// <summary>Creates a fresh folder to unpack into, cleaning up folders left behind by earlier runs.</summary>
     public static string CreateFolder()
     {
+        RemoveLegacyRoot();
         var root = Path.Combine(Path.GetTempPath(), RootFolderName);
         Directory.CreateDirectory(root);
         RemoveStaleFolders(root);
@@ -100,6 +101,19 @@ internal static class KmzArchive
         var folder = Path.Combine(root, Guid.NewGuid().ToString("n"));
         Directory.CreateDirectory(folder);
         return folder;
+    }
+
+    private static void RemoveLegacyRoot()
+    {
+        try
+        {
+            var legacy = Path.Combine(Path.GetTempPath(), PluginIdentity.LegacyName);
+            if (Directory.Exists(legacy)) Directory.Delete(legacy, true);
+        }
+        catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
+        {
+            // A previous process may still hold a temporary extraction; it is harmless.
+        }
     }
 
     /// <summary>Deletes an unpacked folder; a file still held open by the browser is left for the next run.</summary>
@@ -114,7 +128,7 @@ internal static class KmzArchive
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            GpxPanel.Trace("could not remove the unpacked folder yet: " + ex.Message);
+            TrailViewerPanel.Trace("could not remove the unpacked folder yet: " + ex.Message);
         }
     }
 

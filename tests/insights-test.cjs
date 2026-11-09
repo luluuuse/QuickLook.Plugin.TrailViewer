@@ -113,7 +113,7 @@ async function main() {
   await page.locator('.waypoint-overview-item[data-waypoint="5"]').click();
   await settlePopup(page, '.leaflet-popup', 1);
   const selected = await page.evaluate(() => ({
-    index: window.gpxViewer.nav.index(),
+    index: window.trailViewer.nav.index(),
     title: document.querySelector('.gpx-pin.selected')?.title,
     highlighted: document.querySelector('.waypoint-overview-item.selected')?.dataset.waypoint,
   }));

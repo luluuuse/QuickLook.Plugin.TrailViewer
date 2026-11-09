@@ -5,7 +5,9 @@
 // the user's own choice is remembered. Storage is per origin and the plugin puts its version into the host
 // name, so an upgrade starts over from the system language once - which is the safe direction.
 
-const STORAGE_KEY = 'gpxviewer.lang';
+import { readStored, writeStored } from './storage.js';
+
+const STORAGE_KEY = 'lang';
 export const LANGS = ['en', 'zh'];
 
 /** A value is either a string with {placeholders} or a function taking the same values. */
@@ -358,12 +360,8 @@ function detect() {
   } catch {
     // Keep the normal detection below.
   }
-  try {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (LANGS.includes(saved)) return saved;
-  } catch {
-    // Private mode or storage disabled: the system language decides.
-  }
+  const saved = readStored(STORAGE_KEY);
+  if (LANGS.includes(saved)) return saved;
   for (const tag of navigator.languages || [navigator.language || '']) {
     if (typeof tag === 'string' && tag.toLowerCase().startsWith('zh')) return 'zh';
   }
@@ -390,11 +388,7 @@ export function onLangChange(fn) {
 export function setLang(next) {
   if (!LANGS.includes(next) || next === lang) return false;
   lang = next;
-  try {
-    localStorage.setItem(STORAGE_KEY, next);
-  } catch {
-    // Not remembered, still applied for this preview.
-  }
+  writeStored(STORAGE_KEY, next);
   for (const fn of listeners) fn(lang);
   return true;
 }

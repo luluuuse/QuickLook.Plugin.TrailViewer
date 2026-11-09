@@ -82,7 +82,7 @@ async function main() {
     return {
       primary: row?.dataset.primary,
       badges: [...(row?.querySelectorAll('.waypoint-insight-badge') || [])].map((node) => node.textContent),
-      stored: JSON.parse(localStorage.getItem('gpxviewer.waypoint-insights') || '{}'),
+      stored: JSON.parse(localStorage.getItem('trailviewer.waypoint-insights') || '{}'),
     };
   });
   check('manual correction can replace an automatic category',

@@ -32,9 +32,9 @@ const document = `<?xml version="1.0" encoding="UTF-8"?>
 
 async function state(page) {
   return page.evaluate(() => ({
-    index: window.gpxViewer.nav.index(),
-    nodeIndex: window.gpxViewer.nav.nodeIndex(),
-    nodes: window.gpxViewer.nav.nodes(),
+    index: window.trailViewer.nav.index(),
+    nodeIndex: window.trailViewer.nav.nodeIndex(),
+    nodes: window.trailViewer.nav.nodes(),
     selected: document.querySelector('.gpx-pin.selected')?.title || '',
     popup: document.querySelector('.leaflet-popup-content')?.textContent || '',
   }));

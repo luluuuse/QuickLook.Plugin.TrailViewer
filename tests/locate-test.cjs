@@ -32,7 +32,7 @@ async function main() {
 
   // The frame the file opened with, and the ground the track actually covers.
   const view = () => page.evaluate(() => {
-    const map = window.gpxViewer.map;
+    const map = window.trailViewer.map;
     const b = map.getBounds();
     const c = map.getCenter();
     return {
@@ -41,7 +41,7 @@ async function main() {
     };
   });
   const track = await page.evaluate(() => {
-    const g = window.gpxViewer.gpx;
+    const g = window.trailViewer.gpx;
     let s = 90, n = -90, w = 180, e = -180;
     for (const t of g.tracks) {
       for (const seg of t.segments) {
@@ -85,13 +85,13 @@ async function main() {
 
   // Somewhere else entirely -- a different continent and a different zoom.
   const away = async () => {
-    await page.evaluate(() => { window.gpxViewer.map.setView([0, 0], 4, { animate: false }); });
+    await page.evaluate(() => { window.trailViewer.map.setView([0, 0], 4, { animate: false }); });
     await waitForMapIdle(page);
     return view();
   };
   const waitForHome = async () => {
     await page.waitForFunction(({ zoom, lat, lng }) => {
-      const map = window.gpxViewer.map;
+      const map = window.trailViewer.map;
       const center = map.getCenter();
       return map.getZoom() === zoom && Math.abs(center.lat - lat) < 0.002
         && Math.abs(center.lng - lng) < 0.002;
@@ -118,7 +118,7 @@ async function main() {
 
   // 2. The host's road -- the same call QuickLook makes when it holds the keyboard.
   await away();
-  await page.evaluate(() => window.gpxViewer.pressKey('c'));
+  await page.evaluate(() => window.trailViewer.pressKey('c'));
   await waitForHome();
   const afterHost = await view();
   check('pressKey("c") does what the key does', coversTrack(afterHost)
@@ -136,7 +136,7 @@ async function main() {
 
   // 4. Pressing it while already home must not wander.
   const beforeAgain = await view();
-  await page.evaluate(() => window.gpxViewer.pressKey('c'));
+  await page.evaluate(() => window.trailViewer.pressKey('c'));
   await waitForMapIdle(page);
   const again = await view();
   check('pressing it at home changes nothing', Math.abs(again.lat - beforeAgain.lat) < 1e-6
@@ -150,7 +150,7 @@ async function main() {
   await away();
   await page.keyboard.press('c');
   await page.waitForFunction(({ s, n, w, e }) => {
-    const bounds = window.gpxViewer.map.getBounds();
+    const bounds = window.trailViewer.map.getBounds();
     return bounds.getSouth() <= s + 1e-6 && bounds.getNorth() >= n - 1e-6
       && bounds.getWest() <= w + 1e-6 && bounds.getEast() >= e - 1e-6;
   }, track);

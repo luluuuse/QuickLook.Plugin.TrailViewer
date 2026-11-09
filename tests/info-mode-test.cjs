@@ -20,7 +20,7 @@ async function main() {
   page.on('pageerror', (error) => pageErrors.push(error.message));
 
   await page.goto(`${base}/viewer/index.html`);
-  await page.evaluate(() => localStorage.removeItem('gpxviewer.infoDetails'));
+  await page.evaluate(() => localStorage.removeItem('trailviewer.infoDetails'));
   await openViewer(page, base, 'track-time-ele.gpx');
   await waitForLayout(page);
 
@@ -35,7 +35,7 @@ async function main() {
     expanded: document.querySelector('.info-details-toggle')?.getAttribute('aria-expanded'),
     titleText: document.querySelector('.info-details-toggle')?.title || '',
     width: document.getElementById('info').getBoundingClientRect().width,
-    stored: localStorage.getItem('gpxviewer.infoDetails'),
+    stored: localStorage.getItem('trailviewer.infoDetails'),
   }));
 
   const compact = await state();
@@ -86,6 +86,24 @@ async function main() {
   check('the details control is translated',
     translated.button === '更多' && translated.titleText === '显示完整路线信息',
     `${translated.button}/${translated.titleText}`);
+
+  const migrationPage = await browser.newPage({ viewport: { width: 1000, height: 700 }, locale: 'en-US' });
+  await migrationPage.goto(`${base}/viewer/index.html`);
+  await migrationPage.evaluate(() => {
+    localStorage.removeItem('trailviewer.infoDetails');
+    localStorage.setItem('gpxviewer.infoDetails', 'full');
+  });
+  await openViewer(migrationPage, base, 'track-time-ele.gpx');
+  await waitForLayout(migrationPage);
+  const migrated = await migrationPage.evaluate(() => ({
+    mode: document.getElementById('info').dataset.details,
+    current: localStorage.getItem('trailviewer.infoDetails'),
+    legacy: localStorage.getItem('gpxviewer.infoDetails'),
+  }));
+  check('legacy GpxViewer storage keys migrate to TrailViewer',
+    migrated.mode === 'full' && migrated.current === 'full' && migrated.legacy === null,
+    JSON.stringify(migrated));
+  await migrationPage.close();
 
   if (shot) await page.screenshot({ path: shot });
   check('no page errors', pageErrors.length === 0, pageErrors.join('; '));

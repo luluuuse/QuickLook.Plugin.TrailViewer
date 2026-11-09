@@ -6,15 +6,12 @@ import {
   formatRange,
   formatSpeed,
 } from './format.js';
+import { readStored, writeStored } from './storage.js';
 
-const DETAILS_KEY = 'gpxviewer.infoDetails';
+const DETAILS_KEY = 'infoDetails';
 
 function savedDetailsMode() {
-  try {
-    return localStorage.getItem(DETAILS_KEY) === 'full' ? 'full' : 'compact';
-  } catch {
-    return 'compact';
-  }
+  return readStored(DETAILS_KEY) === 'full' ? 'full' : 'compact';
 }
 
 export function createSummaryView({ el, fileName, photosOf, onLayoutChange }) {
@@ -38,8 +35,7 @@ export function createSummaryView({ el, fileName, photosOf, onLayoutChange }) {
     detailsButton.setAttribute('aria-label', detailsButton.title);
     detailsButton.addEventListener('click', () => {
       detailsMode = detailsMode === 'full' ? 'compact' : 'full';
-      try { localStorage.setItem(DETAILS_KEY, detailsMode); }
-      catch { /* The mode still applies to this preview. */ }
+      writeStored(DETAILS_KEY, detailsMode);
       renderInfo(gpx, summary, elevations, estimateSeconds);
       requestAnimationFrame(() => {
         const nextButton = document.querySelector('.info-details-toggle');

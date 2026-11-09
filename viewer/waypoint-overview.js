@@ -1,13 +1,14 @@
 import { formatDistance, formatElevation } from './format.js';
 import { t, units } from './i18n.js';
 import { classifyWaypoint, INSIGHT_KEYS } from './waypoint-insights.js';
+import { readStored, removeStored, writeStored } from './storage.js';
 
-const OVERRIDE_KEY = 'gpxviewer.waypoint-insights';
+const OVERRIDE_KEY = 'waypoint-insights';
 const MANUAL_IMPORTANT = new Set(['danger', 'water', 'camp', 'supply', 'exit']);
 
 function loadOverrides() {
   try {
-    const parsed = JSON.parse(localStorage.getItem(OVERRIDE_KEY) || '{}');
+    const parsed = JSON.parse(readStored(OVERRIDE_KEY) || '{}');
     return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
   } catch {
     return {};
@@ -72,12 +73,8 @@ export function createWaypointOverview({ el, onSelect, onLayoutChange }) {
     if (!value || value === 'auto') delete overrides[key];
     else overrides[key] = value;
     insights.delete(point);
-    try {
-      if (Object.keys(overrides).length === 0) localStorage.removeItem(OVERRIDE_KEY);
-      else localStorage.setItem(OVERRIDE_KEY, JSON.stringify(overrides));
-    } catch {
-      // Manual labels still apply for this preview when storage is unavailable.
-    }
+    if (Object.keys(overrides).length === 0) removeStored(OVERRIDE_KEY);
+    else writeStored(OVERRIDE_KEY, JSON.stringify(overrides));
     render();
   }
 

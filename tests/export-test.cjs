@@ -149,7 +149,7 @@ async function overlayOf(page, base, fixture, options) {
   await page.goto(`${base}/viewer/index.html?src=../tests/fixtures/${encodeURIComponent(fixture)}`);
   await page.waitForFunction(() => document.body.classList.contains('loaded') || document.body.classList.contains('failed'));
   return page.evaluate(async (opts) => {
-    window.__canvas = await window.gpxViewer.overlayCanvas(opts);
+    window.__canvas = await window.trailViewer.overlayCanvas(opts);
     return true;
   }, options || {}).then(() => page.evaluate(measure));
 }
@@ -158,7 +158,7 @@ async function rowOf(page, base, fixture, options) {
   await page.goto(`${base}/viewer/index.html?src=../tests/fixtures/${encodeURIComponent(fixture)}`);
   await page.waitForFunction(() => document.body.classList.contains('loaded') || document.body.classList.contains('failed'));
   return page.evaluate(async (opts) => {
-    window.__canvas = await window.gpxViewer.overlayCanvas(opts);
+    window.__canvas = await window.trailViewer.overlayCanvas(opts);
     return true;
   }, options || {}).then(() => page.evaluate(measureRow));
 }
@@ -294,10 +294,10 @@ async function main() {
 
   const hiddenFirst = await page.evaluate(() => document.getElementById('export').hidden);
   check('the panel starts closed', hiddenFirst === true);
-  check('black ink is the default', await page.evaluate(() => window.gpxViewer.exportSettings().ink) === 'black');
+  check('black ink is the default', await page.evaluate(() => window.trailViewer.exportSettings().ink) === 'black');
 
-  await page.evaluate(() => window.gpxViewer.pressKey('X'));
-  check('shift+X opens it', await page.evaluate(() => window.gpxViewer.panelOpen()) === true);
+  await page.evaluate(() => window.trailViewer.pressKey('X'));
+  check('shift+X opens it', await page.evaluate(() => window.trailViewer.panelOpen()) === true);
   check('and it is on screen', await page.locator('#export').isVisible());
   check('opening the panel moves focus to its action',
     await page.evaluate(() => document.activeElement?.classList.contains('go')) === true);
@@ -312,7 +312,7 @@ async function main() {
     (await page.locator('#export .option[data-value="3:4"]').count()) === 0);
 
   await page.click('#export .pick .option[data-value="1:1"]');
-  check('a click chooses a shape', await page.evaluate(() => window.gpxViewer.exportSettings().size) === '1:1');
+  check('a click chooses a shape', await page.evaluate(() => window.trailViewer.exportSettings().size) === '1:1');
   check('the chosen shape exposes its pressed state',
     await page.locator('#export .option[data-value="1:1"]').getAttribute('aria-pressed') === 'true'
       && await page.locator('#export .option[data-value="9:16"]').getAttribute('aria-pressed') === 'false');
@@ -320,27 +320,27 @@ async function main() {
     await page.locator('#export .pick .option[data-value="1:1"]').evaluate((n) => n.classList.contains('on')));
 
   await page.click('#export .pick .option[data-value="white"]');
-  check('and an ink', await page.evaluate(() => window.gpxViewer.exportSettings().ink) === 'white');
+  check('and an ink', await page.evaluate(() => window.trailViewer.exportSettings().ink) === 'white');
 
   await page.click('#export .pick .option[data-value="soft"]');
-  check('and a backing', await page.evaluate(() => window.gpxViewer.exportSettings().scrim) === 'soft');
+  check('and a backing', await page.evaluate(() => window.trailViewer.exportSettings().scrim) === 'soft');
 
   // All three settings are remembered: a reload is what a new preview looks like.
   await page.reload();
   await page.waitForFunction(() => document.body.classList.contains('loaded'));
   check('the choices survive a reload',
-    JSON.stringify(await page.evaluate(() => window.gpxViewer.exportSettings()))
+    JSON.stringify(await page.evaluate(() => window.trailViewer.exportSettings()))
       === '{"size":"1:1","ink":"white","scrim":"soft"}');
 
   // X on its own exports with those settings and keeps the panel out of the way.
-  await page.evaluate(() => window.gpxViewer.pressKey('X'));
-  await page.evaluate(() => window.gpxViewer.pressKey('x'));
-  check('X closes the panel again', await page.evaluate(() => window.gpxViewer.panelOpen()) === false);
+  await page.evaluate(() => window.trailViewer.pressKey('X'));
+  await page.evaluate(() => window.trailViewer.pressKey('x'));
+  check('X closes the panel again', await page.evaluate(() => window.trailViewer.panelOpen()) === false);
 
-  await page.evaluate(() => window.gpxViewer.pressKey('X'));
+  await page.evaluate(() => window.trailViewer.pressKey('X'));
   await page.click('#export .go');
-  await page.waitForFunction(() => window.gpxViewer.panelOpen() === false);
-  check('the export button closes the panel', await page.evaluate(() => window.gpxViewer.panelOpen()) === false);
+  await page.waitForFunction(() => window.trailViewer.panelOpen() === false);
+  check('the export button closes the panel', await page.evaluate(() => window.trailViewer.panelOpen()) === false);
 
   check('no page errors', errors.length === 0, errors.join(' | '));
 

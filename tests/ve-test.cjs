@@ -41,7 +41,7 @@ async function main() {
     const box = document.getElementById('profile');
     const note = document.querySelector('#profile .scale');
     if (!plot || !chart) return null;
-    const data = window.gpxViewer?.profile;
+    const data = window.trailViewer?.profile;
     const plotH = plot.getBoundingClientRect().height;
     const chartW = chart.getBoundingClientRect().width;
     const span = data ? data.max - data.min : 0;
@@ -112,7 +112,7 @@ async function main() {
   await open('track-time-ele.gpx');
   const clear = await page.evaluate(() => {
     const box = document.getElementById('profile').getBoundingClientRect();
-    const map = window.gpxViewer.map;
+    const map = window.trailViewer.map;
     const pts = [];
     map.eachLayer((layer) => {
       if (typeof layer.getLatLngs !== 'function') return;
