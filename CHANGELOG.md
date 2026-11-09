@@ -21,6 +21,14 @@ tray after installing a new release.
 
 ---
 
+## Unreleased
+
+- Release workflow 改为从本文件的对应版本章节生成 GitHub Release 正文；缺失章节、空正文或 TODO 占位会直接
+  拒绝发布，并自动追加安装包名与 SHA256。
+
+- The release workflow now uses the matching section of this file as the GitHub Release body. Missing sections,
+  empty notes and TODO placeholders fail the release, and the package name plus SHA256 are appended.
+
 ## 1.17.1 — 2026-11-09 · CI 可重复性修复 / Reproducible CI
 
 - 导出面板测试显式使用中文系统，不再依赖 CI runner 的默认语言。

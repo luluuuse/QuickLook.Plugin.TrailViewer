@@ -5,6 +5,7 @@ obj/
 *.suo
 *.qlplugin
 *.zip
+release-notes.md
 node_modules/
 test-results/
 # Local test media (real photos/videos never go into the repo)

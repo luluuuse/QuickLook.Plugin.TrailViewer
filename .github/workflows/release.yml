@@ -66,6 +66,9 @@ jobs:
           $env:CHROMIUM = $edge
           npm test
 
+      - name: Extract release notes
+        run: node scripts/release-notes.cjs --output release-notes.md
+
       - name: Pack release
         shell: pwsh
         run: |
@@ -73,6 +76,15 @@ jobs:
           $package = Get-ChildItem QuickLook.Plugin.TrailViewer-*.qlplugin | Select-Object -First 1
           $hash = (Get-FileHash $package.FullName -Algorithm SHA256).Hash
           "$hash  $($package.Name)" | Set-Content "$($package.FullName).sha256"
+          $assetNotes = @'
+          ## 安装包 / Package
+
+          ```text
+          {0}
+          {1}
+          ```
+          '@ -f $package.Name, $hash
+          Add-Content release-notes.md "`n$assetNotes"
 
       - name: Publish GitHub release
         shell: pwsh
@@ -81,6 +93,6 @@ jobs:
         run: |
           $package = Get-ChildItem QuickLook.Plugin.TrailViewer-*.qlplugin | Select-Object -First 1
           $sha = "$($package.FullName).sha256"
-          $arguments = @('release', 'create', $env:GITHUB_REF_NAME, $package.FullName, $sha, '--verify-tag', '--generate-notes')
+          $arguments = @('release', 'create', $env:GITHUB_REF_NAME, $package.FullName, $sha, '--verify-tag', '--notes-file', 'release-notes.md')
           if ($env:GITHUB_REF_NAME.Contains('-')) { $arguments += '--prerelease' }
           gh @arguments

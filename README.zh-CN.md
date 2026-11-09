@@ -215,7 +215,7 @@ node scripts/pack.cjs
 `npm run check` 会用 ESLint 检查 viewer、测试、脚本和工具，再用 TypeScript 的 `checkJs` 检查浏览器模块。
 CI 在 Windows 构建前执行同一门禁。
 
-常规 `npm test` 先运行 53 个 Node 纯单元测试，再运行 22 个浏览器套件、失败产物自测和版本检查。测试服务器、
+常规 `npm test` 先运行 56 个 Node 纯单元测试，再运行 22 个浏览器套件、失败产物自测和版本检查。测试服务器、
 浏览器启动、断言与诊断由 `tests/support/` 共享；失败产物写到 `test-results/<套件>/`，包含截图、结果 JSON
 和 Playwright `trace.zip`。构建 Harness 后，`npm run test:host` 再运行 50 项 C# 宿主断言，覆盖文件边界、
 偏好文件、导出分块状态机和原子替换。主测试不访问真实地图服务，CyclOSM 实时端点的可用性由独立的每周/手动
@@ -236,8 +236,9 @@ npm test
 
 正式版本用 `node scripts/release.cjs patch`、`minor` 或 `major` 准备；预发布加 `--pre beta.1` 或
 `--pre rc.1`。脚本只改唯一版本源和 CHANGELOG。推送 annotated tag（如 `v1.17.0`）后，release workflow 会
-校验 tag/版本一致、跑全量测试、打包并发布安装包与 SHA256。`npm run test:version` 不需要浏览器，会检查
-SemVer、日志顺序、构建元数据、页面协议/偏好结构版本和内容哈希缓存主机。测试样本由
+校验 tag/版本一致、跑全量测试、从 CHANGELOG 提取对应版本作为 Release 正文、打包并发布安装包与 SHA256。
+版本章节缺失、正文为空或仍有 TODO 时发布会失败。`npm run test:version` 不需要浏览器，会检查 SemVer、
+日志顺序、构建元数据、页面协议/偏好结构版本和内容哈希缓存主机。测试样本由
 `tools/make-fixtures.py` 生成，全部是公式算出来的合成数据，不含任何真实轨迹。
 
 ## 第三方组件
