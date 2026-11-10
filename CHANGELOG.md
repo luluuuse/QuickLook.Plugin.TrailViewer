@@ -26,6 +26,12 @@ Added / Changed / Deprecated / Removed / Fixed / Security 分类；没有内容�
 
 ### 中文
 
+#### 新增
+
+- 地形图新增 OpenHikingMap 和 OpenTopoMap，CyclOSM 继续作为默认地形图源。
+- 路网图和卫星图新增天地图，分别使用 `vec_w + cva_w` 与 `img_w + cia_w` 官方 WMTS 底图/注记组合。
+- 增加天地图密钥配置：密钥使用当前 Windows 用户的 DPAPI 加密保存，并在页面创建前注入当前预览。
+
 #### 修复
 
 - 公共包改为在页面创建前由宿主注入 DPAPI 天地图密钥，页面直接请求官方 WMTS，不再依赖逐瓦片
@@ -34,6 +40,7 @@ Added / Changed / Deprecated / Removed / Fixed / Security 分类；没有内容�
 - 地图设置页提供“更换密钥 / 移除密钥”入口，密钥只从当前用户的 DPAPI 存储读取。
 - 单个天地图瓦片失败不再清空密钥或切换图源；连续失败会保留密钥并自动重试。
 - 宿主旁路读取天地图 HTTP 状态，只有明确的 401/403 才提示密钥或域名被拒绝。
+- 点击当前地图类型打开或关闭图层面板时不会重建活动瓦片图层，消除地图闪黑。
 
 #### 删除
 
@@ -43,6 +50,9 @@ Added / Changed / Deprecated / Removed / Fixed / Security 分类；没有内容�
 
 #### 变更
 
+- 原“地图”类别并入“路网”，最终保留路网、地形、卫星和无底图四种类型。
+- 图源偏好升级为具体图源 ID，同时兼容旧的 `map`、`terrain`、`satellite` 和 `none` 值；各类型继续记住
+  上次选择的图源。
 - 顶部地图工具统一为 32 px 高度；标记点与列表合并为一个连续工具组，语言保持独立。
 - 路网、地形、卫星和无底图合并为一个“当前图层”入口；展开面板分“地图类型”和“地图图源”两级，
   `Q / E` 快捷键继续循环切换类型。
@@ -52,7 +62,20 @@ Added / Changed / Deprecated / Removed / Fixed / Security 分类；没有内容�
 - 标记点启用态改用强调色圆点，避免与当前地图分类的蓝色选中态争夺视觉焦点。
 - 中文图源菜单将“OpenStreetMap 人道主义风格”简化为“OpenStreetMap”。
 
+#### 安全
+
+- 天地图密钥不写入源码、页面 URL、浏览器存储、日志或公开发布包。
+- 宿主只识别天地图官方 HTTPS 响应，并新增仓库密钥扫描，阻止 `tk=` 和供应商明文密钥提交。
+
 ### English
+
+#### Added
+
+- Terrain now offers OpenHikingMap and OpenTopoMap alongside the default CyclOSM source.
+- Road and Satellite now offer Tianditu using the official `vec_w + cva_w` and `img_w + cia_w` WMTS
+  base/label layer pairs.
+- Added Tianditu key configuration: the key is encrypted with Windows DPAPI for the current user and injected
+  into the preview before page creation.
 
 #### Fixed
 
@@ -65,6 +88,8 @@ Added / Changed / Deprecated / Removed / Fixed / Security 分类；没有内容�
   and retry automatically.
 - The host observes Tianditu HTTP statuses out of band, and only an explicit 401/403 reports a rejected key or
   domain.
+- Opening or closing the layer panel on the active map type no longer rebuilds its tile layer, removing the
+  brief black flash.
 
 #### Removed
 
@@ -75,6 +100,9 @@ Added / Changed / Deprecated / Removed / Fixed / Security 分类；没有内容�
 
 #### Changed
 
+- The former Map category is now part of Road, leaving Road, Terrain, Satellite and No map.
+- Layer preferences now use provider IDs while remaining compatible with legacy `map`, `terrain`, `satellite`
+  and `none` values; each type continues to remember its last selected source.
 - Road, Terrain, Satellite and No map now share one current-layer entry. Its panel separates map type from
   source, while Q / E still cycle the type.
 - The narrow layer entry keeps only the icon, current-type abbreviation and chevron; the layer panel becomes a
@@ -85,6 +113,12 @@ Added / Changed / Deprecated / Removed / Fixed / Security 分类；没有内容�
   dialog.
 - The active marker switch now uses an accent-coloured dot instead of competing with the selected map category
   as a second solid blue block.
+
+#### Security
+
+- Tianditu keys are not written to source, page URLs, browser storage, logs or public release packages.
+- The host recognises only official Tianditu HTTPS responses, and a repository secret scan rejects plaintext
+  `tk=` values and provider keys.
 
 ## 1.18.4 — 2026-11-09
 

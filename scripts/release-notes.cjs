@@ -26,17 +26,12 @@ function extractReleaseNotesSince(markdown, version, sinceVersion) {
   const current = findVersionHeading(markdown, version);
   const previous = findVersionHeading(markdown, sinceVersion);
   const sinceLabel = sinceVersion.replace(/^v/, '');
-  const start = current.index;
-  const end = previous.index;
-  if (start >= end) {
+  if (current.index >= previous.index) {
     throw new Error(`CHANGELOG.md order puts ${version} at or after ${sinceVersion}`);
   }
-  const section = markdown.slice(start, end).trim();
-  if (!section) throw new Error(`release notes for ${version} since ${sinceVersion} are empty`);
-  if (/\(待写 \/ TODO\)|（待写 \/ TODO）|（这一版改了什么）/.test(section)) {
-    throw new Error(`release notes for ${version} still contain TODO placeholders`);
-  }
-  return `# 自 v${sinceLabel} 以来 / Since v${sinceLabel}\n\n${section}\n`;
+  // The current version section is the curated net delta. Intermediate development sections may contain
+  // behaviour that was later removed or replaced, so they are not copied into the public release notes.
+  return `# 自 v${sinceLabel} 以来 / Since v${sinceLabel}\n\n${extractReleaseNotes(markdown, version)}`;
 }
 
 function findVersionHeading(markdown, version) {

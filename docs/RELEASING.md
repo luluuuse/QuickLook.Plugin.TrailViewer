@@ -54,9 +54,10 @@ node scripts/release.cjs 2.0.0-rc.1
 node scripts/release-notes.cjs --output release-notes.md
 ```
 
-脚本默认提取当前版本章节；传入 `--since vX.Y.Z` 时会汇总该公开版本之后到当前版本之间的所有 CHANGELOG
-章节。Release workflow 自动读取 GitHub 上一个公开 Release，并使用累积模式，因此在两个公开版本之间产生多个
-内部版本时，不会只发布最后一版的说明。缺失、空正文或 TODO 会让发布失败。workflow 还会追加安装包名和
+脚本默认提取当前版本章节；传入 `--since vX.Y.Z` 时使用当前版本章节作为“自上一个公开版本以来的净变化”
+发布摘要。Release workflow 自动读取 GitHub 上一个公开 Release，并使用该模式，因此在两个公开版本之间产生
+多个内部版本时，只发布最终仍有效的功能、变更、删除、修复和安全内容，不会机械拼接已经撤销或替换的中间记录。
+发布负责人必须把净变化整理进当前版本章节。缺失、空正文或 TODO 会让发布失败。workflow 还会追加安装包名和
 SHA256，并使用 `gh release create --notes-file` 发布。
 
 ## Tag 与发布
