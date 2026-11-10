@@ -22,14 +22,51 @@ function extractReleaseNotes(markdown, version) {
   return `${section}\n`;
 }
 
+function extractReleaseNotesSince(markdown, version, sinceVersion) {
+  const current = findVersionHeading(markdown, version);
+  const previous = findVersionHeading(markdown, sinceVersion);
+  const sinceLabel = sinceVersion.replace(/^v/, '');
+  const start = current.index;
+  const end = previous.index;
+  if (start >= end) {
+    throw new Error(`CHANGELOG.md order puts ${version} at or after ${sinceVersion}`);
+  }
+  const section = markdown.slice(start, end).trim();
+  if (!section) throw new Error(`release notes for ${version} since ${sinceVersion} are empty`);
+  if (/\(待写 \/ TODO\)|（待写 \/ TODO）|（这一版改了什么）/.test(section)) {
+    throw new Error(`release notes for ${version} still contain TODO placeholders`);
+  }
+  return `# 自 v${sinceLabel} 以来 / Since v${sinceLabel}\n\n${section}\n`;
+}
+
+function findVersionHeading(markdown, version) {
+  const normalized = version.replace(/^v/, '');
+  const escaped = normalized.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const heading = new RegExp(`^## ${escaped}(?:\\s|$)`, 'm');
+  const match = heading.exec(markdown);
+  if (!match) throw new Error(`CHANGELOG.md has no section for ${normalized}`);
+  return match;
+}
+
 function main() {
   const args = process.argv.slice(2);
-  const outputIndex = args.indexOf('--output');
-  const output = outputIndex >= 0 ? args[outputIndex + 1] : null;
-  const version = args.find((arg, index) =>
-    !arg.startsWith('-') && (outputIndex < 0 || index !== outputIndex + 1)) || readVersion().version;
+  let output = null;
+  let since = null;
+  let version = null;
+  for (let i = 0; i < args.length; i += 1) {
+    if (args[i] === '--output') {
+      output = args[++i];
+    } else if (args[i] === '--since') {
+      since = args[++i];
+    } else if (!args[i].startsWith('-')) {
+      version = args[i];
+    }
+  }
+  version = version || readVersion().version;
   const markdown = fs.readFileSync(path.join(root, 'CHANGELOG.md'), 'utf8');
-  const notes = extractReleaseNotes(markdown, version);
+  const notes = since
+    ? extractReleaseNotesSince(markdown, version, since)
+    : extractReleaseNotes(markdown, version);
   if (output) {
     const target = path.resolve(root, output);
     fs.writeFileSync(target, notes);
@@ -41,4 +78,4 @@ function main() {
 
 if (require.main === module) main();
 
-module.exports = { extractReleaseNotes };
+module.exports = { extractReleaseNotes, extractReleaseNotesSince };

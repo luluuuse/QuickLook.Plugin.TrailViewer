@@ -67,7 +67,16 @@ jobs:
           npm test
 
       - name: Extract release notes
-        run: node scripts/release-notes.cjs --output release-notes.md
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $previous = gh api "repos/${{ github.repository }}/releases/latest" --jq .tag_name 2>$null
+          if ($LASTEXITCODE -eq 0 -and $previous) {
+            node scripts/release-notes.cjs --since $previous --output release-notes.md
+          } else {
+            node scripts/release-notes.cjs --output release-notes.md
+          }
 
       - name: Pack release
         shell: pwsh

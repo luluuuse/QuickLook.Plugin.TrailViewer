@@ -19,6 +19,11 @@ Added / Changed / Deprecated / Removed / Fixed / Security 分类；没有内容�
 
 ## 1.18.5 — 2026-11-10
 
+> 这是 `v1.17.2` 之后的首个公开版本。以下内容累积 `1.18.0` 至 `1.18.5` 的新增、变更、删除、修复和安全更新。
+>
+> This is the first public release after `v1.17.2`. The notes below cumulatively cover additions, changes,
+> removals, fixes and security updates from `1.18.0` through `1.18.5`.
+
 ### 中文
 
 #### 修复

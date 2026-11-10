@@ -28,3 +28,30 @@ test('release note extraction refuses unfinished placeholders', () => {
   const unfinished = '## 2.0.0 — 2026-01-03 · TODO\n\n- （这一版改了什么）\n';
   assert.throws(() => releaseNotes.extractReleaseNotes(unfinished, '2.0.0'), /TODO/);
 });
+
+test('cumulative notes include every public version since the previous release', () => {
+  const cumulative = `# Changelog
+
+## 1.2.0 — 2026-01-02
+
+- Current fix.
+
+## 1.1.1 — 2026-01-01
+
+- Earlier fix.
+
+## 1.1.0 — 2026-01-01
+
+- New feature.
+
+## 1.0.0 — 2025-12-31
+
+- Previous public release.
+`;
+  const notes = releaseNotes.extractReleaseNotesSince(cumulative, '1.2.0', 'v1.0.0');
+  assert.match(notes, /Since v1\.0\.0/);
+  assert.match(notes, /Current fix/);
+  assert.match(notes, /Earlier fix/);
+  assert.match(notes, /New feature/);
+  assert.doesNotMatch(notes, /Previous public release/);
+});
