@@ -60,11 +60,13 @@ node scripts/pack.cjs
 | 数据 | 路径 |
 |---|---|
 | 偏好文件 | `%APPDATA%\pooi.moe\QuickLook\TrailViewer\viewer-settings.txt` |
+| 天地图密钥（DPAPI） | `%APPDATA%\pooi.moe\QuickLook\TrailViewer\secrets\tianditu.bin` |
 | WebView2 profile | `%APPDATA%\pooi.moe\QuickLook\TrailViewer_WebView2` |
 | 日志 | `%LOCALAPPDATA%\TrailViewer\log.txt` |
 | KMZ 临时目录 | `%TEMP%\TrailViewer\<guid>` |
 
 首次运行会尝试从旧 `GpxViewer` 目录迁移设置和 WebView profile。Harness 使用
 `TRAILVIEWER_USER_DATA` 指定独立 profile；旧的 `GPXVIEWER_USER_DATA` 仍作为迁移期回退。
+天地图密钥只通过应用内配置对话框写入 DPAPI，不再支持环境变量或私有内置密钥构建。
 
 架构和测试细节分别见 [ARCHITECTURE.md](ARCHITECTURE.md) 与 [TESTING.md](TESTING.md)。

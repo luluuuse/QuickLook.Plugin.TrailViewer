@@ -40,8 +40,9 @@ async function main() {
 
   const state = async () => page.evaluate(() => ({
     layer: window.trailViewer.layer(),
-    activeLayer: document.querySelector('.layer-switch button.active')?.dataset.layer || '',
-    activePressed: document.querySelector('.layer-switch button.active')?.getAttribute('aria-pressed') || '',
+    layerCategory: window.trailViewer.layerCategory(),
+    activeLayer: document.querySelector('.layer-category-button.active')?.dataset.layer || '',
+    activePressed: document.querySelector('.layer-category-button.active')?.getAttribute('aria-checked') || '',
     pins: document.querySelectorAll('.gpx-pin').length,
     marks: window.trailViewer.pins.count(),
     pinsVisible: window.trailViewer.pins.visible(),
@@ -50,7 +51,7 @@ async function main() {
     hasControl: window.trailViewer.pins.hasControl(),
     photo: window.trailViewer.photos.isOpen(),
     bar: !!document.getElementById('keys'),
-    layerTitle: document.querySelector('.layer-switch button')?.title || '',
+    layerTitle: document.querySelector('.layer-menu-toggle')?.title || '',
     pinsTitle: document.querySelector('.pins-switch button')?.title || '',
     fitTitle: document.querySelector('.locate-switch button')?.title || '',
     exportTitle: document.querySelector('.export-switch button')?.title || '',
@@ -80,7 +81,7 @@ async function main() {
   check('and the export button names X', /\(X\)/.test(s.exportTitle), s.exportTitle);
   check('the summary does not carry them either', s.summaryKeys === 0, `${s.summaryKeys}`);
   check('the summary announces changes politely', s.infoLive === 'polite', s.infoLive);
-  check('the background starts on the map', s.layer === 'map', s.layer);
+  check('the background starts on the road source', s.layer === 'road.osm' && s.layerCategory === 'road', s.layer);
   check('the active background exposes its pressed state', s.activePressed === 'true', s.activePressed);
 
   // Buttons are now reachable with Tab. Space must still belong to QuickLook, while Enter activates the focused
@@ -110,11 +111,19 @@ async function main() {
   check('W brings them back', s.pins === 5 && s.pinsVisible === true && s.pinsActive === true, `${s.pins}`);
 
   // 3. E walks the bar forwards and wraps; Q walks it backwards.
-  const order = [['e', 'terrain'], ['e', 'satellite'], ['e', 'none'], ['e', 'map'], ['q', 'none'], ['q', 'satellite']];
-  for (const [key, want] of order) {
+  const order = [
+    ['e', 'terrain.cyclosm', 'terrain'],
+    ['e', 'satellite.esri', 'satellite'],
+    ['e', 'none', 'none'],
+    ['e', 'road.osm', 'road'],
+    ['q', 'none', 'none'],
+    ['q', 'satellite.esri', 'satellite'],
+  ];
+  for (const [key, want, category] of order) {
     await press(key);
     s = await state();
-    check(`${key} -> ${want}`, s.layer === want && s.activeLayer === want, `${s.layer}/${s.activeLayer}`);
+    check(`${key} -> ${want}`, s.layer === want && s.layerCategory === category && s.activeLayer === category,
+      `${s.layer}/${s.layerCategory}/${s.activeLayer}`);
   }
 
   // 4. A photo covers the map: the three keys stand down until it is closed.
@@ -199,7 +208,7 @@ async function main() {
   check('W on such a file does not throw', pageErrors.length === 0, pageErrors.join('; '));
   check('and changes nothing', (await state()).hasControl === false);
   // Q and E still work there: the background does not depend on the file's contents.
-  const layerOrder = ['map', 'terrain', 'satellite', 'none'];
+  const layerOrder = ['road.osm', 'terrain.cyclosm', 'satellite.esri', 'none'];
   const next = layerOrder[(layerOrder.indexOf(s.layer) + 1) % layerOrder.length];
   await press('e');
   s = await state();
@@ -285,9 +294,11 @@ async function main() {
   // 11. The background chosen by a key is remembered, the same way a click is.
   await open('kml-photos.kml');
   await press('e');
+  const chosenLayer = (await state()).layer;
   await open('kml-photos.kml');
   s = await state();
-  check('a background chosen with E survives a reload', s.layer === 'terrain' && s.activeLayer === 'terrain', s.layer);
+  check('a background chosen with E survives a reload',
+    s.layer === chosenLayer && s.layerCategory === s.activeLayer, `${chosenLayer} -> ${s.layer}/${s.activeLayer}`);
 
   if (shot) {
     await open('kml-photos.kml');

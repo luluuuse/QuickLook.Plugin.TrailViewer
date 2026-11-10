@@ -1,10 +1,10 @@
 const https = require('https');
 
-function probeLive() {
+function probeLive(host, path) {
   return new Promise((resolve) => {
     const request = https.get({
-      host: 'a.tile-cyclosm.openstreetmap.fr',
-      path: '/cyclosm/13/6784/3376.png',
+      host,
+      path,
       headers: { 'User-Agent': 'QuickLook.Plugin.TrailViewer smoke-test' },
       timeout: 20000,
     }, (response) => {
@@ -21,10 +21,19 @@ function probeLive() {
 }
 
 async function main() {
-  const result = await probeLive();
-  const ok = result.status === 200 && result.bytes > 5000;
-  console.log(`${ok ? 'PASS' : 'FAIL'}  live CyclOSM tile  ${result.status} / ${result.bytes} bytes`);
-  process.exitCode = ok ? 0 : 1;
+  const sources = [
+    ['CyclOSM', 'a.tile-cyclosm.openstreetmap.fr', '/cyclosm/13/6784/3376.png'],
+    ['OpenHikingMap', 'tile.openmaps.fr', '/openhikingmap/5/16/10.png'],
+    ['OpenTopoMap', 'a.tile.opentopomap.org', '/5/16/10.png'],
+  ];
+  let failed = false;
+  for (const [name, host, path] of sources) {
+    const result = await probeLive(host, path);
+    const ok = result.status === 200 && result.bytes > 5000;
+    console.log(`${ok ? 'PASS' : 'FAIL'}  live ${name} tile  ${result.status} / ${result.bytes} bytes`);
+    failed ||= !ok;
+  }
+  process.exitCode = failed ? 1 : 0;
 }
 
 main().catch((error) => {

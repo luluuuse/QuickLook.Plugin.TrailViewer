@@ -11,9 +11,19 @@
 
 ### 地图与标记点
 
+- 顶部“图层”入口显示当前底图类型；面板中分为 **路网**、**地形**、**卫星** 和 **无底图** 四类，
+  下方再选择该类型的图源。<kbd>Q</kbd> / <kbd>E</kbd> 可直接循环切换类型。
+- 路网使用 OpenStreetMap HOT。地形菜单提供 CyclOSM、OpenHikingMap 和 OpenTopoMap；再次进入某一类别时
+  会恢复该类别上次选择的图源。
+- 路网和卫星菜单提供天地图。首次选择时按提示配置天地图开发者密钥；密钥由当前 Windows 用户凭据加密，
+  后续打开无需再次输入。
+- 天地图密钥管理位于图层面板右上角齿轮打开的 **地图设置** 页；已配置时提供 **更换密钥** 和
+  **移除密钥**，主图层列表只显示地图类型和图源。
 - <kbd>←</kbd> <kbd>→</kbd> 或 <kbd>A</kbd> <kbd>D</kbd> 按累计里程顺序切换标记点。
 - 绿色起点、红色终点与重合的黄色图钉共享同一导航节点。
 - 图钉靠近窗口边缘、信息卡、工具栏或剖面时，地图会平滑回中。
+- 顶部地图工具保持统一高度；标记点与列表组成一个工具组。极窄窗口中的图层入口显示图标、当前类型短标签
+  和下拉箭头，完整名称仍可通过悬停提示和无障碍标签读取。
 - `列表` 打开标记点速览；支持语义筛选、合并近点和人工纠正。
 - 点击或键盘 `Enter` 可放大 GPS 异常和数据缺口标签。
 
@@ -46,6 +56,13 @@ access; **No map** renders the route on a local grid.
 
 ### Map and waypoints
 
+- Basemaps are grouped into **Road**, **Terrain**, **Satellite** and **No map**; <kbd>Q</kbd> / <kbd>E</kbd>
+  switches category.
+- Road uses OpenStreetMap HOT. The Terrain menu offers CyclOSM, OpenHikingMap and OpenTopoMap, and remembers
+  the source last selected in that category.
+- The Road and Satellite menus offer Tianditu. Enter a user-owned developer key when first prompted; it is
+  encrypted for the current Windows user and does not need to be entered for later previews.
+- With a key configured, the bottom of the Road or Satellite source menu offers **Change key** and **Remove key**.
 - <kbd>←</kbd> <kbd>→</kbd> or <kbd>A</kbd> <kbd>D</kbd> navigate by cumulative route distance.
 - Green starts and red ends share one navigation node with coincident yellow pins.
 - The map recentres when the selected pin approaches an edge, the summary, toolbars or the profile.

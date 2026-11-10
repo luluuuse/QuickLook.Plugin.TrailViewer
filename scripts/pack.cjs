@@ -1,20 +1,10 @@
-// Packs bin\Release into QuickLook.Plugin.TrailViewer-<version>.qlplugin, the zip QuickLook installs on Space.
-// The version in the name comes from Directory.Build.props, so downloads never collide in a folder.
-//
-//   node scripts/pack.cjs
-//
-// Written by hand rather than with Compress-Archive: Windows PowerShell 5.1 writes backslashes into entry
-// names, and the .qlplugin is a plain zip whose entry names have to use forward slashes.
+// Build the QLP plugin package without external packaging dependencies.
+const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
 const { readVersion } = require('./version.cjs');
 
-const root = path.resolve(__dirname, '..');
-const release = path.join(root, 'bin', 'Release');
-
-const version = readVersion().version;
-const out = path.join(root, `QuickLook.Plugin.TrailViewer-${version}.qlplugin`);
 const skip = new Set(['.pdb', '.xml']);
 
 function walk(dir, prefix = '') {
@@ -43,7 +33,6 @@ function relativeFiles(dir, prefix = '') {
   return names;
 }
 
-// CRC-32, the checksum a zip entry needs; Node has no built-in.
 const CRC_TABLE = (() => {
   const table = new Int32Array(256);
   for (let i = 0; i < 256; i += 1) {
@@ -60,14 +49,13 @@ function crc32(buffer) {
   return (crc ^ -1) >>> 0;
 }
 
-const DOS_TIME = ((12 << 11) | (0 << 5) | 0) & 0xffff; // fixed timestamp: the archive only needs to be valid
+const DOS_TIME = ((12 << 11) | (0 << 5) | 0) & 0xffff;
 const DOS_DATE = (((2024 - 1980) << 9) | (1 << 5) | 1) & 0xffff;
 
-function build(entries) {
+function buildZip(entries) {
   const locals = [];
   const centrals = [];
   let offset = 0;
-
   for (const entry of entries) {
     const name = Buffer.from(entry.name, 'utf8');
     const raw = entry.data;
@@ -76,9 +64,9 @@ function build(entries) {
 
     const local = Buffer.alloc(30);
     local.writeUInt32LE(0x04034b50, 0);
-    local.writeUInt16LE(20, 4); // version needed to extract
-    local.writeUInt16LE(0x0800, 6); // UTF-8 names
-    local.writeUInt16LE(8, 8); // deflate
+    local.writeUInt16LE(20, 4);
+    local.writeUInt16LE(0x0800, 6);
+    local.writeUInt16LE(8, 8);
     local.writeUInt16LE(DOS_TIME, 10);
     local.writeUInt16LE(DOS_DATE, 12);
     local.writeUInt32LE(crc, 14);
@@ -90,8 +78,8 @@ function build(entries) {
 
     const central = Buffer.alloc(46);
     central.writeUInt32LE(0x02014b50, 0);
-    central.writeUInt16LE(20, 4); // version made by
-    central.writeUInt16LE(20, 6); // version needed
+    central.writeUInt16LE(20, 4);
+    central.writeUInt16LE(20, 6);
     central.writeUInt16LE(0x0800, 8);
     central.writeUInt16LE(8, 10);
     central.writeUInt16LE(DOS_TIME, 12);
@@ -100,14 +88,13 @@ function build(entries) {
     central.writeUInt32LE(packed.length, 20);
     central.writeUInt32LE(raw.length, 24);
     central.writeUInt16LE(name.length, 28);
-    central.writeUInt16LE(0, 30); // extra
-    central.writeUInt16LE(0, 32); // comment
-    central.writeUInt16LE(0, 34); // disk
-    central.writeUInt16LE(0, 36); // internal attributes
-    central.writeUInt32LE(0, 38); // external attributes
+    central.writeUInt16LE(0, 30);
+    central.writeUInt16LE(0, 32);
+    central.writeUInt16LE(0, 34);
+    central.writeUInt16LE(0, 36);
+    central.writeUInt32LE(0, 38);
     central.writeUInt32LE(offset, 42);
     centrals.push(central, name);
-
     offset += local.length + name.length + packed.length;
   }
 
@@ -124,51 +111,49 @@ function build(entries) {
   return Buffer.concat([...locals, directory, end]);
 }
 
-if (!fs.existsSync(release)) {
-  console.error(`no build output at ${release}; run dotnet build -c Release first`);
-  process.exit(1);
+function packRelease(root, release, out, version) {
+  if (!fs.existsSync(release)) throw new Error(`no build output at ${release}; build the Release first`);
+  const entries = walk(release);
+  if (entries.length === 0) throw new Error(`${release} is empty`);
+
+  const builtViewer = entries.filter((entry) => entry.name.startsWith('viewer/')).map((entry) => entry.name)
+    .sort();
+  const sourceViewer = relativeFiles(path.join(root, 'viewer')).map((name) => `viewer/${name}`).sort();
+  if (JSON.stringify(builtViewer) !== JSON.stringify(sourceViewer)) {
+    const extra = builtViewer.filter((name) => !sourceViewer.includes(name));
+    const missing = sourceViewer.filter((name) => !builtViewer.includes(name));
+    throw new Error(`release viewer differs from source (extra: ${extra.join(', ') || 'none'};`
+      + ` missing: ${missing.join(', ') || 'none'})`);
+  }
+
+  const builtConfig = path.join(release, 'QuickLook.Plugin.Metadata.config');
+  if (!fs.existsSync(builtConfig)) throw new Error('release metadata is missing; rebuild before packing');
+  const built = fs.readFileSync(builtConfig, 'utf8').match(/<Version>\s*([^<\s]+)\s*<\/Version>/);
+  if (!built) throw new Error('release metadata has no Version');
+  if (built[1] !== version) {
+    throw new Error(`build output is ${built[1]} but Directory.Build.props says ${version}`);
+  }
+
+  entries.unshift({ name: 'LICENSE', data: fs.readFileSync(path.join(root, 'LICENSE')) });
+  const zip = buildZip(entries);
+  fs.writeFileSync(out, zip);
+  return {
+    entries: entries.length,
+    inBytes: entries.reduce((sum, entry) => sum + entry.data.length, 0),
+    outBytes: zip.length,
+    sha256: crypto.createHash('sha256').update(zip).digest('hex').toUpperCase(),
+  };
 }
 
-const entries = walk(release);
-if (entries.length === 0) {
-  console.error(`${release} is empty`);
-  process.exit(1);
-}
+const root = path.resolve(__dirname, '..');
+const version = readVersion().version;
+const out = path.join(root, `QuickLook.Plugin.TrailViewer-${version}.qlplugin`);
 
-// CopyToOutputDirectory=PreserveNewest updates files but never removes ones deleted from viewer/. Packing
-// the whole output folder would therefore publish stale JavaScript after a refactor. Compare the viewer tree
-// to the source before accepting the build.
-const builtViewer = entries.filter((entry) => entry.name.startsWith('viewer/')).map((entry) => entry.name)
-  .sort();
-const sourceViewer = relativeFiles(path.join(root, 'viewer')).map((name) => `viewer/${name}`).sort();
-if (JSON.stringify(builtViewer) !== JSON.stringify(sourceViewer)) {
-  console.error('bin/Release/viewer does not match viewer/; clean and rebuild before packing');
-  const extra = builtViewer.filter((name) => !sourceViewer.includes(name));
-  const missing = sourceViewer.filter((name) => !builtViewer.includes(name));
-  if (extra.length) console.error(`extra: ${extra.join(', ')}`);
-  if (missing.length) console.error(`missing: ${missing.join(', ')}`);
+try {
+  const result = packRelease(root, path.join(root, 'bin', 'Release'), out, version);
+  console.log(`${path.basename(out)}: ${result.entries} files, `
+    + `${(result.inBytes / 1024).toFixed(0)} KB -> ${(result.outBytes / 1024).toFixed(0)} KB`);
+} catch (error) {
+  console.error(error.message);
   process.exit(1);
 }
-
-// A file name carrying one version over a binary carrying another is worse than no version at all: it
-// survives review, gets published, and misleads everyone who downloads it. Catch a stale build here.
-const builtConfig = path.join(release, 'QuickLook.Plugin.Metadata.config');
-if (!fs.existsSync(builtConfig)) {
-  console.error(`${builtConfig} is missing; rebuild before packing`);
-  process.exit(1);
-}
-const built = fs.readFileSync(builtConfig, 'utf8').match(/<Version>\s*([^<\s]+)\s*<\/Version>/);
-if (!built) {
-  console.error(`${builtConfig} has no <Version>`);
-  process.exit(1);
-}
-if (built[1] !== version) {
-  console.error(`build output is ${built[1]} but Directory.Build.props says ${version}; rebuild before packing`);
-  process.exit(1);
-}
-// The upstream MIT notice has to travel with the binary: this is a fork of McBenac's plugin.
-entries.unshift({ name: 'LICENSE', data: fs.readFileSync(path.join(root, 'LICENSE')) });
-const zip = build(entries);
-fs.writeFileSync(out, zip);
-const inBytes = entries.reduce((n, e) => n + e.data.length, 0);
-console.log(`${path.basename(out)}: ${entries.length} files, ${(inBytes / 1024).toFixed(0)} KB -> ${(zip.length / 1024).toFixed(0)} KB`);

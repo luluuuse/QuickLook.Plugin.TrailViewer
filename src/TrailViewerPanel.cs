@@ -148,7 +148,7 @@ internal sealed class TrailViewerPanel : UserControl, IDisposable
         }
     }
 
-    private void OnInitialized(object sender, CoreWebView2InitializationCompletedEventArgs e)
+    private async void OnInitialized(object sender, CoreWebView2InitializationCompletedEventArgs e)
     {
         Trace($"WebView2 initialized: success={e.IsSuccess} {e.InitializationException?.Message}");
         if (_webView == null)
@@ -168,6 +168,9 @@ internal sealed class TrailViewerPanel : UserControl, IDisposable
             core.Settings.AreBrowserAcceleratorKeysEnabled = false;
             core.Settings.IsStatusBarEnabled = false;
             core.Settings.IsZoomControlEnabled = false;
+            // Tile services such as OpenMaps require a user agent that identifies the application.
+            core.Settings.UserAgent += " TrailViewer/"
+                + (typeof(TrailViewerPanel).Assembly.GetName().Version?.ToString(3) ?? "unknown");
             core.NewWindowRequested += OnNewWindowRequested;
             core.NavigationStarting += (_, args) =>
             {
@@ -179,6 +182,7 @@ internal sealed class TrailViewerPanel : UserControl, IDisposable
                 OpenInBrowser(args.Uri);
             };
             core.WebMessageReceived += OnWebMessage;
+            core.WebResourceResponseReceived += OnTiandituResponseReceived;
 
             // Allow = served as if with "Access-Control-Allow-Origin: *", so the page (another origin) can fetch
             // the file. The page treats everything in the file as text and has a Content-Security-Policy.
@@ -186,14 +190,13 @@ internal sealed class TrailViewerPanel : UserControl, IDisposable
             core.SetVirtualHostNameToFolderMapping(FileHost, Path.GetDirectoryName(_path),
                 CoreWebView2HostResourceAccessKind.Allow);
 
-            // Every remote response, for the harness: the terrain tiles fail silently in the page, so a hint
-            // about which status came back is the only way to tell a slow map from a refused one.
-            core.WebResourceResponseReceived += (_, args) =>
+            var tiandituKey = TiandituKeyStore.Load();
+            if (!string.IsNullOrEmpty(tiandituKey))
             {
-                if (args.Request.Uri.Contains("tiles.windy.com"))
-                    Trace($"tile response {args.Response.StatusCode}");
-            };
-
+                await core.AddScriptToExecuteOnDocumentCreatedAsync(
+                    "window.__TRAILVIEWER_RUNTIME_CONFIG__ = Object.freeze({"
+                    + $"tiandituKey: '{tiandituKey}', direct: true }});");
+            }
             _webView.Source = new Uri(BuildViewerUrl(_path, _name));
             Trace("navigating to " + _webView.Source);
         }
@@ -380,11 +383,196 @@ internal sealed class TrailViewerPanel : UserControl, IDisposable
             Finish(message.Substring("error:".Length), "");
         else if (message.StartsWith("settings\t", StringComparison.Ordinal))
             ViewerPreferences.SaveFromQuery(message.Substring("settings\t".Length));
+        else if (message.StartsWith("tianditu-key\tconfigure", StringComparison.Ordinal))
+        {
+            ConfigureTiandituKey(IsEnglishMessage(message));
+        }
+        else if (message.StartsWith("tianditu-key\tremove", StringComparison.Ordinal))
+        {
+            RemoveTiandituKey(IsEnglishMessage(message));
+        }
+    }
+
+    private static bool IsEnglishMessage(string message) =>
+        message.EndsWith("\ten", StringComparison.Ordinal);
+
+    /// <summary>
+    /// Image loads do not expose an HTTP status to the page. Observe Tianditu responses out of band so only an
+    /// explicit authentication failure can invalidate the in-page key; transient failures remain retryable.
+    /// </summary>
+    private void OnTiandituResponseReceived(
+        object sender, CoreWebView2WebResourceResponseReceivedEventArgs args)
+    {
+        if (!IsTiandituTileUri(args.Request.Uri)) return;
+        var status = (int)args.Response.StatusCode;
+        if (status < 400) return;
+        var core = _webView?.CoreWebView2;
+        if (core != null) _ = PostTiandituResponseAsync(core, status);
+    }
+
+    internal static bool IsTiandituTileUri(string value) =>
+        Uri.TryCreate(value, UriKind.Absolute, out var uri)
+        && uri.Scheme == Uri.UriSchemeHttps
+        && (uri.Host.Equals("tianditu.gov.cn", StringComparison.OrdinalIgnoreCase)
+            || uri.Host.EndsWith(".tianditu.gov.cn", StringComparison.OrdinalIgnoreCase));
+
+    private async System.Threading.Tasks.Task PostTiandituResponseAsync(CoreWebView2 core, int status)
+    {
+        try
+        {
+            await Dispatcher.InvokeAsync(() =>
+                core.PostWebMessageAsString($"tianditu-response\t{status}"));
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or ObjectDisposedException
+            or System.Runtime.InteropServices.COMException)
+        {
+            // The preview closed while the response was in flight.
+        }
+    }
+
+    private void ConfigureTiandituKey(bool english)
+    {
+        var owner = Window.GetWindow(this);
+        var dialog = new Window
+        {
+            Owner = owner,
+            Title = english ? "TrailViewer · Tianditu key" : "TrailViewer · 天地图密钥",
+            Width = 430,
+            SizeToContent = SizeToContent.Height,
+            ResizeMode = ResizeMode.NoResize,
+            WindowStartupLocation = owner == null
+                ? WindowStartupLocation.CenterScreen
+                : WindowStartupLocation.CenterOwner,
+            ShowInTaskbar = false,
+        };
+
+        var panel = new StackPanel { Margin = new Thickness(18) };
+        panel.Children.Add(new TextBlock
+        {
+            Text = english
+                ? "Enter your Tianditu developer key (32 hexadecimal characters)."
+                : "输入天地图开发者密钥（32 位十六进制）。",
+            FontWeight = FontWeights.SemiBold,
+            Margin = new Thickness(0, 0, 0, 8),
+        });
+        panel.Children.Add(new TextBlock
+        {
+            Text = english
+                ? "The key is encrypted for the current Windows user. TrailViewer decrypts it only for this "
+                    + "preview and the WebView requests Tianditu directly. It is not written to page URLs, "
+                    + "browser storage, logs or release packages."
+                : "密钥会使用当前 Windows 用户凭据加密。TrailViewer 只在本次预览中解密，由 WebView 直接请求"
+                    + "天地图；它不会写入页面地址、浏览器存储、日志或安装包。",
+            TextWrapping = TextWrapping.Wrap,
+            Margin = new Thickness(0, 0, 0, 12),
+        });
+
+        var status = new TextBlock
+        {
+            Text = TiandituKeyStore.HasKey()
+                ? (english ? "A key is already configured. Enter a new value to replace it." : "当前已配置密钥。输入新值可替换。")
+                : "",
+            Foreground = Brushes.DimGray,
+            TextWrapping = TextWrapping.Wrap,
+            Margin = new Thickness(0, 0, 0, 8),
+        };
+        var input = new PasswordBox { MaxLength = 64, Padding = new Thickness(6) };
+        input.PasswordChanged += (_, _) =>
+        {
+            status.Text = TiandituKeyStore.IsValid(input.Password)
+                ? (english ? "The key format is valid." : "密钥格式有效，保存后即可使用天地图。")
+                : (english
+                    ? "Invalid key format: enter 32 hexadecimal characters."
+                    : "密钥格式无效：需要 32 位十六进制字符。");
+            status.Foreground = TiandituKeyStore.IsValid(input.Password) ? Brushes.DarkGreen : Brushes.DarkRed;
+        };
+        panel.Children.Add(input);
+        panel.Children.Add(status);
+
+        var buttons = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Margin = new Thickness(0, 14, 0, 0),
+        };
+        var cancel = new Button { Content = english ? "Cancel" : "取消", Padding = new Thickness(14, 5, 14, 5) };
+        cancel.Click += (_, _) => dialog.DialogResult = false;
+        var save = new Button
+        {
+            Content = english ? "Save" : "保存",
+            Padding = new Thickness(14, 5, 14, 5),
+            Margin = new Thickness(8, 0, 0, 0),
+            IsDefault = true,
+        };
+        var saved = false;
+        save.Click += (_, _) =>
+        {
+            if (!TiandituKeyStore.IsValid(input.Password))
+            {
+                status.Text = english
+                    ? "Enter a valid 32-character hexadecimal key."
+                    : "请输入有效的 32 位十六进制密钥。";
+                status.Foreground = Brushes.DarkRed;
+                return;
+            }
+            if (!TiandituKeyStore.Save(input.Password))
+            {
+                status.Text = english
+                    ? "Could not save the key. Check the current user's data-directory permissions."
+                    : "无法保存密钥，请检查当前用户的数据目录权限。";
+                status.Foreground = Brushes.DarkRed;
+                return;
+            }
+            input.Clear();
+            saved = true;
+            dialog.DialogResult = true;
+        };
+        buttons.Children.Add(cancel);
+        buttons.Children.Add(save);
+        panel.Children.Add(buttons);
+
+        dialog.Content = panel;
+        dialog.Loaded += (_, _) => input.Focus();
+        dialog.ShowDialog();
+        if (saved) NotifyTiandituKeyState();
+    }
+
+    private void RemoveTiandituKey(bool english)
+    {
+        var owner = Window.GetWindow(this);
+        var answer = MessageBox.Show(owner,
+            english
+                ? "Remove the Tianditu key saved for the current Windows user?"
+                : "移除当前 Windows 用户保存的天地图密钥？",
+            "TrailViewer",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Question);
+        if (answer != MessageBoxResult.Yes) return;
+        TiandituKeyStore.Delete();
+        NotifyTiandituKeyState();
+    }
+
+    private async void NotifyTiandituKeyState()
+    {
+        try
+        {
+            var core = _webView?.CoreWebView2;
+            if (core == null) return;
+            var key = TiandituKeyStore.Load() ?? string.Empty;
+            await core.ExecuteScriptAsync(
+                "window.trailViewer && window.trailViewer.setTiandituKey("
+                + $"'{key}')");
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or ObjectDisposedException)
+        {
+            // The preview closed while the user was editing the key.
+        }
     }
 
     /// <summary>The trace is read by a person watching the harness: a chunk of base64 is not worth a line.</summary>
     private static string Summarise(string message) =>
-        message.StartsWith("exportchunk\t", StringComparison.Ordinal) ? "exportchunk ..." : message;
+        message.StartsWith("exportchunk\t", StringComparison.Ordinal)
+            ? "exportchunk ..." : message;
 
     // The overlay arrives as base64 in pieces, because a large PNG is close to the size where one
     // postMessage starts to be unreliable. The id, sequence and count make a lost or duplicated piece visible

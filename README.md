@@ -38,6 +38,8 @@ Common controls:
   covered by the summary, toolbars, waypoint list or profile.
 - **Responsive UI:** measured `inline`, `wrapped` and `docked` layouts for narrow windows, bilingual UI and
   persistent map/marker/export preferences.
+- **Map sources:** Road keeps the OpenStreetMap HOT base, while Terrain offers CyclOSM, OpenHikingMap and
+  OpenTopoMap in a compact source menu. Tianditu road and satellite imagery are available with a user-owned key.
 - **Overlay export:** square, portrait and landscape PNG layouts with selectable ink and backing.
 
 Detailed behaviour, advanced controls and export examples are in [docs/USAGE.md](docs/USAGE.md).

@@ -4,6 +4,9 @@
   --text: #e6e6e6;
   --muted: #9a9a9a;
   --accent: #2f9bff;
+  --toolbar-height: 32px;
+  --toolbar-radius: 5px;
+  --toolbar-gap: 8px;
   font: 13px/1.4 "Segoe UI", system-ui, sans-serif;
   color-scheme: dark;
 }
@@ -229,9 +232,30 @@ body.layout-docked #info[data-details="full"] {
 /* Very narrow windows keep the two compact switches recognisable without repeating their labels. Their tooltip
    and aria-label carry the meaning, while the layer choice stays legible as short text. */
 @media (max-width: 419px) {
+  .layer-menu-toggle .layer-menu-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .layer-menu-toggle::before {
+    content: attr(data-short);
+    font-size: 13px;
+  }
+
   .pins-switch button,
   .waypoint-overview-switch button {
-    padding-inline: 8px;
+    width: 32px;
+    padding: 0;
+    justify-content: center;
+  }
+
+  .lang-switch button {
+    width: 34px;
+    padding: 0;
   }
 
   .pins-switch button > span:not(.dot),
@@ -745,8 +769,18 @@ body.failed #map {
   color: #666;
 }
 
-.layer-switch {
+.layer-switch,
+.pins-switch,
+.waypoint-overview-switch,
+.lang-switch {
   display: flex;
+  box-sizing: border-box;
+  height: var(--toolbar-height);
+  border-radius: var(--toolbar-radius);
+}
+
+.layer-switch {
+  position: relative;
 }
 
 /* Two square buttons under the zoom buttons, in the same column: the way home, then the picture. Both act on
@@ -775,21 +809,293 @@ body.failed #map {
   cursor: pointer;
 }
 
-.layer-switch button {
+.layer-menu-toggle,
+.pins-switch button,
+.waypoint-overview-switch button,
+.lang-switch button {
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+  height: 100%;
+  padding: 0 10px;
+  line-height: 1;
+}
+
+.layer-menu-toggle {
+  gap: 5px;
   border: 0;
-  border-right: 1px solid #444;
-  padding: 5px 10px;
   font: inherit;
   cursor: pointer;
 }
 
-.layer-switch button:last-child {
-  border-right: 0;
+.layer-menu-toggle::after {
+  content: '▾';
+  font-size: 9px;
+  opacity: 0.75;
 }
 
-.layer-switch button.active {
+.layer-menu-toggle svg {
+  flex: none;
+}
+
+.layer-category-button.active {
   background: var(--accent);
   color: #fff;
+}
+
+.layer-source-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 1000;
+  display: flex;
+  width: min(280px, calc(100vw - 20px));
+  flex-direction: column;
+  padding: 10px;
+  border: 1px solid #444;
+  border-radius: 5px;
+  background: #252525;
+  box-shadow: 0 5px 18px rgba(0, 0, 0, 0.45);
+}
+
+.layer-source-menu[hidden] {
+  display: none;
+}
+
+.layer-menu-header {
+  display: flex;
+  min-height: 30px;
+  align-items: center;
+  gap: 6px;
+  padding: 0 1px 7px 3px;
+  border-bottom: 1px solid #3c3c3c;
+}
+
+.layer-source-heading {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  color: var(--text);
+  font-size: 13px;
+}
+
+.layer-menu-header-actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 3px;
+}
+
+.layer-menu-icon-button {
+  display: grid;
+  width: 27px;
+  height: 27px;
+  padding: 0;
+  place-items: center;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 19px;
+  line-height: 1;
+}
+
+.layer-menu-icon-button:hover {
+  background: #383838;
+  color: #fff;
+}
+
+.layer-menu-icon-button[hidden] {
+  display: none;
+}
+
+.layer-menu-back {
+  font-size: 23px;
+}
+
+.layer-main-view[hidden],
+.layer-settings-view[hidden] {
+  display: none;
+}
+
+.layer-menu-section {
+  padding-top: 8px;
+  border-top: 1px solid #3c3c3c;
+}
+
+.layer-menu-section:first-child {
+  border-top: 0;
+}
+
+.layer-section-label {
+  display: block;
+  padding: 0 3px 6px;
+  color: #aaa;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+}
+
+.layer-category-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.layer-provider-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.layer-switch .layer-source-menu button {
+  position: relative;
+  width: 100%;
+  padding: 7px 8px 7px 25px;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+}
+
+.layer-switch .layer-source-menu .layer-category-button {
+  height: 30px;
+  padding: 0 4px;
+  text-align: center;
+}
+
+.layer-switch .layer-source-menu .layer-category-button.active {
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
+}
+
+.layer-switch .layer-source-menu button::before {
+  position: absolute;
+  top: 7px;
+  left: 9px;
+  content: '';
+}
+
+.layer-switch .layer-source-menu button:hover {
+  background: #383838;
+}
+
+.layer-switch .layer-source-menu .layer-menu-icon-button {
+  position: static;
+  width: 27px;
+  height: 27px;
+  padding: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--muted);
+  text-align: center;
+}
+
+.layer-switch .layer-source-menu .layer-menu-icon-button::before {
+  content: none;
+}
+
+.layer-switch .layer-source-menu button.selected {
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
+}
+
+.layer-switch .layer-source-menu button.selected::before {
+  content: '✓';
+}
+
+.layer-switch .layer-source-menu button.locked:not(.selected) {
+  color: #999;
+}
+
+.layer-source-empty {
+  margin: 2px 3px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.layer-settings-view {
+  display: flex;
+  padding-top: 9px;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.layer-setting-status,
+.layer-setting-note {
+  margin: 0;
+  line-height: 1.4;
+}
+
+.layer-setting-status {
+  color: var(--text);
+  font-size: 12px;
+}
+
+.layer-setting-status::before {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 7px;
+  border-radius: 50%;
+  background: #888;
+  content: '';
+}
+
+.layer-setting-status[data-configured="true"]::before {
+  background: #59c67a;
+}
+
+.layer-setting-note {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.layer-settings-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 3px;
+}
+
+.layer-settings-view .layer-key-action {
+  width: 100%;
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid #454545;
+  border-radius: 4px;
+  background: #303030;
+  color: #d7eaff;
+  text-align: left;
+}
+
+.layer-settings-view .layer-key-action:hover {
+  border-color: #666;
+  background: #383838;
+}
+
+.layer-settings-view .layer-key-action.danger {
+  border-color: rgba(227, 138, 138, 0.35);
+  background: transparent;
+  color: #e39a9a;
+}
+
+@media (max-width: 700px) {
+  .layer-source-menu {
+    position: fixed;
+    top: auto;
+    right: 10px;
+    bottom: calc(var(--profile-height, 0px) + 22px);
+    left: 10px;
+    width: auto;
+    max-height: min(50vh, calc(100vh - var(--profile-height, 0px) - 42px));
+    overflow: auto;
+  }
 }
 
 /* The top-right corner keeps its controls together, but wraps them instead of running off a narrow map once a
@@ -798,23 +1104,36 @@ body.failed #map {
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;
-  align-items: flex-start;
+  align-items: center;
+  row-gap: var(--toolbar-gap);
+  padding: 10px 10px 0 0;
+  box-sizing: border-box;
   max-width: calc(100% - 20px);
+}
+
+#map .leaflet-top.leaflet-right > .leaflet-control {
+  margin: 0 0 0 var(--toolbar-gap);
+}
+
+#map .leaflet-top.leaflet-right > .leaflet-control:first-child,
+#map .leaflet-top.leaflet-right > .leaflet-control.waypoint-overview-switch {
+  margin-left: 0;
 }
 
 /* Show/hide the waypoint pins. The dot says whether they are on: hollow when hidden, filled when shown,
    so the word itself never has to change and the button never changes width. */
 .pins-switch {
-  display: flex;
+  border-radius: var(--toolbar-radius);
 }
 
 .pins-switch button {
-  display: flex;
-  align-items: center;
   border: 0;
-  padding: 5px 10px;
   font: inherit;
   cursor: pointer;
+}
+
+.pins-switch.joined-left {
+  border-radius: var(--toolbar-radius) 0 0 var(--toolbar-radius);
 }
 
 .pins-switch .dot {
@@ -827,12 +1146,13 @@ body.failed #map {
 }
 
 .pins-switch button.active {
-  background: var(--accent);
+  background: #383838;
   color: #fff;
 }
 
 .pins-switch button.active .dot {
-  background: currentColor;
+  border-color: var(--accent);
+  background: var(--accent);
 }
 
 .pins-switch button:not(.active) {
@@ -850,14 +1170,21 @@ body.failed #map {
 /* A waypoint list lets the whole route be scanned before opening any one pin. It occupies the right side on a
    desktop preview and the strip above the profile on a narrow window. */
 .waypoint-overview-switch button {
-  display: flex;
-  align-items: center;
   gap: 6px;
-  height: 29px;
-  padding: 0 9px;
   border: 0;
   font: inherit;
   cursor: pointer;
+}
+
+.waypoint-overview-switch.joined-right {
+  border-left: 1px solid #444;
+  border-radius: 0 var(--toolbar-radius) var(--toolbar-radius) 0;
+}
+
+.waypoint-overview-switch button[aria-expanded="true"] {
+  background: #234f79;
+  color: #fff;
+  box-shadow: inset 0 -2px var(--accent);
 }
 
 .waypoint-overview-switch svg {
@@ -1342,12 +1669,11 @@ body.failed #map {
 
 /* One button, one job: it shows the language the page is in and flips to the other one. */
 .lang-switch {
-  display: flex;
+  border-radius: var(--toolbar-radius);
 }
 
 .lang-switch button {
   border: 0;
-  padding: 5px 10px;
   min-width: 34px;
   font: inherit;
   cursor: pointer;

@@ -4,9 +4,10 @@ import { createKeyboardController } from '../../viewer/keyboard-controller.js';
 
 function makeController(overrides = {}) {
   const calls = [];
-  let selectedLayer = 'map';
+  let selectedLayer = 'road.osm';
+  let selectedCategory = 'road';
   const controller = createKeyboardController({
-    LAYERS: { map: {}, terrain: {}, satellite: {}, none: {} },
+    LAYERS: { road: {}, terrain: {}, satellite: {}, none: {} },
     photoViewer: { isOpen: () => overrides.photoOpen ?? false },
     waypointController: {
       hasControl: () => true,
@@ -20,8 +21,10 @@ function makeController(overrides = {}) {
     }),
     layerSwitch: () => ({
       current: () => selectedLayer,
+      currentCategory: () => selectedCategory,
       select: (layer) => {
         selectedLayer = layer;
+        selectedCategory = layer;
         calls.push(`layer:${layer}`);
       },
     }),
@@ -61,7 +64,7 @@ test('viewer shortcuts route to their owning controllers', () => {
   assert.deepEqual(calls, [
     'pins',
     'layer:none',
-    'layer:map',
+    'layer:road',
     'chrome',
     'fit',
     'close-panel',
@@ -125,7 +128,7 @@ test('direct host keys follow the same guarded routing', () => {
   assert.deepEqual(calls, [
     'pins',
     'layer:none',
-    'layer:map',
+    'layer:road',
     'chrome',
     'fit',
     'close-panel',

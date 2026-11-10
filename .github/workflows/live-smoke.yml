@@ -17,5 +17,5 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Check the live CyclOSM tile endpoint
+      - name: Check the live terrain tile endpoints
         run: node tests/smoke/terrain-live.cjs

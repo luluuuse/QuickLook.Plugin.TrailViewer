@@ -31,6 +31,7 @@ const measure = (page) => page.evaluate(() => {
   add('zoom', '.leaflet-control-zoom');
   add('layers', '.layer-switch');
   add('pins', '.pins-switch');
+  add('overview', '.waypoint-overview-switch');
   add('lang', '.lang-switch');
   add('profile', '#profile');
   add('scale', '.leaflet-control-scale');
@@ -116,6 +117,16 @@ async function main() {
     `${p.zoom.l} vs ${p.info.r}`);
   check('the switches share the top band', p.zoom.t === p.layers.t && p.layers.t === p.pins.t,
     `${p.zoom.t}/${p.layers.t}/${p.pins.t}`);
+  const toolbarHeights = await page.evaluate(() => [
+    '.layer-switch',
+    '.pins-switch',
+    '.waypoint-overview-switch',
+    '.lang-switch',
+  ].map((selector) => document.querySelector(selector))
+    .filter(Boolean)
+    .map((node) => Math.round(node.getBoundingClientRect().height)));
+  check('all map tools use the same height',
+    toolbarHeights.every((height) => height === 32), toolbarHeights.join('/'));
 
   check('nothing overlaps anything', clashes(p).length === 0, clashes(p).join(' ') || 'clean');
   check('the card does not reach the profile', p.info.b < p.profile.t, `${p.info.b} vs ${p.profile.t}`);
@@ -184,10 +195,19 @@ async function main() {
   await squat.close();
 
   // 4. Very narrow: the switches no longer fit beside the zoom, so they wrap instead of covering it.
-  const tiny = await openAt(360, 740);
+  const tiny = await openAt(360, 740, 'waypoints-route.gpx');
   const tm = await measure(tiny);
   check('a 360 px window still has no overlaps', clashes(tm.parts).length === 0, clashes(tm.parts).join(' ') || 'clean');
   check('and it uses the docked tool band', tm.layout === 'docked', tm.layout);
+  check('the compact map tools share one row',
+    new Set([tm.parts.layers.t, tm.parts.pins.t, tm.parts.overview.t, tm.parts.lang.t]).size === 1,
+    `${tm.parts.layers.t}/${tm.parts.pins.t}/${tm.parts.overview.t}/${tm.parts.lang.t}`);
+  check('the compact layer entry keeps a full accessible label',
+    await tiny.$eval('.layer-menu-toggle', (node) => Boolean(node.getAttribute('aria-label'))
+      && Boolean(node.dataset.short) && Math.round(node.getBoundingClientRect().height) === 28));
+  check('markers and list form one compact visual group',
+    Math.abs(tm.parts.pins.r - tm.parts.overview.l) <= 1,
+    `${tm.parts.pins.r} vs ${tm.parts.overview.l}`);
   check('the credit clears the scale bar',
     overlap(tm.parts.scale, tm.parts.credit) === 0,
     `${JSON.stringify(tm.parts.scale)} vs ${JSON.stringify(tm.parts.credit)}`);

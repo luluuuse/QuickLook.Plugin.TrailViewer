@@ -11,13 +11,15 @@
     "typecheck": "tsc -p jsconfig.json",
     "docs:check": "node scripts/docs-check.cjs",
     "branding:check": "node scripts/branding-check.cjs",
-    "check": "npm run lint && npm run typecheck && npm run docs:check && npm run branding:check",
+    "secrets:check": "node scripts/secrets-check.cjs",
+    "check": "npm run lint && npm run typecheck && npm run docs:check && npm run branding:check && npm run secrets:check",
     "test": "npm run test:unit && node scripts/test.cjs",
     "test:unit": "node --test \"tests/unit/*.test.mjs\"",
     "test:host": "node scripts/host-test.cjs",
     "test:live": "node tests/smoke/terrain-live.cjs",
     "test:version": "node tests/version-test.cjs",
-    "release:prepare": "node scripts/release.cjs"
+    "release:prepare": "node scripts/release.cjs",
+    "pack": "node scripts/pack.cjs"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",

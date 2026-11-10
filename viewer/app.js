@@ -34,6 +34,17 @@ const L = window.L;
 const params = new URLSearchParams(location.search);
 const src = params.get('src');
 const fileName = params.get('name') || fileNameFromSource(src);
+const hasQuickLookHost = Boolean(
+  window.chrome?.webview?.postMessage && window.chrome.webview.addEventListener,
+);
+const runtimeConfig = window.__TRAILVIEWER_RUNTIME_CONFIG__ || {};
+let runtimeTiandituKey = runtimeConfig.direct === true
+  && /^[0-9a-fA-F]{32}$/.test(runtimeConfig.tiandituKey || '')
+  ? runtimeConfig.tiandituKey
+  : '';
+const initialDirectTiandituKey = runtimeTiandituKey;
+let tiandituTransientShown = false;
+let tiandituRejectedShown = false;
 
 function fileNameFromSource(source) {
   if (!source) return t('file.untitled');
@@ -284,8 +295,34 @@ async function main() {
     ? createExportControl({ L, map, el, t, onExport: () => void overlayExport.save() })
     : null;
   if (exportCtrl) map.on('click', () => overlayExport.close());
+  const warnTiandituTemporarily = () => {
+    if (tiandituTransientShown) return;
+    tiandituTransientShown = true;
+    showToast(t('layer.tiandituUnavailable'), 5000);
+  };
+  const rejectTiandituKey = () => {
+    if (tiandituRejectedShown) return;
+    tiandituRejectedShown = true;
+    runtimeTiandituKey = '';
+    layerSwitch?.keyRejected();
+    showToast(t('layer.tiandituRejected'), 5000);
+  };
   const switcher = createLayerSwitcher({
-    L, map, el, t, initial: savedLayer(params), onRemember: syncPreferences,
+    L,
+    map,
+    el,
+    t,
+    initial: savedLayer(params),
+    onRemember: syncPreferences,
+    tiandituDirectKey: initialDirectTiandituKey,
+    onTiandituDirectError: () => queueMicrotask(warnTiandituTemporarily),
+    onConfigureTianditu: () => {
+      if (hasQuickLookHost) post(`tianditu-key\tconfigure\t${getLang()}`);
+      else showToast(t('layer.tiandituHostOnly'), 5000);
+    },
+    onRemoveTianditu: () => {
+      if (hasQuickLookHost) post(`tianditu-key\tremove\t${getLang()}`);
+    },
   }); // after the view is set: the grid needs the map bounds
   layerSwitch = switcher;
   // A file that draws no dots and has no waypoints gets no switch: there is nothing for it to show or hide.
@@ -360,7 +397,30 @@ async function main() {
       hasControl: waypointController.hasControl,
       count: waypointController.count,
     },
-    selectLayer: (key) => switcher.select(key, true), layer: switcher.current,
+    selectLayer: (key) => switcher.select(key, true),
+    setTiandituKey: (key) => {
+      runtimeTiandituKey = /^[0-9a-fA-F]{32}$/.test(key || '') ? key : '';
+      tiandituTransientShown = false;
+      tiandituRejectedShown = false;
+      switcher.setDirectKey(runtimeTiandituKey);
+      return Boolean(runtimeTiandituKey);
+    },
+    tiandituResponse: (status) => {
+      const code = Number(status);
+      if (code === 401 || code === 403) {
+        rejectTiandituKey();
+        return 'rejected';
+      }
+      if (code >= 400) {
+        warnTiandituTemporarily();
+        return 'temporary';
+      }
+      return 'ok';
+    },
+    tiandituKeyRejected: rejectTiandituKey,
+    tiandituTransport: () => runtimeTiandituKey ? 'direct' : 'none',
+    layer: switcher.current,
+    layerCategory: switcher.currentCategory,
     // The frame the file opened with, for a test that wants it without walking the layers.
     locate: () => mapViewController.fit(),
     mapLayout: () => ({
@@ -383,6 +443,10 @@ async function main() {
   };
   window.trailViewer = api;
   window.gpxViewer = api; // Remove after one compatibility release.
+  window.chrome?.webview?.addEventListener('message', (event) => {
+    if (typeof event.data !== 'string' || !event.data.startsWith('tianditu-response\t')) return;
+    api.tiandituResponse(Number(event.data.split('\t')[1]));
+  });
   document.body.classList.add('loaded');
   post(`ready\t${summary.points} points, ${distanceLog(summary.distanceMeters)}`);
 }

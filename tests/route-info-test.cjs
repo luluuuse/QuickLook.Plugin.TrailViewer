@@ -348,6 +348,10 @@ async function main() {
   check('the overview button wraps inside a narrow window',
     narrow.boxes.every((box) => box && box.left >= 0 && box.right <= narrow.width + 0.5),
     narrow.boxes.map((box) => `${Math.round(box.left)}..${Math.round(box.right)}`).join(' '));
+  check('the marker and list tools share one height and group',
+    narrow.boxes[2].height === 32 && narrow.boxes[0].height === 32
+      && Math.abs(narrow.boxes[2].right - narrow.boxes[0].left) <= 1,
+    `${narrow.boxes[2].height}/${narrow.boxes[0].height}, ${narrow.boxes[2].right} vs ${narrow.boxes[0].left}`);
   check('the wrapped controls clear the summary',
     narrow.boxes.every((box) => box.bottom <= narrow.info.top || box.top >= narrow.info.bottom),
     `info ${Math.round(narrow.info.bottom)}, controls ${Math.round(Math.min(...narrow.boxes.map((box) => box.top)))}`);

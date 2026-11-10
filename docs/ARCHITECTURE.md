@@ -26,6 +26,7 @@ QuickLook
 | `viewer/waypoint-insights.js` | 本地航点语义分类 |
 | `viewer/profile-*.js` | 剖面数据、SVG 和地图光标 |
 | `viewer/map-view.js`, `viewer/map-focus.js` | 安全区域、取景、选中点避让和三态布局 |
+| `viewer/map-controls.js` | 底图类别、具体图源、图源菜单与署名 |
 | `viewer/export*.js` | 离屏画布、版式和 PNG 分块传输 |
 
 模块通过显式参数注入依赖，不共享可变全局状态。`window.trailViewer` 仅用于浏览器测试和宿主诊断。
@@ -34,6 +35,8 @@ QuickLook
 
 `src/TrailViewerPanel.cs` 负责 WebView2、文件读取和快捷键路由；`OverlayTransfer.cs` 负责导出分块状态机；
 `ViewerPreferences.cs` 负责跨版本偏好文件；`KmzArchive.cs` 负责受限解包。
+`TiandituKeyStore.cs` 使用当前 Windows 用户的 DPAPI 保存天地图密钥。宿主在页面创建前注入当前预览的
+运行时配置，页面直接请求天地图官方 WMTS；宿主不代理瓦片，也没有逐瓦片 WebMessage 往返。
 
 前端到宿主的主要消息：
 
@@ -47,6 +50,9 @@ exportdone  <id> <count>
 ```
 
 页面协议版本位于 `Directory.Build.props`，与产品版本独立。
+
+直连模式需要页面在请求瓦片时持有 `tk`，因此密钥会存在于当前 WebView 的内存和官方瓦片请求 URL 中。
+密钥在磁盘上由 DPAPI 加密；宿主不会把明文写入 viewer 地址、LocalStorage、日志或安装包。
 
 ## 产品身份与迁移
 

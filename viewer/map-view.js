@@ -147,15 +147,18 @@ export function createMapView({ map, isChromeHidden }) {
     const zoomRight = zoomLeft + zoomWidth;
     const inlineRoom = innerWidth - zoomRight - 22;
     const inline = !tools || row.total <= inlineRoom;
-    const minWrapped = Math.max(48, row.widest + 12);
+    // A wrapped tool bar needs enough room for at least the compact waypoint group and language chip.
+    // Below that the controls belong in the measured docked band rather than stacking one per row.
+    const minWrapped = Math.max(132, row.widest + 12);
     const wrappedRoom = Math.max(0, innerWidth - zoomRight - 22);
     const wrapped = !inline && wrappedRoom >= minWrapped;
     const next = inline ? 'inline' : wrapped ? 'wrapped' : 'docked';
 
-    if (next !== layoutState) {
+    const layoutClass = `layout-${next}`;
+    if (next !== layoutState || !document.body.classList.contains(layoutClass)) {
       layoutState = next;
       document.body.classList.remove(...LAYOUT_CLASSES);
-      document.body.classList.add(`layout-${layoutState}`);
+      document.body.classList.add(layoutClass);
       document.body.classList.toggle('stepped', layoutState === 'docked');
     }
 

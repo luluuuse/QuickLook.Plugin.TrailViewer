@@ -25,6 +25,7 @@ internal static class SelfTests
             TestKmzLimit(root, temporary);
             TestPreferences(temporary);
             TestProductIdentity(temporary);
+            TestTianditu(temporary);
             TestViewerBuildId(temporary);
             TestOverlayTransfer();
             TestAtomicFile(temporary);
@@ -134,17 +135,17 @@ internal static class SelfTests
 
         ViewerPreferences.SaveFromQueryToFile(
             "layer=terrain&pins=0&lang=EN&evil=value&exportSize=1%3A1&exportSize=bad"
-            + "&layer=satellite&exportInk=white&pins=1&exportScrim=soft&broken&%ZZ=bad",
+            + "&layer=terrain.openTopo&exportInk=white&pins=1&exportScrim=soft&broken&%ZZ=bad",
             path);
         Check("preferences accept only the final valid values",
             ViewerPreferences.QueryFromFile(path)
-                == "exportInk=white&exportScrim=soft&exportSize=1%3A1&layer=satellite&pins=1",
+                == "exportInk=white&exportScrim=soft&exportSize=1%3A1&layer=terrain.openTopo&pins=1",
             ViewerPreferences.QueryFromFile(path));
 
         ViewerPreferences.SaveFromQueryToFile("pins=0&lang=zh&unknown=terrain", path);
         Check("a later message merges with the existing values",
             ViewerPreferences.QueryFromFile(path)
-                == "exportInk=white&exportScrim=soft&exportSize=1%3A1&lang=zh&layer=satellite&pins=0",
+                == "exportInk=white&exportScrim=soft&exportSize=1%3A1&lang=zh&layer=terrain.openTopo&pins=0",
             ViewerPreferences.QueryFromFile(path));
 
         var before = ViewerPreferences.QueryFromFile(path);
@@ -162,6 +163,10 @@ internal static class SelfTests
         }, new UTF8Encoding(false));
         Check("invalid lines on disk are ignored",
             ViewerPreferences.QueryFromFile(path) == "exportSize=4%3A3&lang=zh&layer=terrain&pins=1",
+            ViewerPreferences.QueryFromFile(path));
+        ViewerPreferences.SaveFromQueryToFile("layer=satellite.tianditu", path);
+        Check("Tianditu provider IDs are valid map preferences",
+            ViewerPreferences.QueryFromFile(path).Contains("layer=satellite.tianditu"),
             ViewerPreferences.QueryFromFile(path));
         Check("no temporary preference files are left",
             !Directory.GetFiles(Path.GetDirectoryName(path), "*.tmp").Any()
@@ -225,6 +230,24 @@ internal static class SelfTests
         Check("legacy log moves to the current product directory",
             Log.MigrateLegacyFile(legacyLog, currentLog)
             && File.Exists(currentLog) && !File.Exists(legacyLog));
+    }
+
+    private static void TestTianditu(string temporary)
+    {
+        const string fakeKey = "0123456789abcdef0123456789abcdef";
+        var keyFile = Path.Combine(temporary, "tianditu", "key.bin");
+        Check("Tianditu accepts a 32-character hexadecimal key", TiandituKeyStore.IsValid(fakeKey));
+        Check("Tianditu rejects a malformed key", !TiandituKeyStore.IsValid("not-a-key"));
+        Check("Tianditu encrypts the saved key", TiandituKeyStore.Save(fakeKey, keyFile) && File.Exists(keyFile));
+        var storedText = Convert.ToBase64String(File.ReadAllBytes(keyFile));
+        Check("the encrypted key file does not contain the plaintext key", !storedText.Contains(fakeKey));
+        Check("the encrypted key round-trips for the current Windows user",
+            TiandituKeyStore.LoadFromFile(keyFile) == fakeKey);
+        Check("Tianditu deletes a saved key", TiandituKeyStore.Delete(keyFile) && !File.Exists(keyFile));
+        Check("TrailViewer recognizes Tianditu tile response URLs",
+            TrailViewerPanel.IsTiandituTileUri("https://t3.tianditu.gov.cn/vec_w/wmts?tk=irrelevant"));
+        Check("TrailViewer ignores lookalike Tianditu response hosts",
+            !TrailViewerPanel.IsTiandituTileUri("https://tianditu.gov.cn.example.test/vec_w/wmts"));
     }
 
     private static void TestOverlayTransfer()

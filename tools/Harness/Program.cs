@@ -478,7 +478,8 @@ internal static class Program
         while (DateTime.UtcNow < deadline)
         {
             var pending = await panel.RunScriptAsync(
-                "[...document.querySelectorAll('.leaflet-tile-pane img')].filter(i => !i.complete).length");
+                "[...document.querySelectorAll('.leaflet-tile-pane img')]"
+                + ".filter(i => !i.complete || !i.getAttribute('src')).length");
             if ((pending ?? string.Empty).Trim().Trim('"') == "0") return;
             await Task.Delay(300);
         }

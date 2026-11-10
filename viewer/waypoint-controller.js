@@ -70,6 +70,7 @@ export function createWaypointController({
   let pinLayer = null;
   let pinControl = null;
   let listControl = null;
+  let pinBar = null;
   let stops = [];
   let photoStops = [];
   let navigation = [];
@@ -407,6 +408,7 @@ export function createWaypointController({
       options: { position: 'topright' },
       onAdd() {
         const bar = el('div', 'pins-switch leaflet-bar');
+        pinBar = bar;
         button = el('button');
         button.type = 'button';
         button.setAttribute('aria-pressed', String(shown));
@@ -441,6 +443,8 @@ export function createWaypointController({
       options: { position: 'topright' },
       onAdd() {
         const bar = el('div', 'waypoint-overview-switch leaflet-bar');
+        pinBar?.classList.add('joined-left');
+        bar.classList.add('joined-right');
         button = el('button');
         button.type = 'button';
         button.title = t('overview.openTitle');

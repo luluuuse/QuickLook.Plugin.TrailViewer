@@ -42,7 +42,7 @@ async function main() {
       // The keys are named on the buttons now: one tooltip per control that has one.
       tips: ['.layer-switch button', '.pins-switch button', '.locate-switch button', '.export-switch button']
         .map((q) => document.querySelector(q)?.title || '').join(' | '),
-      layers: Array.from(document.querySelectorAll('.layer-switch button')).map((n) => n.textContent),
+      layers: Array.from(document.querySelectorAll('.layer-category-button')).map((n) => n.textContent),
       langButton: text('.lang-switch button'),
       langTitle: document.querySelector('.lang-switch button')?.title || '',
       profile: text('#profile .range'),
@@ -88,7 +88,7 @@ async function main() {
     s.values[s.values.length - 1]);
   check('the tooltips name the keys in Chinese',
     /Q \/ E 切换/.test(s.tips) && /（W）/.test(s.tips) && /（C）/.test(s.tips) && /（X）/.test(s.tips), s.tips);
-  check('the layer buttons are translated', s.layers.join('/') === '地图/地形/卫星/无底图', s.layers.join('/'));
+  check('the layer buttons are translated', s.layers.join('/') === '路网/地形/卫星/无底图', s.layers.join('/'));
   check('the profile title is translated', s.profile === '海拔', s.profile);
   check('the profile axis is translated but keeps its unit', s.axis.length === 2 && s.axis.every((a) => /^-?\d+ m$/.test(a)), s.axis.join(' / '));
   check('the profile legend is translated', /^(陡坡|无陡坡)\s*.*·\s*最陡\s*\d+%$/.test(s.legend.replace(/\s+/g, ' ')), s.legend);
@@ -119,7 +119,7 @@ async function main() {
     s.values.join(' | ').slice(0, 120));
   check('the tooltips follow',
     /Q \/ E switch/.test(s.tips) && /\(W\)/.test(s.tips) && /\(C\)/.test(s.tips) && /\(X\)/.test(s.tips), s.tips);
-  check('the layer buttons follow', s.layers.join('/') === 'Map/Terrain/Satellite/No map', s.layers.join('/'));
+  check('the layer buttons follow', s.layers.join('/') === 'Road/Terrain/Satellite/No map', s.layers.join('/'));
   check('the profile follows', s.profile === 'Elevation', s.profile);
   check('and so does its axis', s.axis.every((a) => /^-?\d+ m$/.test(a)), s.axis.join(' / '));
   check('and its legend', /^(Steep|No steep ground)\s*.*·\s*max\s*\d+%$/.test(s.legend.replace(/\s+/g, ' ')), s.legend);

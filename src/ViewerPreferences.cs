@@ -20,7 +20,14 @@ internal static class ViewerPreferences
     private static readonly Dictionary<string, string[]> Allowed = new(StringComparer.Ordinal)
     {
         ["lang"] = new[] { "en", "zh" },
-        ["layer"] = new[] { "map", "terrain", "satellite", "none" },
+        ["layer"] = new[]
+        {
+            // Legacy category values remain readable so an upgrade keeps the user's selected background.
+            "map", "terrain", "satellite", "none",
+            "road.osm", "road.tianditu",
+            "terrain.cyclosm", "terrain.openHiking", "terrain.openTopo",
+            "satellite.esri", "satellite.tianditu",
+        },
         ["pins"] = new[] { "0", "1" },
         ["exportSize"] = new[] { "1:1", "9:16", "4:3" },
         ["exportInk"] = new[] { "black", "white" },

@@ -14,7 +14,7 @@ export function createKeyboardController({
     const switcher = getLayerSwitch();
     if (!switcher) return;
     const keys = Object.keys(LAYERS);
-    const at = keys.indexOf(switcher.current());
+    const at = keys.indexOf(switcher.currentCategory());
     switcher.select(keys[(at + step + keys.length) % keys.length], true);
   }
 

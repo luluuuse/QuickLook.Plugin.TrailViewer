@@ -26,6 +26,8 @@
 
   <ItemGroup>
     <!-- KMZ is a zip: opening it needs the framework's own zip support, nothing to ship. -->
+    <Reference Include="System.Net.Http" />
+    <Reference Include="System.Security" />
     <Reference Include="System.IO.Compression" />
     <Reference Include="System.IO.Compression.FileSystem" />
   </ItemGroup>
