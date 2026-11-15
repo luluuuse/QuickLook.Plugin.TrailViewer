@@ -17,6 +17,25 @@ Added / Changed / Deprecated / Removed / Fixed / Security 分类；没有内容�
 
 - None.
 
+## 1.18.6 — 2026-11-15
+
+### 中文
+
+#### 修复
+
+- 修复 KML 点位使用标准 `<Style><IconStyle><Icon><href>` 内联图标时被误当成空节点并导致整条轨迹
+  打不开的问题。
+- 兼容 COROS 等导出的 KML 2.1 文件；已验证包含 17,722 个点位的登山轨迹可以正常打开和绘制。
+
+### English
+
+#### Fixed
+
+- Fixed KML tracks failing to open when a point uses the standard inline
+  `<Style><IconStyle><Icon><href>` icon structure.
+- Added compatibility for KML 2.1 exports such as COROS files; a 17,722-point hiking track now parses and
+  renders successfully.
+
 ## 1.18.5 — 2026-11-10
 
 > 这是 `v1.17.2` 之后的首个公开版本。以下内容累积 `1.18.0` 至 `1.18.5` 的新增、变更、删除、修复和安全更新。

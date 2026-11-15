@@ -179,8 +179,9 @@ function readPlacemark(placemark, out, styles) {
   const { text: description, insightText, images } = readDescription(placemark);
   const styleUrl = childText(placemark, 'styleUrl');
   const inlineStyle = child(placemark, 'Style');
-  const inlineIcon = inlineStyle && child(child(inlineStyle, 'Icon'), 'href');
-  const icon = textOf(inlineIcon) || styles.get((styleUrl || '').replace(/^#/, '')) || styleUrl;
+  const inlineIcon = inlineStyle && child(child(inlineStyle, 'IconStyle') || inlineStyle, 'Icon');
+  const inlineHref = inlineIcon && child(inlineIcon, 'href');
+  const icon = textOf(inlineHref) || styles.get((styleUrl || '').replace(/^#/, '')) || styleUrl;
 
   const collect = (node) => {
     for (const geometry of node.children) {

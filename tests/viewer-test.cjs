@@ -174,14 +174,22 @@ async function main() {
       + '<when>2026-01-01T09:00:00Z</when><when>2026-01-01T09:01:00Z</when>'
       + '<gx:coord>not-a-point</gx:coord><gx:coord>8 46 10</gx:coord>'
       + '</gx:Track></Placemark></kml>');
+    const styledPoint = kml.parseKml(
+      '<kml xmlns="http://earth.google.com/kml/2.1"><Placemark>'
+      + '<Style><IconStyle><Icon><href>https://example.test/flag.png</href></Icon></IconStyle></Style>'
+      + '<Point><coordinates>114.2,31.1,100</coordinates></Point>'
+      + '</Placemark></kml>');
     return {
       duration: summary.durationSeconds,
       trackTime: track.tracks[0].segments[0][0].time.toISOString(),
+      styledPointIcon: styledPoint.waypoints[0].icon,
     };
   });
   check('parser regression', 'waypoint times do not extend a recorded trip', parserChecks.duration, 3600);
   check('parser regression', 'an invalid gx:Track point does not shift the next time',
     parserChecks.trackTime, '2026-01-01T09:01:00.000Z');
+  check('parser regression', 'an inline IconStyle icon does not crash the KML reader',
+    parserChecks.styledPointIcon, 'https://example.test/flag.png');
 
   // The k-d tree must be an optimisation only: every nearest sample has to match the old linear scan,
   // including duplicate points and equal-distance ties.
