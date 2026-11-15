@@ -67,8 +67,6 @@ Added / Changed / Deprecated / Removed / Fixed / Security 分类；没有内容�
 - Splits open in the four-column basic mode and can switch to detailed mode in one click. Detailed mode adds
   cumulative time, ascent, descent, average heart rate, moving speed and vertical speed. The heart-rate column
   is omitted entirely when the file has no valid heart-rate data.
-- The split model also calculates cumulative time, ascent, descent, average heart rate, moving speed and
-  vertical speed for the detailed second phase. FIT heart rate is parsed now but is not displayed yet.
 - Added automated coverage for FIT activities, compressed timestamps, developer fields, course points,
   truncated files, damaged checksums and GPS-free workouts.
 - Added coverage for split boundaries, pause exclusion, recorded timer totals, untimed routes, narrow-window
