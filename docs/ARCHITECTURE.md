@@ -9,8 +9,8 @@ QuickLook 宿主通过 C# 加载 WebView2，再把页面消息和文件路径连
 QuickLook
   → TrailViewerPanel / WebView2
   → viewer/index.html
-  → GPX/KML parser
-  → summary + track layer + waypoint controller + profile
+  → GPX/KML/FIT parser
+  → summary + per-kilometre splits + track layer + waypoint controller + profile
   → map focus / safe-area layout
 ```
 
@@ -19,8 +19,9 @@ QuickLook
 | 模块 | 职责 |
 |---|---|
 | `viewer/app.js` | 解析、模块装配和宿主消息 |
-| `viewer/gpx.js`, `viewer/kml.js` | 文件解析与统一模型 |
-| `viewer/track-analysis.js` | 运动时间、断点、GPS 异常和用时估算 |
+| `viewer/gpx.js`, `viewer/kml.js`, `viewer/fit.js` | 文件解析与统一模型；FIT 使用受限原生二进制读取器 |
+| `viewer/track-analysis.js` | 运动时间、断点、GPS 异常、用时估算和里程切片 |
+| `viewer/split-analysis.js`, `viewer/split-view.js` | 逐公里时间/速度模型、第一版表格及详细版列契约 |
 | `viewer/track-layer.js` | 轨迹线、方向/公里标记、异常与起终点 |
 | `viewer/waypoint-controller.js` | 沿线导航、图钉、相册和速览联动 |
 | `viewer/waypoint-insights.js` | 本地航点语义分类 |

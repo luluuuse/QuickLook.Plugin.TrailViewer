@@ -76,3 +76,14 @@ export function clock(seconds) {
   const minutes = Math.floor((seconds % 3600) / 60);
   return `${pad(hours)}:${pad(minutes)}:${pad(Math.floor(seconds % 60))}`;
 }
+
+/** Stopwatch notation for split rows: 15:25 under an hour, and 7:19:43 when hours matter. */
+export function formatTimer(seconds, forceHours = false) {
+  const total = Math.max(0, Math.round(seconds));
+  const pad = (number) => String(number).padStart(2, '0');
+  const hours = Math.floor(total / 3600);
+  const minutes = Math.floor((total % 3600) / 60);
+  const trailingSeconds = total % 60;
+  if (hours > 0 || forceHours) return `${hours}:${pad(minutes)}:${pad(trailingSeconds)}`;
+  return `${minutes}:${pad(trailingSeconds)}`;
+}

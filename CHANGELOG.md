@@ -17,6 +17,73 @@ Added / Changed / Deprecated / Removed / Fixed / Security 分类；没有内容�
 
 - None.
 
+## 1.19.0 — 2026-11-15
+
+### 中文
+
+#### 新增
+
+- 新增 `.fit` 活动与路线文件预览。读取带 GPS 的 `record` 消息，并展示时间、经纬度、海拔和
+  `course_point` 标记点。
+- 使用 `session` 的总耗时和计时时间；总时间悬停提示中的运动时间优先采用 FIT 记录的计时时间，
+  展示里程仍由 GPS 轨迹点计算。
+- 支持 FIT 普通时间戳、压缩时间戳、大小端定义、开发者字段跳过、无效值过滤以及文件与头部 CRC 校验。
+- 简介下方新增独立的每公里折叠项，打开文件时默认收起；主动点击后才显示分段距离、实际经过时间和
+  按运动时间计算的平均速度。底部汇总总时间与运动时间，最快分段使用强调色标出。长路线在固定高度区域内
+  滚动，不把地图横向撑宽；展开时只向下避让，不改动缩放/定位/导出控件列的位置。简介卡与分段面板同时
+  展开时按两者实际高度顺序堆叠，不再相互覆盖。展开或收起只更新安全区域，不再重新适配整条轨迹，
+  避免底图重新加载造成闪黑。
+- 每公里行支持鼠标点击和键盘 `Enter` / `Space` 选中。选中后自动聚焦该里程对应的轨迹范围，并用高对比
+  青色覆盖强调；再次选择同一行或收起面板会清除轨迹强调。
+- 每公里面板默认显示简要四列，并可在标题栏一键切换详细模式；详细模式增加累计时间、累计上升/下降、
+  平均心率、运动速度和垂直速度。文件没有有效心率数据时自动省略平均心率列，不保留空白项。
+- 增加 FIT 活动、压缩时间、开发者字段、路线点、截断文件、损坏校验和和无 GPS 训练文件的自动测试。
+- 增加分段边界、停留排除、文件记录暂停总量、无时间轨迹、窄窗布局和第二版字段契约测试。
+- 收窄每公里分段面板：简要模式 288 px、详细模式 520 px（无心率 470 px），压缩列宽和单元格间距、数字右对齐，并移除表头图标；窄窗仍可在表格内部横向滚动。
+
+#### 说明
+
+- 简要模式聚焦轨迹绘制和速度所需的必要数据；步频、功率、温度和训练步骤等完整设备指标暂不展示。
+- 工作区真实 COROS FIT 已验证为 17,721 个可绘制点、19.70 km、110–811 m，耗时 7 小时 19 分，
+  与同名 KML 的轨迹和海拔范围一致。
+
+### English
+
+#### Added
+
+- Added `.fit` activity and course previews. GPS `record` messages provide time, coordinates and elevation,
+  while `course_point` messages appear as map markers.
+- `session` totals supply elapsed time and timer time; moving time prefers the FIT timer duration in the
+  total-time tooltip while displayed distance remains calculated from GPS points.
+- Added normal and compressed FIT timestamps, both byte orders, developer-field skipping, invalid-value
+  filtering, and header/file CRC validation.
+- Added an independent, collapsed-by-default split entry below the route summary. Clicking it reveals
+  segment distance, elapsed time and moving speed, plus total and moving-time totals. The fastest split is
+  emphasized, and long routes scroll inside a fixed-height table without widening the map. Expansion moves
+  downward only and never changes the zoom/locate/export control column. Expanded summary details and splits
+  now stack by their measured heights instead of overlapping.
+- Split rows are selectable with a click or keyboard Enter/Space. Selecting one focuses the matching trajectory
+  range and emphasizes it in high-contrast cyan; selecting it again or collapsing the panel clears the overlay.
+- Splits open in the four-column basic mode and can switch to detailed mode in one click. Detailed mode adds
+  cumulative time, ascent, descent, average heart rate, moving speed and vertical speed. The heart-rate column
+  is omitted entirely when the file has no valid heart-rate data.
+- The split model also calculates cumulative time, ascent, descent, average heart rate, moving speed and
+  vertical speed for the detailed second phase. FIT heart rate is parsed now but is not displayed yet.
+- Added automated coverage for FIT activities, compressed timestamps, developer fields, course points,
+  truncated files, damaged checksums and GPS-free workouts.
+- Added coverage for split boundaries, pause exclusion, recorded timer totals, untimed routes, narrow-window
+  layout and the detailed-phase column contract.
+- Tightened the per-kilometre split panel: 288 px in basic mode and 520 px in detailed mode (470 px
+  without heart rate), with narrower columns, tighter cell spacing, right-aligned numbers and no header
+  icons; narrow windows still scroll the table horizontally.
+
+#### Notes
+
+- Basic mode focuses on the data needed to draw and pace a track. Cadence, power, temperature, workout steps and
+  the full device metric set are not displayed yet.
+- A real COROS FIT in the workspace resolves to 17,721 drawable points, 19.70 km, 110–811 m and 7 h 19 min,
+  matching the route and elevation range of the companion KML.
+
 ## 1.18.6 — 2026-11-15
 
 ### 中文

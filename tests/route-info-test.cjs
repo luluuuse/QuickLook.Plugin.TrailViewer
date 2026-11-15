@@ -61,8 +61,13 @@ async function main() {
   check('every direction sample carries a bearing',
     route.bearings.length === route.arrows && route.bearings.every((value) => /deg$/.test(value)),
     route.bearings.slice(0, 3).join(','));
-  check('kilometre labels count whole kilometres',
-    route.kilometres.includes('1 km') && route.kilometres.includes('10 km'), route.kilometres.join(','));
+  const kilometreValues = route.kilometres.map((label) => Number.parseInt(label, 10));
+  const kilometreSteps = kilometreValues.slice(1).map((value, index) => value - kilometreValues[index]);
+  check('kilometre labels count whole kilometres at one readable interval',
+    kilometreValues.length >= 6 && kilometreValues.every(Number.isInteger)
+      && kilometreValues.some((value) => value >= 10)
+      && new Set(kilometreSteps).size === 1,
+    route.kilometres.join(','));
   check('the fitted route keeps labels to a readable count',
     route.kilometres.length <= 18, `${route.kilometres.length} labels`);
   check('a grade-aware estimate is calculated', route.estimate > 0, `${route.estimate}`);

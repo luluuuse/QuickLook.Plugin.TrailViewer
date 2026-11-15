@@ -5,8 +5,8 @@
 | 层级 | 位置 | 重点 |
 |---|---|---|
 | 纯单元测试 | `tests/unit/` | 格式、几何、SemVer、剖面、导航和解析算法 |
-| 浏览器测试 | `tests/*-test.cjs` | 地图、交互、布局、照片、导出、语言和可访问性 |
-| 夹具检测 | `tests/viewer-test.cjs`, `tests/fixtures/` | GPX/KML/KMZ 解析和格式边界 |
+| 浏览器测试 | `tests/*-test.cjs` | 地图、分段表、交互、布局、照片、导出、语言和可访问性 |
+| 夹具检测 | `tests/viewer-test.cjs`, `tests/fixtures/` | GPX/KML/KMZ/FIT 解析和格式边界 |
 | 宿主自测 | `tools/Harness/SelfTests.cs` | KMZ、偏好、DPAPI 密钥、导出状态机和缓存身份 |
 | live smoke | `tests/smoke/` | CyclOSM、OpenHikingMap、OpenTopoMap 真实瓦片端点，独立于主 CI |
 

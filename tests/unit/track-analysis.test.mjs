@@ -8,6 +8,7 @@ import {
   movementSummary,
   naismithSeconds,
   routeDirectionSamples,
+  sliceRouteByDistance,
 } from '../../viewer/track-analysis.js';
 
 const at = (offset, seconds) => ({
@@ -87,6 +88,18 @@ test('route samples use one continuous distance across recorded parts', () => {
   assert.equal(samples.length, 1);
   assert.equal(samples[0].distanceMeters, 3000);
   assert.ok(samples[0].point.lon > 0.0289 && samples[0].point.lon < 0.0291);
+});
+
+test('a distance slice interpolates both ends and never joins separate recorded parts', () => {
+  const first = [at(0, 0), at(0.018, 100)];
+  const second = [at(0.020, 200), at(0.038, 300)];
+  const slices = sliceRouteByDistance([first, second], { from: 1000, to: 3000 });
+
+  assert.equal(slices.length, 2);
+  assert.ok(Math.abs(slices[0][0].lon - 0.008984) < 0.0001);
+  assert.ok(slices[0].at(-1).lon > 0.0179);
+  assert.ok(slices[1][0].lon >= 0.0199 && slices[1][0].lon < 0.0210);
+  assert.ok(slices[1].at(-1).lon > 0.0289 && slices[1].at(-1).lon < 0.0291);
 });
 
 test('distance markers keep kilometre detail when the route fills the screen', () => {

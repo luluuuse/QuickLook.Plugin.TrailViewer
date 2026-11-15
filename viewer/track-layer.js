@@ -4,6 +4,7 @@ import {
   findTrackGaps,
   pathDistance,
   routeDirectionSamples,
+  sliceRouteByDistance,
 } from './track-analysis.js';
 import { formatDistance } from './format.js';
 
@@ -160,6 +161,7 @@ export function createTrackLayer({ L, el, localized, t, pointPopup, onFocusBound
       const anomalyMarkerLayer = L.layerGroup();
       const gapLineLayer = L.layerGroup().addTo(map);
       const gapMarkerLayer = L.layerGroup();
+      const splitHighlightLayer = L.layerGroup().addTo(map);
       let anomalyEpisodes = [];
       let gapEpisodes = [];
       let colorIndex = 0;
@@ -387,6 +389,36 @@ export function createTrackLayer({ L, el, localized, t, pointPopup, onFocusBound
         segments,
         navigationMarks,
         refreshDistanceMarks: renderMapMarks,
+        highlightRange(from, to) {
+          splitHighlightLayer.clearLayers();
+          const paths = sliceRouteByDistance(
+            distancePaths.map((entry) => entry.points),
+            { from, to },
+          );
+          const bounds = L.latLngBounds([]);
+          for (const points of paths) {
+            const latLngs = points.map((point) => [point.lat, point.lon]);
+            L.polyline(latLngs, {
+              color: '#07141a',
+              weight: 10,
+              opacity: 0.88,
+              interactive: false,
+              className: 'gpx-split-highlight',
+            }).addTo(splitHighlightLayer);
+            L.polyline(latLngs, {
+              color: '#72e7ff',
+              weight: 6,
+              opacity: 1,
+              interactive: false,
+              className: 'gpx-split-highlight',
+            }).addTo(splitHighlightLayer);
+            for (const point of points) bounds.extend([point.lat, point.lon]);
+          }
+          return { bounds, paths: paths.length, points: paths.reduce((sum, points) => sum + points.length, 0) };
+        },
+        clearSplitHighlight() {
+          splitHighlightLayer.clearLayers();
+        },
         setAnnotationMarkersVisible(visible) {
           if (visible) {
             anomalyMarkerLayer.addTo(map);

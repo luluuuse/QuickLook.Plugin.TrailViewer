@@ -2,7 +2,7 @@
 
 [简体中文](README.zh-CN.md) | English
 
-Preview GPX, KML and KMZ tracks directly in QuickLook on Windows. Press <kbd>Space</kbd> on a track file
+Preview GPX, KML, KMZ and FIT tracks directly in QuickLook on Windows. Press <kbd>Space</kbd> on a track file
 in Explorer to see the route, waypoints, photos and elevation profile without opening a map application.
 
 ![A track with the route summary, waypoint overview and elevation profile](docs/screenshot-map.jpg)
@@ -11,7 +11,7 @@ in Explorer to see the route, waypoints, photos and elevation profile without op
 
 1. Download the latest `.qlplugin` from [GitHub Releases](https://github.com/luluuuse/QuickLook.Plugin.TrailViewer/releases/latest).
 2. Open the package, install it, and restart QuickLook from the tray.
-3. Select a `.gpx`, `.kml` or `.kmz` file in Explorer and press <kbd>Space</kbd>.
+3. Select a `.gpx`, `.kml`, `.kmz` or `.fit` file in Explorer and press <kbd>Space</kbd>.
 
 Common controls:
 
@@ -26,10 +26,14 @@ Common controls:
 
 ## Highlights
 
-- **Track rendering:** GPX tracks, KML LineStrings and `gx:Track`, each segment in its own colour, with
+- **Track rendering:** GPX tracks, KML LineStrings and `gx:Track`, plus FIT activity/course records, each segment in its own colour, with
   adaptive direction arrows and distance labels.
 - **Route intelligence:** moving time, recording gaps, implausible GPS jumps and a grade-aware time estimate
   using Naismith, Langmuir descents and a steep-uphill correction.
+- **Per-kilometre splits:** an independent entry below the route summary opens on demand to show elapsed time
+  and moving speed for every kilometre, with total/moving-time totals. Selecting a row focuses and highlights
+  that part of the route on the map. A one-click details mode adds cumulative time, ascent/descent, average
+  heart rate, moving speed and vertical speed.
 - **Waypoints and photos:** route-ordered navigation, yellow pins, photo albums and a searchable overview
   with local danger/water/camp/exit insight labels.
 - **Elevation profile:** gradient-coloured terrain, waypoint dots, scrub readout and a layout that preserves
@@ -51,6 +55,10 @@ Supported inputs:
 - GPX 1.0 and 1.1
 - KML 2.2, including `gx:Track` and `MultiGeometry`
 - Zipped `.kmz` archives
+- FIT activities and courses with GPS records, compressed timestamps, elevation and course points
+
+FIT previews focus on route data. Laps, heart rate, cadence, power, temperature and workout steps are not shown
+in the first version.
 
 Files with more than 20,000 recorded points still draw the route and endpoints but stop creating a clickable
 marker for every sample. Invalid XML produces an explicit error page with the parser message.

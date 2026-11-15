@@ -6,8 +6,11 @@
 
 ### 打开文件
 
-在资源管理器中选中 `.gpx`、`.kml` 或 `.kmz`，按 <kbd>Space</kbd>。在线底图需要网络；选择“无底图”时
+在资源管理器中选中 `.gpx`、`.kml`、`.kmz` 或 `.fit`，按 <kbd>Space</kbd>。在线底图需要网络；选择“无底图”时
 轨迹直接绘制在本地网格上。
+
+FIT 第一版读取活动和路线中的 GPS 记录、时间、海拔、会话用时及 `course_point` 路线点。圈数、心率、
+步频、功率、温度、训练步骤和完整设备指标暂不展示。
 
 ### 地图与标记点
 
@@ -32,6 +35,21 @@
 剖面按坡度着色，最高点和最低点直接标在曲线上。鼠标沿曲线移动可查看海拔、里程和时间；点击可固定光标。
 剖面会参与地图安全区域计算，被选中的地图点不会被剖面遮住。
 
+### 每公里分段
+
+带时间戳的轨迹会在简介下方显示独立的“每公里”折叠项。文件打开时默认收起，不显示具体行；点击后才
+展开分段表，再次点击可收起：
+
+- **距离**：完整分段为 1.00 km，最后一段为剩余里程。
+- **时间**：从该公里起点到终点的实际经过时间。
+- **运动速度**：按运动时间计算；文件提供暂停总量时优先使用文件计时，否则根据移动速度排除停顿。
+- 表底汇总总时间与运动时间，最快分段的速度使用强调色显示。
+- 长路线在固定高度表格内滚动，表头和底部汇总保持可见。
+- 点击某一圈或聚焦该行后按 `Enter` / `Space`，地图会自动缩放到这一圈的轨迹范围，并用青色覆盖强调；
+  再次选择同一圈或收起面板可清除强调。
+- 标题栏默认显示“详细”切换键。点击后增加累计时间、累计上升/下降、平均心率、运动速度和垂直速度；
+  文件没有有效心率数据时，平均心率列完全隐藏。
+
 ### 导出叠加图
 
 <kbd>X</kbd> 按上次设置直接导出，<kbd>Shift</kbd>+<kbd>X</kbd> 打开设置：
@@ -51,8 +69,12 @@
 
 ### Open a file
 
-Select a `.gpx`, `.kml` or `.kmz` file in Explorer and press <kbd>Space</kbd>. Online basemaps require network
+Select a `.gpx`, `.kml`, `.kmz` or `.fit` file in Explorer and press <kbd>Space</kbd>. Online basemaps require network
 access; **No map** renders the route on a local grid.
+
+The first FIT version reads GPS records, time, elevation, session totals and `course_point` markers from
+activities and courses. Laps, heart rate, cadence, power, temperature, workout steps and the full device metric
+set are not displayed yet.
 
 ### Map and waypoints
 
@@ -73,6 +95,19 @@ access; **No map** renders the route on a local grid.
 
 The profile is coloured by gradient and labels its highest and lowest points. Move over the chart for elevation,
 distance and time; click to pin the scrubber. Its height participates in the map's safe-area calculation.
+
+### Per-kilometre splits
+
+Timed routes show an independent **Splits** entry below the route summary. It starts collapsed and renders no
+rows until clicked. The expanded table contains distance, elapsed time and moving speed; the last row holds the
+remaining partial kilometre. Total and moving time are summarized at the bottom, the fastest split is
+emphasized, and long tables scroll while their headers and totals remain visible.
+
+Click a split, or focus its row and press Enter/Space, to focus that part of the route on the map. The selected
+range is emphasized in cyan; selecting it again or collapsing the panel clears the emphasis.
+
+The header's **Details** control adds cumulative time, cumulative ascent/descent, average heart rate, moving
+speed and vertical speed. When the file has no valid heart-rate data, that column is omitted entirely.
 
 ### Overlay export
 

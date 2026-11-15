@@ -16,7 +16,7 @@
     <AssemblyVersion>$(TrailViewerVersionPrefix).0</AssemblyVersion>
     <FileVersion>$(TrailViewerVersionPrefix).0</FileVersion>
     <Product>QuickLook.Plugin.TrailViewer</Product>
-    <Description>Previews GPX, KML and KMZ tracks, routes, areas and waypoints on a map, with photos on waypoints and an English/Chinese interface.</Description>
+    <Description>Previews GPX, KML, KMZ and FIT tracks, routes, areas and waypoints on a map, with photos on waypoints and an English/Chinese interface.</Description>
   </PropertyGroup>
 
   <ItemGroup>

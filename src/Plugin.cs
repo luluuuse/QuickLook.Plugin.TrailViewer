@@ -8,7 +8,7 @@ public class Plugin : IViewer
 {
     private TrailViewerPanel _panel;
 
-    // Above the text viewer, which would otherwise show .gpx files as XML source.
+    // Above the text viewer and generic binary viewers.
     public int Priority => 10;
 
     public void Init()

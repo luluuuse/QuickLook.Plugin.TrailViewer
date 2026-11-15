@@ -25,6 +25,12 @@ test('durations preserve sub-minute seconds', () => {
   assert.equal(format.formatDuration(65), '1 min 5 s');
 });
 
+test('split timers use stopwatch notation', () => {
+  assert.equal(format.formatTimer(925), '15:25');
+  assert.equal(format.formatTimer(26383, true), '7:19:43');
+  assert.equal(format.formatTimer(3600), '1:00:00');
+});
+
 test('missing elevation is a dash rather than zero', () => {
   assert.equal(format.formatElevation(null), '\u2014');
 });

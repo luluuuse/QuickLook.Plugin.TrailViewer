@@ -6,6 +6,7 @@ Run with `python3 -B tools/make-fixtures.py` (no bytecode next to the script).
 """
 import json
 import math
+import struct
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -14,6 +15,7 @@ NS10 = 'http://www.topografix.com/GPX/1/0'
 NS11 = 'http://www.topografix.com/GPX/1/1'
 EARTH_RADIUS_M = 6371008.8  # mean Earth radius, same as viewer/gpx.js
 START = datetime(2026, 1, 1, 9, 0, 0, tzinfo=timezone.utc)
+FIT_EPOCH = datetime(1989, 12, 31, 0, 0, 0, tzinfo=timezone.utc)
 
 
 def iso(t):
@@ -65,6 +67,60 @@ def pt_xml(tag, p, indent):
 def gpx_doc(ns, version, head, body):
     return (f'<?xml version="1.0" encoding="UTF-8"?>\n'
             f'<gpx version="{version}" creator="make-fixtures" xmlns="{ns}">\n{head}{body}</gpx>\n')
+
+
+def fit_crc(data):
+    crc = 0
+    for byte in data:
+        crc ^= byte
+        for _ in range(8):
+            crc = (crc >> 1) ^ 0xA001 if crc & 1 else crc >> 1
+    return crc & 0xFFFF
+
+
+def fit_definition(local, global_number, fields, developer_fields=()):
+    has_developer = bool(developer_fields)
+    header = 0x40 | local | (0x20 if has_developer else 0)
+    out = bytearray([header, 0, 0])
+    out += struct.pack('<H', global_number)
+    out.append(len(fields))
+    for number, size, base_type in fields:
+        out += bytes([number, size, base_type])
+    if has_developer:
+        out.append(len(developer_fields))
+        for number, size, developer_index in developer_fields:
+            out += bytes([number, size, developer_index])
+    return bytes(out)
+
+
+def fit_record(local, payload, compressed_offset=None):
+    if compressed_offset is None:
+        header = local
+    else:
+        header = 0x80 | ((local & 0x03) << 5) | (compressed_offset & 0x1F)
+    return bytes([header]) + payload
+
+
+def fit_string(value, size):
+    return value.encode('utf-8')[:size].ljust(size, b'\0')
+
+
+def fit_timestamp(value):
+    return int((value - FIT_EPOCH).total_seconds())
+
+
+def fit_semicircles(degrees):
+    return round(degrees * 0x80000000 / 180)
+
+
+def fit_file(data):
+    header = bytearray([14, 0x20])
+    header += struct.pack('<H', 21158)
+    header += struct.pack('<I', len(data))
+    header += b'.FIT'
+    header += struct.pack('<H', fit_crc(header))
+    body = header + data
+    return bytes(body) + struct.pack('<H', fit_crc(body))
 
 
 def track_xml(name, segments):
@@ -203,6 +259,110 @@ def main():
     files['truncated.gpx'] = files['track-time-ele.gpx'][:len(files['track-time-ele.gpx']) // 2]
     exp['truncated.gpx'] = {'error': True}
 
+    # FIT activity with native and compressed timestamps, elevation, a course point and a developer field.
+    # The developer field proves that vendor metrics are skipped without shifting every following record.
+    fit_start = START + timedelta(days=5)
+    fit_points = [
+        {
+            'lat': 46.50 + i * 0.0002,
+            'lon': 7.90 + i * 0.0003,
+            'ele': 1500 + i * 5,
+            'time': fit_start + timedelta(seconds=15 * i),
+        }
+        for i in range(5)
+    ]
+    fit_course_point = {
+        'lat': fit_points[2]['lat'],
+        'lon': fit_points[2]['lon'],
+        'name': 'Hut',
+        'time': fit_points[2]['time'],
+    }
+    timestamp_field = (253, 4, 0x86)
+    record_fields = [
+        timestamp_field,
+        (0, 4, 0x85),   # position_lat, sint32
+        (1, 4, 0x85),   # position_long, sint32
+        (2, 2, 0x84),   # altitude, uint16
+        (3, 1, 0x02),   # heart_rate, uint8
+        (5, 4, 0x86),   # distance, uint32
+    ]
+    course_point_fields = [
+        (1, 4, 0x86),
+        (2, 4, 0x85),
+        (3, 4, 0x85),
+        (4, 4, 0x86),
+        (5, 1, 0x00),
+        (6, 16, 0x07),
+    ]
+    fit_data = bytearray()
+    fit_data += fit_definition(4, 0, [(0, 1, 0x00)])
+    fit_data += fit_record(4, bytes([4]))  # file_id type: activity
+    fit_data += fit_definition(2, 31, [(5, 32, 0x07)])
+    fit_data += fit_record(2, fit_string('Synthetic FIT', 32))
+    fit_data += fit_definition(1, 18, [
+        timestamp_field,
+        (7, 4, 0x86),   # total_elapsed_time, scale 1000
+        (8, 4, 0x86),   # total_timer_time, scale 1000
+        (9, 4, 0x86),   # total_distance, scale 100
+    ])
+    fit_distance = sum(
+        haversine((a['lat'], a['lon']), (b['lat'], b['lon']))
+        for a, b in zip(fit_points, fit_points[1:])
+    )
+    fit_data += fit_record(1, (
+        struct.pack('<I', fit_timestamp(fit_points[-1]['time']))
+        + struct.pack('<III', 3_600_000, 3_300_000, round(fit_distance * 100))
+    ))
+    fit_data += fit_definition(3, 32, course_point_fields)
+    fit_data += fit_record(3, (
+        struct.pack('<I', fit_timestamp(fit_course_point['time']))
+        + struct.pack('<iiI', fit_semicircles(fit_course_point['lat']),
+                      fit_semicircles(fit_course_point['lon']), round(fit_distance * 50))
+        + bytes([0])
+        + fit_string(fit_course_point['name'], 16)
+    ))
+    fit_data += fit_definition(0, 20, record_fields, developer_fields=[(0, 2, 0)])
+    for index, point in enumerate(fit_points):
+        values = (
+            struct.pack('<iiHBI',
+                        fit_semicircles(point['lat']),
+                        fit_semicircles(point['lon']),
+                        round((point['ele'] + 500) * 5),
+                        118 + index,
+                        round(haversine((fit_points[0]['lat'], fit_points[0]['lon']),
+                                        (point['lat'], point['lon'])) * 100))
+            + b'\x01\x02'
+        )
+        if index == 0:
+            fit_data += fit_record(0, struct.pack('<I', fit_timestamp(point['time'])) + values)
+        else:
+            fit_data += fit_record(0, values,
+                                   compressed_offset=fit_timestamp(point['time']) & 0x1F)
+    files['synthetic.fit'] = fit_file(bytes(fit_data))
+    exp['synthetic.fit'] = expected(
+        tracks=[('Synthetic FIT', [fit_points])],
+        waypoints=[fit_course_point],
+    )
+    exp['synthetic.fit']['durationSeconds'] = 3600
+
+    # A valid workout framing with no GPS records must reach a readable error instead of being previewed as
+    # an empty map.
+    no_gps = (
+        fit_definition(4, 0, [(0, 1, 0x00)])
+        + fit_record(4, bytes([5]))  # file_id type: workout
+        + fit_definition(1, 18, [(7, 4, 0x86), (8, 4, 0x86)])
+        + fit_record(1, struct.pack('<II', 600_000, 600_000))
+    )
+    files['no-gps.fit'] = fit_file(no_gps)
+    exp['no-gps.fit'] = {'error': True}
+
+    bad_crc = bytearray(files['synthetic.fit'])
+    bad_crc[-1] ^= 0xFF
+    files['bad-crc.fit'] = bytes(bad_crc)
+    exp['bad-crc.fit'] = {'error': True}
+    files['truncated.fit'] = files['synthetic.fit'][:-100]
+    exp['truncated.fit'] = {'error': True}
+
     # A long file name on a tall, narrow window. The card is only as wide as its longest line, so the name is
     # part of the fixture: this is the width that used to push the corner switches onto the card.
     t5 = START + timedelta(days=4)
@@ -236,8 +396,8 @@ def main():
     files['not-gpx.gpx'] = ('<?xml version="1.0" encoding="UTF-8"?>\n'
                             '<kml xmlns="http://www.opengis.net/kml/2.2"><Document/></kml>\n')
 
-    for name, text in files.items():
-        (OUT / name).write_bytes(text.encode('utf-8'))
+    for name, content in files.items():
+        (OUT / name).write_bytes(content if isinstance(content, bytes) else content.encode('utf-8'))
     # Merged into whatever is already there rather than replacing it: this script writes the GPX fixtures,
     # and the KML/KMZ ones (and their expected numbers) are checked in beside them. Rewriting the file from
     # scratch silently dropped thirteen entries the first time it was run.
@@ -245,8 +405,11 @@ def main():
     detect = known.get('detect', {})
     # Anything already listed keeps the answer it was given: a few of these were corrected by hand against
     # what the detector actually does (not-gpx.gpx is accepted), and a formula here would undo that.
+    detect.setdefault('truncated.fit', False)
     for name in sorted(files):
-        detect.setdefault(name, name not in ('empty.gpx', 'broken.gpx', 'not-gpx.gpx', 'late-root.gpx'))
+        detect.setdefault(name, name not in (
+            'empty.gpx', 'broken.gpx', 'not-gpx.gpx', 'late-root.gpx', 'truncated.fit',
+        ))
     viewer = known.get('viewer', {})
     # Shallow merge per fixture: the numbers come from here, while keys this script does not produce (areas,
     # elevation, the line and marker counts) stay as checked in.

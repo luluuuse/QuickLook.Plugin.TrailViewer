@@ -27,6 +27,7 @@ const measure = (page) => page.evaluate(() => {
     parts[name] = { l: Math.round(box.left), r: Math.round(box.right), t: Math.round(box.top), b: Math.round(box.bottom) };
   };
   add('info', '#info');
+  add('splits', '#splits');
   add('export', '.export-switch');
   add('zoom', '.leaflet-control-zoom');
   add('layers', '.layer-switch');
@@ -91,9 +92,11 @@ async function main() {
   // The card hugs its own text: a portrait window is no reason to stretch it across the map.
   check('the summary keeps its own width', p.info.l === 10 && p.info.r < m.w * 0.65,
     `${p.info.l}..${p.info.r} in ${m.w}`);
-  // Four rows in a column was the old behaviour: the ceiling on the card's width collapsed and every number
-  // moved to a line of its own.
-  check('the card is a band, not a column', p.info.b - p.info.t < 240, `${p.info.b - p.info.t} px tall`);
+  // Four rows in a column was the old behaviour. The split table now makes the card taller on purpose, but it
+  // must still leave the majority of a portrait map visible above the profile.
+  const portraitMapRoom = p.profile.t - p.info.t;
+  check('the split-aware card leaves most of the portrait map visible',
+    p.info.b - p.info.t < portraitMapRoom * 0.6, `${p.info.b - p.info.t} of ${portraitMapRoom} px`);
 
   const pairs = await page.evaluate(() => [...document.querySelectorAll('#info .stats .pair')].map((n) => {
     const box = n.getBoundingClientRect();

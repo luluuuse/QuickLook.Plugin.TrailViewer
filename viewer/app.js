@@ -1,8 +1,10 @@
 // Track viewer page: loads the file from ?src=, draws it with Leaflet and reports "ready\t<summary>" or
 // "error:<text>" to the plugin (window.chrome.webview). Works in any browser through a local web server.
-// GPX and KML are recognised by their root element, so a mis-named file still opens.
+// FIT is recognised by its binary signature. GPX and KML are recognised by their root element, so a
+// mis-named text track still opens.
 import { GpxError, parseGpxDocument, parseXml, summarize } from './gpx.js';
 import { KmlError, parseKmlDocument } from './kml.js';
+import { FitError, isFit, parseFit } from './fit.js';
 import { getLang, isChinese, langLabel, onLangChange, t, toggleLang, units } from './i18n.js';
 import { installSpaceGuard } from './focus.js';
 import { createPhotoViewer } from './photo-viewer.js';
@@ -18,10 +20,14 @@ import {
 import {
   formatCoord,
   formatDistance,
+  formatSpeed,
+  formatTimer,
   formatters,
 } from './format.js';
 import { createWaypointContent, renderPointPopup } from './waypoint-content.js';
 import { createSummaryView } from './summary-view.js';
+import { analyseSplits } from './split-analysis.js';
+import { createSplitsView } from './split-view.js';
 import { createTrackLayer } from './track-layer.js';
 import { createWaypointController } from './waypoint-controller.js';
 import { createOverlayExport } from './overlay-export.js';
@@ -103,6 +109,14 @@ function repaintLocalized() {
   }
 }
 
+const splitController = createSplitsView({
+  el,
+  t,
+  formatSpeed,
+  formatTimer,
+  onLayoutChange: () => mapViewController?.refreshControls({ refitHome: false }),
+  onSelect: (split) => focusSplit(split),
+});
 const renderInfo = createSummaryView({
   el,
   fileName,
@@ -127,6 +141,16 @@ const trackLayer = createTrackLayer({
   onFocusBounds: (bounds, options) => mapViewController?.focusBounds(bounds, options),
 });
 let activeTrackLayer = null;
+function focusSplit(split) {
+  if (!split) {
+    activeTrackLayer?.clearSplitHighlight();
+    return;
+  }
+  const highlight = activeTrackLayer?.highlightRange(split.fromMeters, split.toMeters);
+  if (highlight?.bounds.isValid()) {
+    mapViewController?.focusBounds(highlight.bounds, { maxZoom: 16, animate: true });
+  }
+}
 const waypointController = createWaypointController({
   L,
   el,
@@ -218,11 +242,13 @@ async function main() {
     return;
   }
 
-  let text;
+  let bytes;
   try {
     const response = await fetch(src);
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    text = await response.text();
+    // FIT is binary. Reading the response as bytes first also lets a FIT file keep working if it was renamed;
+    // GPX and KML are decoded only after the FIT signature check fails.
+    bytes = new Uint8Array(await response.arrayBuffer());
   } catch (e) {
     showError(t('error.read', { detail: e.message }));
     return;
@@ -231,16 +257,33 @@ async function main() {
   let gpx;
   let summary;
   try {
-    // One XML parse for both formats; the root element decides which reader runs. Keyhole markup uses
-    // <kml> at the root, GPX uses <gpx>, so neither can be mistaken for the other.
-    const doc = parseXml(text);
-    const rootName = doc.documentElement?.localName;
-    if (rootName !== 'kml' && rootName !== 'gpx') {
-      throw new KmlError(t('error.notTrack'));
+    if (isFit(bytes)) {
+      gpx = parseFit(bytes);
+    } else {
+      // One XML parse for both text formats; the root element decides which reader runs. Keyhole markup uses
+      // <kml> at the root, GPX uses <gpx>, so neither can be mistaken for the other.
+      const doc = parseXml(new TextDecoder().decode(bytes));
+      const rootName = doc.documentElement?.localName;
+      if (rootName !== 'kml' && rootName !== 'gpx') {
+        throw new KmlError(t('error.notTrack'));
+      }
+      gpx = rootName === 'kml' ? parseKmlDocument(doc) : parseGpxDocument(doc);
     }
-    gpx = rootName === 'kml' ? parseKmlDocument(doc) : parseGpxDocument(doc);
     summary = summarize(gpx);
   } catch (e) {
+    if (e instanceof FitError) {
+      const key = {
+        notFit: 'error.notFit',
+        truncated: 'error.fitTruncated',
+        crc: 'error.fitCrc',
+        corrupt: 'error.fitCorrupt',
+        noGps: 'error.fitNoGps',
+        workoutNoGps: 'error.fitWorkoutNoGps',
+        unsupported: 'error.fitUnsupported',
+      }[e.code] || 'error.fitCorrupt';
+      showError(t(key));
+      return;
+    }
     const known = e instanceof GpxError || e instanceof KmlError;
     showError(known ? e.message : t('error.unexpected', { detail: e.message }));
     return;
@@ -255,7 +298,9 @@ async function main() {
     descent: elevations.descent,
     bins: elevations.slopeBins,
   }) : null;
+  const splitData = analyseSplits(gpx, summary);
   renderInfo(gpx, summary, elevations, hikeEstimate);
+  splitController.render(splitData, summary, { reset: true });
   // Drawn before the map: the fit below needs to know whether the panel is there, and the panel's own height
   // is fixed in CSS, so the map never has to be told its size changed.
   const profile = elevations ? profileController.render(gpx, elevations) : null;
@@ -342,6 +387,7 @@ async function main() {
     applyPageLanguage();
     syncPreferences();
     renderInfo(gpx, summary, elevations, hikeEstimate);
+    splitController.render(splitData, summary);
     switcher.relabel();
     locateCtrl.relabel();
     exportCtrl?.relabel();
@@ -365,7 +411,18 @@ async function main() {
   });
 
   const api = {
-    gpx, summary, map, scrub, photos: photoViewer, hikeEstimate,
+    gpx, summary, splits: splitData, map, scrub, photos: photoViewer, hikeEstimate,
+    splitPanel: {
+      open: splitController.open,
+      close: splitController.close,
+      toggle: splitController.toggle,
+      isOpen: splitController.isOpen,
+      select: splitController.select,
+      selected: splitController.selected,
+      mode: splitController.mode,
+      setMode: splitController.setMode,
+      toggleMode: splitController.toggleMode,
+    },
     // The worked-out route shape, without the point arrays a test does not need.
     profile: elevations && {
       min: elevations.min, max: elevations.max, total: elevations.total,

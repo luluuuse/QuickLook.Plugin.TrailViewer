@@ -71,6 +71,7 @@ export function createMapView({ map, isChromeHidden }) {
   let layoutState = 'inline';
   let safeRect = makeRect(0, 0, container.clientWidth, container.clientHeight);
   let layoutFrame = 0;
+  let pendingRefitHome = true;
   let fitFrame = 0;
   let revealFrame = 0;
   let revealAgain = false;
@@ -104,6 +105,7 @@ export function createMapView({ map, isChromeHidden }) {
     addObserved(container);
     for (const selector of [
       '#info',
+      '#splits',
       '#profile',
       '#export',
       '.waypoint-overview',
@@ -140,9 +142,12 @@ export function createMapView({ map, isChromeHidden }) {
 
     const hidden = isChromeHidden();
     const card = hidden ? null : mapRect(document.getElementById('info'));
+    const splitPanel = hidden ? null : document.getElementById('splits');
+    const splits = splitPanel && shown(splitPanel) ? mapRect(splitPanel) : null;
     const zoom = mapRect(zoomWrap);
     const zoomWidth = zoom?.width || 30;
     const row = controlWidths(tools);
+    // The red zoom/locate/export column belongs to the summary card. Expanding the split panel must not move it.
     const zoomLeft = card ? card.right + 8 : 10;
     const zoomRight = zoomLeft + zoomWidth;
     const inlineRoom = innerWidth - zoomRight - 22;
@@ -153,6 +158,16 @@ export function createMapView({ map, isChromeHidden }) {
     const wrappedRoom = Math.max(0, innerWidth - zoomRight - 22);
     const wrapped = !inline && wrappedRoom >= minWrapped;
     const next = inline ? 'inline' : wrapped ? 'wrapped' : 'docked';
+    const splitWouldMeetZoom = splits && zoom
+      && splits.right > zoomLeft - 6;
+    const splitTop = Math.max(
+      (card?.bottom || 0) + 8,
+      splitPanel?.classList.contains('expanded') && splitWouldMeetZoom
+        ? (zoom?.bottom || 0) + 8
+        : 0,
+      10,
+    );
+    setVariable('--splits-top', cssPixels(splitTop || 10));
 
     const layoutClass = `layout-${next}`;
     if (next !== layoutState || !document.body.classList.contains(layoutClass)) {
@@ -163,7 +178,7 @@ export function createMapView({ map, isChromeHidden }) {
     }
 
     if (layoutState === 'docked') {
-      const cardBottom = card ? card.bottom : 8;
+      const cardBottom = card?.bottom || 8;
       const toolsRoom = Math.max(0, innerWidth - zoomWidth - 32);
       const toolsBelowZoom = toolsRoom < minWrapped;
       setVariable('--zoom-left', '0px');
@@ -196,6 +211,7 @@ export function createMapView({ map, isChromeHidden }) {
     const hidden = isChromeHidden();
     const topBoxes = [
       hidden ? null : mapRect(document.getElementById('info')),
+      hidden ? null : mapRect(document.getElementById('splits')),
       mapRect(document.querySelector('#map .leaflet-top.leaflet-left')),
       mapRect(document.querySelector('#map .leaflet-top.leaflet-right')),
       mapRect(document.getElementById('export')),
@@ -278,11 +294,14 @@ export function createMapView({ map, isChromeHidden }) {
     }
   }
 
-  function scheduleRefresh() {
+  function scheduleRefresh({ refitHome = true } = {}) {
+    pendingRefitHome = layoutFrame ? pendingRefitHome && refitHome : refitHome;
     if (layoutFrame) return;
     layoutFrame = requestAnimationFrame(() => {
+      const shouldRefitHome = pendingRefitHome;
+      pendingRefitHome = true;
       layoutFrame = 0;
-      refreshLayout();
+      refreshLayout({ refitHome: shouldRefitHome });
     });
   }
 
@@ -397,14 +416,14 @@ export function createMapView({ map, isChromeHidden }) {
     focusSelection,
     revealPoint,
     observeControls() {
-      observer = new ResizeObserver(scheduleRefresh);
+      observer = new ResizeObserver(() => scheduleRefresh({ refitHome: false }));
       observeLayoutNodes();
       placeControls();
-      addEventListener('resize', scheduleRefresh);
+      addEventListener('resize', () => scheduleRefresh({ refitHome: true }));
       refreshLayout({ refitHome: false });
     },
-    refreshControls() {
-      scheduleRefresh();
+    refreshControls({ refitHome = true } = {}) {
+      scheduleRefresh({ refitHome });
     },
     safeRect: () => ({ ...safeRect }),
     layoutState: () => layoutState,

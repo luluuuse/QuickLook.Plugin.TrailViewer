@@ -191,6 +191,386 @@ body.no-map #map {
   gap: 1px;
 }
 
+/* A separate, collapsed-by-default split entry below the summary. Opening it reveals only the kilometre rows;
+   the column labels and the two totals stay in place while those rows scroll. */
+#splits {
+  position: absolute;
+  z-index: 1000;
+  top: var(--splits-top, 100px);
+  left: 10px;
+  box-sizing: border-box;
+  width: max-content;
+  max-width: min(288px, calc(100% - 20px));
+  overflow: hidden;
+  border-radius: 6px;
+  background: var(--panel);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.4);
+}
+
+#splits[hidden] {
+  display: none;
+}
+
+#splits.expanded {
+  width: min(288px, calc(100% - 20px));
+}
+
+#splits.expanded[data-mode="detailed"] {
+  width: min(520px, calc(100% - 20px));
+  max-width: min(520px, calc(100% - 20px));
+}
+
+#splits.expanded[data-mode="detailed"]:has(.splits-table.without-heart) {
+  width: min(470px, calc(100% - 20px));
+  max-width: min(470px, calc(100% - 20px));
+}
+
+.split-panel-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.split-toggle {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: 8px;
+  width: auto;
+  min-width: 0;
+  min-height: 36px;
+  padding: 7px 11px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.split-toggle:hover {
+  background: rgba(255, 255, 255, 0.055);
+}
+
+#splits.expanded .split-panel-header {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.09);
+}
+
+.split-toggle-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.split-toggle-count {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 9.5px;
+  white-space: nowrap;
+}
+
+.split-chevron {
+  width: 13px;
+  height: 13px;
+  flex: none;
+  fill: none;
+  stroke: var(--muted);
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: transform 120ms ease;
+}
+
+.split-mode-toggle {
+  flex: none;
+  min-width: 38px;
+  margin-right: 9px;
+  padding: 3px 7px;
+  border: 1px solid #4b5963;
+  border-radius: 9px;
+  background: #23313a;
+  color: #b9e9f5;
+  cursor: pointer;
+  font: inherit;
+  font-size: 9.5px;
+  line-height: 15px;
+}
+
+.split-mode-toggle:hover,
+.split-mode-toggle[aria-pressed="true"] {
+  border-color: #72e7ff;
+  color: #ffffff;
+}
+
+#splits.expanded .split-chevron {
+  transform: rotate(180deg);
+}
+
+.split-content {
+  padding: 0 10px 10px;
+}
+
+.splits-scroll {
+  max-height: clamp(108px, 22vh, 210px);
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.14);
+  scrollbar-color: #555 transparent;
+  scrollbar-width: thin;
+}
+
+#splits[data-mode="detailed"] .splits-scroll {
+  overflow-x: auto;
+}
+
+.splits-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  table-layout: fixed;
+  font-variant-numeric: tabular-nums;
+}
+
+#splits[data-mode="detailed"] .splits-table {
+  min-width: 480px;
+}
+
+#splits[data-mode="detailed"] .splits-table.without-heart {
+  min-width: 430px;
+}
+
+.splits-table thead {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #292929;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.09);
+}
+
+.splits-table th {
+  padding: 5px 3px;
+  color: #b8b8b8;
+  font-size: 9px;
+  font-weight: 500;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.splits-table th:first-child,
+.splits-table td:first-child {
+  width: 22%;
+  padding-left: 6px;
+}
+
+.splits-table th:nth-child(2),
+.splits-table td:nth-child(2) {
+  width: 27%;
+}
+
+.splits-table th:nth-child(3),
+.splits-table td:nth-child(3) {
+  width: 23%;
+}
+
+.splits-table th:nth-child(4),
+.splits-table td:nth-child(4) {
+  width: 28%;
+  padding-right: 6px;
+}
+
+#splits[data-mode="detailed"] .splits-table .split-index {
+  width: 30px;
+}
+
+#splits[data-mode="detailed"] .splits-table .split-distance {
+  width: 52px;
+}
+
+#splits[data-mode="detailed"] .splits-table .split-time {
+  width: 47px;
+}
+
+#splits[data-mode="detailed"] .splits-table .split-cumulativeTime {
+  width: 60px;
+}
+
+#splits[data-mode="detailed"] .splits-table .split-ascent,
+#splits[data-mode="detailed"] .splits-table .split-descent {
+  width: 40px;
+}
+
+#splits[data-mode="detailed"] .splits-table .split-heartRate {
+  width: 45px;
+}
+
+#splits[data-mode="detailed"] .splits-table .split-movingSpeed {
+  width: 59px;
+}
+
+#splits[data-mode="detailed"] .splits-table .split-verticalSpeed {
+  width: 65px;
+}
+
+#splits[data-mode="detailed"] .splits-table th:first-child,
+#splits[data-mode="detailed"] .splits-table td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: #242424;
+}
+
+#splits[data-mode="detailed"] .splits-table th:first-child {
+  background: #292929;
+}
+
+#splits[data-mode="detailed"] .splits-table tbody tr.fastest td:first-child {
+  background: #303030;
+}
+
+#splits[data-mode="detailed"] .splits-table tbody tr.selected td:first-child {
+  background: #263a4c;
+}
+
+.split-column-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.split-icon {
+  width: 13px;
+  height: 13px;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.splits-table td {
+  padding: 5px 3px;
+  border-top: 1px solid rgba(255, 255, 255, 0.055);
+  color: #ddd;
+  font-size: 11.5px;
+  white-space: nowrap;
+}
+
+/* Numbers read as a column: right-aligned, so the gap sits between columns rather than inside each cell. */
+#splits[data-mode="detailed"] .splits-table th,
+#splits[data-mode="detailed"] .splits-table td {
+  text-align: right;
+}
+
+#splits[data-mode="detailed"] .splits-table th:first-child,
+#splits[data-mode="detailed"] .splits-table td:first-child {
+  text-align: left;
+}
+
+.splits-table tbody tr:first-child td {
+  border-top: 0;
+}
+
+.splits-table tbody tr {
+  cursor: pointer;
+}
+
+.splits-table tbody tr:hover {
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.splits-table tbody tr:focus-visible {
+  outline: 2px solid #8fc7ff;
+  outline-offset: -2px;
+}
+
+.splits-table tbody tr.fastest {
+  background: rgba(255, 255, 255, 0.085);
+}
+
+.splits-table tbody tr.selected {
+  background: rgba(47, 155, 255, 0.2);
+  box-shadow: inset 3px 0 0 #72e7ff;
+}
+
+.splits-table tbody tr.selected .split-number,
+.splits-table tbody tr.selected .split-distance,
+.splits-table tbody tr.selected .split-time {
+  color: #ffffff !important;
+}
+
+.split-number {
+  color: #f2f2f2 !important;
+  font-weight: 600;
+}
+
+.split-distance,
+.split-time,
+.split-speed {
+  font-weight: 500;
+}
+
+.split-speed {
+  color: #c9c9c9 !important;
+}
+
+.splits-table tr.fastest .split-speed {
+  color: #ff626d !important;
+  font-weight: 600;
+}
+
+.splits-totals {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 8px;
+  padding: 8px 9px 7px;
+  border-radius: 4px;
+  background: #242424;
+}
+
+.split-total {
+  display: flex;
+  min-width: 0;
+  flex-direction: column-reverse;
+}
+
+.split-total strong {
+  color: #f4f4f4;
+  font-size: 17px;
+  font-weight: 500;
+  line-height: 1.15;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.split-total span {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 9.5px;
+  white-space: nowrap;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
 #info .empty {
   margin: 8px 0 0;
   color: var(--muted);
@@ -207,6 +587,10 @@ body.no-map #map {
 @media (max-aspect-ratio: 1/1), (max-width: 959px) {
   #info {
     max-width: min(310px, calc(100% - 20px));
+  }
+
+  .splits-scroll {
+    max-height: clamp(96px, 16vh, 132px);
   }
 
   body.stepped #map .leaflet-top.leaflet-left .leaflet-control {
@@ -267,6 +651,30 @@ body.layout-docked #info[data-details="full"] {
     clip-path: inset(50%);
     white-space: nowrap;
   }
+
+  .splits-table th,
+  .splits-table td {
+    padding-right: 3px;
+    padding-left: 3px;
+  }
+
+  .splits-table th:first-child,
+  .splits-table td:first-child {
+    padding-left: 6px;
+  }
+
+  .splits-table th:nth-child(4),
+  .splits-table td:nth-child(4) {
+    padding-right: 6px;
+  }
+
+  .splits-table th {
+    font-size: 9px;
+  }
+
+  .splits-table td {
+    font-size: 10.5px;
+  }
 }
 
 /* Floating over the map like the summary, in the same translucent panel: the tiles keep going underneath and
@@ -299,6 +707,7 @@ body.with-profile .leaflet-bottom {
    markers, language) and the profile. The scale and the OSM credit stay -- one says how big the picture is, the
    other is the terms the tiles come under -- and with no panel in the way they drop back to the floor. */
 body.chrome-hidden #info,
+body.chrome-hidden #splits,
 body.chrome-hidden #profile,
 body.chrome-hidden #map .leaflet-top {
   display: none;

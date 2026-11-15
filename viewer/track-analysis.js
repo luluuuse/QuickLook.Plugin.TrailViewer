@@ -178,6 +178,55 @@ export function routeDirectionSamples(paths, { interval = 1000, offset = 0 } = {
   return samples;
 }
 
+function pointAlong(a, b, ratio) {
+  return {
+    lat: a.lat + (b.lat - a.lat) * ratio,
+    lon: a.lon + (b.lon - a.lon) * ratio,
+  };
+}
+
+/**
+ * Returns the parts of a route between two cumulative distances. Segment boundaries stay separate, so a
+ * highlight never draws a line across a recording gap; both requested ends are interpolated exactly.
+ */
+export function sliceRouteByDistance(paths, { from = 0, to = Infinity, offset = 0 } = {}) {
+  const slices = [];
+  let along = offset;
+  const end = Math.max(from, to);
+  for (const points of paths) {
+    let current = [];
+    for (let index = 1; index < points.length; index += 1) {
+      const previousPoint = points[index - 1];
+      const point = points[index];
+      const step = distanceMeters(previousPoint, point);
+      const segmentStart = along;
+      const segmentEnd = along + step;
+      const start = Math.max(from, segmentStart);
+      const finish = Math.min(end, segmentEnd);
+      if (finish > start && step > 0) {
+        const a = pointAlong(
+          previousPoint,
+          point,
+          Math.min(1, Math.max(0, (start - segmentStart) / step)),
+        );
+        const b = pointAlong(
+          previousPoint,
+          point,
+          Math.min(1, Math.max(0, (finish - segmentStart) / step)),
+        );
+        if (current.length === 0) current.push(a);
+        current.push(b);
+      }
+      along = segmentEnd;
+      if (along >= end) break;
+    }
+    if (current.length >= 2) slices.push(current);
+    current = [];
+    if (along >= end) break;
+  }
+  return slices;
+}
+
 /**
  * One sample for every whole distance interval along a path, with the course at that point. The point is
  * interpolated rather than snapped to the next recorded GPS sample, so kilometre labels stay honest.

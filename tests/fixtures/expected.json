@@ -28,7 +28,11 @@
     "gps-anomaly.gpx": true,
     "dense-waypoints.kml": true,
     "gps-anomaly-band.gpx": true,
-    "mixed-anomalies.gpx": true
+    "mixed-anomalies.gpx": true,
+    "truncated.fit": false,
+    "bad-crc.fit": true,
+    "no-gps.fit": true,
+    "synthetic.fit": true
   },
   "viewer": {
     "gpx10.gpx": {
@@ -241,6 +245,28 @@
       "end": "2026-01-02T19:06:20Z",
       "durationSeconds": 380,
       "elevation": false
+    },
+    "synthetic.fit": {
+      "tracks": 1,
+      "segments": 1,
+      "routes": 0,
+      "waypoints": 1,
+      "areas": 0,
+      "points": 5,
+      "distanceMeters": 127.9,
+      "start": "2026-01-06T09:00:00Z",
+      "end": "2026-01-06T09:01:00Z",
+      "durationSeconds": 3600,
+      "elevation": true
+    },
+    "no-gps.fit": {
+      "error": true
+    },
+    "bad-crc.fit": {
+      "error": true
+    },
+    "truncated.fit": {
+      "error": true
     }
   }
 }

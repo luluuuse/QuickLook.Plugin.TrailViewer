@@ -13,6 +13,7 @@ const CONTENT_TYPES = {
   '.gpx': 'application/gpx+xml; charset=utf-8',
   '.kml': 'application/vnd.google-earth.kml+xml; charset=utf-8',
   '.kmz': 'application/vnd.google-earth.kmz',
+  '.fit': 'application/vnd.ant.fit',
 };
 
 function startStaticServer(root = path.resolve(__dirname, '..', '..')) {

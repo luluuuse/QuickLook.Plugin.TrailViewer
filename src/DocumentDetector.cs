@@ -6,7 +6,8 @@ namespace QuickLook.Plugin.TrailViewer;
 
 /// <summary>
 /// Decides whether a file is a track document this plugin can draw: a .gpx or .kml file whose root element
-/// is &lt;gpx&gt; or &lt;kml&gt;, or a .kmz archive that holds one.
+/// is &lt;gpx&gt; or &lt;kml&gt;, a structurally complete .fit activity/course, or a .kmz archive that holds a
+/// KML document.
 /// Only the start of the file is read, so huge tracks are accepted without parsing them here;
 /// the web viewer parses the whole file and reports errors further in.
 /// </summary>
@@ -14,7 +15,7 @@ internal static class DocumentDetector
 {
     private const int HeadBytes = 64 * 1024;
 
-    private static readonly string[] Extensions = { ".gpx", ".kml" };
+    private static readonly string[] Extensions = { ".gpx", ".kml", ".fit" };
 
     // Matched against the local name, so the kml: prefix and the missing namespace of older files both work.
     private static readonly string[] Roots = { "gpx", "kml" };
@@ -33,6 +34,8 @@ internal static class DocumentDetector
             var head = ReadHead(path);
             if (head.Length == 0)
                 return false;
+            if (path.EndsWith(".fit", StringComparison.OrdinalIgnoreCase))
+                return IsFit(head, new FileInfo(path).Length);
 
             var settings = new XmlReaderSettings
             {
@@ -50,6 +53,29 @@ internal static class DocumentDetector
         {
             return false;
         }
+    }
+
+    /// <summary>
+    /// Checks only the FIT framing. The viewer validates both CRCs and whether the data contains GPS records;
+    /// accepting a structurally complete but damaged file here lets it show a useful, localised error page.
+    /// </summary>
+    private static bool IsFit(byte[] head, long fileLength)
+    {
+        if (head.Length < 14 || fileLength < 14)
+            return false;
+
+        var headerSize = head[0];
+        if (headerSize != 12 && headerSize != 14)
+            return false;
+        if (head[8] != (byte)'.' || head[9] != (byte)'F'
+            || head[10] != (byte)'I' || head[11] != (byte)'T')
+            return false;
+
+        var dataSize = (long)(head[4] | (head[5] << 8) | (head[6] << 16) | (head[7] << 24));
+        // The uint32 data size is read as a positive long even when bit 31 is set.
+        if (dataSize < 0)
+            dataSize += 1L << 32;
+        return headerSize + dataSize + 2 == fileLength;
     }
 
     private static bool HasTrackExtension(string path)

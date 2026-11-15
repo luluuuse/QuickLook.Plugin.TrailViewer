@@ -14,7 +14,7 @@ namespace QuickLook.Plugin.TrailViewer;
 
 /// <summary>
 /// Hosts the bundled web viewer (viewer/index.html) in WebView2. The viewer files and the folder of
-/// the GPX/KML file - or of the .kml unpacked from a KMZ - are exposed on two virtual hosts;
+/// the GPX/KML/FIT file - or of the .kml unpacked from a KMZ - are exposed on two virtual hosts;
 /// the page reports back "ready\t&lt;summary&gt;" or "error:&lt;text&gt;".
 /// </summary>
 internal sealed class TrailViewerPanel : UserControl, IDisposable
