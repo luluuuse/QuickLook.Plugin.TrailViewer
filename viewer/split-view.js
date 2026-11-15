@@ -90,6 +90,7 @@ export function createSplitsView({
   let expanded = false;
   let selectedIndex = null;
   let mode = 'basic';
+  let focusActivatedIndex = null;
 
   function updateSelectionRows() {
     for (const row of panel.querySelectorAll('.splits-table tbody tr')) {
@@ -104,6 +105,12 @@ export function createSplitsView({
     selectedIndex = null;
     updateSelectionRows();
     if (notify) onSelect?.(null);
+  }
+
+  function select(index) {
+    selectedIndex = index;
+    updateSelectionRows();
+    onSelect?.(data.splits[index - 1]);
   }
 
   function choose(index) {
@@ -180,10 +187,22 @@ export function createSplitsView({
         }
         row.append(cell);
       }
-      row.addEventListener('click', () => choose(split.index));
-      row.addEventListener('keydown', (event) => {
-        if (event.key !== 'Enter' && event.key !== ' ') return;
-        event.preventDefault();
+      row.addEventListener('focus', () => {
+        if (selectedIndex !== split.index) {
+          select(split.index);
+          focusActivatedIndex = split.index;
+        }
+      });
+      row.addEventListener('blur', () => {
+        if (focusActivatedIndex === split.index) focusActivatedIndex = null;
+      });
+      row.addEventListener('click', () => {
+        // Moving focus into an unselected row already selected it. Consume that focus-generated click so the
+        // pointer action does not immediately toggle the new selection back off.
+        if (focusActivatedIndex === split.index) {
+          focusActivatedIndex = null;
+          return;
+        }
         choose(split.index);
       });
       body.append(row);
@@ -250,7 +269,9 @@ export function createSplitsView({
   }
 
   function setExpanded(next) {
-    if (!next) clearSelection();
+    if (!next) {
+      clearSelection();
+    }
     expanded = Boolean(next);
     draw();
     requestAnimationFrame(() => onLayoutChange?.());

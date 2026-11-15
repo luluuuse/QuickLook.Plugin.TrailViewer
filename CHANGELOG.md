@@ -17,6 +17,22 @@ Added / Changed / Deprecated / Removed / Fixed / Security 分类；没有内容�
 
 - None.
 
+## 1.19.1 — 2026-11-15
+
+### 中文
+
+#### 删除
+
+- 移除每公里分段以 `Enter` / `Space` 激活的快捷方式及相关文案。分段行通过 `Tab` 获得焦点时会立即选中
+  并定位，不再需要额外按键；鼠标点击同样可以选圈。
+
+### English
+
+#### Removed
+
+- Removed split-row Enter/Space activation and its documentation. Moving focus to a row with Tab now selects
+  and locates it immediately; clicking a row also selects it.
+
 ## 1.19.0 — 2026-11-15
 
 ### 中文

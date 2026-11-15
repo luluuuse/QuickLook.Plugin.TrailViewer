@@ -58,6 +58,7 @@ async function main() {
       rows: [...document.querySelectorAll('.splits-table tbody tr')].map((row) => (
         [...row.cells].map((cell) => cell.textContent)
       )),
+      tabbableRows: document.querySelectorAll('.splits-table tbody tr[tabindex="0"]').length,
       totals: [...document.querySelectorAll('.split-total')].map((node) => ({
         value: node.querySelector('strong').textContent,
         label: node.querySelector('span').textContent,
@@ -137,6 +138,9 @@ async function main() {
     state.mode === 'basic' && state.modeButton === 'Details' && state.modePressed === 'false'
       && state.tableMode === 'basic',
     JSON.stringify({ mode: state.mode, button: state.modeButton, pressed: state.modePressed }));
+  check('every split row remains reachable with Tab',
+    state.tabbableRows === state.rows.length,
+    `${state.tabbableRows}/${state.rows.length} tabbable rows`);
   check('the route has a whole-kilometre row for every split',
     state.rows.length === Math.ceil(state.model.totalDistance / 1000), `${state.rows.length}`);
   check('the first row carries distance, time and speed',
@@ -192,8 +196,17 @@ async function main() {
     state.panelWidth > basicPanelWidth && state.zoom === zoomBeforeMode && state.mapMoves === 0,
     `${basicPanelWidth} -> ${state.panelWidth}; zoom ${zoomBeforeMode} -> ${state.zoom}`);
 
+  const firstSplitRow = page.locator('.splits-table tbody tr').first();
+  await firstSplitRow.focus();
+  await firstSplitRow.press('Enter');
+  await firstSplitRow.press('Space');
+  state = await splitState();
+  check('Tab focus selects a split; Enter/Space add no extra shortcut',
+    state.selectedIndex === 1 && state.selectedRows === 1 && state.highlightLines >= 2,
+    JSON.stringify({ selected: state.selectedIndex, lines: state.highlightLines }));
+
   const zoomBeforeSelection = state.zoom;
-  await page.locator('.splits-table tbody tr').first().click();
+  await firstSplitRow.click();
   await waitForMapIdle(page);
   state = await splitState();
   check('selecting a split highlights its trajectory on the map',
@@ -207,11 +220,10 @@ async function main() {
     `${zoomBeforeSelection} -> ${state.zoom} @ ${state.center.lat},${state.center.lng}`);
 
   const secondRow = page.locator('.splits-table tbody tr').nth(1);
-  await secondRow.focus();
-  await secondRow.press('Enter');
+  await secondRow.click();
   await waitForMapIdle(page);
   state = await splitState();
-  check('keyboard selection moves the highlight to another split',
+  check('clicking another split moves the highlight',
     state.selectedIndex === 2 && state.selectedRows === 1 && state.highlightLines >= 2,
     JSON.stringify({ selected: state.selectedIndex, rows: state.selectedRows, lines: state.highlightLines }));
 

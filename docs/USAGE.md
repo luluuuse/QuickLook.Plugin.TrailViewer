@@ -45,8 +45,8 @@ FIT 第一版读取活动和路线中的 GPS 记录、时间、海拔、会话�
 - **运动速度**：按运动时间计算；文件提供暂停总量时优先使用文件计时，否则根据移动速度排除停顿。
 - 表底汇总总时间与运动时间，最快分段的速度使用强调色显示。
 - 长路线在固定高度表格内滚动，表头和底部汇总保持可见。
-- 点击某一圈或聚焦该行后按 `Enter` / `Space`，地图会自动缩放到这一圈的轨迹范围，并用青色覆盖强调；
-  再次选择同一圈或收起面板可清除强调。
+- 使用 `Tab` 将焦点移到某一圈时会立即选中并定位；也可以直接点击某一圈。地图会缩放到对应轨迹范围，
+  并用青色覆盖强调；再次点击同一圈或收起面板可清除强调。`Enter` / `Space` 不是本功能的快捷键。
 - 标题栏默认显示“详细”切换键。点击后增加累计时间、累计上升/下降、平均心率、运动速度和垂直速度；
   文件没有有效心率数据时，平均心率列完全隐藏。
 
@@ -103,8 +103,9 @@ rows until clicked. The expanded table contains distance, elapsed time and movin
 remaining partial kilometre. Total and moving time are summarized at the bottom, the fastest split is
 emphasized, and long tables scroll while their headers and totals remain visible.
 
-Click a split, or focus its row and press Enter/Space, to focus that part of the route on the map. The selected
-range is emphasized in cyan; selecting it again or collapsing the panel clears the emphasis.
+Tab onto a split to select and focus it immediately, or click it directly. The selected range is emphasized in
+cyan; clicking it again or collapsing the panel clears the emphasis. Enter/Space are not shortcuts for this
+action.
 
 The header's **Details** control adds cumulative time, cumulative ascent/descent, average heart rate, moving
 speed and vertical speed. When the file has no valid heart-rate data, that column is omitted entirely.
