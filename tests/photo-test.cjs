@@ -275,7 +275,11 @@ async function main() {
 
   // 8. Stepping through the album and wrapping around.
   await page.locator('.photo-arrow.next').click();
-  await page.waitForFunction(() => document.querySelector('.photo-image')?.naturalWidth > 0);
+  await page.waitForFunction(() => {
+    const image = document.querySelector('.photo-image');
+    const zoom = document.querySelector('.photo-zoom');
+    return image?.naturalWidth > 0 && zoom && !zoom.hidden && zoom.textContent === '100%';
+  });
   state = await viewer();
   check('next wraps to the first photo', /photo\.png$/.test(state.src), state.src);
   check('counter follows', state.counter === '1 / 2', state.counter);

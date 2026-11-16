@@ -17,6 +17,80 @@ Added / Changed / Deprecated / Removed / Fixed / Security 分类；没有内容�
 
 - None.
 
+## 1.20.10 — 2026-11-16
+
+### 中文
+
+#### 新增
+
+- 右上角新增统一 **工具箱**，集中提供多段手动测距和叠加图导出。
+- 测距支持右键打点、左键拖图、滚轮缩放、14 px 屏幕吸附、分段小计和总距离；提供结束本段、撤销、
+  重做、清空、结束测距和地图中心打点。
+- 新增测距快捷键：<kbd>M</kbd> 开始/结束，测距中 <kbd>Ctrl</kbd>+<kbd>Z</kbd> 撤回，
+  <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> 重做；宿主只在测距激活时接管历史快捷键。
+- 新增集中式图标注册表和 [图标规范](docs/ICON_SYSTEM.md)：UI 图标使用统一 24×24 网格、16/12 px
+  尺寸档、1.75 px 圆角描边、无填充和统一蓝色激活态；地图数据符号保留语义填充色。
+- 叠加图导出面板新增关闭按钮，关闭后焦点返回打开前的控件。
+
+#### 变更
+
+- 工具箱、测距、导出和地图图层面板统一使用半透明背景与背景模糊；任务面板贴近窗口右侧，
+  测距与导出面板互斥显示。
+- 重绘缩放、定位、图层、设置、标记点、列表、工具箱、速览、照片和数据符号图标；
+  Leaflet 加减与弹窗关闭符号由应用图标适配层替换，不改第三方文件。
+- 每公里详细表格改用紧凑固定列网格，增加累计时间、上升/下降、平均心率、运动速度和垂直速度；
+  底部汇总总时间、运动时间和休息时间。
+- 照片全览显示真实原图像素比例，支持最高 800% 滚轮缩放、拖拽平移和点击百分比恢复适应窗口。
+
+#### 修复
+
+- 修复 KMZ 内相对路径照片无法显示的问题；保留 KML 父目录并受限解包 JPG、PNG、WebP、GIF、BMP、AVIF。
+- 修复高分辨率照片放大后的纹理接缝，以及大照片缩放和窗口变化后的比例失真。
+- 修复地图图源面板混合显示所有地图类型的问题；现在只显示当前类型对应图源。
+- 修复每公里标题栏右侧激活色缺失、缩放加减符号未居中，以及分段数据列头的多余装饰图标。
+- 修复测距公里标签过度遮挡线路的问题，降低底色透明度与阴影强度。
+- 同步更新中英文 README、使用说明、架构、测试、图标规范、handoff 和当前界面截图。
+- 修复照片查看器浏览器测试在切换照片时过早读取缩放状态的竞态，避免云端发布验证偶发失败。
+
+### English
+
+#### Added
+
+- Added a unified **Toolbox** for multi-section manual distance measurement and overlay export.
+- Measurement supports right-click points, left-drag panning, wheel zoom, 14 px screen snapping, section
+  subtotals and an overall distance, with end-section, undo, redo, clear, finish and centre-point actions.
+- Added measurement shortcuts: <kbd>M</kbd> toggles measuring, <kbd>Ctrl</kbd>+<kbd>Z</kbd> undoes and
+  <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> redoes. The host captures history keys only while measuring.
+- Added the centralized icon registry and [icon specification](docs/ICON_SYSTEM.md): UI icons share a 24×24
+  grid, 16/12 px tiers, 1.75 px rounded no-fill strokes and one blue active state; semantic map symbols keep
+  their fills.
+- Added a close button to the overlay-export panel, restoring focus to the control that opened it.
+
+#### Changed
+
+- Toolbox, measurement, export and map-layer panels now use a translucent blurred surface; task panels sit on
+  the right and measurement/export are mutually exclusive.
+- Redrew zoom, locate, layers, settings, marker, list, toolbox, overview, photo and data-symbol icons.
+  Application code adapts Leaflet zoom and popup-close glyphs without modifying the vendored library.
+- Reworked per-kilometre details into compact fixed columns with cumulative time, ascent/descent, average heart
+  rate, moving speed and vertical speed; totals include total, moving and rest time.
+- Photo viewing now reports true source-pixel percentage with wheel zoom up to 800%, drag-to-pan and a
+  click-to-fit percentage control.
+
+#### Fixed
+
+- Fixed KMZ photos using relative paths by preserving the KML parent directory and safely extracting referenced
+  JPG, PNG, WebP, GIF, BMP and AVIF assets.
+- Fixed texture seams in zoomed high-resolution photos and inaccurate scale after large-photo or window changes.
+- Fixed the map-source panel mixing providers from every map type; only providers for the active type appear.
+- Fixed the missing right edge of the expanded split header, off-centre zoom glyphs and decorative split-header
+  icons.
+- Reduced measurement-label background opacity and shadow so the measured line and map routes remain visible.
+- Synchronized the bilingual README, usage, architecture, testing, icon specification, handoff and current
+  interface screenshot.
+- Fixed a timing race in the photo-viewer browser test that read the zoom state before a photo switch had
+  finished, preventing intermittent cloud release-validation failures.
+
 ## 1.20.9 — 2026-11-16
 
 ### 中文
