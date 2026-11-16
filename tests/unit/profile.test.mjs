@@ -6,6 +6,7 @@ import {
   groundRuns,
   profileSamples,
   rawElevationGain,
+  seriesSamples,
   slopeBins,
   slopeColor,
   SLOPE_FULL,
@@ -26,6 +27,18 @@ test('profileSamples preserves endpoints and a one-sample summit', () => {
   assert.equal(kept[0].along, 0);
   assert.equal(kept.at(-1).along, 9999);
   assert.ok(kept.some((sample) => sample.ele === 9999));
+});
+
+test('seriesSamples preserves a one-sample heart-rate spike', () => {
+  const samples = Array.from({ length: 10000 }, (_, index) => ({
+    along: index,
+    heartRate: index === 5123 ? 205 : 120 + (index % 7),
+  }));
+  const kept = seriesSamples(samples, 600, (sample) => sample.heartRate);
+  assert.ok(kept.length <= 1202);
+  assert.equal(kept[0].along, 0);
+  assert.equal(kept.at(-1).along, 9999);
+  assert.ok(kept.some((sample) => sample.heartRate === 205));
 });
 
 test('short alternating runs collapse into one contiguous run', () => {

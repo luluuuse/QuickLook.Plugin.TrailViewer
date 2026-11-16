@@ -5,7 +5,9 @@ import { distanceMeters } from './gpx.js';
 function trackPoints(gpx) {
   const points = [];
   let along = 0;
-  for (const segment of gpx.tracks.flatMap((track) => track.segments)) {
+  const segments = gpx.tracks.flatMap((track) => track.segments);
+  for (let segmentIndex = 0; segmentIndex < segments.length; segmentIndex += 1) {
+    const segment = segments[segmentIndex];
     let previous = null;
     for (const point of segment) {
       if (previous) along += distanceMeters(previous, point);
@@ -15,11 +17,45 @@ function trackPoints(gpx) {
         lon: point.lon,
         ele: point.ele,
         time: point.time,
+        heartRate: point.heartRate,
+        segmentIndex,
       });
       previous = point;
     }
   }
   return points;
+}
+
+function heartRateData(points) {
+  const segments = [];
+  let run = [];
+  let segmentIndex = -1;
+  const flush = () => {
+    if (run.length >= 2) segments.push(run);
+    run = [];
+  };
+  for (const point of points) {
+    if (point.segmentIndex !== segmentIndex) {
+      flush();
+      segmentIndex = point.segmentIndex;
+    }
+    const rate = point.heartRate;
+    if (!Number.isFinite(rate) || rate <= 0 || rate >= 255) {
+      flush();
+      continue;
+    }
+    run.push({ along: point.along, heartRate: rate });
+  }
+  flush();
+  const values = segments.flat().map((point) => point.heartRate);
+  if (values.length < 2) return null;
+  const dataMin = Math.min(...values);
+  const dataMax = Math.max(...values);
+  const average = values.reduce((sum, value) => sum + value, 0) / values.length;
+  const spread = Math.max(10, dataMax - dataMin);
+  const min = Math.max(0, Math.floor((dataMin - Math.max(5, spread * 0.08)) / 10) * 10);
+  const max = Math.max(min + 10, Math.ceil((dataMax + Math.max(5, spread * 0.08)) / 10) * 10);
+  return { segments, min, max, dataMin, dataMax, average, count: values.length };
 }
 
 function pointNear(points, distance) {
@@ -44,7 +80,7 @@ function attachScrub({
   focusStop,
   revealPoint,
 }) {
-  const { points, total, svg, plot, chart, guide, dot, readout, value, meta, yOf } = state;
+  const { points, total, svg, plot, chart, guide, dot, readout, value, meta, yOf, heart } = state;
   const marker = L.circleMarker([0, 0], {
     radius: 7,
     color: '#1b1b1b',
@@ -94,6 +130,16 @@ function attachScrub({
     } else {
       dot.hidden = true;
     }
+    if (heart?.enabled() && Number.isFinite(point.heartRate)) {
+      heart.dot.style.left = `${x}px`;
+      heart.dot.style.top = `${(heart.yOf(point.heartRate) / 100) * rect.height}px`;
+      heart.dot.hidden = false;
+      heart.value.textContent = `${Math.round(point.heartRate)} bpm`;
+      heart.value.hidden = false;
+    } else if (heart) {
+      heart.dot.hidden = true;
+      heart.value.hidden = true;
+    }
 
     value.textContent = point.ele !== undefined ? `${Math.round(point.ele)} ${t('unit.m')}` : '';
     value.hidden = value.textContent === '';
@@ -121,6 +167,8 @@ function attachScrub({
   function clear() {
     guide.hidden = true;
     dot.hidden = true;
+    if (heart) heart.dot.hidden = true;
+    if (heart) heart.value.hidden = true;
     readout.hidden = true;
     if (onMap) {
       marker.remove();
@@ -191,7 +239,7 @@ export function createProfileController({
       const points = trackPoints(gpx);
       const samples = points.filter((point) => point.ele !== undefined);
       if (samples.length < 2) return null;
-      return { points, samples, ...analyse(samples) };
+      return { points, samples, heartRate: heartRateData(points), ...analyse(samples) };
     },
     render(gpx, data) {
       return renderProfile(gpx, data);

@@ -21,6 +21,19 @@ function childText(parent, name) {
   return text || null;
 }
 
+function extensionHeartRate(el) {
+  for (const extensions of children(el, 'extensions')) {
+    for (const node of extensions.getElementsByTagName('*')) {
+      const name = node.localName.toLowerCase();
+      if (name !== 'hr' && name !== 'heartrate' && name !== 'heartratebpm') continue;
+      const raw = name === 'heartratebpm' ? childText(node, 'value') : node.textContent.trim();
+      const value = Number(raw);
+      if (Number.isFinite(value) && value > 0 && value < 255) return value;
+    }
+  }
+  return null;
+}
+
 /** @returns {TrackPoint | null} */
 function readPoint(el) {
   const lat = Number(el.getAttribute('lat'));
@@ -43,6 +56,8 @@ function readPoint(el) {
   }
   const symbol = childText(el, 'sym');
   if (symbol !== null) point.icon = symbol;
+  const heartRate = extensionHeartRate(el);
+  if (heartRate !== null) point.heartRate = heartRate;
   return point;
 }
 

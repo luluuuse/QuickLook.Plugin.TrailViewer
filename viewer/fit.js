@@ -1,6 +1,6 @@
 // A deliberately small FIT reader for recorded activities and courses. It reads the binary framing,
 // definitions and the handful of profile fields TrailViewer needs, then returns the same ParsedTrack model
-// as the GPX and KML readers. Workout steps, laps, heart rate, cadence, power and developer metrics are
+// as the GPX and KML readers. Workout steps, laps, cadence, power and developer metrics are
 // intentionally left out of this first version.
 
 const FIT_EPOCH_MS = Date.UTC(1989, 11, 31);

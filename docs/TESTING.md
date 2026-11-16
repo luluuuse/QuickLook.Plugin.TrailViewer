@@ -30,6 +30,7 @@ npm run test:live
 - `tests/unit/icons.test.mjs`：图标注册表、尺寸、描边和未知图标回退。
 - `tests/icons-test.cjs`：全部控件/数据符号、Leaflet 适配、激活态和纯文字分段列头。
 - `tests/measure-test.cjs`：多段测距、吸附、快捷键、透明标签、右侧布局和导出互斥。
+- `tests/profile-test.cjs`：坡度剖面、可选心率开关/双轴/缺口、悬停读数和窄窗布局。
 - `tests/export-test.cjs`：导出版式、透明 PNG、设置面板关闭按钮和宿主保存流程。
 - `tests/terrain-test.cjs`：地图类型图源过滤、面板透明度、天地图密钥与 403 降级。
 

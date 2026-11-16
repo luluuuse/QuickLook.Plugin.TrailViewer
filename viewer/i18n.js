@@ -174,6 +174,10 @@ const DICT = {
     'profile.low': 'Lowest point',
     // The colour scale runs from level ground to a 25 % wall, and stops there whatever the file contains.
     'profile.scaleHint': 'Gradient, saturated at 25 %',
+    'profile.heartRate': 'Heart rate',
+    'profile.heartRateShow': 'Show heart rate overlay',
+    'profile.heartRateHide': 'Hide heart rate overlay',
+    'profile.heartRateAverage': (v) => `Avg ${v.rate} bpm`,
     // Two numbers rather than five categories: how much of the route is steep, and the worst gradient on it.
     'grade.steep': 'Steep',
     'grade.noSteep': 'No steep ground',
@@ -427,6 +431,10 @@ const DICT = {
     'profile.high': '最高点',
     'profile.low': '最低点',
     'profile.scaleHint': '坡度色阶，25 % 封顶',
+    'profile.heartRate': '心率',
+    'profile.heartRateShow': '显示心率叠加',
+    'profile.heartRateHide': '隐藏心率叠加',
+    'profile.heartRateAverage': (v) => `平均 ${v.rate} bpm`,
     'grade.steep': '陡坡',
     'grade.noSteep': '无陡坡',
     'grade.steepest': '最陡',

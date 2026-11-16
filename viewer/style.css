@@ -737,8 +737,9 @@ body.chrome-hidden.with-profile .leaflet-bottom {
 
 #profile .label {
   display: flex;
-  justify-content: space-between;
-  gap: 12px;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
   color: var(--muted);
   height: 16px;
 }
@@ -747,12 +748,55 @@ body.chrome-hidden.with-profile .leaflet-bottom {
    and a 40 % climb looks like a gentle rise; said, the reader can convert what they see back to the ground.
    Only shown when the stretch leaves the readable band, which is most files never. */
 #profile .label .scale {
+  margin-left: auto;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 
 #profile .label .scale[hidden] {
   display: none;
+}
+
+#profile .profile-heart-toggle {
+  display: inline-flex;
+  box-sizing: border-box;
+  flex: 0 0 auto;
+  height: 16px;
+  align-items: center;
+  gap: 4px;
+  padding: 0 6px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 10px;
+  line-height: 1;
+  pointer-events: auto;
+  white-space: nowrap;
+}
+
+#profile .profile-heart-toggle:hover {
+  border-color: rgba(255, 118, 132, 0.65);
+  color: #fff;
+}
+
+#profile .profile-heart-toggle.active {
+  border-color: rgba(255, 118, 132, 0.75);
+  background: rgba(255, 118, 132, 0.16);
+  color: #fff;
+}
+
+#profile .profile-heart-icon {
+  display: block;
+  flex: none;
+  color: currentColor;
+}
+
+#profile .profile-heart-toggle:hover .profile-heart-icon,
+#profile .profile-heart-toggle.active .profile-heart-icon {
+  color: #ffb3bb;
 }
 
 /* The pointer's own reading, riding above the cursor. It is a label on the ground it is measuring, so it stays
@@ -789,6 +833,16 @@ body.chrome-hidden.with-profile .leaflet-bottom {
 #profile .readout .ele {
   font-size: 11.5px;
   font-weight: 600;
+}
+
+#profile .readout .heart {
+  color: #ff9aa4;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+#profile .readout .heart[hidden] {
+  display: none;
 }
 
 /* Lighter than the rest of the muted text: this sits on whatever colour the ground happens to be. */
@@ -938,7 +992,7 @@ body.chrome-hidden.with-profile .leaflet-bottom {
   pointer-events: none;
 }
 
-#profile svg {
+#profile .chart > svg {
   display: block;
   width: 100%;
   height: 100%;
@@ -957,6 +1011,73 @@ body.chrome-hidden.with-profile .leaflet-bottom {
   stroke: rgba(255, 255, 255, 0.8);
   stroke-width: 1.3;
   vector-effect: non-scaling-stroke;
+}
+
+#profile .heart-line {
+  fill: none;
+  stroke: #ff6675;
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.8));
+  pointer-events: none;
+}
+
+#profile .heart-average-line {
+  stroke: #ffb3bb;
+  stroke-width: 1;
+  stroke-dasharray: 6 5;
+  vector-effect: non-scaling-stroke;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.8));
+  pointer-events: none;
+}
+
+#profile .heart-average {
+  position: absolute;
+  z-index: 2;
+  right: 4px;
+  padding: 1px 3px;
+  border-radius: 3px;
+  background: rgba(16, 16, 16, 0.62);
+  color: #ffc0c7;
+  font-size: 9px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+  white-space: nowrap;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.95);
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+#profile .heart-average[hidden] {
+  display: none;
+}
+
+#profile .heart-axis {
+  position: absolute;
+  z-index: 2;
+  inset: 0 4px 0 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: flex-end;
+  color: #ffb3bb;
+  font-size: 9px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.95);
+  pointer-events: none;
+}
+
+#profile .heart-axis[hidden] {
+  display: none;
+}
+
+#profile .heart-axis span {
+  padding: 1px 3px;
+  border-radius: 3px;
+  background: rgba(16, 16, 16, 0.58);
 }
 
 #profile .guide {
@@ -1011,6 +1132,22 @@ body.chrome-hidden.with-profile .leaflet-bottom {
   box-shadow: 0 0 0 2px rgba(24, 24, 24, 0.55), 0 0 0 3.5px #ffffff;
   pointer-events: none;
   z-index: 4;
+}
+
+#profile .heart-dot {
+  position: absolute;
+  z-index: 4;
+  width: 7px;
+  height: 7px;
+  margin: -3.5px 0 0 -3.5px;
+  border-radius: 50%;
+  background: #ff6675;
+  box-shadow: 0 0 0 2px rgba(16, 16, 16, 0.8), 0 0 0 3px rgba(255, 102, 117, 0.55);
+  pointer-events: none;
+}
+
+#profile .heart-dot[hidden] {
+  display: none;
 }
 
 /* Pinned: the point stays put so it can be read without holding the mouse still. */
@@ -2451,6 +2588,12 @@ body.failed #map {
   border-color: #444;
 }
 
+/* Attachment cards use the same translucent surface as the waypoint list, without adding a blur. */
+.photo-popup .leaflet-popup-content-wrapper,
+.photo-popup .leaflet-popup-tip {
+  background: var(--panel);
+}
+
 .point-popup .coord {
   font-family: Consolas, monospace;
 }
@@ -2760,8 +2903,7 @@ body.measuring #map.leaflet-container {
   z-index: 3000;
   display: flex;
   flex-direction: column;
-  /* Opaque: bits of the info panel showing through behind a photo read as smudges. */
-  background: #0b0b0c;
+  background: rgba(11, 11, 12, 0.42);
 }
 
 /* Kept explicit: "display: flex" above would otherwise win over the hidden attribute. */
@@ -2775,12 +2917,13 @@ body.measuring #map.leaflet-container {
   align-items: flex-start;
   gap: 12px;
   padding: 10px 14px 14px;
-  background: linear-gradient(rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0));
+  background: transparent;
 }
 
 .photo-titles {
   flex: 1 1 auto;
   min-width: 0;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.92);
 }
 
 .photo-titles strong {
@@ -2923,5 +3066,19 @@ body.measuring #map.leaflet-container {
 }
 
 .photo-arrow[hidden] {
+  display: none;
+}
+
+/* The transparent photo canvas should reveal the map itself, not the duplicate panels and controls that sit
+   above it during normal browsing. The map, route and markers stay untouched. */
+body.showing-photo #info,
+body.showing-photo #splits,
+body.showing-photo #profile,
+body.showing-photo #export,
+body.showing-photo #toolbox-panel,
+body.showing-photo .waypoint-overview,
+body.showing-photo #map .leaflet-top,
+body.showing-photo #map .leaflet-control-scale,
+body.showing-photo .leaflet-popup {
   display: none;
 }

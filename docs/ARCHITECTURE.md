@@ -25,7 +25,7 @@ QuickLook
 | `viewer/track-layer.js` | 轨迹线、方向/公里标记、异常与起终点 |
 | `viewer/waypoint-controller.js` | 沿线导航、图钉、相册和速览联动 |
 | `viewer/waypoint-insights.js` | 本地航点语义分类 |
-| `viewer/profile-*.js` | 剖面数据、SVG 和地图光标 |
+| `viewer/profile-*.js` | 剖面数据、坡度着色、可选心率双轴、SVG 和地图光标 |
 | `viewer/map-view.js`, `viewer/map-focus.js` | 安全区域、取景、选中点避让和三态布局 |
 | `viewer/map-controls.js` | 底图类别、具体图源、图源菜单与署名 |
 | `viewer/measure.js` | 多段手动测距、屏幕像素吸附、测距图层和实时距离 |
@@ -81,6 +81,10 @@ exportdone  <id> <count>
 `map-view.js` 测量信息卡、顶部工具、工具箱、速览、剖面、比例尺和版权行的实际矩形，得到可用地图区域。
 `map-focus.js` 提供纯几何计算：舒适区、居中位移和最小避让。所有初始取景、图钉切换、弹窗和剖面光标共用
 这套规则。
+
+心率只使用源文件中的逐点读数：FIT `record.heart_rate` 和常见 GPX TrackPointExtension。剖面控制器按缺失点
+和轨迹分段拆成连续序列；开启开关后使用独立 bpm 纵轴绘制，不改变海拔数值与坡度颜色。全程平均值为所有
+有效读数的算术平均值，用横虚线标出。
 
 ## 缓存与版本
 

@@ -38,9 +38,11 @@ Common controls:
   heart rate, moving speed and vertical speed.
 - **Waypoints and photos:** route-ordered navigation, yellow pins, photo albums with true source-pixel
   percentages, wheel zoom up to 800% and drag-to-pan, plus a searchable overview with local
-  danger/water/camp/exit insight labels.
+  danger/water/camp/exit insight labels. Attachment preview cards use the waypoint list's unblurred translucent
+  background, and the full-size photo viewer keeps the map visible around the image.
 - **Elevation profile:** gradient-coloured terrain, waypoint dots, scrub readout and a layout that preserves
-  the vertical scale across window sizes.
+  the vertical scale across window sizes. Per-point heart rate can be overlaid on its own scale and is off
+  by default; a dashed line marks the whole-route average.
 - **Manual measurement:** the toolbox supports multi-section point-to-point distance measurement. Right-click
   adds a point while left-drag pans and the wheel zooms; nearby waypoints and recorded track samples snap
   automatically. Section subtotals and the overall distance update on the map.
@@ -68,8 +70,8 @@ Supported inputs:
 - Zipped `.kmz` archives
 - FIT activities and courses with GPS records, compressed timestamps, elevation and course points
 
-FIT previews focus on route data. Laps, heart rate, cadence, power, temperature and workout steps are not shown
-in the first version.
+FIT previews focus on route data. Recorded heart rate can be overlaid on the profile. Laps, cadence, power,
+temperature and workout steps are not shown in the first version.
 
 Files with more than 20,000 recorded points still draw the route and endpoints but stop creating a clickable
 marker for every sample. Invalid XML produces an explicit error page with the parser message.

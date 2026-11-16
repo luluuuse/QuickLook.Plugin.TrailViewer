@@ -131,7 +131,7 @@ function resample(samples, step) {
  * Keep the shape of a profile while bounding its SVG to the pixels that can show it. Each one-pixel column
  * contributes its lowest and highest samples, so spikes survive; consecutive columns stay in route order.
  */
-export function profileSamples(samples, width = 600) {
+export function seriesSamples(samples, width, readValue) {
   if (samples.length <= width * 2 + 2) return samples;
   const total = samples[samples.length - 1].along || 1;
   const buckets = new Array(width);
@@ -141,8 +141,9 @@ export function profileSamples(samples, width = 600) {
     if (!current) {
       buckets[bucket] = { low: i, high: i };
     } else {
-      if (samples[i].ele < samples[current.low].ele) current.low = i;
-      if (samples[i].ele > samples[current.high].ele) current.high = i;
+      const value = readValue(samples[i]);
+      if (value < readValue(samples[current.low])) current.low = i;
+      if (value > readValue(samples[current.high])) current.high = i;
     }
   }
 
@@ -153,6 +154,10 @@ export function profileSamples(samples, width = 600) {
     kept.add(bucket.high);
   }
   return [...kept].sort((a, b) => a - b).map((index) => samples[index]);
+}
+
+export function profileSamples(samples, width = 600) {
+  return seriesSamples(samples, width, (sample) => sample.ele);
 }
 
 /** @returns {GroundCell['grade']} */

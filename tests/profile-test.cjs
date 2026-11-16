@@ -95,6 +95,33 @@ async function main() {
     })),
   }));
 
+  const heart = () => page.evaluate(() => {
+    const button = document.querySelector('#profile .profile-heart-toggle');
+    const layer = document.querySelector('#profile .heart-rate-layer');
+    const axis = document.querySelector('#profile .heart-axis');
+    const averageLine = document.querySelector('#profile .heart-average-line');
+    const average = document.querySelector('#profile .heart-average');
+    return {
+      data: window.trailViewer.profile?.heartRate || null,
+      rates: window.trailViewer.gpx.tracks.flatMap((track) => track.segments)
+        .flat().map((point) => point.heartRate ?? null),
+      button: button?.textContent || '',
+      pressed: button?.getAttribute('aria-pressed') || null,
+      title: button?.title || '',
+      lines: document.querySelectorAll('#profile .heart-line').length,
+      visible: layer ? getComputedStyle(layer).display !== 'none' : false,
+      axisHidden: axis?.hidden ?? null,
+      axis: [...document.querySelectorAll('#profile .heart-axis span')].map((node) => node.textContent),
+      averageLine: averageLine ? {
+        y1: averageLine.getAttribute('y1'),
+        y2: averageLine.getAttribute('y2'),
+        dash: getComputedStyle(averageLine).strokeDasharray,
+      } : null,
+      averageText: average?.textContent || '',
+      averageHidden: average?.hidden ?? null,
+    };
+  });
+
   // 1. A synthetic hike with heights and times: the summary gains speed, ascent and descent, in a row of
   //    their own with the extent of the route in a second row under them.
   await open('track-time-ele.gpx');
@@ -260,7 +287,7 @@ async function main() {
       || low.box.right < high.box.left, 'overlap');
 
   // 5. Hovering reports the point under the cursor, next to the cursor.
-  await page.locator('#profile svg').hover({ position: { x: 300, y: 40 } });
+  await page.locator('#profile .chart > svg').hover({ position: { x: 300, y: 40 } });
   const tip = await page.evaluate(() => {
     const node = document.querySelector('#profile .readout');
     const box = node.getBoundingClientRect();
@@ -305,6 +332,92 @@ async function main() {
   check('a flat route is called flat, not 0 m steep',
     /^No steep ground\s*\u00b7\s*max\s*\d+%$/.test(s.legend.text) && s.legend.steep.metres === 0,
     `${s.legend.text} (${s.legend.steep.metres} m)`);
+
+  // 6c. Heart rate is optional, off by default and drawn on its own scale with gaps preserved.
+  await open('heart-rate.gpx');
+  let h = await heart();
+  check('GPX heart-rate extensions reach the point model',
+    h.rates.join(',') === '100,110,120,130,,140,150,160', h.rates.join(','));
+  check('the profile prepares two continuous heart-rate runs',
+    h.data?.count === 7 && h.data.segments.length === 2 && h.lines === 2, JSON.stringify(h.data));
+  check('heart rate is off by default',
+    h.button === 'Heart rate' && h.pressed === 'false' && h.visible === false && h.axisHidden === true
+      && h.averageHidden === true,
+    JSON.stringify(h));
+  check('the heart-rate toggle explains its action', h.title === 'Show heart rate overlay', h.title);
+  await page.locator('#profile .profile-heart-toggle').click();
+  h = await heart();
+  check('the heart-rate overlay can be enabled',
+    h.pressed === 'true' && h.visible === true && h.axisHidden === false, JSON.stringify(h));
+  check('the independent heart-rate axis uses padded round limits',
+    h.axis.join('/') === '170 bpm/90 bpm', h.axis.join('/'));
+  check('the heart-rate overlay marks the whole-route average',
+    h.data?.average === 130 && h.averageText === 'Avg 130 bpm'
+      && h.averageHidden === false && h.averageLine?.y1 === '50.0'
+      && h.averageLine?.y2 === '50.0' && /6px[, ]+5px/.test(h.averageLine.dash),
+    JSON.stringify({ average: h.data?.average, text: h.averageText, line: h.averageLine }));
+  await page.locator('#profile .chart > svg').hover({ position: { x: 300, y: 35 } });
+  const heartReadout = await page.evaluate(() => ({
+    value: document.querySelector('#profile .readout .heart')?.textContent || '',
+    hidden: document.querySelector('#profile .readout .heart')?.hidden,
+    dot: document.querySelector('#profile .heart-dot')?.hidden,
+  }));
+  check('hovering reports the heart rate at the route position',
+    /^\d+ bpm$/.test(heartReadout.value) && heartReadout.hidden === false && heartReadout.dot === false,
+    JSON.stringify(heartReadout));
+  await page.locator('.lang-switch button').click();
+  await waitForLayout(page);
+  h = await heart();
+  check('the heart-rate control follows the language',
+    h.button === '心率' && h.title === '隐藏心率叠加', `${h.button}/${h.title}`);
+  check('the average label follows the language', h.averageText === '平均 130 bpm', h.averageText);
+  await page.locator('.lang-switch button').click();
+  await waitForLayout(page);
+
+  const heartPlacements = [];
+  for (const width of [1200, 900, 700, 520, 360]) {
+    await page.setViewportSize({ width, height: 800 });
+    await waitForLayout(page);
+    heartPlacements.push(await page.evaluate((measuredWidth) => {
+      const rect = (node) => node.getBoundingClientRect();
+      const profile = rect(document.getElementById('profile'));
+      const range = rect(document.querySelector('#profile .label .range'));
+      const button = rect(document.querySelector('#profile .profile-heart-toggle'));
+      const icon = rect(document.querySelector('#profile .profile-heart-icon'));
+      const text = rect(document.querySelector('#profile .profile-heart-toggle > span'));
+      const axis = [...document.querySelectorAll('#profile .heart-axis span')].map(rect);
+      return {
+        width: measuredWidth,
+        gap: button.left - range.right,
+        button: { left: button.left, right: button.right, height: button.height },
+        icon: { width: icon.width, height: icon.height },
+        textInside: text.left >= button.left && text.right <= button.right,
+        buttonInside: button.left >= profile.left && button.right <= profile.right,
+        axisInside: axis.every((box) => box.left >= profile.left && box.right <= profile.right),
+      };
+    }, width));
+  }
+  check('the heart-rate icon keeps its compact 12 px geometry',
+    heartPlacements.every((item) => item.icon.width === 12 && item.icon.height === 12),
+    JSON.stringify(heartPlacements));
+  check('the heart-rate label stays inside the pill at every width',
+    heartPlacements.every((item) => item.textInside && item.buttonInside
+      && item.button.height === 16 && item.axisInside),
+    JSON.stringify(heartPlacements));
+  check('the heart-rate pill stays beside the profile title across layouts',
+    heartPlacements.every((item) => Math.abs(item.gap - 8) <= 0.5),
+    JSON.stringify(heartPlacements));
+  await page.setViewportSize({ width: 1200, height: 800 });
+
+  await open('synthetic.fit');
+  h = await heart();
+  check('FIT heart-rate records expose the same toggle',
+    h.data?.count === 5 && h.pressed === 'false' && h.lines === 1, JSON.stringify(h));
+
+  await open('track-time-ele.gpx');
+  h = await heart();
+  check('a track without heart rate gets no toggle or empty overlay',
+    h.data === null && h.button === '' && h.lines === 0, JSON.stringify(h));
 
   // 7. Waypoints get a dot where the track passes them, and a click opens the same pin the map would.
   await open('kml-photos.kml');

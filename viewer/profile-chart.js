@@ -1,11 +1,13 @@
 import {
   elevationAt,
   profileSamples,
+  seriesSamples,
   SLOPE_FULL,
   slopeColor,
   slopeScale,
 } from './profile.js';
 import { createPointIndex } from './spatial.js';
+import { iconElement } from './icons.js';
 
 /**
  * Builds the SVG elevation panel. Map dragging remains in app.js; this module owns only the chart and its
@@ -53,7 +55,7 @@ export function createProfileChart({
 
   /** @param {import('./types.js').ParsedTrack} gpx @param {import('./types.js').ProfileData} data */
   return function renderProfile(gpx, data) {
-    const { points, samples, min, max, total, cells, steep } = data;
+    const { points, samples, min, max, total, cells, steep, heartRate } = data;
     const width = 600;
     const height = 100;
     const curve = profileSamples(samples, width);
@@ -61,6 +63,10 @@ export function createProfileChart({
     const span = max - min || 1;
     const at = (distance) => (distance / Math.max(total, 1)) * width;
     const yOf = (elevation) => height - ((elevation - min) / span) * (height - 8) - 4;
+    const heartSpan = heartRate ? Math.max(1, heartRate.max - heartRate.min) : 1;
+    const heartYOf = heartRate
+      ? (rate) => height - ((rate - heartRate.min) / heartSpan) * (height - 8) - 4
+      : null;
 
     const ns = 'http://www.w3.org/2000/svg';
     const svg = document.createElementNS(ns, 'svg');
@@ -132,12 +138,55 @@ export function createProfileChart({
     line.setAttribute('d', `M${curve.map((point) => `${at(point.along).toFixed(1)},${yOf(point.ele).toFixed(1)}`).join(' L')}`);
     svg.append(line);
 
+    let heartGroup = null;
+    if (heartRate) {
+      heartGroup = document.createElementNS(ns, 'g');
+      heartGroup.setAttribute('class', 'heart-rate-layer');
+      for (const segment of heartRate.segments) {
+        const values = seriesSamples(segment, width, (point) => point.heartRate);
+        if (values.length < 2) continue;
+        const path = document.createElementNS(ns, 'path');
+        path.setAttribute('class', 'heart-line');
+        path.setAttribute('d', values.map((point, index) => `${index === 0 ? 'M' : 'L'}`
+          + `${at(point.along).toFixed(1)},${heartYOf(point.heartRate).toFixed(1)}`).join(' '));
+        heartGroup.append(path);
+      }
+      const averageLine = document.createElementNS(ns, 'line');
+      averageLine.setAttribute('class', 'heart-average-line');
+      averageLine.setAttribute('x1', '0');
+      averageLine.setAttribute('x2', String(width));
+      averageLine.setAttribute('y1', heartYOf(heartRate.average).toFixed(1));
+      averageLine.setAttribute('y2', heartYOf(heartRate.average).toFixed(1));
+      heartGroup.append(averageLine);
+      heartGroup.style.display = 'none';
+      svg.append(heartGroup);
+    }
+
     const guide = el('div', 'guide');
     const dot = el('div', 'dot');
+    const heartDot = el('div', 'heart-dot');
     guide.hidden = true;
     dot.hidden = true;
+    heartDot.hidden = true;
     const chart = el('div', 'chart');
-    chart.append(svg);
+    chart.append(svg, heartDot);
+
+    let heartAxis = null;
+    let heartAverage = null;
+    if (heartRate) {
+      heartAxis = el('div', 'heart-axis');
+      heartAxis.append(
+        localized(el('span', 'top'), () => `${heartRate.max} bpm`),
+        localized(el('span', 'bottom'), () => `${heartRate.min} bpm`),
+      );
+      heartAxis.hidden = true;
+      chart.append(heartAxis);
+      heartAverage = localized(el('span', 'heart-average'), () =>
+        t('profile.heartRateAverage', { rate: Math.round(heartRate.average) }));
+      heartAverage.style.top = `${(heartYOf(heartRate.average) / height) * 100}%`;
+      heartAverage.hidden = true;
+      chart.append(heartAverage);
+    }
 
     const gutter = el('div', 'gutter');
     gutter.append(
@@ -181,14 +230,32 @@ export function createProfileChart({
 
     chart.append(guide, dot);
     const value = el('b', 'ele');
+    const heartRateValue = el('b', 'heart');
     const meta = el('span', 'meta');
     const readout = el('span', 'readout');
-    readout.append(value, meta);
+    heartRateValue.hidden = true;
+    readout.append(value, heartRateValue, meta);
     readout.hidden = true;
     chart.append(readout);
 
     const label = el('div', 'label');
     label.append(localized(el('span', 'range'), () => t('profile.title')));
+    let heartEnabled = false;
+    let heartToggle = null;
+    if (heartRate) {
+      heartToggle = el('button', 'profile-heart-toggle');
+      heartToggle.type = 'button';
+      heartToggle.dataset.profileHeart = 'toggle';
+      heartToggle.setAttribute('aria-pressed', 'false');
+      const title = () => t(heartEnabled ? 'profile.heartRateHide' : 'profile.heartRateShow');
+      localized(heartToggle, title, 'title');
+      localized(heartToggle, title, 'aria-label');
+      heartToggle.append(
+        iconElement('heart', { size: 12, className: 'profile-heart-icon' }),
+        localized(el('span'), () => t('profile.heartRate')),
+      );
+      label.append(heartToggle);
+    }
     let noteOff = false;
     let noteVe = 3;
     const scaleNote = localized(el('span', 'scale'), () => (noteOff
@@ -196,6 +263,25 @@ export function createProfileChart({
       : ''));
     scaleNote.hidden = true;
     label.append(scaleNote);
+
+    function setHeartEnabled(enabled) {
+      if (!heartRate || !heartGroup || !heartAxis || !heartToggle) return;
+      heartEnabled = enabled;
+      heartGroup.style.display = enabled ? '' : 'none';
+      heartAxis.hidden = !enabled;
+      heartAverage.hidden = !enabled;
+      heartDot.hidden = true;
+      heartRateValue.hidden = true;
+      heartToggle.classList.toggle('active', enabled);
+      heartToggle.setAttribute('aria-pressed', String(enabled));
+      const title = t(enabled ? 'profile.heartRateHide' : 'profile.heartRateShow');
+      heartToggle.title = title;
+      heartToggle.setAttribute('aria-label', title);
+    }
+
+    if (heartToggle) {
+      heartToggle.addEventListener('click', () => setHeartEnabled(!heartEnabled));
+    }
 
     const box = document.getElementById('profile');
     box.append(label, gradeLegend(steep), plot);
@@ -246,6 +332,14 @@ export function createProfileChart({
       value,
       meta,
       yOf,
+      heart: heartRate ? {
+        data: heartRate,
+        yOf: heartYOf,
+        enabled: () => heartEnabled,
+        setEnabled: setHeartEnabled,
+        dot: heartDot,
+        value: heartRateValue,
+      } : null,
       pins,
       refit: fit,
     };

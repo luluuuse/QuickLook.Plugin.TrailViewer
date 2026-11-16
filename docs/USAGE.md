@@ -9,8 +9,8 @@
 在资源管理器中选中 `.gpx`、`.kml`、`.kmz` 或 `.fit`，按 <kbd>Space</kbd>。在线底图需要网络；选择“无底图”时
 轨迹直接绘制在本地网格上。
 
-FIT 读取活动和路线中的 GPS 记录、时间、海拔、会话用时及 `course_point` 路线点。简要模式聚焦路线
-基础数据；步频、功率、温度、训练步骤和完整设备指标暂不展示。
+FIT 读取活动和路线中的 GPS 记录、时间、海拔、心率、会话用时及 `course_point` 路线点。简要模式聚焦
+路线基础数据；步频、功率、温度、训练步骤和完整设备指标暂不展示。
 
 ### 地图与标记点
 
@@ -37,7 +37,9 @@ FIT 读取活动和路线中的 GPS 记录、时间、海拔、会话用时及 `
 ### 海拔剖面
 
 剖面按坡度着色，最高点和最低点直接标在曲线上。鼠标沿曲线移动可查看海拔、里程和时间；点击可固定光标。
-剖面会参与地图安全区域计算，被选中的地图点不会被剖面遮住。
+剖面会参与地图安全区域计算，被选中的地图点不会被剖面遮住。轨迹含逐点心率时，标题右侧会出现 **心率**
+开关，默认关闭；打开后增加红色心率曲线、独立 bpm 范围，悬停读数同时显示当前心率。缺失心率的位置会断开
+曲线，不进行插值。横贯剖面的红色虚线表示全部有效心率读数的算术平均值。
 
 ### 距离测量
 
@@ -96,9 +98,9 @@ FIT 读取活动和路线中的 GPS 记录、时间、海拔、会话用时及 `
 Select a `.gpx`, `.kml`, `.kmz` or `.fit` file in Explorer and press <kbd>Space</kbd>. Online basemaps require network
 access; **No map** renders the route on a local grid.
 
-The first FIT version reads GPS records, time, elevation, session totals and `course_point` markers from
-activities and courses. Laps, heart rate, cadence, power, temperature, workout steps and the full device metric
-set are not displayed yet.
+The first FIT version reads GPS records, time, elevation, heart rate, session totals and `course_point` markers
+from activities and courses. Laps, cadence, power, temperature, workout steps and the full device metric set are
+not displayed yet.
 
 ### Map and waypoints
 
@@ -119,11 +121,17 @@ set are not displayed yet.
 - In the full-size photo viewer, the top-right percentage is the displayed width divided by the source width:
   a 2560 px photo shown at 640 px reads 25%, and 100% means 1:1 pixels. Use the wheel to zoom up to 800%,
   drag a zoomed photo to pan, click the percentage to fit the window again, or change photos to start over.
+- The first-click attachment card reuses the waypoint list's unblurred translucent background. The full-size
+  viewer also keeps its dark semi-transparent surround, with duplicate panels and controls hidden.
 
 ### Elevation profile
 
 The profile is coloured by gradient and labels its highest and lowest points. Move over the chart for elevation,
 distance and time; click to pin the scrubber. Its height participates in the map's safe-area calculation.
+When the track contains per-point heart rate, a **Heart rate** button appears above the chart. It starts off;
+turning it on adds a red line, its own bpm range and the current reading to the hover/touch readout. Missing
+readings split the line rather than inventing values. A dashed horizontal line marks the arithmetic average of
+all valid heart-rate readings.
 
 ### Distance measurement
 

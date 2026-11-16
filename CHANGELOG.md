@@ -17,6 +17,54 @@ Added / Changed / Deprecated / Removed / Fixed / Security 分类；没有内容�
 
 - None.
 
+## 1.21.0 — 2026-11-16
+
+### 中文
+
+#### 新增
+
+- 有心率数据的 FIT 和 GPX 轨迹可在海拔剖面上叠加心率曲线；使用独立 bpm 纵轴、默认关闭，悬停读数
+  同步显示当前心率；横虚线标出全程平均心率。
+
+#### 变更
+
+- 附件图片小弹窗复用标记点列表的无磨砂半透明背景；照片全览保持深色半透明外围，并在查看期间隐藏重复
+  的摘要、剖面、工具箱和地图操作控件。
+- 心率开关固定在剖面标题旁，图标恢复为 12 px，文字始终位于胶囊内，不再随窗口宽度改变位置。
+
+### English
+
+#### Added
+
+- FIT and GPX tracks with heart-rate data can overlay heart rate on the elevation profile, using an independent
+  bpm axis. The overlay is off by default, adds the current reading to the hover/touch readout and marks the
+  whole-route average with a dashed horizontal line.
+
+#### Changed
+
+- Attachment preview cards reuse the waypoint list's unblurred translucent background. The full-size viewer
+  keeps its dark semi-transparent surround and hides duplicate summary, profile, toolbox and map controls.
+- The heart-rate switch stays beside the profile title, uses a 12 px icon and keeps its label inside the pill
+  instead of moving between layouts.
+
+## 1.20.11 — 2026-11-16
+
+### 中文
+
+#### 变更
+
+- 点击带附件图片时的小弹窗复用标记点列表的半透明背景，不使用磨砂。
+- 照片全览继续使用已确认的深色半透明背景，并在查看期间隐藏底层重复的摘要、分段、剖面、工具箱和
+  地图操作控件，只保留地图内容与必要署名。
+
+### English
+
+#### Changed
+
+- Attachment preview cards now reuse the waypoint list's translucent background without a frosted filter.
+- The full-size viewer keeps its confirmed dark semi-transparent background and hides duplicate summary,
+  split, profile, toolbox and map-operation controls, leaving the map content and required attribution visible.
+
 ## 1.20.10 — 2026-11-16
 
 ### 中文

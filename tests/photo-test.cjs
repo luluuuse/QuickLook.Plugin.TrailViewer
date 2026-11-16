@@ -126,6 +126,10 @@ async function main() {
     hint: document.querySelector('.photo-popup .photo-hint')?.textContent || '',
     thumbSrc: document.querySelector('.photo-popup .photo-thumb img')?.getAttribute('src') || '',
     thumbLoaded: (document.querySelector('.photo-popup .photo-thumb img')?.naturalWidth || 0) > 0,
+    background: getComputedStyle(document.querySelector('.photo-popup .leaflet-popup-content-wrapper'))
+      .backgroundColor,
+    tipBackground: getComputedStyle(document.querySelector('.photo-popup .leaflet-popup-tip'))
+      .backgroundColor,
     viewerOpen: window.trailViewer.photos.isOpen(),
     bigLoaded: Boolean(document.querySelector('.photo-image')?.getAttribute('src')),
   }));
@@ -139,6 +143,10 @@ async function main() {
   check('thumbnail actually loads', card.thumbLoaded === true);
   check('card says the photo can be enlarged', /full size/.test(card.hint), card.hint);
   check('no full-size image before the second click', card.bigLoaded === false);
+  check('the attachment card matches the waypoint-list transparency',
+    card.background === 'rgba(24, 24, 24, 0.86)'
+      && card.tipBackground === 'rgba(24, 24, 24, 0.86)',
+    `${card.background} / ${card.tipBackground}`);
 
   // 4. The thumbnail opens the original, and the card gets out of the way.
   await openFromCard(0);
@@ -158,6 +166,36 @@ async function main() {
     /of original size/.test(state.zoomTitle) && /fit the window/.test(state.zoomTitle), state.zoomTitle);
   check('opening the photo moves focus to its close button',
     await page.evaluate(() => document.activeElement?.classList.contains('photo-close')) === true);
+  const photoBackground = await page.evaluate(() => {
+    const root = document.querySelector('.photo-viewer');
+    const bar = document.querySelector('.photo-bar');
+    const stage = document.querySelector('.photo-stage');
+    const surface = [root, bar, stage].map((node) => {
+      const style = getComputedStyle(node);
+      return {
+        background: style.backgroundColor,
+        backdropFilter: style.backdropFilter || style.webkitBackdropFilter || 'none',
+        filter: style.filter,
+      };
+    });
+    return {
+      surfaces: surface,
+      mapBehind: Boolean(document.querySelector('#map .leaflet-map-pane')),
+      chromeHidden: ['.info', '#info', '#profile', '#map .leaflet-top']
+        .every((selector) => {
+          const node = document.querySelector(selector);
+          return !node || getComputedStyle(node).display === 'none';
+        }),
+    };
+  });
+  check('non-photo areas keep the map visible through a semi-transparent surface',
+    photoBackground.surfaces[0].background === 'rgba(11, 11, 12, 0.42)'
+      && photoBackground.surfaces.slice(1).every((item) => item.background === 'rgba(0, 0, 0, 0)')
+      && photoBackground.mapBehind && photoBackground.chromeHidden,
+    JSON.stringify(photoBackground));
+  check('the photo viewer adds no background blur or frosted filter',
+    photoBackground.surfaces.every((item) => item.backdropFilter === 'none' && item.filter === 'none'),
+    JSON.stringify(photoBackground));
   await page.keyboard.press('Tab');
   check('Tab reaches the percentage reset control',
     await page.evaluate(() => document.activeElement?.classList.contains('photo-zoom')) === true);

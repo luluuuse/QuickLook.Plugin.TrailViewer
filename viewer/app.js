@@ -467,7 +467,7 @@ async function main() {
       min: elevations.min, max: elevations.max, total: elevations.total,
       ascent: elevations.ascent, descent: elevations.descent, runs: elevations.runs,
       rawAscent: elevations.rawAscent, rawDescent: elevations.rawDescent, steep: elevations.steep,
-      slopeBins: elevations.slopeBins,
+      slopeBins: elevations.slopeBins, heartRate: elevations.heartRate,
     },
     nav: {
       select: waypointController.select,
