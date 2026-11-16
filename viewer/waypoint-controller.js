@@ -5,6 +5,7 @@ import { classifyWaypoint } from './waypoint-insights.js';
 import { sampleScreenPoints } from './waypoint-sampling.js';
 import { readStored, writeStored } from './storage.js';
 import { iconElement, setIcon, symbolMarkup } from './icons.js';
+import { lineDistanceAt } from './route-model.js';
 
 const PINS_KEY = 'pins';
 const MAX_DOTS = 20000;
@@ -27,7 +28,18 @@ function pinIcon(L, withPhoto) {
   });
 }
 
-function buildRouteIndex(segments, gpx) {
+function buildRouteIndex(segments, gpx, routeModel) {
+  if (routeModel) {
+    const points = [];
+    const lines = routeModel.tracks.length > 0 ? routeModel.tracks : routeModel.routes;
+    for (const line of lines) {
+      for (let index = 0; index < line.points.length; index += 1) {
+        const point = line.points[index];
+        points.push({ lat: point.lat, lon: point.lon, along: lineDistanceAt(line, index) });
+      }
+    }
+    return createPointIndex(points);
+  }
   const lines = segments.length > 0
     ? segments.map((segment) => segment.points)
     : gpx.routes.map((route) => route.points);
@@ -79,6 +91,8 @@ export function createWaypointController({
   let halo = null;
   let trackMarkCount = 0;
   let pendingPinRender = 0;
+  let waypointIndex = null;
+  const renderedStops = new Set();
   const overview = createWaypointOverview({
     el,
     onSelect: (index) => selectNode(index),
@@ -124,14 +138,15 @@ export function createWaypointController({
   }
 
   function showStop(stop) {
-    stop.marker.setIcon(stop.pinIcon);
-    const marker = stop.marker.getElement();
-    if (marker) marker.style.display = '';
+    if (renderedStops.has(stop)) return;
+    pinLayer?.addLayer(stop.marker);
+    renderedStops.add(stop);
   }
 
   function hideStop(stop) {
-    const marker = stop.marker.getElement();
-    if (marker) marker.style.display = 'none';
+    if (!renderedStops.has(stop)) return;
+    pinLayer?.removeLayer(stop.marker);
+    renderedStops.delete(stop);
   }
 
   function selectedNode() {
@@ -142,22 +157,24 @@ export function createWaypointController({
     if (!map) return;
     if (!shown || stops.length === 0) return;
 
-    for (const stop of stops) hideStop(stop);
-    const protectedStops = new Set();
     const selected = selectedNode()?.stop || stops[stopIndex];
+    const target = new Set();
+    if (selected) target.add(selected);
+    const protectedStops = new Set();
     if (selected) protectedStops.add(selected);
-    for (const stop of stops) if (stop.important) protectedStops.add(stop);
-    for (const stop of protectedStops) {
-      showStop(stop);
-      stop.marker.setZIndexOffset(stop === selected ? 1200 : 900);
-    }
-    for (const stop of stops) {
-      stop.marker.getElement()?.classList.toggle('selected', stop === selected);
-    }
+    const viewBounds = map.getBounds().pad(0.15);
+    const inView = new Set(waypointIndex?.within({
+      south: viewBounds.getSouth(),
+      west: viewBounds.getWest(),
+      north: viewBounds.getNorth(),
+      east: viewBounds.getEast(),
+    }) || []);
+    for (const stop of stops) if (stop.important && inView.has(stop.point)) protectedStops.add(stop);
+    for (const stop of protectedStops) target.add(stop);
 
     const ordinary = stops
       .map((stop, index) => ({ stop, index }))
-      .filter(({ stop }) => !protectedStops.has(stop));
+      .filter(({ stop }) => !protectedStops.has(stop) && inView.has(stop.point));
     const protectedPoints = [...protectedStops].map((stop) =>
       map.latLngToContainerPoint([stop.point.lat, stop.point.lon]));
     const sampled = sampleScreenPoints(
@@ -169,7 +186,16 @@ export function createWaypointController({
         occupied: protectedPoints,
       },
     );
-    for (const { item } of sampled) showStop(item.stop);
+    for (const { item } of sampled) target.add(item.stop);
+
+    for (const stop of [...renderedStops]) {
+      if (!target.has(stop)) hideStop(stop);
+    }
+    for (const stop of target) {
+      showStop(stop);
+      stop.marker.setZIndexOffset(stop === selected ? 1200 : 900);
+      stop.marker.getElement()?.classList.toggle('selected', stop === selected);
+    }
   }
 
   function scheduleWaypointPins() {
@@ -328,7 +354,7 @@ export function createWaypointController({
   function buildNavigation(anchorMarks, routeIndex) {
     const waypointGroups = stops.map((stop) => ({ stop, anchors: [] }));
     const anchorGroups = [];
-    for (const anchor of anchorMarks) {
+    for (const anchor of routeIndex ? anchorMarks : []) {
       const withAlong = {
         ...anchor,
         along: routeIndex.nearest(anchor.point)?.along,
@@ -464,7 +490,7 @@ export function createWaypointController({
   }
 
   return {
-    draw(targetMap, gpx, segments, anchorMarks = []) {
+    draw(targetMap, gpx, segments, anchorMarks = [], routeModel = null) {
       map = targetMap;
       stops = [];
       photoStops = [];
@@ -475,12 +501,14 @@ export function createWaypointController({
       overviewCache = null;
       halo = null;
       trackMarkCount = 0;
+      waypointIndex = createPointIndex(gpx.waypoints || []);
+      renderedStops.clear();
       pinLayer = L.layerGroup();
       const dots = L.canvas({ padding: 0.5 });
       const pointCount = segments.reduce((sum, segment) => sum + segment.points.length, 0);
-      const withDots = pointCount <= MAX_DOTS;
+      const withDots = !gpx.network && pointCount <= MAX_DOTS;
       const bounds = L.latLngBounds([]);
-      const routeIndex = buildRouteIndex(segments, gpx);
+      const routeIndex = gpx.network ? null : buildRouteIndex(segments, gpx, routeModel);
 
       if (withDots) {
         for (const segment of segments) {
@@ -507,12 +535,11 @@ export function createWaypointController({
           keyboard: false,
           title: waypoint.name || '',
         });
-        pinLayer.addLayer(marker);
         const stop = {
           point: waypoint,
           marker,
           photos,
-          along: routeIndex.nearest(waypoint)?.along,
+          along: routeIndex?.nearest(waypoint)?.along,
           pinIcon: pin,
           important,
           sourceIndex: stops.length,
@@ -563,6 +590,7 @@ export function createWaypointController({
     photoStops: () => photoStops,
     index: () => stopIndex,
     navigation: () => navigation,
+    waypointIndex: () => waypointIndex,
     nodeIndex: () => selectedNodeIndex,
     hasControl: () => pinControl !== null,
     hasOverview: () => listControl !== null,

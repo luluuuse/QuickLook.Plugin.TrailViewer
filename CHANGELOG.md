@@ -17,6 +17,331 @@ Added / Changed / Deprecated / Removed / Fixed / Security 分类；没有内容�
 
 - None.
 
+## 1.21.13 — 2026-11-17
+
+### 中文
+
+#### 变更
+
+- 自动识别由大量独立路线合并而成的路网 KML，不再把全网误算为一次连续行程；路网模式不显示无意义的
+  全局均速、休息时间、每公里表和合并剖面。
+- 路网轨迹使用 Canvas、视口过滤和按缩放级别简化的几何；最大 27 MB 路网实测首屏约从 3.21 秒降至
+  2.70 秒，JS 堆峰值约从 114 MB 降至 85 MB。
+- 路线拖动时按帧补入当前视口，标注点图层只更新可见集合的差异，减少快速跨区拖动时的集中重绘。
+- 新增共享只读轨迹模型，分段长度和累计里程只计算一次，供地图、摘要、剖面、导航、导出和每公里分析复用。
+- 每公里统计改为首次展开时计算，并使用单次区间游标和二分时间定位；3,300 公里轨迹回归约 45 ms。
+- 测距吸附索引改为首次使用，航点索引与标记点控制器共享；5,000 个航点只为视口采样创建图钉 DOM。
+- 摘要与每公里分析共用运动阈值和心率口径，并在记录段边界重置运动状态；段间时间统一计入休息时间。
+- 地图平移和缩放不再重复测量整套 DOM，距离标记按缩放级别缓存采样。
+
+#### 修复
+
+- 修复照片全览关闭后地图可能重新计算可用区域并突然跳动的问题。
+- 修复 KMZ 叠加图被写入临时解包目录并在关闭预览后丢失的问题。
+- GPX、KML、KMZ 和 FIT 统一增加 64 MB 上限，超限文件在启动 WebView 前明确报错。
+- 修复 20 万点心率统计、连续平移语言节点增长、WebView2 关闭及 COM 回调异常。
+
+### English
+
+#### Changed
+
+- Route-network KML files made from many independent tracks are detected automatically instead of being treated
+  as one continuous trip; network mode omits meaningless global moving speed, rest time, split table and merged
+  profile.
+- Network tracks use Canvas with viewport filtering and zoom-dependent geometry. The largest 27 MB network now
+  reaches first paint in about 2.70 seconds instead of 3.21 seconds, with peak JS heap reduced from roughly
+  114 MB to 85 MB.
+- Routes enter the viewport as the map moves, while the waypoint layer updates only visibility differences,
+  reducing concentrated redraws during fast cross-area dragging.
+- Added a shared read-only route model so segment lengths and cumulative distance are calculated once for the
+  map, summary, profile, navigation, export and split analysis.
+- Per-kilometre analysis is calculated on first expansion and uses a monotonic interval cursor with binary time
+  lookup; the 3,300-kilometre regression runs in about 45 ms.
+- Measurement indexes are created on first use and share the marker controller's waypoint index; 5,000
+  waypoints create marker DOM only for the current viewport sample.
+- The summary and split analysis share movement thresholds and heart-rate semantics and reset movement at every
+  recorded segment; time between segments is counted as rest.
+- Map panning and zooming no longer remeasure the full DOM, and distance markers cache samples per zoom level.
+
+#### Fixed
+
+- Fixed the map sometimes recalculating its available area and jumping after closing a full-size photo.
+- Fixed overlays exported from KMZ files being written into the temporary extraction folder and lost when the
+  preview closes.
+- GPX, KML, KMZ and FIT inputs now share a 64 MB limit and fail clearly before WebView starts.
+- Fixed heart-rate statistics on 200,000 readings, language-node growth during repeated panning, and WebView2
+  shutdown or COM callback errors.
+
+## 1.21.12 — 2026-11-17
+
+### 中文
+
+#### 变更
+
+- 路网不再把全部轨迹点复制为 Leaflet LatLng；只为当前视口内的路线创建 Canvas 折线。
+- 路网折线按当前缩放级别简化点集，总览使用更轻的几何，高倍缩放仍保留可见细节。
+- 最大 27 MB 路网的首屏约从 2.79 秒降至 2.70 秒，JS 堆峰值约从 105 MB 降至 85 MB。
+- 总览实际绘制点从 99,009 个降至 1,277 个，路线名称提示和 Canvas 命中行为保持可用。
+
+### English
+
+#### Changed
+
+- Networks no longer copy every track point into Leaflet LatLng objects; Canvas polylines are created only
+  for routes intersecting the current viewport.
+- Network geometry is simplified for the current zoom, keeping overview rendering light while retaining
+  visible detail when zoomed in.
+- The largest 27 MB network now reaches first paint in about 2.70 seconds instead of 2.79 seconds, with peak
+  JS heap reduced from roughly 105 MB to 85 MB.
+- The overview draws about 1,277 points instead of 99,009 while route-name tooltips and Canvas hit testing
+  remain available.
+
+## 1.21.11 — 2026-11-17
+
+### 中文
+
+#### 变更
+
+- 测距吸附索引改为首次吸附或开始测距时创建，普通预览不再为全部轨迹点建立 k-d tree。
+- 测距直接复用标记点控制器的航点空间索引，避免同一批航点被索引两次。
+- 最大 27 MB 路网实测 JS 堆约从 114 MB 降至 105 MB，首屏约从 3.21 秒降至 2.79 秒。
+
+### English
+
+#### Changed
+
+- Measurement snapping indexes are created on first use instead of during every normal preview.
+- Measurement reuses the waypoint controller's spatial index instead of indexing the same waypoints twice.
+- The largest 27 MB network now measures about 105 MB of JS heap and a 2.79-second first paint, down from
+  roughly 114 MB and 3.21 seconds.
+
+## 1.21.10 — 2026-11-17
+
+### 中文
+
+#### 变更
+
+- 每公里统计改用单调区间游标和二分时间定位，避免为每一公里重新扫描全部轨迹区间。
+- 路网模式跳过导航用轨迹空间索引副本，保留文件顺序的完整标注点导航。
+- 路网轨迹坐标不再保存不参与剖面和导出的海拔字段，进一步降低解析内存。
+- 新增 3,300 公里长轨迹分段性能回归；本机计算约 45 ms。
+
+### English
+
+#### Changed
+
+- Per-kilometre analysis now uses a monotonic interval cursor and binary time lookup instead of rescanning all
+  intervals for every kilometre.
+- Network mode skips the duplicate route-space index used only for along-route ordering and keeps complete
+  marker navigation in file order.
+- Network track coordinates no longer retain elevation fields that are unused by profile and export.
+- Added a 3,300-kilometre split-performance regression, measured at roughly 45 ms locally.
+
+## 1.21.9 — 2026-11-17
+
+### 中文
+
+#### 变更
+
+- 自动识别由大量独立路线合并而成的路网 KML，不再把全网误算为一次完整行程。
+- 路网模式不显示全局运动均速、休息时间、每公里表和合并海拔剖面，保留路线、标注点、照片、测距与导出。
+- 路网轨迹改用 Canvas 绘制，关闭逐点圆点、全路网公里数字和异常标记，避免大量无效 Leaflet 元素。
+- 路网轨迹点不再创建 `Date` 对象；5,000 航点的视口标记虚拟化继续生效。
+- 新增生成式路网浏览器回归，覆盖 24 条独立路线、2,400 个轨迹点、300 个标注点和连续缩放。
+
+### English
+
+#### Changed
+
+- Route-network KML files made from many independent tracks are detected automatically instead of being
+  treated as one continuous trip.
+- Network mode omits global moving speed, rest time, the all-network split table and the combined elevation
+  profile while retaining routes, waypoints, photos, measurement and export.
+- Network tracks use the Canvas renderer; per-point circles, all-network kilometre labels and anomaly badges
+  are skipped to avoid thousands of ineffective Leaflet elements.
+- Network points no longer allocate `Date` objects, while viewport virtualisation continues for large waypoint
+  sets.
+- Added a generated browser regression with 24 independent tracks, 2,400 points, 300 markers and repeated
+  zooming.
+
+## 1.21.8 — 2026-11-17
+
+### 中文
+
+#### 变更
+
+- 新增共享只读轨迹模型，分段长度和累计里程只计算一次，供摘要、地图、剖面、导航、导出和每公里分析复用。
+- 航点按当前视口做空间查询，只为屏幕采样需要的标记创建 Leaflet DOM；5,000 个航点仍保留全部导航项。
+- 增加解析、准备、首屏、首次展开每公里和连续缩放的性能基线，并在浏览器测试中设置宽松回归阈值。
+
+### English
+
+#### Changed
+
+- Added a shared read-only route model so segment lengths and cumulative distance are measured once for the
+  summary, map, profile, navigation, export and split analysis.
+- Waypoints are queried by viewport and only markers needed by the current screen sample create Leaflet DOM;
+  5,000 waypoints still retain every navigation stop.
+- Added performance baselines for parsing, preparation, first paint, first split expansion and repeated zooming,
+  with broad regression budgets in the browser tests.
+
+## 1.21.7 — 2026-11-17
+
+### 中文
+
+#### 变更
+
+- 轨迹摘要将距离、高程范围和时间范围合并为一次逐点扫描，不再为时间统计重复遍历全部轨迹点。
+- 缺口与异常诊断在同一预览中复用，地图图层不再重复执行同一套全轨迹检测。
+- 公里标记直接复用已计算的分段长度；缩放时不再次扫描全部点计算总里程。
+- 剖面、叠加图导出和测距初始化不再创建中间分段数组。
+
+### English
+
+#### Changed
+
+- Route summaries now collect distance, elevation range and time range in one point pass instead of walking the
+  full track again for timestamps.
+- Gap and anomaly diagnostics are reused within one preview, so the map layer no longer repeats the same
+  full-route scan.
+- Distance markers reuse precomputed segment lengths and no longer rescan every point to calculate total
+  distance when the zoom changes.
+- Profile, overlay export and measurement setup no longer allocate intermediate segment arrays.
+
+## 1.21.6 — 2026-11-17
+
+### 中文
+
+#### 变更
+
+- 每公里统计改为首次展开面板时计算；收起状态只读取摘要中的里程和可用时间，不再增加打开轨迹的预处理。
+- 摘要与每公里表共用同一组运动阈值，并在每条记录段开始时重置运动状态；段间时间统一计入休息时间。
+- 全程与每公里的平均心率统一为所有有效点读数的算术平均值，缺失读数不会被当作零或距离权重。
+
+### English
+
+#### Changed
+
+- Per-kilometre statistics are calculated only when the panel is first expanded. The collapsed entry reads
+  distance and time availability from the summary instead of preprocessing every route point.
+- The summary and split table now share one movement threshold configuration and reset movement at every
+  recorded segment. Time between segments is consistently counted as rest.
+- Whole-route and per-kilometre average heart rate now use the arithmetic mean of valid point readings; missing
+  readings are neither treated as zero nor distance weights.
+
+## 1.21.5 — 2026-11-17
+
+### 中文
+
+#### 变更
+
+- 测试运行器支持按套件名称选择专项测试；未匹配任何名称的直接报错，避免零项测试误报成功。
+- 新增 `test:quick` 和 `test:suite` 命令，并在测试文档中明确迭代、测试包和正式发布三档验证流程。
+
+### English
+
+#### Changed
+
+- The test runner can select a focused subset by suite name and rejects unmatched names instead of reporting a
+  false success from zero tests.
+- Added `test:quick` and `test:suite` commands and documented separate verification levels for iteration, test
+  packages and formal releases.
+
+## 1.21.4 — 2026-11-16
+
+### 中文
+
+#### 修复
+
+- 修复带照片的标记点放大查看后，点击图片外区域返回时地图可能重新计算可用区域并突然移动的问题。
+- 照片全览期间继续隐藏信息卡、剖面和地图控件，但保留它们原有的布局尺寸；关闭照片后保持当前地图视野不变。
+
+### English
+
+#### Fixed
+
+- Fixed the map sometimes recalculating its available area and jumping after closing a full-size photo opened from
+  a photo waypoint.
+- The photo viewer still hides the summary, profile and map controls, but now preserves their layout geometry and
+  leaves the map view unchanged when the photo closes.
+
+## 1.21.3 — 2026-11-16
+
+### 中文
+
+#### 变更
+
+- 地图平移和缩放不再重新测量整套 DOM 布局；布局只在窗口、面板或控件尺寸变化时刷新。
+- 距离标记按缩放级别缓存路线采样，普通平移不再重复扫描全部轨迹点。
+- GPX 点解析改为一次遍历直接子元素，减少大文件加载时的重复扫描和临时数组。
+
+#### 修复
+
+- 缺口和异常 tooltip 不再登记到全局语言节点列表；连续平移不会让该列表持续增长。
+- 心率统计改为单次循环，20 万点心率轨迹不会因参数展开触发调用栈溢出。
+- WebView2 快捷键、天地图状态和导出回调统一处理浏览器关闭及 COM 进程异常。
+- KMZ 导出的叠加图现在保存在原始 KMZ 同级目录，不再写入临时解包目录。
+- GPX、KML、KMZ 和 FIT 统一限制为 64 MB，超限文件在启动 WebView 前显示明确错误。
+
+### English
+
+#### Changed
+
+- Map panning and zooming no longer remeasure the full DOM layout; layout refreshes only when the window,
+  panels or controls change size.
+- Distance markers cache route samples per zoom level, so ordinary panning no longer scans every track point.
+- GPX point parsing now walks direct children once, reducing repeated scans and temporary arrays on large files.
+
+#### Fixed
+
+- Gap and anomaly tooltips no longer register in the global language-node list, so repeated panning cannot grow
+  that list indefinitely.
+- Heart-rate statistics use one pass, preventing call-stack overflow on 200,000-reading tracks.
+- WebView2 shortcut, Tianditu-state and export callbacks consistently handle browser shutdown and COM errors.
+- Overlays exported from KMZ files now go beside the original KMZ instead of the temporary extraction folder.
+- GPX, KML, KMZ and FIT inputs share a 64 MB limit and fail clearly before WebView starts.
+
+## 1.21.2 — 2026-11-16
+
+### 中文
+
+#### 修复
+
+- 心率统计改为单次循环，不再通过参数展开求最小值和最大值；20 万点心率轨迹不会触发调用栈溢出。
+- WebView2 快捷键、天地图状态和导出回调统一识别浏览器关闭及 COM 进程异常，关闭预览时不再产生未处理异常。
+- 修复从 KMZ 导出的叠加图被写入临时解包目录并在关闭预览后丢失的问题；现在保存在原始 KMZ 同级目录。
+- GPX、KML、KMZ 和 FIT 统一限制为 64 MB，超限文件在启动 WebView 前显示明确错误。
+
+### English
+
+#### Fixed
+
+- Heart-rate statistics now use one pass instead of argument spreading for minimum and maximum values, so
+  200,000-reading tracks no longer trigger call-stack overflow.
+- WebView2 shortcut, Tianditu-state and export callbacks now consistently recognise browser shutdown and COM
+  process errors, preventing unhandled exceptions when a preview closes.
+- Fixed overlays exported from KMZ files being written into the temporary extraction folder and deleted when the
+  preview closed; exports now go beside the original KMZ.
+- GPX, KML, KMZ and FIT inputs now share a 64 MB limit. Oversized files fail clearly before WebView starts.
+
+## 1.21.1 — 2026-11-16
+
+### 中文
+
+#### 修复
+
+- 修复从 KMZ 导出的叠加图被写入临时解包目录、关闭预览后丢失的问题；现在始终保存在原始 KMZ 同级目录。
+- GPX、KML、KMZ 和 FIT 统一限制为 64 MB，超限文件在启动 WebView 前显示明确错误，避免内存耗尽。
+
+### English
+
+#### Fixed
+
+- Fixed overlays exported from KMZ files being written into the temporary extraction folder and deleted when the
+  preview closed; exports now go beside the original KMZ.
+- GPX, KML, KMZ and FIT inputs now share a 64 MB limit. Oversized files fail with a clear message before WebView
+  starts, preventing memory exhaustion.
+
 ## 1.21.0 — 2026-11-16
 
 ### 中文

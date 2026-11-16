@@ -25,6 +25,10 @@ internal static class Strings
         ? "无法读取该 KMZ 文件：" + detail
         : "Could not read this KMZ file: " + detail;
 
+    internal static string FileTooLarge(long limitBytes) => Chinese
+        ? $"该轨迹文件超过 {limitBytes / (1024 * 1024)} MB，无法安全预览。"
+        : $"This track is larger than {limitBytes / (1024 * 1024)} MB and cannot be previewed safely.";
+
     internal static string PreviewFailed(string detail) => Chinese
         ? "无法打开预览：" + detail
         : "Could not open the preview: " + detail;

@@ -12,6 +12,8 @@
 FIT 读取活动和路线中的 GPS 记录、时间、海拔、心率、会话用时及 `course_point` 路线点。简要模式聚焦
 路线基础数据；步频、功率、温度、训练步骤和完整设备指标暂不展示。
 
+单个轨迹文件最大为 64 MB；GPX、KML、KMZ 和 FIT 超限时会在启动 WebView 前直接显示错误，避免内存耗尽。
+
 ### 地图与标记点
 
 - 顶部“图层”入口显示当前底图类型；面板中分为 **路网**、**地形**、**卫星** 和 **无底图** 四类，
@@ -66,13 +68,24 @@ FIT 读取活动和路线中的 GPS 记录、时间、海拔、心率、会话�
 - **距离**：完整分段为 1.00 km，最后一段为剩余里程。
 - **时间**：从该公里起点到终点的实际经过时间。
 - **运动速度**：按运动时间计算；文件提供暂停总量时优先使用文件计时，否则根据移动速度排除停顿。
+- 每公里统计在第一次展开时才计算，收起时不会遍历全部轨迹点。
+- 测距吸附索引在第一次吸附或开始测距时才创建，普通地图浏览不会承担测距索引的初始化开销。
+- 大路网只绘制当前视野附近的路线，并按缩放级别简化显示细节；标注点、照片和测距仍使用完整数据。
 - 表底汇总总时间与运动时间，最快分段的速度使用强调色显示。
 - 长路线在固定高度表格内滚动，表头和底部汇总保持可见。
 - 使用 `Tab` 将焦点移到某一圈时会立即选中并定位；也可以直接点击某一圈。地图会缩放到对应轨迹范围，
   并用青色覆盖强调；再次点击同一圈或收起面板可清除强调。`Enter` / `Space` 不是本功能的快捷键。
 - 标题栏默认显示“详细”切换键。点击后增加累计时间、累计上升/下降、平均心率、运动速度和垂直速度；
-  文件没有有效心率数据时，平均心率列完全隐藏。
+  文件没有有效心率数据时，平均心率列完全隐藏。平均心率为该公里内有效点读数的算术平均值，与全程
+  平均心率口径一致。
 - 展开时蓝色激活背景覆盖完整标题栏；各数据列头保持纯文字，不增加装饰图标。
+
+### 路网轨迹
+
+由大量独立路线合并出的两步路路网 KML 会自动进入路网模式。路网会显示全部路线和标注点，但不显示
+全路网运动均速、休息时间、每公里表或合并海拔剖面，因为这些数据不属于同一次连续行程。地图使用
+Canvas 绘制路线，并跳过普通轨迹点圆点、公里数字和路网级异常标记，以降低大文件的内存和交互开销。
+标注点、照片、测距和叠加图导出仍可使用。
 
 ### 导出叠加图
 
@@ -101,6 +114,9 @@ access; **No map** renders the route on a local grid.
 The first FIT version reads GPS records, time, elevation, heart rate, session totals and `course_point` markers
 from activities and courses. Laps, cadence, power, temperature, workout steps and the full device metric set are
 not displayed yet.
+
+Each track file is limited to 64 MB. Oversized GPX, KML, KMZ and FIT files show an error before WebView starts,
+so malformed or padded files cannot exhaust memory.
 
 ### Map and waypoints
 

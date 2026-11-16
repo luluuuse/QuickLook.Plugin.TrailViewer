@@ -5,6 +5,7 @@
 import { GpxError, parseGpxDocument, parseXml, summarize } from './gpx.js';
 import { KmlError, parseKmlDocument } from './kml.js';
 import { FitError, isFit, parseFit } from './fit.js';
+import { createRouteModel } from './route-model.js';
 import { getLang, isChinese, langLabel, onLangChange, t, toggleLang, units } from './i18n.js';
 import { installSpaceGuard } from './focus.js';
 import { createPhotoViewer } from './photo-viewer.js';
@@ -25,7 +26,7 @@ import {
 } from './format.js';
 import { createWaypointContent, renderPointPopup } from './waypoint-content.js';
 import { createSummaryView } from './summary-view.js';
-import { analyseSplits } from './split-analysis.js';
+import { analyseSplits, splitCount } from './split-analysis.js';
 import { createSplitsView } from './split-view.js';
 import { createTrackLayer } from './track-layer.js';
 import { createWaypointController } from './waypoint-controller.js';
@@ -42,6 +43,13 @@ const L = window.L;
 const params = new URLSearchParams(location.search);
 const src = params.get('src');
 const fileName = params.get('name') || fileNameFromSource(src);
+const timing = {
+  parseMs: null,
+  prepareMs: null,
+  readyMs: null,
+  firstPaintMs: null,
+  splitFirstOpenMs: null,
+};
 const hasQuickLookHost = Boolean(
   window.chrome?.webview?.postMessage && window.chrome.webview.addEventListener,
 );
@@ -111,11 +119,14 @@ function repaintLocalized() {
   }
 }
 
+let splitData = null;
+let loadSplitsData = () => null;
 const splitController = createSplitsView({
   el,
   t,
   formatSpeed,
   formatTimer,
+  loadData: () => loadSplitsData(),
   onLayoutChange: () => mapViewController?.refreshControls({ refitHome: false }),
   onSelect: (split) => focusSplit(split),
 });
@@ -241,6 +252,7 @@ function distanceLog(meters) {
 }
 
 async function main() {
+  const started = performance.now();
   applyPageLanguage();
 
   if (!src) {
@@ -261,6 +273,7 @@ async function main() {
   }
 
   let gpx;
+  let routeModel;
   let summary;
   try {
     if (isFit(bytes)) {
@@ -275,7 +288,9 @@ async function main() {
       }
       gpx = rootName === 'kml' ? parseKmlDocument(doc) : parseGpxDocument(doc);
     }
-    summary = summarize(gpx);
+    routeModel = createRouteModel(gpx);
+    summary = summarize(gpx, routeModel);
+    timing.parseMs = performance.now() - started;
   } catch (e) {
     if (e instanceof FitError) {
       const key = {
@@ -297,19 +312,32 @@ async function main() {
 
   // Worked out once: the summary box and the profile read the same numbers, and neither recomputes on a
   // language switch.
-  const elevations = summary.elevation ? profileController.read(gpx) : null;
+  const elevations = summary.elevation ? profileController.read(gpx, routeModel) : null;
   const hikeEstimate = elevations ? gradeAwareHikeSeconds({
     distance: summary.distanceMeters,
     ascent: elevations.ascent,
     descent: elevations.descent,
     bins: elevations.slopeBins,
   }) : null;
-  const splitData = analyseSplits(gpx, summary);
+  splitData = null;
+  loadSplitsData = () => {
+    if (!splitData) {
+      const splitStarted = performance.now();
+      splitData = analyseSplits(gpx, summary, routeModel);
+      timing.splitFirstOpenMs = performance.now() - splitStarted;
+    }
+    return splitData;
+  };
+  const splitPreview = {
+    count: splitCount(summary.distanceMeters),
+    available: summary.points > 0 && summary.start !== null && summary.end !== null,
+  };
   renderInfo(gpx, summary, elevations, hikeEstimate);
-  splitController.render(splitData, summary, { reset: true });
+  splitController.render(summary, { reset: true, ...splitPreview });
   // Drawn before the map: the fit below needs to know whether the panel is there, and the panel's own height
   // is fixed in CSS, so the map never has to be told its size changed.
   const profile = elevations ? profileController.render(gpx, elevations) : null;
+  timing.prepareMs = performance.now() - started;
 
   const map = L.map('map', { keyboard: false, worldCopyJump: false });
   map.getContainer().tabIndex = -1;
@@ -317,9 +345,11 @@ async function main() {
   map.attributionControl.setPrefix('<a href="https://leafletjs.com" target="_blank">Leaflet</a>');
   L.control.scale({ imperial: false, position: 'bottomleft' }).addTo(map);
   mapViewController = createMapView({ map, isChromeHidden: uiFeedback.isHidden });
-  const tracks = trackLayer.draw(map, gpx);
+  const tracks = trackLayer.draw(map, gpx, routeModel);
   activeTrackLayer = tracks;
-  const waypointBounds = waypointController.draw(map, gpx, tracks.segments, tracks.navigationMarks);
+  const waypointBounds = waypointController.draw(
+    map, gpx, tracks.segments, tracks.navigationMarks, routeModel,
+  );
   tracks.bounds.extend(waypointBounds);
   const bounds = tracks.bounds;
   mapViewController.setRoute(bounds);
@@ -337,6 +367,7 @@ async function main() {
     gpx,
     summary,
     elevations,
+    routeModel,
     fileName,
     onSettingsChange: syncPreferences,
     onPanelOpen: () => toolboxController?.close(),
@@ -348,6 +379,7 @@ async function main() {
     formatDistance,
     gpx,
     segments: tracks.segments,
+    waypointIndex: () => waypointController.waypointIndex(),
     onLayoutChange: () => mapViewController?.refreshControls({ refitHome: false }),
   });
   measurementController = measurement;
@@ -425,7 +457,7 @@ async function main() {
     applyPageLanguage();
     syncPreferences();
     renderInfo(gpx, summary, elevations, hikeEstimate);
-    splitController.render(splitData, summary);
+    splitController.render(summary, splitPreview);
     switcher.relabel();
     locateCtrl.relabel();
     measurement.relabel();
@@ -450,12 +482,17 @@ async function main() {
   });
 
   const api = {
-    gpx, summary, splits: splitData, map, scrub, photos: photoViewer, hikeEstimate,
+    gpx, summary, map, scrub, photos: photoViewer, hikeEstimate,
+    trackStats: tracks.networkStats,
+    performance: () => ({ ...timing }),
+    get splits() { return loadSplitsData(); },
+    localizedNodeCount: () => localizedNodes.length,
     splitPanel: {
       open: splitController.open,
       close: splitController.close,
       toggle: splitController.toggle,
       isOpen: splitController.isOpen,
+      loaded: splitController.loaded,
       select: splitController.select,
       selected: splitController.selected,
       mode: splitController.mode,
@@ -547,6 +584,7 @@ async function main() {
       clear: measurement.clear,
       canUndo: measurement.canUndo,
       canRedo: measurement.canRedo,
+      indexed: measurement.indexed,
       summary: measurement.summary,
       sections: measurement.sections,
       snapAt: measurement.snapAt,
@@ -561,6 +599,10 @@ async function main() {
     api.tiandituResponse(Number(event.data.split('\t')[1]));
   });
   document.body.classList.add('loaded');
+  timing.readyMs = performance.now() - started;
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    timing.firstPaintMs = performance.now() - started;
+  }));
   post(`ready\t${summary.points} points, ${distanceLog(summary.distanceMeters)}`);
 }
 

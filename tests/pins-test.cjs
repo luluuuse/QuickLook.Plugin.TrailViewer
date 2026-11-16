@@ -223,7 +223,52 @@ async function main() {
   check('the marker switch hides the sampled pins',
     (await page.locator('.gpx-pin').count()) === 0);
 
-  // 9. A file that draws no marks at all — only an area — still gets no switch.
+  // 9. Thousands of placemarks stay responsive by creating markers only for the sampled viewport.
+  let dense5000 = '<?xml version="1.0"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document>';
+  for (let index = 0; index < 5000; index += 1) {
+    const lat = 30 + (index % 100) * 0.0002;
+    const lon = 100 + Math.floor(index / 100) * 0.0002;
+    dense5000 += `<Placemark><name>Point ${index}</name><Point><coordinates>${lon},${lat},0</coordinates></Point></Placemark>`;
+  }
+  dense5000 += '</Document></kml>';
+  await page.route((url) => url.pathname.endsWith('/generated-5000-waypoints.kml'),
+    (route) => route.fulfill({ body: dense5000, contentType: 'application/vnd.google-earth.kml+xml' }));
+  const denseStarted = Date.now();
+  await page.evaluate(() => localStorage.removeItem('trailviewer.pins'));
+  await page.goto(`${base}/viewer/index.html?src=../generated-5000-waypoints.kml`);
+  await page.waitForFunction(() => document.body.classList.contains('loaded'));
+  await waitForLayout(page);
+  await page.waitForFunction(() => window.trailViewer.performance().firstPaintMs !== null);
+  const denseLoadMs = Date.now() - denseStarted;
+  const dense5000State = await page.evaluate(() => ({
+    stops: window.trailViewer.nav.stops().length,
+    count: window.trailViewer.pins.count(),
+    markerNodes: document.querySelectorAll('.gpx-pin').length,
+    performance: window.trailViewer.performance(),
+  }));
+  check('five thousand waypoints retain every navigation stop',
+    dense5000State.stops === 5000 && dense5000State.count === 5000,
+    JSON.stringify(dense5000State));
+  check('dense waypoint markers are created only for the current viewport sample',
+    dense5000State.markerNodes > 0 && dense5000State.markerNodes < 500,
+    `${dense5000State.markerNodes}/${dense5000State.stops}`);
+  check('five thousand waypoints load within the browser budget',
+    denseLoadMs < 10000 && dense5000State.performance.firstPaintMs < 10000,
+    JSON.stringify({ denseLoadMs, ...dense5000State.performance }));
+  console.log(`generated-5000-waypoints.kml: ${denseLoadMs} ms, ${dense5000State.markerNodes} visible marker nodes`);
+  await page.evaluate(() => window.trailViewer.nav.select(4999));
+  await waitForLayout(page);
+  check('an off-sample dense waypoint can still be selected',
+    await page.evaluate(() => document.querySelectorAll('.gpx-pin.selected').length === 1));
+
+  await open('waypoints-route.gpx');
+  await waitForLayout(page);
+  const routeOnly = await page.evaluate(() =>
+    window.trailViewer.nav.stops().map((stop) => stop.along));
+  check('route-only files still place waypoints along the route',
+    routeOnly.length === 3 && routeOnly.every(Number.isFinite), JSON.stringify(routeOnly));
+
+  // 10. A file that draws no marks at all — only an area — still gets no switch.
   await open('kml-polygon-only.kml');
   s = await state();
   check('no switch when the file draws no marks', s.hasControl === false && s.marks === 0, `${s.hasControl}/${s.marks}`);

@@ -65,6 +65,7 @@ async function main() {
         lines: document.querySelectorAll('path.gpx-track').length,
         dashed: document.querySelectorAll('path.gpx-route').length,
         pins: document.querySelectorAll('.gpx-pin').length,
+        waypoints: window.trailViewer.gpx.waypoints.length,
         startMarkers: document.querySelectorAll('path.gpx-start').length,
         endMarkers: document.querySelectorAll('path.gpx-end').length,
         profile: !document.getElementById('profile').hidden,
@@ -81,7 +82,7 @@ async function main() {
     }
     check(fixture, 'track lines', got.lines, want.segments);
     check(fixture, 'dashed routes', got.dashed, want.routes);
-    check(fixture, 'waypoint pins', got.pins, want.waypoints);
+    check(fixture, 'waypoint records', got.waypoints, want.waypoints);
     check(fixture, 'start markers', got.startMarkers, want.tracks);
     check(fixture, 'end markers', got.endMarkers, want.tracks);
     check(fixture, 'elevation profile', got.profile, want.elevation);
@@ -129,6 +130,32 @@ async function main() {
     if (n === 30000) check('generated-30000.gpx', 'profile path is pixel bounded', curveVertices <= 1202,
       true, `${curveVertices} vertices`);
     if (seconds > 10) failures.push(`generated-${n}.gpx: took ${seconds.toFixed(1)} s (limit 10 s)`);
+    if (n === 30000) {
+      await page.evaluate(() => window.trailViewer.selectLayer('none'));
+      await page.locator('.split-toggle').click();
+      await page.waitForFunction(() => window.trailViewer.splitPanel.loaded());
+      await page.waitForFunction(() => window.trailViewer.performance().firstPaintMs !== null);
+      const perf = await page.evaluate(() => window.trailViewer.performance());
+      const zoomMs = await page.evaluate(async () => {
+        const map = window.trailViewer.map;
+        const zoom = map.getZoom();
+        const started = performance.now();
+        for (let index = 0; index < 8; index += 1) {
+          map.setZoom(Math.max(2, Math.min(19, zoom + (index % 3) - 1)), { animate: false });
+          await new Promise((resolve) => requestAnimationFrame(resolve));
+        }
+        return performance.now() - started;
+      });
+      console.log(`generated-30000.gpx baseline: ${JSON.stringify({ ...perf, zoomMs })}`);
+      if (!(perf.parseMs <= 5000)) failures.push(`generated-30000.gpx: parse ${perf.parseMs} ms (limit 5000)`);
+      if (!(perf.firstPaintMs <= 10000)) {
+        failures.push(`generated-30000.gpx: first paint ${perf.firstPaintMs} ms (limit 10000)`);
+      }
+      if (!(perf.splitFirstOpenMs <= 3000)) {
+        failures.push(`generated-30000.gpx: first split open ${perf.splitFirstOpenMs} ms (limit 3000)`);
+      }
+      if (!(zoomMs <= 2000)) failures.push(`generated-30000.gpx: eight zooms ${zoomMs} ms (limit 2000)`);
+    }
   }
 
   // The chosen layer is remembered for the next preview.

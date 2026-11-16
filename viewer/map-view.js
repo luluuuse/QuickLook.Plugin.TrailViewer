@@ -399,9 +399,7 @@ export function createMapView({ map, isChromeHidden }) {
     } else if (homeView) {
       atHome = false;
     }
-    scheduleRefresh();
   });
-  map.on('zoomend', scheduleRefresh);
   map.on('resize', () => {
     scheduleRefresh();
     if (!atHome) scheduleReveal();

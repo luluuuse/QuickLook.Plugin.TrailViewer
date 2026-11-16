@@ -16,6 +16,8 @@
 npm run check
 npm run test:unit
 $env:CHROMIUM = 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
+npm run test:suite -- photo focus
+npm run test:suite -- --list
 npm test
 npm run test:host
 npm run test:version
@@ -25,14 +27,55 @@ npm run test:live
 `npm test` 先跑所有纯单元测试，再逐个执行浏览器套件。失败时 `tests/support/artifacts.cjs` 写入截图、
 `result.json` 和 Playwright `trace.zip` 到 `test-results/<suite>/`。
 
+浏览器性能基线覆盖 30,000 点轨迹的解析、首屏、每公里首次展开和连续缩放，并生成 5,000 个航点验证
+视口标记虚拟化。阈值刻意留有余量，用于拦截数量级回归，不作为不同机器之间的精确基准。
+单元测试还生成 30,001 点、约 3,300 公里的长轨迹，确保每公里统计不再按公里重复扫描所有区间。
+
+`npm run test:suite -- <名称...>` 只运行名称中包含任一指定文本的套件；也可以传完整文件名。
+名称不存在时直接失败，避免拼写错误变成“零项测试全部通过”。`--list` 只列出将要运行的套件。
+
+## 按改动选择测试
+
+日常迭代不必每次运行全部 25+ 个浏览器套件。先运行 `npm run test:quick`，再按改动选择专项；正式发布、
+修改共享样式或事件链时仍运行全量测试。
+
+| 改动范围 | 建议专项 |
+|---|---|
+| 照片、附件弹窗、全览返回 | `photo focus` |
+| 剖面、心率、速览或高程 | `profile ve scrub` |
+| 测距、工具箱 | `measure portrait` |
+| 标记点、导航和列表 | `nav pins insights` |
+| 图层、缩放和定位 | `terrain zoom locate` |
+| 图标 | `icons`，并运行单元测试 |
+| 导出 | `export` |
+| GPX/KML/FIT 解析与轨迹标记 | `viewer route-info`，并运行单元测试 |
+| 共享布局、键盘和全局状态 | 全部浏览器套件 |
+
+给用户生成测试包时，建议顺序为：
+
+```powershell
+npm run test:quick
+npm run test:suite -- photo focus
+dotnet build src/QuickLook.Plugin.TrailViewer.csproj -c Release
+npm run test:version
+node scripts/pack.cjs
+```
+
+修改 C# 宿主时增加 `npm run test:host`。正式发布前执行 `npm run check`、`npm test`、宿主测试和版本检查。
+先完成版本号与构建，再运行版本测试，避免构建元数据仍指向旧版本。
+
 当前专项入口：
 
 - `tests/unit/icons.test.mjs`：图标注册表、尺寸、描边和未知图标回退。
 - `tests/icons-test.cjs`：全部控件/数据符号、Leaflet 适配、激活态和纯文字分段列头。
 - `tests/measure-test.cjs`：多段测距、吸附、快捷键、透明标签、右侧布局和导出互斥。
 - `tests/profile-test.cjs`：坡度剖面、可选心率开关/双轴/缺口、悬停读数和窄窗布局。
+- `tests/route-info-test.cjs`：距离标记、缺口/异常聚类和重复平移时的语言节点稳定性。
 - `tests/export-test.cjs`：导出版式、透明 PNG、设置面板关闭按钮和宿主保存流程。
 - `tests/terrain-test.cjs`：地图类型图源过滤、面板透明度、天地图密钥与 403 降级。
+- `tests/runner-test.cjs`：专项筛选、套件列表、未知名称和未知参数处理。
+- `tests/network-test.cjs`：生成式多路线路网、时间对象跳过、拖动中视口刷新、LOD Canvas、标注点虚拟化及性能预算。
+- `tests/measure-test.cjs`：测距索引懒加载、航点吸附、轨迹吸附、地图手势和面板布局。
 
 ## 测试原则
 

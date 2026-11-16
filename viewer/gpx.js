@@ -2,8 +2,8 @@
 // Elements are matched by local name, so files with or without the GPX namespace both work.
 
 import { t } from './i18n.js';
-import { distanceMeters } from './geo.js';
 import { findTrackGaps, movementSummary } from './track-analysis.js';
+import { createRouteModel } from './route-model.js';
 
 /** @typedef {import('./types.js').TrackPoint} TrackPoint */
 /** @typedef {import('./types.js').ParsedTrack} ParsedTrack */
@@ -21,9 +21,9 @@ function childText(parent, name) {
   return text || null;
 }
 
-function extensionHeartRate(el) {
-  for (const extensions of children(el, 'extensions')) {
-    for (const node of extensions.getElementsByTagName('*')) {
+function extensionHeartRate(extensions) {
+  for (const extension of extensions) {
+    for (const node of extension.getElementsByTagName('*')) {
       const name = node.localName.toLowerCase();
       if (name !== 'hr' && name !== 'heartrate' && name !== 'heartratebpm') continue;
       const raw = name === 'heartratebpm' ? childText(node, 'value') : node.textContent.trim();
@@ -43,20 +43,27 @@ function readPoint(el) {
     return null;
   }
   const point = { lat, lon };
-  const ele = childText(el, 'ele');
+  const direct = new Map();
+  const extensions = [];
+  for (const child of el.children) {
+    if (child.localName === 'extensions') extensions.push(child);
+    if (!direct.has(child.localName)) direct.set(child.localName, child.textContent.trim());
+  }
+  const text = (name) => direct.get(name) || null;
+  const ele = text('ele');
   if (ele !== null && Number.isFinite(Number(ele))) point.ele = Number(ele);
-  const time = childText(el, 'time');
+  const time = text('time');
   if (time !== null && !Number.isNaN(Date.parse(time))) point.time = new Date(time);
-  const name = childText(el, 'name');
+  const name = text('name');
   if (name !== null) point.name = name;
-  const description = childText(el, 'desc') || childText(el, 'cmt');
+  const description = text('desc') || text('cmt');
   if (description !== null) {
     point.description = description;
     point.insightText = description;
   }
-  const symbol = childText(el, 'sym');
+  const symbol = text('sym');
   if (symbol !== null) point.icon = symbol;
-  const heartRate = extensionHeartRate(el);
+  const heartRate = extensionHeartRate(extensions);
   if (heartRate !== null) point.heartRate = heartRate;
   return point;
 }
@@ -66,12 +73,6 @@ function readPoints(parent, name) {
 }
 
 export { distanceMeters } from './geo.js';
-
-function pathLength(points) {
-  let total = 0;
-  for (let i = 1; i < points.length; i++) total += distanceMeters(points[i - 1], points[i]);
-  return total;
-}
 
 /** Parses XML text once, for either format. Throws GpxError when the text is not well-formed XML. */
 export function parseXml(text) {
@@ -119,50 +120,85 @@ export function parseGpxDocument(doc) {
 }
 
 /** Totals for the info box. Distance is the track length, or the route length when there are no tracks. */
-/** @param {ParsedTrack} gpx @returns {TrackSummary} */
-export function summarize(gpx) {
+/** @param {ParsedTrack} gpx @param {ReturnType<typeof createRouteModel>} [routeModel] @returns {TrackSummary} */
+export function summarize(gpx, routeModel = null) {
   let segmentCount = 0;
   let trackPointCount = 0;
-  let trackDistance = 0;
-  let routeDistance = 0;
   let lowest = Infinity;
   let highest = -Infinity;
-  for (const track of gpx.tracks) {
-    for (const segment of track.segments) {
-      segmentCount += 1;
-      trackPointCount += segment.length;
-      trackDistance += pathLength(segment);
-      for (const point of segment) {
-        if (point.ele === undefined) continue;
-        if (point.ele < lowest) lowest = point.ele;
-        if (point.ele > highest) highest = point.ele;
+  let trackStart = null;
+  let trackEnd = null;
+  let routeStart = null;
+  let routeEnd = null;
+  let waypointStart = null;
+  let waypointEnd = null;
+  const model = routeModel || createRouteModel(gpx);
+  if (gpx.network) {
+    const points = model.tracks.reduce((sum, line) => sum + line.points.length, 0);
+    return {
+      tracks: gpx.tracks.length,
+      segments: model.tracks.length,
+      routes: gpx.routes.length,
+      waypoints: gpx.waypoints.length,
+      areas: gpx.areas?.length || 0,
+      points,
+      distanceMeters: model.distanceMeters,
+      start: null,
+      end: null,
+      durationSeconds: null,
+      movingDurationSeconds: null,
+      pausedSeconds: null,
+      movingTimeSource: 'network',
+      stops: 0,
+      gaps: 0,
+      gapEvents: 0,
+      gapDistanceMeters: 0,
+      anomalies: 0,
+      anomalyEvents: 0,
+      anomalyDistanceMeters: 0,
+      elevation: false,
+      network: true,
+    };
+  }
+  for (const line of model.tracks) {
+    segmentCount += 1;
+    trackPointCount += line.points.length;
+    for (const point of line.points) {
+      if (point.time) {
+        if (!trackStart || point.time < trackStart) trackStart = point.time;
+        if (!trackEnd || point.time > trackEnd) trackEnd = point.time;
+      }
+      if (point.ele === undefined) continue;
+      if (point.ele < lowest) lowest = point.ele;
+      if (point.ele > highest) highest = point.ele;
+    }
+  }
+  for (const line of model.routes) {
+    for (const point of line.points) {
+      if (point.time) {
+        if (!routeStart || point.time < routeStart) routeStart = point.time;
+        if (!routeEnd || point.time > routeEnd) routeEnd = point.time;
       }
     }
   }
-  for (const route of gpx.routes) routeDistance += pathLength(route.points);
+  for (const point of gpx.waypoints) {
+    if (!point.time) continue;
+    if (!waypointStart || point.time < waypointStart) waypointStart = point.time;
+    if (!waypointEnd || point.time > waypointEnd) waypointEnd = point.time;
+  }
 
-  const distance = segmentCount > 0 ? trackDistance : routeDistance;
+  const distance = model.distanceMeters;
 
   // Use the measured route first, without flattening its points into temporary arrays. Waypoint timestamps
   // often describe a planned stop and can sit outside the recording.
-  let start = null;
-  let end = null;
-  const timeline = trackPointCount > 0 ? 'track' : gpx.routes.some((route) => route.points.length > 0) ? 'route' : 'waypoint';
-  const consider = (point) => {
-    if (!point.time) return;
-    if (!start || point.time < start) start = point.time;
-    if (!end || point.time > end) end = point.time;
-  };
-  if (timeline === 'track') {
-    for (const track of gpx.tracks) for (const segment of track.segments) for (const point of segment) consider(point);
-  } else if (timeline === 'route') {
-    for (const route of gpx.routes) for (const point of route.points) consider(point);
-  } else {
-    for (const point of gpx.waypoints) consider(point);
-  }
+  const timeline = trackPointCount > 0 ? 'track' : model.routes.length > 0 ? 'route' : 'waypoint';
+  const start = timeline === 'track' ? trackStart : timeline === 'route' ? routeStart : waypointStart;
+  const end = timeline === 'track' ? trackEnd : timeline === 'route' ? routeEnd : waypointEnd;
   const movement = movementSummary(gpx.tracks);
   const gaps = findTrackGaps(gpx.tracks);
-  const measuredDuration = start && end ? Math.round((end - start) / 1000) : null;
+  const measuredDuration = start && end
+    ? Math.round((end.getTime() - start.getTime()) / 1000)
+    : null;
   const duration = Number.isFinite(gpx.timeUsedSeconds)
     ? Math.round(gpx.timeUsedSeconds)
     : measuredDuration;
@@ -170,6 +206,9 @@ export function summarize(gpx) {
     ? Math.min(duration, Math.max(0, Math.round(gpx.pauseSeconds)))
     : null;
   const movingDuration = metadataPause !== null ? duration - metadataPause : movement.movingDurationSeconds;
+  const pausedDuration = duration !== null && movingDuration !== null
+    ? Math.max(0, duration - movingDuration)
+    : movement.pausedSeconds;
 
   return {
     tracks: gpx.tracks.length,
@@ -183,7 +222,7 @@ export function summarize(gpx) {
     end,
     durationSeconds: duration,
     movingDurationSeconds: movingDuration,
-    pausedSeconds: metadataPause ?? movement.pausedSeconds,
+    pausedSeconds: pausedDuration,
     movingTimeSource: metadataPause !== null ? 'metadata' : 'estimated',
     stops: movement.stops + movement.timeGaps,
     gaps: gaps.segmentCount,

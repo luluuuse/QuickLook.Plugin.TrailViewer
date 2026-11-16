@@ -53,11 +53,11 @@ export function createMeasurement({
   formatDistance,
   gpx,
   segments,
+  waypointIndex: sharedWaypointIndex,
   onLayoutChange,
 }) {
-  const waypointIndex = createPointIndex(gpx.waypoints || []);
-  const trackPoints = segments.flatMap((segment) => segment.points);
-  const trackIndex = createPointIndex(trackPoints);
+  let waypointIndex = null;
+  let trackIndex = null;
   const layer = L.layerGroup().addTo(map);
   const previewLayer = L.layerGroup().addTo(map);
   const snapLayer = L.layerGroup().addTo(map);
@@ -69,6 +69,24 @@ export function createMeasurement({
   let moveFrame = 0;
   const undoStack = [];
   let redoStack = [];
+
+  function getWaypointIndex() {
+    if (!waypointIndex) {
+      waypointIndex = sharedWaypointIndex?.() || createPointIndex(gpx.waypoints || []);
+    }
+    return waypointIndex;
+  }
+
+  function getTrackIndex() {
+    if (!trackIndex) {
+      const trackPoints = [];
+      for (const segment of segments) {
+        for (const point of segment.points) trackPoints.push(point);
+      }
+      trackIndex = createPointIndex(trackPoints);
+    }
+    return trackIndex;
+  }
 
   function snapshot() {
     return {
@@ -159,6 +177,7 @@ export function createMeasurement({
   }
 
   function nearest(index, latlng, kind) {
+    if (!index) return null;
     const lon = Number(latlng.lng ?? latlng.lon);
     const point = index.nearest({ lat: Number(latlng.lat), lon });
     if (!point) return null;
@@ -173,8 +192,8 @@ export function createMeasurement({
   }
 
   function snapAt(latlng) {
-    const marker = nearest(waypointIndex, latlng, 'marker');
-    const track = nearest(trackIndex, latlng, 'track');
+    const marker = nearest(getWaypointIndex(), latlng, 'marker');
+    const track = nearest(getTrackIndex(), latlng, 'track');
     return chooseSnap([marker, track].filter(Boolean)) || {
       lat: Number(latlng.lat),
       lon: Number(latlng.lng ?? latlng.lon),
@@ -265,6 +284,7 @@ export function createMeasurement({
   map.on('movestart zoomstart', hideHover);
 
   function start() {
+    getTrackIndex();
     active = true;
     document.body.classList.add('measuring');
     notify();
@@ -342,6 +362,7 @@ export function createMeasurement({
     canEndSection: () => Boolean(current && current.points.length >= 2),
     canUndo: () => undoStack.length > 0,
     canRedo: () => redoStack.length > 0,
+    indexed: () => Boolean(trackIndex),
     snapAt,
   };
 }

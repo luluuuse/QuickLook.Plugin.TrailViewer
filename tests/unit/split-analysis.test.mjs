@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { performance } from 'node:perf_hooks';
 import test from 'node:test';
 
 import { analyseSplits } from '../../viewer/split-analysis.js';
@@ -32,7 +33,7 @@ test('splits cut a timed route at whole kilometres and keep the final remainder'
   assert.equal(data.totalTimeSeconds, 720);
   assert.ok(data.movingTimeSeconds > 700);
   assert.equal(data.hasHeartRate, true);
-  assert.ok(data.splits[0].averageHeartRate >= 110 && data.splits[0].averageHeartRate <= 111);
+  assert.equal(data.splits[0].averageHeartRate, 110.5);
   assert.ok(data.splits[0].ascentMeters > 0);
   assert.ok(data.fastestIndex >= 1 && data.fastestIndex <= data.splits.length);
 });
@@ -74,6 +75,20 @@ test('a recorded pause total scales split moving time consistently', () => {
   assert.equal(data.splits[0].movingSeconds, 200);
 });
 
+test('a new recorded segment resets movement without counting its boundary as stopped time', () => {
+  const points = [
+    [point(0, 0), point(0.001, 10)],
+    [point(0.001, 20), point(0.00107, 120)],
+  ];
+  const data = analyseSplits({ tracks: [{ segments: points }] });
+  const split = data.splits[0];
+
+  assert.equal(split.elapsedSeconds, 120);
+  assert.equal(split.movingSeconds, 10);
+  assert.equal(data.totalTimeSeconds, 120);
+  assert.equal(data.movingTimeSeconds, 10);
+});
+
 test('a route without timestamps yields no displayable split table but keeps distance rows', () => {
   const points = [point(0, null), point(0.0045, null), point(0.009, null)];
   const data = analyseSplits({ tracks: [{ segments: [points] }] });
@@ -81,4 +96,18 @@ test('a route without timestamps yields no displayable split table but keeps dis
   assert.ok(data.totalDistanceMeters > 0);
   assert.ok(data.splits.length >= 1);
   assert.ok(data.splits.every((split) => split.elapsedSeconds === null && split.averageSpeedMps === null));
+});
+
+test('a 3,300-kilometre route completes without a split-by-interval quadratic scan', () => {
+  const points = Array.from({ length: 30001 }, (_, index) => point(
+    index * 0.0009,
+    index * 10,
+    { ele: 100 + index % 20 },
+  ));
+  const started = performance.now();
+  const data = analyseSplits({ tracks: [{ segments: [points] }] });
+  const elapsed = performance.now() - started;
+
+  assert.ok(data.splits.length >= 3000);
+  assert.ok(elapsed < 2000, `split analysis took ${elapsed.toFixed(1)} ms`);
 });

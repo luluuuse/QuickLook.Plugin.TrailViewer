@@ -2,11 +2,9 @@
 // the remaining fields are calculated here so the detailed split view can be added without changing the
 // source model or duplicating the route walk.
 
-import { distanceMeters } from './geo.js';
+import { MOVEMENT_RULES, averageHeartRate, isValidHeartRate } from './track-analysis.js';
+import { createRouteModel } from './route-model.js';
 
-const MOVE_START_MPS = 0.1;
-const MOVE_STOP_MPS = 0.02;
-const TIME_GAP_SECONDS = 300;
 const EPSILON = 1e-6;
 
 /** @typedef {import('./types.js').ParsedTrack} ParsedTrack */
@@ -19,48 +17,59 @@ function secondsBetween(start, end) {
   return Number.isFinite(seconds) && seconds >= 0 ? seconds : null;
 }
 
-function traversal(gpx) {
+function traversal(model) {
   const intervals = [];
-  let along = 0;
+  const heartSamples = [];
+  let lineIndex = -1;
 
-  for (const track of gpx.tracks) {
-    for (const segment of track.segments) {
-      let previous = null;
-      for (const point of segment) {
-        if (previous) {
-          const metres = distanceMeters(previous, point);
-          intervals.push({
-            from: along,
-            to: along + metres,
-            metres,
-            startTime: previous.time,
-            endTime: point.time,
-            startEle: previous.ele,
-            endEle: point.ele,
-            startHeartRate: previous.heartRate,
-            endHeartRate: point.heartRate,
-            moving: false,
-          });
-          along += metres;
-        }
-        previous = point;
+  for (const line of model.tracks) {
+    lineIndex += 1;
+    for (let index = 0; index < line.points.length; index += 1) {
+      const point = line.points[index];
+      if (index > 0) {
+        const previous = line.points[index - 1];
+        const from = line.startMeters + line.cumulative[index - 1];
+        const to = line.startMeters + line.cumulative[index];
+        const metres = to - from;
+        intervals.push({
+          from,
+          to,
+          metres,
+          startTime: previous.time,
+          endTime: point.time,
+          startEle: previous.ele,
+          endEle: point.ele,
+          moving: false,
+          segmentIndex: lineIndex,
+        });
+      }
+      if (isValidHeartRate(point.heartRate)) {
+        heartSamples.push({
+          along: line.startMeters + line.cumulative[index],
+          heartRate: point.heartRate,
+        });
       }
     }
   }
-  return { intervals, total: along };
+  return { intervals, heartSamples, total: model.trackDistanceMeters };
 }
 
 function markMoving(intervals) {
   let moving = false;
+  let segmentIndex = -1;
   for (const interval of intervals) {
+    if (interval.segmentIndex !== segmentIndex) {
+      moving = false;
+      segmentIndex = interval.segmentIndex;
+    }
     const seconds = secondsBetween(interval.startTime, interval.endTime);
-    if (!(seconds > 0) || seconds > TIME_GAP_SECONDS) {
+    if (!(seconds > 0) || seconds > MOVEMENT_RULES.maxGapSeconds) {
       moving = false;
       continue;
     }
     const speed = interval.metres / seconds;
-    if (!moving && speed >= MOVE_START_MPS) moving = true;
-    else if (moving && speed < MOVE_STOP_MPS) {
+    if (!moving && speed >= MOVEMENT_RULES.startSpeed) moving = true;
+    else if (moving && speed < MOVEMENT_RULES.stopSpeed) {
       moving = false;
       continue;
     }
@@ -69,53 +78,68 @@ function markMoving(intervals) {
 }
 
 function timeAt(intervals, distance, total, side = 'start') {
-  const starts = [];
-  const ends = [];
-  for (const interval of intervals) {
-    if (distance < interval.from - EPSILON || distance > interval.to + EPSILON) continue;
-    const hasTimes = interval.startTime instanceof Date && interval.endTime instanceof Date;
-    if (hasTimes && distance > interval.from + EPSILON && distance < interval.to - EPSILON
-        && interval.metres > 0) {
-      const ratio = Math.min(1, Math.max(0, (distance - interval.from) / interval.metres));
-      const milliseconds = interval.startTime.getTime()
-        + (interval.endTime.getTime() - interval.startTime.getTime()) * ratio;
+  let low = 0;
+  let high = intervals.length;
+  while (low < high) {
+    const middle = (low + high) >> 1;
+    if (intervals[middle].to < distance - EPSILON) low = middle + 1;
+    else high = middle;
+  }
+  const containing = intervals[low];
+  if (containing) {
+    const hasTimes = containing.startTime instanceof Date && containing.endTime instanceof Date;
+    if (hasTimes && distance > containing.from + EPSILON && distance < containing.to - EPSILON
+        && containing.metres > 0) {
+      const ratio = Math.min(1, Math.max(0, (distance - containing.from) / containing.metres));
+      const milliseconds = containing.startTime.getTime()
+        + (containing.endTime.getTime() - containing.startTime.getTime()) * ratio;
       const value = new Date(milliseconds);
       if (!Number.isNaN(value.getTime())) return value;
     }
-    if (interval.startTime instanceof Date && Math.abs(distance - interval.from) <= EPSILON) {
-      starts.push(interval.startTime);
-    }
-    if (interval.endTime instanceof Date && Math.abs(distance - interval.to) <= EPSILON) {
-      ends.push(interval.endTime);
-    }
   }
-  const earliest = (values) => values.length > 0
-    ? new Date(Math.min(...values.map((value) => value.getTime())))
-    : null;
-  const latest = (values) => values.length > 0
-    ? new Date(Math.max(...values.map((value) => value.getTime())))
-    : null;
-  if (distance <= EPSILON) return earliest(starts) || earliest(ends);
-  if (distance >= total - EPSILON) return latest(ends) || latest(starts);
+
+  let earliestStart = null;
+  let earliestEnd = null;
+  let latestStart = null;
+  let latestEnd = null;
+  for (let index = Math.max(0, low - 1);
+    index < intervals.length && intervals[index].from <= distance + EPSILON;
+    index += 1) {
+    const interval = intervals[index];
+    if (Math.abs(distance - interval.from) <= EPSILON && interval.startTime instanceof Date) {
+      if (!earliestStart || interval.startTime < earliestStart) earliestStart = interval.startTime;
+      if (!latestStart || interval.startTime > latestStart) latestStart = interval.startTime;
+    }
+    if (Math.abs(distance - interval.to) <= EPSILON && interval.endTime instanceof Date) {
+      if (!earliestEnd || interval.endTime < earliestEnd) earliestEnd = interval.endTime;
+      if (!latestEnd || interval.endTime > latestEnd) latestEnd = interval.endTime;
+    }
+    if (interval.from > distance + EPSILON) break;
+  }
+  const earliest = earliestStart || earliestEnd;
+  const latest = latestEnd || latestStart;
+  if (distance <= EPSILON) return earliest;
+  if (distance >= total - EPSILON) return latest;
   return side === 'end'
-    ? earliest(ends) || earliest(starts)
-    : latest(starts) || latest(ends);
+    ? earliestEnd || earliestStart
+    : latestStart || latestEnd;
 }
 
-function intervalHeartRate(interval) {
-  const rates = [interval.startHeartRate, interval.endHeartRate]
-    .filter((value) => Number.isFinite(value) && value > 0);
-  return rates.length > 0 ? rates.reduce((sum, value) => sum + value, 0) / rates.length : null;
+export function splitCount(distance) {
+  return distance > EPSILON ? Math.max(1, Math.ceil((distance - EPSILON) / 1000)) : 0;
 }
 
-function splitMetrics(intervals, from, to) {
+function splitMetrics(intervals, from, to, state) {
   let movingSeconds = 0;
   let ascent = 0;
   let descent = 0;
-  let heartWeight = 0;
-  let heartDistance = 0;
 
-  for (const interval of intervals) {
+  while (state.index < intervals.length && intervals[state.index].to <= from + EPSILON) {
+    state.index += 1;
+  }
+  for (let index = state.index; index < intervals.length; index += 1) {
+    const interval = intervals[index];
+    if (interval.from > to - EPSILON) break;
     const overlap = Math.min(to, interval.to) - Math.max(from, interval.from);
     if (!(overlap > 0)) continue;
     const fraction = interval.metres > 0 ? overlap / interval.metres : 0;
@@ -128,20 +152,30 @@ function splitMetrics(intervals, from, to) {
       if (change > 0) ascent += change;
       else descent -= change;
     }
-
-    const heartRate = intervalHeartRate(interval);
-    if (heartRate !== null) {
-      heartWeight += overlap;
-      heartDistance += heartRate * overlap;
-    }
   }
 
   return {
     movingSeconds,
     ascent,
     descent,
-    averageHeartRate: heartWeight > 0 ? heartDistance / heartWeight : null,
   };
+}
+
+function heartRateAverageIn(samples, from, to, includeEnd) {
+  let low = 0;
+  let high = samples.length;
+  while (low < high) {
+    const middle = (low + high) >> 1;
+    if (samples[middle].along < from - EPSILON) low = middle + 1;
+    else high = middle;
+  }
+  const rates = [];
+  for (let index = low; index < samples.length; index += 1) {
+    const sample = samples[index];
+    if (sample.along > to + EPSILON || (!includeEnd && sample.along >= to - EPSILON)) break;
+    rates.push(sample.heartRate);
+  }
+  return averageHeartRate(rates);
 }
 
 /**
@@ -152,8 +186,9 @@ function splitMetrics(intervals, from, to) {
  * @param {TrackSummary | null} [summary]
  * @returns {SplitData}
  */
-export function analyseSplits(gpx, summary = null) {
-  const { intervals, total } = traversal(gpx);
+export function analyseSplits(gpx, summary = null, routeModel = null) {
+  const model = routeModel || createRouteModel(gpx);
+  const { intervals, heartSamples, total } = traversal(model);
   if (!(total > 0) || intervals.length === 0) {
     return {
       splits: [],
@@ -168,13 +203,15 @@ export function analyseSplits(gpx, summary = null) {
   markMoving(intervals);
   const recordedStart = timeAt(intervals, 0, total, 'start');
   const splits = [];
-  for (let from = 0, index = 1; from < total - EPSILON; from += 1000, index += 1) {
+  const count = splitCount(total);
+  const metricsState = { index: 0 };
+  for (let from = 0, index = 1; index <= count; from += 1000, index += 1) {
     const to = Math.min(total, from + 1000);
     const distance = to - from;
     const startTime = timeAt(intervals, from, total, 'start');
     const endTime = timeAt(intervals, to, total, 'end');
     const elapsed = secondsBetween(startTime, endTime);
-    const metrics = splitMetrics(intervals, from, to);
+    const metrics = splitMetrics(intervals, from, to, metricsState);
     const metadataRatio = summary?.movingTimeSource === 'metadata'
       && summary.durationSeconds > 0
       && summary.movingDurationSeconds !== null
@@ -202,14 +239,19 @@ export function analyseSplits(gpx, summary = null) {
       ascentMeters: metrics.ascent,
       descentMeters: metrics.descent,
       verticalSpeedMps,
-      averageHeartRate: metrics.averageHeartRate,
+      averageHeartRate: heartRateAverageIn(heartSamples, from, to, index === count),
     });
   }
 
   const totalEnd = timeAt(intervals, total, total, 'end');
   const totalTime = secondsBetween(recordedStart, totalEnd);
   const splitMovingTime = splits.reduce((sum, split) => sum + (split.movingSeconds || 0), 0);
-  const movingTime = totalTime === null ? splitMovingTime : Math.min(splitMovingTime, totalTime);
+  const summaryMoving = Number.isFinite(summary?.movingDurationSeconds)
+    ? summary.movingDurationSeconds
+    : null;
+  const movingTime = summaryMoving ?? (totalTime === null
+    ? splitMovingTime
+    : Math.min(splitMovingTime, totalTime));
   let fastestIndex = null;
   let fastestSpeed = -Infinity;
   for (const split of splits) {
@@ -222,7 +264,9 @@ export function analyseSplits(gpx, summary = null) {
   return {
     splits,
     totalDistanceMeters: total,
-    totalTimeSeconds: totalTime === null ? null : Math.round(totalTime),
+    totalTimeSeconds: Number.isFinite(summary?.durationSeconds)
+      ? Math.round(summary.durationSeconds)
+      : totalTime === null ? null : Math.round(totalTime),
     movingTimeSeconds: movingTime > 0 ? Math.round(movingTime) : null,
     fastestIndex,
     hasHeartRate: splits.some((split) => split.averageHeartRate !== null),

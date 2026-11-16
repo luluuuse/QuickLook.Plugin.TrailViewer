@@ -25,6 +25,8 @@ internal static class SelfTests
             TestKmzResourceLimits(temporary);
             TestKmzTraversal(temporary);
             TestKmzLimit(root, temporary);
+            TestSourceSafety(temporary);
+            TestViewerShutdownFilter();
             TestPreferences(temporary);
             TestProductIdentity(temporary);
             TestTianditu(temporary);
@@ -247,6 +249,28 @@ internal static class SelfTests
         var noDocument = Path.Combine(root, "tests", "fixtures", "kmz-empty.kmz");
         ExpectInvalidData("an empty KMZ is rejected during extraction", () =>
             KmzArchive.ExtractDocument(noDocument, folder));
+    }
+
+    private static void TestSourceSafety(string temporary)
+    {
+        Check("a 64 MB direct track remains accepted",
+            !TrailViewerPanel.IsOversized(TrailViewerPanel.MaxInputBytes));
+        Check("a direct track over 64 MB is rejected",
+            TrailViewerPanel.IsOversized(TrailViewerPanel.MaxInputBytes + 1));
+
+        var source = Path.Combine(temporary, "source", "route.kmz");
+        var target = TrailViewerPanel.OverlayTarget(source, "overlay.png");
+        Check("an overlay is written beside the original archive",
+            target == Path.Combine(temporary, "source", "overlay.png"), target);
+    }
+
+    private static void TestViewerShutdownFilter()
+    {
+        Check("viewer COM shutdown is handled",
+            TrailViewerPanel.IsViewerShutdown(
+                new System.Runtime.InteropServices.COMException("closed")));
+        Check("unrelated viewer errors are not swallowed",
+            !TrailViewerPanel.IsViewerShutdown(new ArgumentException("bad input")));
     }
 
     private static void TestPreferences(string temporary)

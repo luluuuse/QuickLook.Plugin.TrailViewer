@@ -12,6 +12,7 @@ const {
   settlePopup,
   waitForFocus,
   waitForLayout,
+  waitForMapIdle,
   waitForPhoto,
 } = require('./support/browser.cjs');
 const { createChecker } = require('./support/assertions.cjs');
@@ -75,6 +76,7 @@ async function main() {
     // The click must leave the card open. Waiting for the popup transition distinguishes an open card from
     // one that Leaflet has already started fading out.
     await settlePopup(page, '.photo-popup', 1);
+    await waitForMapIdle(page);
     const open = await page.locator('.photo-popup').count();
     check(`the card for "${name}" stays open after the click`, open === 1, `${open} cards`);
   };
@@ -149,6 +151,7 @@ async function main() {
     `${card.background} / ${card.tipBackground}`);
 
   // 4. The thumbnail opens the original, and the card gets out of the way.
+  const layoutBeforePhoto = await page.evaluate(() => window.trailViewer.mapLayout());
   await openFromCard(0);
   let state = await viewer();
   check('thumbnail opens the viewer', state.open === true);
@@ -166,6 +169,10 @@ async function main() {
     /of original size/.test(state.zoomTitle) && /fit the window/.test(state.zoomTitle), state.zoomTitle);
   check('opening the photo moves focus to its close button',
     await page.evaluate(() => document.activeElement?.classList.contains('photo-close')) === true);
+  const layoutDuringPhoto = await page.evaluate(() => window.trailViewer.mapLayout());
+  check('a full-size photo does not change the map layout',
+    JSON.stringify(layoutDuringPhoto.safe) === JSON.stringify(layoutBeforePhoto.safe),
+    JSON.stringify({ before: layoutBeforePhoto.safe, during: layoutDuringPhoto.safe }));
   const photoBackground = await page.evaluate(() => {
     const root = document.querySelector('.photo-viewer');
     const bar = document.querySelector('.photo-bar');
@@ -184,7 +191,9 @@ async function main() {
       chromeHidden: ['.info', '#info', '#profile', '#map .leaflet-top']
         .every((selector) => {
           const node = document.querySelector(selector);
-          return !node || getComputedStyle(node).display === 'none';
+          if (!node) return true;
+          const style = getComputedStyle(node);
+          return style.display === 'none' || style.visibility === 'hidden';
         }),
     };
   });
@@ -331,10 +340,25 @@ async function main() {
   check('clicking the original does not step', state.counter === '1 / 2', state.counter);
 
   // 10. Clicking the backdrop closes.
+  const mapBeforeBackdropClose = await page.evaluate(() => {
+    const center = window.trailViewer.map.getCenter();
+    return { lat: center.lat, lng: center.lng, zoom: window.trailViewer.map.getZoom() };
+  });
   await page.mouse.click(20, 780);
   check('backdrop click closes', (await page.evaluate(() => window.trailViewer.photos.isOpen())) === false);
   check('closing restores focus to the map',
     await page.evaluate(() => document.activeElement?.id) === 'map');
+  await page.evaluate(() => new Promise((resolve) =>
+    requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  const mapAfterBackdropClose = await page.evaluate(() => {
+    const center = window.trailViewer.map.getCenter();
+    return { lat: center.lat, lng: center.lng, zoom: window.trailViewer.map.getZoom() };
+  });
+  check('closing a photo leaves the map where it was',
+    Math.abs(mapAfterBackdropClose.lat - mapBeforeBackdropClose.lat) < 0.000001
+      && Math.abs(mapAfterBackdropClose.lng - mapBeforeBackdropClose.lng) < 0.000001
+      && mapAfterBackdropClose.zoom === mapBeforeBackdropClose.zoom,
+    JSON.stringify({ before: mapBeforeBackdropClose, after: mapAfterBackdropClose }));
 
   // 11. An inline data URI loads without any network.
   await openCard('Inline');

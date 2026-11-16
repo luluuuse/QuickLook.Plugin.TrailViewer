@@ -8,9 +8,38 @@ import {
 } from './track-analysis.js';
 import { formatDistance } from './format.js';
 import { iconMarkup, symbolMarkup } from './icons.js';
+import { createRouteModel } from './route-model.js';
 
 const COLORS = ['#ff5a36', '#2f9bff', '#f5c400', '#c23cff', '#18c964', '#ff3d9a', '#00c2c7', '#ff9f1a'];
 const ROUTE_COLOR = '#ffffff';
+const NETWORK_LOD_PIXELS = 0.75;
+const NETWORK_VIEW_PADDING = 0.25;
+
+function lineBounds(L, points) {
+  let south = Infinity;
+  let west = Infinity;
+  let north = -Infinity;
+  let east = -Infinity;
+  for (const point of points) {
+    if (point.lat < south) south = point.lat;
+    if (point.lat > north) north = point.lat;
+    if (point.lon < west) west = point.lon;
+    if (point.lon > east) east = point.lon;
+  }
+  return L.latLngBounds([south, west], [north, east]);
+}
+
+function networkLatLngs(L, map, points, zoom) {
+  const projected = new Array(points.length);
+  for (let index = 0; index < points.length; index += 1) {
+    const point = points[index];
+    projected[index] = map.project({ lat: point.lat, lng: point.lon }, zoom);
+  }
+  // shortcut: LOD uses the current Web Mercator pixel scale, so a route crossing the antimeridian would
+  // need segment splitting if such a network appears.
+  return L.LineUtil.simplify(projected, NETWORK_LOD_PIXELS)
+    .map((point) => map.unproject(point, zoom));
+}
 
 function distanceIcon(L, sample) {
   const label = sample.kilometre && sample.distanceMeters >= 1000
@@ -52,7 +81,7 @@ function samplesForRoute(entries, intervals) {
   });
   if (arrows.length === 0) {
     return entries.flatMap((entry) => {
-      const length = pathDistance(entry.points);
+      const length = entry.length ?? pathDistance(entry.points);
       if (length < 20) return [];
       return directionSamples(entry.points, {
         interval: length / 2,
@@ -160,11 +189,14 @@ function activateMarker(marker, action) {
 /** Draws KML areas, track/route lines and start/end markers; waypoint markers are left to the controller. */
 export function createTrackLayer({ L, el, localized, t, pointPopup, onFocusBounds }) {
   return {
-    draw(map, gpx) {
+    draw(map, gpx, routeModel = null) {
+      const model = routeModel || createRouteModel(gpx);
+      const network = Boolean(gpx.network);
       const bounds = L.latLngBounds([]);
       const segments = [];
       const navigationMarks = [];
       const distancePaths = [];
+      const networkEntries = [];
       const distanceLayer = L.layerGroup().addTo(map);
       const anomalyLineLayer = L.layerGroup().addTo(map);
       const anomalyMarkerLayer = L.layerGroup();
@@ -175,21 +207,92 @@ export function createTrackLayer({ L, el, localized, t, pointPopup, onFocusBound
       let gapEpisodes = [];
       let colorIndex = 0;
       let distanceOffset = 0;
-      const showEnds = gpx.tracks.length <= 20;
+      const showEnds = !network && model.trackGroups.length <= 20;
+      let distanceCache = null;
+      let networkLayer = null;
+      let networkStats = null;
 
-      const renderMapMarks = () => {
+      function createNetworkLayer() {
+        const renderer = L.canvas({ padding: 0.5 });
+        const layer = L.layerGroup().addTo(map);
+        const rendered = new Map();
+        const simplified = new Map();
+        let lodZoom = null;
+        let pending = 0;
+        let renderCount = 0;
+
+        function refresh() {
+          pending = 0;
+          const zoom = map.getZoom();
+          if (zoom !== lodZoom) {
+            layer.clearLayers();
+            rendered.clear();
+            simplified.clear();
+            lodZoom = zoom;
+          }
+          const visibleBounds = map.getBounds().pad(NETWORK_VIEW_PADDING);
+          const visible = networkEntries.filter((entry) => visibleBounds.intersects(entry.bounds));
+          const wanted = new Set(visible);
+          for (const entry of rendered.keys()) {
+            if (wanted.has(entry)) continue;
+            layer.removeLayer(rendered.get(entry));
+            rendered.delete(entry);
+          }
+          let renderedPoints = 0;
+          for (const entry of visible) {
+            let latlngs = simplified.get(entry);
+            if (!latlngs) {
+              latlngs = networkLatLngs(L, map, entry.points, zoom);
+              simplified.set(entry, latlngs);
+            }
+            renderedPoints += latlngs.length;
+            if (rendered.has(entry)) continue;
+            const line = L.polyline(latlngs, {
+              color: entry.color,
+              weight: entry.weight,
+              opacity: 0.9,
+              dashArray: entry.dashArray,
+              className: entry.className,
+              renderer,
+              smoothFactor: 0,
+            });
+            if (entry.tooltip) line.bindTooltip(entry.tooltip, { sticky: true });
+            line.addTo(layer);
+            rendered.set(entry, line);
+          }
+          networkStats = {
+            zoom,
+            renderCount: ++renderCount,
+            totalLines: networkEntries.length,
+            visibleLines: visible.length,
+            renderedLines: rendered.size,
+            sourcePoints: networkEntries.reduce((sum, entry) => sum + entry.points.length, 0),
+            renderedPoints,
+          };
+        }
+
+        function schedule() {
+          if (pending) return;
+          pending = requestAnimationFrame(refresh);
+        }
+
+        map.on('move zoomend resize', schedule);
+        refresh();
+        return layer;
+      }
+
+      function renderDistanceMarks() {
         distanceLayer.clearLayers();
-        anomalyLineLayer.clearLayers();
-        anomalyMarkerLayer.clearLayers();
-        gapLineLayer.clearLayers();
-        gapMarkerLayer.clearLayers();
-        const paths = distancePaths.map((entry) => entry.points);
-        const totalDistance = distancePaths.reduce((sum, entry) => sum + pathDistance(entry.points), 0);
-        const intervals = adaptiveDistanceIntervals(totalDistance, projectedLength(map, paths));
+        const zoom = map.getZoom();
+        if (!distanceCache || distanceCache.zoom !== zoom) {
+          const paths = distancePaths.map((entry) => entry.points);
+          const intervals = adaptiveDistanceIntervals(distanceOffset, projectedLength(map, paths));
+          distanceCache = { zoom, samples: samplesForRoute(distancePaths, intervals) };
+        }
         const size = map.getSize();
         const arrowBoxes = [];
         const labelBoxes = [];
-        for (const sample of samplesForRoute(distancePaths, intervals)) {
+        for (const sample of distanceCache.samples) {
           const projected = map.latLngToContainerPoint([sample.point.lat, sample.point.lon]);
           if (projected.x < -40 || projected.y < -40
             || projected.x > size.x + 40 || projected.y > size.y + 40) continue;
@@ -208,8 +311,15 @@ export function createTrackLayer({ L, el, localized, t, pointPopup, onFocusBound
             keyboard: false,
           }).addTo(distanceLayer);
         }
+      }
 
+      function renderAnnotationMarks() {
+        anomalyLineLayer.clearLayers();
+        anomalyMarkerLayer.clearLayers();
+        gapLineLayer.clearLayers();
+        gapMarkerLayer.clearLayers();
         const zoom = map.getZoom();
+        const size = map.getSize();
         const anomalyRadius = zoom <= 12 ? 120 : zoom <= 14 ? 72 : 30;
         const anomalyLabels = [];
         for (const cluster of clusterGaps(anomalyEpisodes, map, anomalyRadius)) {
@@ -253,10 +363,14 @@ export function createTrackLayer({ L, el, localized, t, pointPopup, onFocusBound
             }),
             zIndexOffset: 350,
           });
-          marker.bindTooltip(localized(el('span'), () => t('map.anomalyHint', {
-            count: eventCount,
-            distance: formatDistance(affectedDistance),
-          })), { direction: 'top', offset: [0, -10] });
+          marker.bindTooltip(() => {
+            const span = el('span');
+            span.textContent = t('map.anomalyHint', {
+              count: eventCount,
+              distance: formatDistance(affectedDistance),
+            });
+            return span;
+          }, { direction: 'top', offset: [0, -10] });
           const focus = clusterBounds(L, cluster);
           activateMarker(marker, () => onFocusBounds?.(focus, { maxZoom: 18, minZoomGain: 2 }));
           marker.addTo(anomalyMarkerLayer);
@@ -290,27 +404,48 @@ export function createTrackLayer({ L, el, localized, t, pointPopup, onFocusBound
             }),
             zIndexOffset: 400,
           });
-          marker.bindTooltip(localized(el('span'), () => t('map.gapHint', {
-            count: eventCount,
-            distance: formatDistance(missingDistance),
-          })), { direction: 'top', offset: [0, -10] });
+          marker.bindTooltip(() => {
+            const span = el('span');
+            span.textContent = t('map.gapHint', {
+              count: eventCount,
+              distance: formatDistance(missingDistance),
+            });
+            return span;
+          }, { direction: 'top', offset: [0, -10] });
           const focus = clusterBounds(L, cluster);
           activateMarker(marker, () => onFocusBounds?.(focus, { maxZoom: 18, minZoomGain: 2 }));
           marker.addTo(gapMarkerLayer);
         }
-      };
+      }
 
-      let pendingRender = 0;
+      let pendingDistanceRender = 0;
+      let pendingAnnotationRender = 0;
       const scheduleDistanceMarks = () => {
-        if (pendingRender) return;
-        pendingRender = requestAnimationFrame(() => {
-          pendingRender = 0;
-          renderMapMarks();
+        if (pendingDistanceRender) return;
+        pendingDistanceRender = requestAnimationFrame(() => {
+          pendingDistanceRender = 0;
+          renderDistanceMarks();
         });
       };
-      map.on('zoomend', scheduleDistanceMarks);
-      map.on('moveend', scheduleDistanceMarks);
-      map.on('resize', scheduleDistanceMarks);
+      const scheduleAnnotationMarks = () => {
+        if (pendingAnnotationRender) return;
+        pendingAnnotationRender = requestAnimationFrame(() => {
+          pendingAnnotationRender = 0;
+          renderAnnotationMarks();
+        });
+      };
+      map.on('zoomend', () => {
+        scheduleDistanceMarks();
+        scheduleAnnotationMarks();
+      });
+      map.on('moveend', () => {
+        scheduleDistanceMarks();
+        scheduleAnnotationMarks();
+      });
+      map.on('resize', () => {
+        scheduleDistanceMarks();
+        scheduleAnnotationMarks();
+      });
 
       for (const area of gpx.areas || []) {
         const shape = L.polygon(area.rings.map((ring) => ring.map((point) => [point.lat, point.lon])), {
@@ -325,31 +460,55 @@ export function createTrackLayer({ L, el, localized, t, pointPopup, onFocusBound
         bounds.extend(shape.getBounds());
       }
 
-      gpx.tracks.forEach((track) => {
-        track.segments.forEach((points, segmentIndex) => {
+      model.trackGroups.forEach((group) => {
+        const track = group.track;
+        group.segments.forEach((segmentLine, segmentIndex) => {
+          const points = segmentLine.points;
           const color = COLORS[colorIndex++ % COLORS.length];
-          const line = L.polyline(points.map((point) => [point.lat, point.lon]), {
-            color,
-            weight: 4,
-            opacity: 0.9,
-            className: 'gpx-track',
-          }).addTo(map);
           const title = track.name
             ? (number) => (track.segments.length > 1
               ? t('point.segment', { name: track.name, segment: number })
               : track.name)
             : null;
-          if (title) line.bindTooltip(localized(el('span'), () => title(segmentIndex + 1)), { sticky: true });
-          bounds.extend(line.getBounds());
+          const lineBoundsValue = lineBounds(L, points);
+          bounds.extend(lineBoundsValue);
           segments.push({ points, color, track });
-          const length = pathDistance(points);
-          distancePaths.push({ points, offset: distanceOffset });
-          distanceOffset += length;
+          if (network) {
+            networkEntries.push({
+              points,
+              bounds: lineBoundsValue,
+              color,
+              weight: 4,
+              className: 'gpx-track gpx-network-track',
+              tooltip: title
+                ? localized(el('span'), () => title(segmentIndex + 1))
+                : null,
+            });
+          } else {
+            const polyline = L.polyline(points.map((point) => [point.lat, point.lon]), {
+              color,
+              weight: 4,
+              opacity: 0.9,
+              className: 'gpx-track',
+            }).addTo(map);
+            if (title) {
+              polyline.bindTooltip(
+                localized(el('span'), () => title(segmentIndex + 1)),
+                { sticky: true },
+              );
+            }
+            distancePaths.push({
+              points,
+              offset: distanceOffset,
+              length: segmentLine.length,
+            });
+            distanceOffset += segmentLine.length;
+          }
         });
 
-        const first = track.segments[0]?.[0];
-        const lastSegment = track.segments[track.segments.length - 1];
-        const last = lastSegment?.[lastSegment.length - 1];
+        const first = group.segments[0]?.points[0];
+        const lastLine = group.segments[group.segments.length - 1];
+        const last = lastLine?.points[lastLine.points.length - 1];
         if (last && showEnds) {
           const marker = L.circleMarker([last.lat, last.lon], {
             radius: 8,
@@ -374,22 +533,42 @@ export function createTrackLayer({ L, el, localized, t, pointPopup, onFocusBound
         }
       });
 
-      for (const route of gpx.routes) {
-        const line = L.polyline(route.points.map((point) => [point.lat, point.lon]), {
-          color: ROUTE_COLOR,
-          weight: 3,
-          opacity: 0.9,
-          dashArray: '8 8',
-          className: 'gpx-route',
-        }).addTo(map);
-        if (route.name) line.bindTooltip(el('span', null, route.name), { sticky: true });
-        bounds.extend(line.getBounds());
-        const length = pathDistance(route.points);
-        distancePaths.push({ points: route.points, offset: distanceOffset });
-        distanceOffset += length;
+      for (const routeLine of model.routes) {
+        const route = routeLine.route;
+        const lineBoundsValue = lineBounds(L, routeLine.points);
+        bounds.extend(lineBoundsValue);
+        if (network) {
+          networkEntries.push({
+            points: routeLine.points,
+            bounds: lineBoundsValue,
+            color: ROUTE_COLOR,
+            weight: 3,
+            dashArray: '8 8',
+            className: 'gpx-route gpx-network-route',
+            tooltip: route.name ? el('span', null, route.name) : null,
+          });
+        } else {
+          const line = L.polyline(routeLine.points.map((point) => [point.lat, point.lon]), {
+            color: ROUTE_COLOR,
+            weight: 3,
+            opacity: 0.9,
+            dashArray: '8 8',
+            className: 'gpx-route',
+          }).addTo(map);
+          if (route.name) line.bindTooltip(el('span', null, route.name), { sticky: true });
+          distancePaths.push({
+            points: routeLine.points,
+            offset: distanceOffset,
+            length: routeLine.length,
+          });
+          distanceOffset += routeLine.length;
+        }
       }
+      if (network) networkLayer = createNetworkLayer();
 
-      const recordings = findTrackGaps(gpx.tracks);
+      const recordings = network
+        ? { episodes: [] }
+        : findTrackGaps(gpx.tracks);
       anomalyEpisodes = recordings.episodes.filter((gap) => gap.kind === 'jump');
       gapEpisodes = recordings.episodes.filter((gap) => gap.kind === 'segment');
 
@@ -397,7 +576,12 @@ export function createTrackLayer({ L, el, localized, t, pointPopup, onFocusBound
         bounds,
         segments,
         navigationMarks,
-        refreshDistanceMarks: renderMapMarks,
+        networkStats: () => networkLayer ? networkStats : null,
+        refreshDistanceMarks() {
+          if (network) return;
+          renderDistanceMarks();
+          renderAnnotationMarks();
+        },
         highlightRange(from, to) {
           splitHighlightLayer.clearLayers();
           const paths = sliceRouteByDistance(

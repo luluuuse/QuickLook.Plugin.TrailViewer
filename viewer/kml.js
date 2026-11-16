@@ -35,14 +35,26 @@ function childText(parent, name) {
 }
 
 /** Some exporters carry measured totals beside the geometry. TwoBulu uses milliseconds for these values. */
-function metricSeconds(container, name) {
+function metricNumber(container, name) {
   if (!container) return undefined;
   for (const data of Array.from(container.getElementsByTagName('Data'))) {
     if (data.getAttribute('name') !== name) continue;
     const value = Number(childText(data, 'value'));
-    if (Number.isFinite(value) && value >= 0) return value / 1000;
+    if (Number.isFinite(value) && value >= 0) return value;
   }
   return undefined;
+}
+
+/** TimeUsed and PauseTime are milliseconds; newer network exports also include duration_seconds. */
+function metricSeconds(container, name) {
+  const value = metricNumber(container, name);
+  return value === undefined ? undefined : value / 1000;
+}
+
+function isRouteNetwork(segmentCount, durationSeconds, distanceMeters) {
+  if (!(segmentCount >= 20)) return false;
+  if (!(durationSeconds > 0)) return true;
+  return distanceMeters > 0 && durationSeconds / (distanceMeters / 1000) > 24 * 3600;
 }
 
 function isLatLon(lat, lon) {
@@ -68,9 +80,9 @@ export function parseCoordinates(raw) {
 }
 
 /** gx:coord holds "lon lat alt", space separated. */
-function parseGxCoord(raw) {
+function parseGxCoord(raw, { skipElevation = false } = {}) {
   const parts = (raw || '').trim().split(/\s+/);
-  const point = parseCoordinates(`${parts[0]},${parts[1]},${parts[2] ?? ''}`);
+  const point = parseCoordinates(`${parts[0]},${parts[1]},${skipElevation ? '' : parts[2] ?? ''}`);
   return point[0] || null;
 }
 
@@ -128,15 +140,15 @@ function readImages(raw) {
 }
 
 /** A gx:Track keeps its times and its coordinates in two parallel lists that are matched by index. */
-function readTrack(track) {
-  const times = children(track, 'when').map((when) => Date.parse(when.textContent.trim()));
+function readTrack(track, { skipTime = false, skipElevation = false } = {}) {
+  const times = skipTime ? [] : children(track, 'when').map((when) => Date.parse(when.textContent.trim()));
   const coords = [];
   let lastTime = null;
   // Keep the time index tied to the original coordinate. Filtering invalid coordinates first shifted every
   // later time by one when a malformed point appeared in the middle of the track.
   children(track, 'coord').forEach((coord, i) => {
     if (Number.isFinite(times[i])) lastTime = times[i];
-    const point = parseGxCoord(coord.textContent);
+    const point = parseGxCoord(coord.textContent, { skipElevation });
     if (!point) return;
     if (lastTime !== null) point.time = new Date(lastTime);
     coords.push(point);
@@ -173,9 +185,9 @@ function addWaypoint(waypoints, seen, point) {
   }
 }
 
-function readPlacemark(placemark, out, styles) {
+function readPlacemark(placemark, out, styles, { skipTime = false, skipElevation = false } = {}) {
   const name = childText(placemark, 'name');
-  const time = readTime(placemark);
+  const time = skipTime ? undefined : readTime(placemark);
   const { text: description, insightText, images } = readDescription(placemark);
   const styleUrl = childText(placemark, 'styleUrl');
   const inlineStyle = child(placemark, 'Style');
@@ -192,7 +204,7 @@ function readPlacemark(placemark, out, styles) {
           break;
         }
         case 'Track': {
-          const points = readTrack(geometry);
+          const points = readTrack(geometry, { skipTime, skipElevation });
           if (points.length > 0) out.segments.push(points);
           break;
         }
@@ -239,6 +251,13 @@ function readPlacemark(placemark, out, styles) {
 export function parseKmlDocument(doc) {
   const root = doc?.documentElement;
   if (!root || root.localName !== 'kml') throw new KmlError(t('error.notKml'));
+  const documentNode = child(root, 'Document');
+  const documentName = documentNode ? childText(documentNode, 'name') : null;
+  const extended = documentNode || root;
+  const segmentCount = metricNumber(extended, 'segment_count');
+  const durationSeconds = metricNumber(extended, 'duration_seconds');
+  const namedDistance = metricNumber(extended, 'distance_meters');
+  const network = isRouteNetwork(segmentCount, durationSeconds, namedDistance);
 
   const tracks = [];
   const areas = [];
@@ -256,7 +275,7 @@ export function parseKmlDocument(doc) {
     for (const element of node.children) {
       if (element.localName === 'Placemark') {
         const found = { segments: [], areas: [], points: [] };
-        readPlacemark(element, found, styles);
+        readPlacemark(element, found, styles, { skipTime: network, skipElevation: network });
         if (found.segments.length > 0) {
           tracks.push({ name: childText(element, 'name'), segments: found.segments });
         }
@@ -269,10 +288,6 @@ export function parseKmlDocument(doc) {
   };
   visit(root);
 
-  const documentNode = child(root, 'Document');
-  const documentName = documentNode ? childText(documentNode, 'name') : null;
-  const extended = documentNode || root;
-
   return {
     version: '2.2',
     // Same rule as the GPX parser: the document's own name, else the name of its only track.
@@ -283,6 +298,7 @@ export function parseKmlDocument(doc) {
     routes: [],
     waypoints,
     areas,
+    network,
     timeUsedSeconds: metricSeconds(extended, 'TimeUsed'),
     pauseSeconds: metricSeconds(extended, 'PauseTime'),
   };

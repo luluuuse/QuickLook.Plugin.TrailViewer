@@ -38,6 +38,8 @@ async function main() {
     const zoomBox = document.querySelector('#map .leaflet-top.leaflet-left')?.getBoundingClientRect();
     const safe = window.trailViewer?.mapLayout().safe;
     const totals = document.querySelector('.splits-totals')?.getBoundingClientRect();
+    const loaded = window.trailViewer.splitPanel.loaded();
+    const model = loaded ? window.trailViewer.splits : null;
     return {
       present: !panel.hidden,
       parent: panel.parentElement?.tagName,
@@ -92,13 +94,14 @@ async function main() {
         vertical: info.scrollHeight - info.clientHeight,
       },
       totalsVisible: Boolean(totals) && totals.top >= panelBox.top && totals.bottom <= panelBox.bottom + 1,
-      model: window.trailViewer.splits && {
-        count: window.trailViewer.splits.splits.length,
-        fields: Object.keys(window.trailViewer.splits.splits[0] || {}),
-        fastestIndex: window.trailViewer.splits.fastestIndex,
-        totalDistance: window.trailViewer.splits.totalDistanceMeters,
-        totalTime: window.trailViewer.splits.totalTimeSeconds,
-        movingTime: window.trailViewer.splits.movingTimeSeconds,
+      loaded,
+      model: model && {
+        count: model.splits.length,
+        fields: Object.keys(model.splits[0] || {}),
+        fastestIndex: model.fastestIndex,
+        totalDistance: model.totalDistanceMeters,
+        totalTime: model.totalTimeSeconds,
+        movingTime: model.movingTimeSeconds,
       },
     };
   });
@@ -115,6 +118,8 @@ async function main() {
     `${state.expanded}/${state.contentPresent}/${state.rows.length}/${state.mode}`);
   check('the collapsed entry still names the feature and its size',
     state.toggleText.includes('Splits') && state.toggleText.includes('16 rows'), state.toggleText);
+  check('the collapsed split panel does not calculate per-kilometre data',
+    state.loaded === false && state.model === null, JSON.stringify({ loaded: state.loaded }));
 
   await page.evaluate(() => {
     window.__splitMapMoves = 0;
@@ -126,8 +131,8 @@ async function main() {
   await waitForLayout(page);
   state = await splitState();
   check('clicking the entry reveals the split data',
-    state.expanded === 'true' && state.contentPresent && state.rows.length > 0,
-    `${state.expanded}/${state.rows.length}`);
+    state.expanded === 'true' && state.contentPresent && state.rows.length > 0 && state.loaded,
+    `${state.expanded}/${state.rows.length}/${state.loaded}`);
   check('the opened panel does not sit underneath the zoom controls', state.zoomClear,
     JSON.stringify(state));
   check('opening the split panel does not move the zoom/locate/export column',
@@ -357,10 +362,10 @@ async function main() {
   const noTimes = await page.evaluate(() => ({
     hidden: document.getElementById('splits').hidden,
     toggle: document.querySelectorAll('.split-toggle').length,
-    rows: window.trailViewer.splits?.splits.length,
+    loaded: window.trailViewer.splitPanel.loaded(),
   }));
   check('an untimed route hides the unusable split entry',
-    noTimes.hidden && noTimes.toggle === 0 && noTimes.rows === 0, JSON.stringify(noTimes));
+    noTimes.hidden && noTimes.toggle === 0 && noTimes.loaded === false, JSON.stringify(noTimes));
 
   await openViewer(page, base, 'synthetic.fit');
   await waitForLayout(page);

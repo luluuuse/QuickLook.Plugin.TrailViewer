@@ -3080,5 +3080,5 @@ body.showing-photo .waypoint-overview,
 body.showing-photo #map .leaflet-top,
 body.showing-photo #map .leaflet-control-scale,
 body.showing-photo .leaflet-popup {
-  display: none;
+  visibility: hidden;
 }

@@ -247,6 +247,26 @@ async function main() {
       && /Data gaps/.test(mixedSummary.text) && /Speed anomalies/.test(mixedSummary.text),
     JSON.stringify(mixedSummary));
 
+  const localizedBefore = await page.evaluate(() => window.trailViewer.localizedNodeCount());
+  await page.evaluate(async () => {
+    for (let index = 0; index < 20; index += 1) {
+      await new Promise((resolve) => {
+        const map = window.trailViewer.map;
+        map.once('moveend', resolve);
+        map.panBy([2, 0], { animate: false });
+      });
+    }
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+  });
+  const localizedAfter = await page.evaluate(() => ({
+    count: window.trailViewer.localizedNodeCount(),
+    warnings: document.querySelectorAll('.gpx-gap-marker, .gpx-anomaly-marker').length,
+  }));
+  check('repeated panning does not grow the language-node list',
+    localizedAfter.count === localizedBefore, `${localizedBefore} -> ${localizedAfter.count}`);
+  check('repeated panning keeps warning markers available',
+    localizedAfter.warnings > 0, `${localizedAfter.warnings}`);
+
   await openViewer(page, base, 'kml-pause.kml');
   const recorded = await page.evaluate(() => ({
     total: window.trailViewer.summary.durationSeconds,

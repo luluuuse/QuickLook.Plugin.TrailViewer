@@ -25,6 +25,8 @@ async function main() {
 
   await openViewer(page, base, 'kml-photos.kml');
   await waitForLayout(page);
+  check('the measurement track index is lazy before first use',
+    await page.evaluate(() => window.trailViewer.measure.indexed()) === false);
 
   // 1. Both tasks live behind one toolbox entry.
   check('the old standalone export button is gone',
@@ -89,6 +91,8 @@ async function main() {
     };
   });
   check('a nearby waypoint snaps as a marker', snaps.marker.kind === 'marker', snaps.marker.kind);
+  check('the first snap builds the measurement track index',
+    await page.evaluate(() => window.trailViewer.measure.indexed()) === true);
 
   await page.evaluate(() => window.trailViewer.pins.hide());
   const hiddenSnap = await page.evaluate(() => {

@@ -2,8 +2,8 @@
 /** @typedef {{ name?: string | null, segments: TrackPoint[][] }} Track */
 /** @typedef {{ name?: string | null, points: TrackPoint[] }} Route */
 /** @typedef {{ name?: string | null, rings: TrackPoint[][] }} Area */
-/** @typedef {{ version?: string | null, name?: string | null, tracks: Track[], routes: Route[], waypoints: TrackPoint[], areas?: Area[], timeUsedSeconds?: number, pauseSeconds?: number }} ParsedTrack */
-/** @typedef {{ tracks: number, segments: number, routes: number, waypoints: number, areas: number, points: number, distanceMeters: number, start: Date | null, end: Date | null, durationSeconds: number | null, movingDurationSeconds: number | null, pausedSeconds: number | null, movingTimeSource: 'metadata' | 'estimated', stops: number, gaps: number, gapEvents: number, gapDistanceMeters: number, anomalies: number, anomalyEvents: number, anomalyDistanceMeters: number, elevation: boolean }} TrackSummary */
+/** @typedef {{ version?: string | null, name?: string | null, tracks: Track[], routes: Route[], waypoints: TrackPoint[], areas?: Area[], timeUsedSeconds?: number, pauseSeconds?: number, network?: boolean }} ParsedTrack */
+/** @typedef {{ tracks: number, segments: number, routes: number, waypoints: number, areas: number, points: number, distanceMeters: number, start: Date | null, end: Date | null, durationSeconds: number | null, movingDurationSeconds: number | null, pausedSeconds: number | null, movingTimeSource: 'metadata' | 'estimated' | 'network', stops: number, gaps: number, gapEvents: number, gapDistanceMeters: number, anomalies: number, anomalyEvents: number, anomalyDistanceMeters: number, elevation: boolean, network?: boolean }} TrackSummary */
 /** @typedef {TrackPoint & { along: number }} ElevationSample */
 /** @typedef {{ along: number, heartRate: number }} HeartRateSample */
 /** @typedef {{ segments: HeartRateSample[][], min: number, max: number, dataMin: number, dataMax: number, average: number, count: number }} HeartRateData */

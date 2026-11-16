@@ -2,12 +2,32 @@ import { bearingDegrees, distanceMeters } from './geo.js';
 
 // Hiking pace can fall below 2 km/h in snow, scree and navigation-heavy ground. These thresholds only decide
 // whether a recorder is stationary; they are deliberately lower than normal walking speed.
-const MOVE_START_MPS = 0.1;
-const MOVE_STOP_MPS = 0.02;
-const TIME_GAP_SECONDS = 300;
+export const MOVEMENT_RULES = Object.freeze({
+  startSpeed: 0.1,
+  stopSpeed: 0.02,
+  maxGapSeconds: 300,
+});
 const POSITION_GAP_METRES = 30;
 const IMPLAUSIBLE_SPEED_MPS = 15;
 const DISTANCE_INTERVALS_METRES = [1000, 2000, 5000, 10000, 20000, 25000, 50000, 100000, 200000, 500000];
+// Parsed point arrays are immutable for a preview, so the summary and map can share one gap walk.
+const defaultGapCache = new WeakMap();
+
+export function isValidHeartRate(value) {
+  return Number.isFinite(value) && value > 0 && value < 255;
+}
+
+/** Arithmetic mean of valid recorded readings; missing readings do not become zero or distance weights. */
+export function averageHeartRate(values) {
+  let count = 0;
+  let total = 0;
+  for (const value of values) {
+    if (!isValidHeartRate(value)) continue;
+    count += 1;
+    total += value;
+  }
+  return count > 0 ? total / count : null;
+}
 
 export function pathDistance(points) {
   let total = 0;
@@ -20,39 +40,48 @@ export function pathDistance(points) {
  * A time jump over five minutes is a recording break and is not counted as moving regardless of distance.
  */
 export function movementSummary(tracks, {
-  startSpeed = MOVE_START_MPS,
-  stopSpeed = MOVE_STOP_MPS,
-  maxGapSeconds = TIME_GAP_SECONDS,
+  startSpeed = MOVEMENT_RULES.startSpeed,
+  stopSpeed = MOVEMENT_RULES.stopSpeed,
+  maxGapSeconds = MOVEMENT_RULES.maxGapSeconds,
 } = {}) {
   let observedSeconds = 0;
   let movingSeconds = 0;
   let stops = 0;
   let timeGaps = 0;
+  let previous = null;
+  let boundary = false;
 
   for (const track of tracks) {
     for (const segment of track.segments) {
       let moving = false;
-      for (let i = 1; i < segment.length; i += 1) {
-        const previous = segment[i - 1];
-        const point = segment[i];
-        if (!previous.time || !point.time) continue;
-        const seconds = (point.time - previous.time) / 1000;
-        if (!(seconds > 0)) continue;
-        observedSeconds += seconds;
-        if (seconds > maxGapSeconds) {
-          timeGaps += 1;
-          moving = false;
+      for (const point of segment) {
+        if (!previous?.time || !point.time) {
+          previous = point;
           continue;
         }
-
-        const speed = distanceMeters(previous, point) / seconds;
-        if (!moving && speed >= startSpeed) moving = true;
-        else if (moving && speed < stopSpeed) {
-          moving = false;
-          stops += 1;
+        const seconds = (point.time - previous.time) / 1000;
+        if (!(seconds > 0)) {
+          previous = point;
+          continue;
         }
-        if (moving) movingSeconds += seconds;
+        const startsSegment = boundary;
+        boundary = false;
+        observedSeconds += seconds;
+        if (startsSegment || seconds > maxGapSeconds) {
+          if (seconds > maxGapSeconds) timeGaps += 1;
+          moving = false;
+        } else {
+          const speed = distanceMeters(previous, point) / seconds;
+          if (!moving && speed >= startSpeed) moving = true;
+          else if (moving && speed < stopSpeed) {
+            moving = false;
+            stops += 1;
+          }
+          if (moving) movingSeconds += seconds;
+        }
+        previous = point;
       }
+      boundary = true;
     }
   }
 
@@ -66,10 +95,11 @@ export function movementSummary(tracks, {
 }
 
 /** Gaps inside a segment and jumps between segments, with both map geometry and timing metadata. */
-export function findTrackGaps(tracks, {
-  maxDistanceMeters = POSITION_GAP_METRES,
-  implausibleSpeed = IMPLAUSIBLE_SPEED_MPS,
-} = {}) {
+export function findTrackGaps(tracks, options = {}) {
+  const cacheable = options.maxDistanceMeters === undefined && options.implausibleSpeed === undefined;
+  if (cacheable && defaultGapCache.has(tracks)) return defaultGapCache.get(tracks);
+  const maxDistanceMeters = options.maxDistanceMeters ?? POSITION_GAP_METRES;
+  const implausibleSpeed = options.implausibleSpeed ?? IMPLAUSIBLE_SPEED_MPS;
   const items = [];
   let previous = null;
 
@@ -135,7 +165,7 @@ export function findTrackGaps(tracks, {
   const episodesOfKind = (kind) => episodes.filter((episode) => episode.kind === kind);
   const segmentEpisodes = episodesOfKind('segment');
   const jumpEpisodes = episodesOfKind('jump');
-  return {
+  const result = {
     items,
     episodes,
     count: items.length,
@@ -146,6 +176,8 @@ export function findTrackGaps(tracks, {
     segmentDistanceMeters: segmentEpisodes.reduce((sum, episode) => sum + episode.distanceMeters, 0),
     jumpDistanceMeters: jumpEpisodes.reduce((sum, episode) => sum + episode.distanceMeters, 0),
   };
+  if (cacheable) defaultGapCache.set(tracks, result);
+  return result;
 }
 
 /** Samples whole cumulative intervals across one or more paths without counting gaps between paths. */

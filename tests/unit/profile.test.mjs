@@ -11,6 +11,7 @@ import {
   slopeColor,
   SLOPE_FULL,
 } from '../../viewer/profile.js';
+import { heartRateData } from '../../viewer/profile-controller.js';
 
 test('elevationGain settles a monotonic climb and descent', () => {
   assert.deepEqual(elevationGain([0, 100]), { ascent: 100, descent: 0 });
@@ -39,6 +40,19 @@ test('seriesSamples preserves a one-sample heart-rate spike', () => {
   assert.equal(kept[0].along, 0);
   assert.equal(kept.at(-1).along, 9999);
   assert.ok(kept.some((sample) => sample.heartRate === 205));
+});
+
+test('heartRateData summarizes 200,000 readings without argument spreading', () => {
+  const points = Array.from({ length: 200000 }, (_, index) => ({
+    along: index,
+    segmentIndex: 0,
+    heartRate: 90 + (index % 50),
+  }));
+  const data = heartRateData(points);
+  assert.equal(data.count, 200000);
+  assert.equal(data.dataMin, 90);
+  assert.equal(data.dataMax, 139);
+  assert.ok(Math.abs(data.average - 114.5) < 1e-9);
 });
 
 test('short alternating runs collapse into one contiguous run', () => {

@@ -30,10 +30,12 @@ internal sealed class TrailViewerPanel : UserControl, IDisposable
 
     private static readonly string FileHost = $"file.{PluginIdentity.VirtualHostSuffix}";
     private static readonly TimeSpan LoadTimeout = TimeSpan.FromSeconds(20);
+    internal const long MaxInputBytes = 64L * 1024 * 1024;
 
     private readonly Stopwatch _clock = Stopwatch.StartNew();
     private readonly DispatcherTimer _timeout;
     private string _path;
+    private string _sourcePath;
     private string _name;
     private string _fileRoot;
     private string _unpackedFolder;
@@ -60,9 +62,26 @@ internal sealed class TrailViewerPanel : UserControl, IDisposable
     public void Load(string path)
     {
         _measureActive = false;
-        _path = path;
-        _name = Path.GetFileName(path);
-        _fileRoot = Path.GetDirectoryName(path);
+        _sourcePath = Path.GetFullPath(path);
+        _path = _sourcePath;
+        _name = Path.GetFileName(_sourcePath);
+        _fileRoot = Path.GetDirectoryName(_sourcePath);
+
+        long sourceBytes;
+        try
+        {
+            sourceBytes = new FileInfo(_sourcePath).Length;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Fail(Strings.PreviewFailed(ex.Message));
+            return;
+        }
+        if (IsOversized(sourceBytes))
+        {
+            Fail(Strings.FileTooLarge(MaxInputBytes));
+            return;
+        }
 
         if (!IsWebView2Available())
         {
@@ -76,7 +95,7 @@ internal sealed class TrailViewerPanel : UserControl, IDisposable
             try
             {
                 _unpackedFolder = KmzArchive.CreateFolder();
-                _path = KmzArchive.ExtractDocument(path, _unpackedFolder);
+                _path = KmzArchive.ExtractDocument(_sourcePath, _unpackedFolder);
                 _fileRoot = _unpackedFolder;
                 Trace($"unpacked {_name} to {_path}");
             }
@@ -373,7 +392,7 @@ internal sealed class TrailViewerPanel : UserControl, IDisposable
             if (core != null)
                 await core.ExecuteScriptAsync($"window.trailViewer && window.trailViewer.pressKey('{name}')");
         }
-        catch (Exception ex) when (ex is InvalidOperationException or ObjectDisposedException)
+        catch (Exception ex) when (IsViewerShutdown(ex))
         {
             // The preview closed between the key and the call; nothing left to press.
         }
@@ -449,8 +468,7 @@ internal sealed class TrailViewerPanel : UserControl, IDisposable
             await Dispatcher.InvokeAsync(() =>
                 core.PostWebMessageAsString($"tianditu-response\t{status}"));
         }
-        catch (Exception ex) when (ex is InvalidOperationException or ObjectDisposedException
-            or System.Runtime.InteropServices.COMException)
+        catch (Exception ex) when (IsViewerShutdown(ex))
         {
             // The preview closed while the response was in flight.
         }
@@ -560,7 +578,7 @@ internal sealed class TrailViewerPanel : UserControl, IDisposable
         dialog.Content = panel;
         dialog.Loaded += (_, _) => input.Focus();
         dialog.ShowDialog();
-        if (saved) NotifyTiandituKeyState();
+        if (saved) _ = NotifyTiandituKeyStateAsync();
     }
 
     private void RemoveTiandituKey(bool english)
@@ -575,10 +593,10 @@ internal sealed class TrailViewerPanel : UserControl, IDisposable
             MessageBoxImage.Question);
         if (answer != MessageBoxResult.Yes) return;
         TiandituKeyStore.Delete();
-        NotifyTiandituKeyState();
+        _ = NotifyTiandituKeyStateAsync();
     }
 
-    private async void NotifyTiandituKeyState()
+    private async System.Threading.Tasks.Task NotifyTiandituKeyStateAsync()
     {
         try
         {
@@ -589,7 +607,7 @@ internal sealed class TrailViewerPanel : UserControl, IDisposable
                 "window.trailViewer && window.trailViewer.setTiandituKey("
                 + $"'{key}')");
         }
-        catch (Exception ex) when (ex is InvalidOperationException or ObjectDisposedException)
+        catch (Exception ex) when (IsViewerShutdown(ex))
         {
             // The preview closed while the user was editing the key.
         }
@@ -646,7 +664,7 @@ internal sealed class TrailViewerPanel : UserControl, IDisposable
         string target;
         try
         {
-            target = Path.Combine(Path.GetDirectoryName(_path) ?? "", picture.Name);
+            target = OverlayTarget(_sourcePath, picture.Name);
             AtomicFile.Write(target, picture.Picture);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException)
@@ -687,6 +705,15 @@ internal sealed class TrailViewerPanel : UserControl, IDisposable
             .Replace("\r", "\\r").Replace("\n", "\\n")
             .Replace("\u2028", "\\u2028").Replace("\u2029", "\\u2029");
 
+    internal static bool IsOversized(long bytes) => bytes > MaxInputBytes;
+
+    internal static bool IsViewerShutdown(Exception exception) =>
+        exception is InvalidOperationException or ObjectDisposedException
+            or System.Runtime.InteropServices.COMException;
+
+    internal static string OverlayTarget(string sourcePath, string name) =>
+        Path.Combine(Path.GetDirectoryName(Path.GetFullPath(sourcePath)) ?? "", name);
+
     private async System.Threading.Tasks.Task SendToViewer(string call)
     {
         try
@@ -695,7 +722,7 @@ internal sealed class TrailViewerPanel : UserControl, IDisposable
             if (core != null)
                 await core.ExecuteScriptAsync($"window.trailViewer && window.trailViewer.{call}");
         }
-        catch (Exception ex) when (ex is InvalidOperationException or ObjectDisposedException)
+        catch (Exception ex) when (IsViewerShutdown(ex))
         {
             // The preview closed between the write and the toast; nothing left to tell.
         }

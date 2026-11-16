@@ -39,6 +39,7 @@ export function createOverlayExport({
   gpx,
   summary,
   elevations,
+  routeModel,
   fileName,
   onSettingsChange,
   onPanelOpen,
@@ -50,12 +51,15 @@ export function createOverlayExport({
   };
   let panel = null;
   let exporting = false;
-
-  function segments() {
-    return [
+  const lines = routeModel
+    ? routeModel.lines.map((line) => line.points)
+    : [
       ...gpx.tracks.flatMap((track) => track.segments),
       ...(gpx.routes || []).map((route) => route.points),
     ].filter((line) => line && line.length > 0);
+
+  function segments() {
+    return lines;
   }
 
   function exportRows() {

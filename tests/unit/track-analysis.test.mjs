@@ -35,6 +35,22 @@ test('movement time excludes a stationary interval and counts one stop', () => {
   });
 });
 
+test('segments reset movement while their timestamp gap remains rest time', () => {
+  const track = {
+    segments: [
+      [at(0, 0), at(0.001, 10)],
+      [at(0.001, 20), at(0.00107, 120)],
+    ],
+  };
+  assert.deepEqual(movementSummary([track]), {
+    observedSeconds: 120,
+    movingDurationSeconds: 10,
+    pausedSeconds: 110,
+    stops: 0,
+    timeGaps: 0,
+  });
+});
+
 test('a recording gap is classified without pretending it was walked', () => {
   const track = {
     segments: [
@@ -54,6 +70,13 @@ test('a GPS jump inside a segment is marked as a jump', () => {
   assert.equal(gaps.count, 1);
   assert.equal(gaps.episodeCount, 1);
   assert.equal(gaps.items[0].kind, 'jump');
+});
+
+test('custom gap options bypass the cache used by repeated default analysis', () => {
+  const tracks = [{ segments: [[at(0, 0), at(0.001, 1)]] }];
+  assert.equal(findTrackGaps(tracks).count, 1);
+  assert.equal(findTrackGaps(tracks, { maxDistanceMeters: 200 }).count, 0);
+  assert.equal(findTrackGaps(tracks).count, 1);
 });
 
 test('one bad GPS point is one episode rather than an exit and return', () => {

@@ -36,6 +36,8 @@ Common controls:
   and moving speed for every kilometre, with total/moving-time totals. Selecting a row focuses and highlights
   that part of the route on the map. A one-click details mode adds cumulative time, ascent/descent, average
   heart rate, moving speed and vertical speed.
+- **Route networks:** merged networks are detected and rendered as independent routes instead of one trip;
+  global speed, split and combined-profile calculations are skipped for faster loading and lower memory use.
 - **Waypoints and photos:** route-ordered navigation, yellow pins, photo albums with true source-pixel
   percentages, wheel zoom up to 800% and drag-to-pan, plus a searchable overview with local
   danger/water/camp/exit insight labels. Attachment preview cards use the waypoint list's unblurred translucent
@@ -75,6 +77,7 @@ temperature and workout steps are not shown in the first version.
 
 Files with more than 20,000 recorded points still draw the route and endpoints but stop creating a clickable
 marker for every sample. Invalid XML produces an explicit error page with the parser message.
+Each input file is limited to 64 MB.
 
 ## Privacy
 

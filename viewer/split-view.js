@@ -61,23 +61,31 @@ function verticalSpeedText(speed, t) {
 }
 
 /**
- * @param {{ el: Function, t: Function, formatSpeed: Function, formatTimer: Function, onLayoutChange?: Function, onSelect?: Function }} deps
+ * @param {{ el: Function, t: Function, formatSpeed: Function, formatTimer: Function, loadData: Function, onLayoutChange?: Function, onSelect?: Function }} deps
  */
 export function createSplitsView({
   el,
   t,
   formatSpeed,
   formatTimer,
+  loadData,
   onLayoutChange,
   onSelect,
 }) {
   const panel = document.getElementById('splits');
   let data = null;
   let summary = null;
+  let expectedCount = 0;
+  let previewAvailable = false;
   let expanded = false;
   let selectedIndex = null;
   let mode = 'basic';
   let focusActivatedIndex = null;
+
+  function ensureData() {
+    if (!data) data = loadData();
+    return data;
+  }
 
   function updateSelectionRows() {
     for (const row of panel.querySelectorAll('.splits-table tbody tr')) {
@@ -241,8 +249,10 @@ export function createSplitsView({
   }
 
   function draw() {
-    const available = Boolean(data && data.splits.length > 0
-      && data.splits.some((split) => split.elapsedSeconds !== null));
+    const loaded = expanded ? ensureData() : data;
+    const available = loaded
+      ? loaded.splits.length > 0 && loaded.splits.some((split) => split.elapsedSeconds !== null)
+      : previewAvailable && expectedCount > 0;
     panel.hidden = !available;
     panel.replaceChildren();
     panel.classList.toggle('expanded', available && expanded);
@@ -261,7 +271,9 @@ export function createSplitsView({
     const label = el('span', 'split-toggle-label');
     label.id = 'splits-title';
     label.append(iconElement('route', { className: 'split-icon' }), el('span', null, t('splits.title')));
-    const count = el('span', 'split-toggle-count', t('splits.count', { count: data.splits.length }));
+    const count = el('span', 'split-toggle-count', t('splits.count', {
+      count: loaded?.splits.length || expectedCount,
+    }));
     toggle.append(label, count, iconElement('chevron-down', { className: 'split-chevron' }));
     toggle.addEventListener('click', () => setExpanded(!expanded));
     header.append(toggle);
@@ -297,14 +309,16 @@ export function createSplitsView({
   }
 
   return {
-    render(nextData, nextSummary, { reset = false } = {}) {
+    render(nextSummary, { reset = false, count = 0, available = false } = {}) {
       if (reset) {
         clearSelection(false);
         expanded = false;
         mode = 'basic';
+        data = null;
       }
-      data = nextData;
       summary = nextSummary;
+      expectedCount = count;
+      previewAvailable = available;
       draw();
       if (reset) onSelect?.(null);
     },
@@ -316,6 +330,7 @@ export function createSplitsView({
       if (Number.isInteger(index) && index >= 1 && index <= (data?.splits.length || 0)) choose(index);
     },
     selected: () => selectedIndex,
+    loaded: () => Boolean(data),
     mode: () => mode,
     setMode,
     toggleMode: () => setMode(mode === 'detailed' ? 'basic' : 'detailed'),

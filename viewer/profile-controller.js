@@ -1,18 +1,16 @@
 import { analyse } from './profile.js';
 import { createProfileChart } from './profile-chart.js';
-import { distanceMeters } from './gpx.js';
+import { isValidHeartRate } from './track-analysis.js';
+import { createRouteModel } from './route-model.js';
 
-function trackPoints(gpx) {
+function trackPoints(model) {
   const points = [];
-  let along = 0;
-  const segments = gpx.tracks.flatMap((track) => track.segments);
-  for (let segmentIndex = 0; segmentIndex < segments.length; segmentIndex += 1) {
-    const segment = segments[segmentIndex];
-    let previous = null;
-    for (const point of segment) {
-      if (previous) along += distanceMeters(previous, point);
+  let segmentIndex = 0;
+  for (const line of model.tracks) {
+    for (let index = 0; index < line.points.length; index += 1) {
+      const point = line.points[index];
       points.push({
-        along,
+        along: line.startMeters + line.cumulative[index],
         lat: point.lat,
         lon: point.lon,
         ele: point.ele,
@@ -20,13 +18,13 @@ function trackPoints(gpx) {
         heartRate: point.heartRate,
         segmentIndex,
       });
-      previous = point;
     }
+    segmentIndex += 1;
   }
   return points;
 }
 
-function heartRateData(points) {
+export function heartRateData(points) {
   const segments = [];
   let run = [];
   let segmentIndex = -1;
@@ -40,22 +38,31 @@ function heartRateData(points) {
       segmentIndex = point.segmentIndex;
     }
     const rate = point.heartRate;
-    if (!Number.isFinite(rate) || rate <= 0 || rate >= 255) {
+    if (!isValidHeartRate(rate)) {
       flush();
       continue;
     }
     run.push({ along: point.along, heartRate: rate });
   }
   flush();
-  const values = segments.flat().map((point) => point.heartRate);
-  if (values.length < 2) return null;
-  const dataMin = Math.min(...values);
-  const dataMax = Math.max(...values);
-  const average = values.reduce((sum, value) => sum + value, 0) / values.length;
+  let count = 0;
+  let dataMin = Infinity;
+  let dataMax = -Infinity;
+  let total = 0;
+  for (const segment of segments) {
+    for (const point of segment) {
+      count += 1;
+      total += point.heartRate;
+      if (point.heartRate < dataMin) dataMin = point.heartRate;
+      if (point.heartRate > dataMax) dataMax = point.heartRate;
+    }
+  }
+  if (count < 2) return null;
+  const average = total / count;
   const spread = Math.max(10, dataMax - dataMin);
   const min = Math.max(0, Math.floor((dataMin - Math.max(5, spread * 0.08)) / 10) * 10);
   const max = Math.max(min + 10, Math.ceil((dataMax + Math.max(5, spread * 0.08)) / 10) * 10);
-  return { segments, min, max, dataMin, dataMax, average, count: values.length };
+  return { segments, min, max, dataMin, dataMax, average, count };
 }
 
 function pointNear(points, distance) {
@@ -235,8 +242,9 @@ export function createProfileController({
   });
 
   return {
-    read(gpx) {
-      const points = trackPoints(gpx);
+    read(gpx, routeModel = null) {
+      const model = routeModel || createRouteModel(gpx);
+      const points = trackPoints(model);
       const samples = points.filter((point) => point.ele !== undefined);
       if (samples.length < 2) return null;
       return { points, samples, heartRate: heartRateData(points), ...analyse(samples) };
