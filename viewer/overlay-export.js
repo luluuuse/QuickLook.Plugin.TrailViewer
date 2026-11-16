@@ -41,6 +41,7 @@ export function createOverlayExport({
   elevations,
   fileName,
   onSettingsChange,
+  onPanelOpen,
 }) {
   const settings = {
     size: remembered(params, SIZE_KEY, SIZES, '9:16'),
@@ -149,6 +150,7 @@ export function createOverlayExport({
         panel.close();
         void save();
       },
+      onOpen: onPanelOpen,
     });
   }
 

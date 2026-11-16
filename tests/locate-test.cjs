@@ -160,21 +160,22 @@ async function main() {
   await page.keyboard.press('s');
   await setChromeHidden(false);
 
-  // 6. The export button follows it down the same column: the top band belongs to the summary, and the right
-  //    corner already carries three switches, so anything else about "the route as a whole" stacks here.
+  // 6. The route-fitting button stays in the left column; task tools live together in the opposing corner.
   const pair = await page.evaluate(() => {
     const fit = document.querySelector('.locate-switch button').getBoundingClientRect();
-    const out = document.querySelector('.export-switch button').getBoundingClientRect();
+    const tools = document.querySelector('.toolbox-switch > button').getBoundingClientRect();
     return {
-      dx: Math.round(out.left - fit.left),
-      dy: Math.round(out.top - fit.bottom),
-      w: Math.round(out.width),
-      h: Math.round(out.height),
+      fitWidth: Math.round(fit.width),
+      fitHeight: Math.round(fit.height),
+      toolsWidth: Math.round(tools.width),
+      toolsHeight: Math.round(tools.height),
+      toolsToRight: tools.left > fit.right,
     };
   });
-  check('an export button follows the fit button down the column',
-    pair.w === 30 && pair.h === 30 && Math.abs(pair.dx) <= 1 && pair.dy >= 4,
-    `${pair.w}x${pair.h}, ${pair.dx} px sideways, ${pair.dy} px under`);
+  check('the toolbox stands in the opposite corner without moving the fit control',
+    pair.fitWidth === 30 && pair.fitHeight === 30
+      && pair.toolsWidth === 30 && pair.toolsHeight === 30 && pair.toolsToRight,
+    JSON.stringify(pair));
 
   check('the page threw nothing', pageErrors.length === 0, pageErrors.join(' | ') || 'clean');
 

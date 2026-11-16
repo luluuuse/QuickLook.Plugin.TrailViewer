@@ -8,7 +8,7 @@ using System.Windows.Threading;
 namespace QuickLook.Plugin.TrailViewer;
 
 /// <summary>
-/// W, Q, E, S, C and X, caught below the application instead of inside it. Measured: QuickLook shows its preview
+/// W, Q, E, S, C, X, M and measuring undo/redo, caught below the application instead of inside it. Measured: QuickLook shows its preview
 /// with ShowActivated="False" and reads its own keys (Space, Esc, arrows) through a global keyboard hook, so the
 /// keyboard never enters this window -- a WPF handler only ever sees a key after someone clicks into the
 /// preview. A raw low-level hook is the only place that always sees it first.
@@ -41,6 +41,7 @@ internal sealed class GlobalKeys : IDisposable
     private delegate IntPtr HookProc(int code, IntPtr wParam, IntPtr lParam);
 
     private readonly Func<bool> _onScreen;
+    private readonly Func<bool> _measureActive;
     private readonly Action<string> _onKey;
     private readonly HookProc _callback; // held in a field: the GC must not collect the thunk the OS calls
     private readonly ManualResetEventSlim _ready = new(false);
@@ -56,10 +57,11 @@ internal sealed class GlobalKeys : IDisposable
     private bool _disposed;
 
     /// <param name="onScreen">Asked on the hook thread: is there a preview to act on right now?</param>
-    /// <param name="onKey">Called on the hook thread with "w", "q", "e", "s" or "c". Must not block.</param>
-    public GlobalKeys(Func<bool> onScreen, Action<string> onKey)
+    /// <param name="onKey">Called on the hook thread with a viewer key name. Must not block.</param>
+    public GlobalKeys(Func<bool> onScreen, Func<bool> measureActive, Action<string> onKey)
     {
         _onScreen = onScreen;
+        _measureActive = measureActive;
         _onKey = onKey;
         _callback = Filter;
     }
@@ -118,16 +120,26 @@ internal sealed class GlobalKeys : IDisposable
         if (message != WmKeyDown && message != WmSysKeyDown)
             return Next(code, wParam, lParam);
 
-        // Shift carries a meaning of its own on one key only: Shift+X asks for the export panel, and the page
-        // is told by the case of the letter. Any other combination with a modifier belongs to somebody else
-        // -- Ctrl+S is save, Alt+W opens a menu -- so it is let through untouched.
-        var shifted = name == "x" && Down(VkShift)
-            && !Down(VkControl) && !Down(VkMenu) && !Down(VkLWin) && !Down(VkRWin);
+        var control = Down(VkControl);
+        var shift = Down(VkShift);
+        var alt = Down(VkMenu);
+        var win = Down(VkLWin) || Down(VkRWin);
+        var plain = !control && !shift && !alt && !win;
+        var plainAction = plain && name != "z";
+        // Shift+X opens the export panel. Ctrl+Z and Ctrl+Shift+Z belong to measurement only while its mode is
+        // active, so an inactive preview leaves Explorer's own undo shortcut untouched.
+        var shiftedExport = name == "x" && shift && !control && !alt && !win;
+        var measureHistory = name == "z" && control && !alt && !win;
 
-        if ((AnyModifierDown() && !shifted) || !SafeOnScreen() || !HostIsForeground())
+        if ((!plainAction && !shiftedExport && !measureHistory) || !SafeOnScreen() || !HostIsForeground())
         {
-            Reason = AnyModifierDown() && !shifted ? "modifier"
+            Reason = !plainAction && !shiftedExport && !measureHistory ? "modifier"
                 : !SafeOnScreen() ? "off-screen" : "foreground=" + ForegroundName();
+            return Next(code, wParam, lParam);
+        }
+        if (measureHistory && !_measureActive())
+        {
+            Reason = "measure-inactive";
             return Next(code, wParam, lParam);
         }
 
@@ -137,7 +149,7 @@ internal sealed class GlobalKeys : IDisposable
 
         try
         {
-            _onKey(shifted ? "X" : name);
+            _onKey(shiftedExport ? "X" : measureHistory && shift ? "Z" : name);
         }
         catch (Exception ex)
         {
@@ -210,9 +222,6 @@ internal sealed class GlobalKeys : IDisposable
         return host;
     }
 
-    private static bool AnyModifierDown() => Down(VkControl) || Down(VkMenu) || Down(VkShift)
-        || Down(VkLWin) || Down(VkRWin);
-
     private static bool Down(int vk) => (GetAsyncKeyState(vk) & 0x8000) != 0;
 
     private static string NameOf(int vk) => vk switch
@@ -223,6 +232,8 @@ internal sealed class GlobalKeys : IDisposable
         0x53 => "s",
         0x43 => "c",
         0x58 => "x",
+        0x4D => "m",
+        0x5A => "z",
         _ => null,
     };
 

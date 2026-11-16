@@ -1,4 +1,4 @@
-export function createUiFeedback({ t, overlay, afterShow }) {
+export function createUiFeedback({ t, overlay, toolbox, afterShow }) {
   let hidden = false;
   let toastTimer = 0;
 
@@ -21,6 +21,7 @@ export function createUiFeedback({ t, overlay, afterShow }) {
     document.body.classList.toggle('chrome-hidden', hidden);
     if (hidden) {
       overlay()?.close();
+      toolbox?.()?.close();
       showToast(t('chrome.hint'));
     } else {
       requestAnimationFrame(() => afterShow?.());

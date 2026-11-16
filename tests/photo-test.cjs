@@ -6,7 +6,6 @@
 //
 // Set CHROMIUM to a Chromium/Chrome executable if Playwright's own browser is not installed.
 // Remote photos are intercepted, so this runs offline.
-const fs = require('fs');
 const path = require('path');
 const {
   launchBrowser,
@@ -39,9 +38,13 @@ async function main() {
     if (/Content Security Policy/i.test(m.text())) cspViolations.push(m.text());
   });
 
-  // The remote photo in the fixture never leaves the machine.
-  const remote = fs.readFileSync(path.join(root, 'tests/fixtures/photo2.png'));
-  await page.route('https://example.test/**', (route) => route.fulfill({ body: remote, contentType: 'image/png' }));
+  // The remote photo in the fixture never leaves the machine. A large logical canvas makes native-pixel zoom
+  // percentages observable while the viewer fits it into the window.
+  const remote = Buffer.from(
+    '<svg xmlns="http://www.w3.org/2000/svg" width="2000" height="3000">'
+    + '<rect width="2000" height="3000" fill="#345"/></svg>',
+  );
+  await page.route('https://example.test/**', (route) => route.fulfill({ body: remote, contentType: 'image/svg+xml' }));
 
   await page.goto(`${base}/viewer/index.html?src=../tests/fixtures/${fixture}`);
   await page.waitForFunction(() => document.body.classList.contains('loaded'));
@@ -88,7 +91,31 @@ async function main() {
     counterHidden: document.querySelector('.photo-counter')?.hidden,
     counter: document.querySelector('.photo-counter')?.textContent || '',
     arrows: document.querySelectorAll('.photo-arrow:not([hidden])').length,
+    zoomHidden: document.querySelector('.photo-zoom')?.hidden,
+    zoom: document.querySelector('.photo-zoom')?.textContent || '',
+    zoomTitle: document.querySelector('.photo-zoom')?.title || '',
+    transform: document.querySelector('.photo-image')?.style.transform || '',
+    naturalWidth: document.querySelector('.photo-image')?.naturalWidth || 0,
+    displayWidth: document.querySelector('.photo-image')?.getBoundingClientRect().width || 0,
   }));
+  const waitForImageMotion = async () => {
+    await page.waitForFunction(() => document.querySelector('.photo-image')
+      ?.getAnimations().every((animation) => animation.playState !== 'running'));
+  };
+  const wheelPhoto = async (deltaY, expected = null) => {
+    const before = await page.locator('.photo-zoom').textContent();
+    const stage = await page.locator('.photo-stage').boundingBox();
+    await page.mouse.move(stage.x + stage.width / 2, stage.y + stage.height / 2);
+    await page.mouse.wheel(0, deltaY);
+    await page.waitForFunction(
+      ({ previous, wanted }) => {
+        const text = document.querySelector('.photo-zoom')?.textContent;
+        return wanted === null ? text !== previous : text === wanted;
+      },
+      { previous: before, wanted: expected },
+    );
+    await waitForImageMotion();
+  };
 
   // 3. The pin opens a card: details, one thumbnail, no full-size image yet.
   await openCard('Remote');
@@ -122,11 +149,78 @@ async function main() {
   check('meta shows coordinates', /\d+\.\d{6}, \d+\.\d{6}/.test(state.meta), state.meta);
   check('meta shows the description text', state.meta.includes('Standing on the bridge'), state.meta);
   check('single photo hides the counter', state.counterHidden === true);
+  const initialPercent = Number.parseInt(state.zoom, 10);
+  const initialDisplayedPercent = Math.round(state.displayWidth / state.naturalWidth * 100);
+  check('the fitted viewer reports its true source-pixel percentage',
+    state.zoomHidden === false && initialPercent === initialDisplayedPercent && initialPercent < 100,
+    `${state.zoom} vs ${initialDisplayedPercent}% of ${state.naturalWidth}px`);
+  check('the zoom badge explains the mouse-wheel gesture',
+    /of original size/.test(state.zoomTitle) && /fit the window/.test(state.zoomTitle), state.zoomTitle);
   check('opening the photo moves focus to its close button',
     await page.evaluate(() => document.activeElement?.classList.contains('photo-close')) === true);
   await page.keyboard.press('Tab');
-  check('a single-photo dialog traps Tab on its only control',
+  check('Tab reaches the percentage reset control',
+    await page.evaluate(() => document.activeElement?.classList.contains('photo-zoom')) === true);
+  await page.keyboard.press('Tab');
+  check('a single-photo dialog traps Tab between zoom and close',
     await page.evaluate(() => document.activeElement?.classList.contains('photo-close')) === true);
+
+  await page.setViewportSize({ width: 1200, height: 1400 });
+  await page.waitForFunction((before) =>
+    Number.parseInt(document.querySelector('.photo-zoom')?.textContent, 10) > before, initialPercent);
+  state = await viewer();
+  const resizedPercent = Number.parseInt(state.zoom, 10);
+  check('fit mode updates the percentage when the window gets larger',
+    resizedPercent > initialPercent && resizedPercent
+      === Math.round(state.displayWidth / state.naturalWidth * 100),
+    `${initialPercent}% -> ${state.zoom}`);
+
+  await wheelPhoto(-100);
+  state = await viewer();
+  const manualPercent = Number.parseInt(state.zoom, 10);
+  check('wheel zoom moves to an absolute source-pixel level',
+    manualPercent > resizedPercent
+      && Math.round(state.displayWidth / state.naturalWidth * 100) === manualPercent,
+    `${state.zoom} ${state.displayWidth}/${state.naturalWidth}`);
+  const rendering = await page.evaluate(() => {
+    const image = document.querySelector('.photo-image');
+    return {
+      width: image.style.width,
+      transform: image.style.transform,
+      willChange: getComputedStyle(image).willChange,
+    };
+  });
+  check('zoomed images use layout pixels rather than a scaled compositor layer',
+    parseFloat(rendering.width) > 0 && !rendering.transform.includes('scale')
+      && rendering.willChange === 'auto',
+    JSON.stringify(rendering));
+  const beforeDrag = state.transform;
+  const stageBox = await page.locator('.photo-stage').boundingBox();
+  await page.mouse.move(stageBox.x + stageBox.width / 2, stageBox.y + stageBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(stageBox.x + stageBox.width / 2 + 36, stageBox.y + stageBox.height / 2 + 28);
+  await page.mouse.up();
+  state = await viewer();
+  check('a source-pixel zoom can be panned by dragging the photo',
+    /translate\(-?\d/.test(state.transform) && state.transform !== beforeDrag,
+    `${beforeDrag} -> ${state.transform}`);
+  await page.setViewportSize({ width: 1200, height: 800 });
+  await page.waitForFunction((wanted) => {
+    const image = document.querySelector('.photo-image');
+    return image && Math.round(image.getBoundingClientRect().width / image.naturalWidth * 100) === wanted;
+  }, manualPercent);
+  await waitForImageMotion();
+  state = await viewer();
+  check('manual zoom keeps its source-pixel percentage after a resize',
+    Number.parseInt(state.zoom, 10) === manualPercent
+      && Math.round(state.displayWidth / state.naturalWidth * 100) === manualPercent,
+    `${manualPercent}% -> ${state.zoom}; ${state.displayWidth}/${state.naturalWidth}`);
+  await page.locator('.photo-zoom').click();
+  await waitForImageMotion();
+  state = await viewer();
+  check('clicking the percentage returns to fit and reports the fitted percentage',
+    Number.parseInt(state.zoom, 10) === initialPercent && state.transform === '',
+    `${state.zoom} ${state.transform}`);
   await settlePopup(page, '.leaflet-popup', 0);
   const cardLeft = await page.locator('.photo-popup').isVisible().catch(() => false);
   check('the card is closed behind the viewer', cardLeft === false);
@@ -152,12 +246,32 @@ async function main() {
   check('second thumbnail opens the second photo', /photo2\.png$/.test(state.src), state.src);
   check('counter starts at the clicked photo', state.counter === '2 / 2', state.counter);
   check('two arrows appear', state.arrows === 2, `${state.arrows}`);
+  await wheelPhoto(-100, '125%');
+  state = await viewer();
+  check('one wheel notch zooms the photo in',
+    state.zoom === '125%' && Math.round(state.displayWidth / state.naturalWidth * 100) === 125,
+    `${state.zoom} ${state.displayWidth}/${state.naturalWidth}`);
+  await wheelPhoto(-100, '150%');
+  state = await viewer();
+  check('further wheel input reaches the next zoom level',
+    state.zoom === '150%' && Math.round(state.displayWidth / state.naturalWidth * 100) === 150,
+    `${state.zoom} ${state.displayWidth}/${state.naturalWidth}`);
+  await wheelPhoto(100, '125%');
+  await wheelPhoto(100, '100%');
+  await wheelPhoto(100, '100%');
+  state = await viewer();
+  check('wheel zoom stops at the fitted 100% size', state.zoom === '100%' && state.transform === '',
+    `${state.zoom} ${state.transform}`);
+  await wheelPhoto(-100, '125%');
   await page.keyboard.press('Shift+Tab');
-  check('Shift+Tab wraps to the last dialog action',
+  check('Shift+Tab reaches the percentage reset before the last dialog action',
+    await page.evaluate(() => document.activeElement?.classList.contains('photo-zoom')) === true);
+  await page.keyboard.press('Shift+Tab');
+  check('Shift+Tab wraps to the last album action',
     await page.evaluate(() => document.activeElement?.classList.contains('next')) === true);
   await page.keyboard.press('Tab');
-  check('Tab from the last action wraps to close',
-    await page.evaluate(() => document.activeElement?.classList.contains('photo-close')) === true);
+  check('Tab from the last action wraps to the percentage reset',
+    await page.evaluate(() => document.activeElement?.classList.contains('photo-zoom')) === true);
 
   // 8. Stepping through the album and wrapping around.
   await page.locator('.photo-arrow.next').click();
@@ -165,6 +279,8 @@ async function main() {
   state = await viewer();
   check('next wraps to the first photo', /photo\.png$/.test(state.src), state.src);
   check('counter follows', state.counter === '1 / 2', state.counter);
+  check('changing photos resets zoom to 100%', state.zoom === '100%' && state.transform === '',
+    `${state.zoom} ${state.transform}`);
 
   // 9. Clicking the original neither closes nor steps: it is what the user asked to look at.
   await page.locator('.photo-image').click();

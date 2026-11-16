@@ -55,6 +55,15 @@ async function main() {
       panelWidth: panelBox.width,
       contentPresent: Boolean(document.getElementById('splits-content')),
       headers: [...document.querySelectorAll('.splits-table th')].map((node) => node.textContent),
+      columnWidths: [...document.querySelectorAll('.splits-table th')]
+        .map((node) => Math.round(node.getBoundingClientRect().width)),
+      cellPadding: [...document.querySelectorAll('.splits-table tbody tr:first-child td')]
+        .map((node) => {
+          const style = getComputedStyle(node);
+          return `${style.paddingLeft}/${style.paddingRight}`;
+        }),
+      separatorWidths: [...document.querySelectorAll('.splits-table tbody tr:first-child td')]
+        .map((node) => getComputedStyle(node).borderRightWidth),
       rows: [...document.querySelectorAll('.splits-table tbody tr')].map((row) => (
         [...row.cells].map((cell) => cell.textContent)
       )),
@@ -65,7 +74,7 @@ async function main() {
       })),
       scrollable: scroller ? scroller.scrollHeight > scroller.clientHeight : false,
       stickyHeader: document.querySelector('.splits-table thead')
-        ? getComputedStyle(document.querySelector('.splits-table thead')).position
+        ? getComputedStyle(document.querySelector('.splits-table thead th')).position
         : null,
       fastestRows: document.querySelectorAll('.splits-table tbody tr.fastest').length,
       selectedRows: document.querySelectorAll('.splits-table tbody tr.selected').length,
@@ -143,6 +152,13 @@ async function main() {
     `${state.tabbableRows}/${state.rows.length} tabbable rows`);
   check('the route has a whole-kilometre row for every split',
     state.rows.length === Math.ceil(state.model.totalDistance / 1000), `${state.rows.length}`);
+  check('the basic grid has fixed columns and a uniform gutter',
+    state.columnWidths.join('|') === '28|54|54|64'
+      && state.cellPadding.every((value) => value === '6px/6px')
+      && state.separatorWidths.slice(0, -1).every((value) => value === '1px')
+      && state.separatorWidths.at(-1) === '0px'
+      && state.panelWidth <= 250,
+    `${state.columnWidths.join('|')} / ${state.cellPadding.join(',')} / ${state.panelWidth}px`);
   check('the first row carries distance, time and speed',
     state.rows[0][1] === '1.00 km' && /^\d+:\d{2}$/.test(state.rows[0][2])
       && /^\d+\.\d km\/h$/.test(state.rows[0][3]), state.rows[0].join('|'));
@@ -192,6 +208,17 @@ async function main() {
       && /^\d+ m$/.test(state.rows[0][4]) && /^\d+ m$/.test(state.rows[0][5])
       && /^-?\d+ m\/h$/.test(state.rows[0][7]),
     state.rows[0].join('|'));
+  check('detailed totals place rest time after total and moving time',
+    state.totals.length === 3
+      && state.totals.map((item) => item.label).join('|') === 'Total time|Moving time|Rest time'
+      && state.totals[2].value === '0:00:00',
+    JSON.stringify(state.totals));
+  check('the detailed grid uses deterministic compact columns and equal gutters',
+    state.columnWidths.join('|') === '28|54|54|60|40|40|64|72'
+      && state.cellPadding.every((value) => value === '6px/6px')
+      && state.separatorWidths.slice(0, -1).every((value) => value === '1px')
+      && state.panelWidth <= 460,
+    `${state.columnWidths.join('|')} / ${state.cellPadding.join(',')} / ${state.panelWidth}px`);
   check('the detailed panel is wider than basic without refitting the map',
     state.panelWidth > basicPanelWidth && state.zoom === zoomBeforeMode && state.mapMoves === 0,
     `${basicPanelWidth} -> ${state.panelWidth}; zoom ${zoomBeforeMode} -> ${state.zoom}`);
@@ -255,10 +282,30 @@ async function main() {
   state = await splitState();
   check('an open split panel keeps its state while the labels change language',
     state.expanded === 'true'
-      && state.headers.join('|') === '圈数|距离|时间|累计时间|上升|下降|运动速度|垂直速度'
+      && state.headers.join('|') === '圈|距离|时间|累计时间|上升|下降|运动速度|垂直速度'
       && state.totals[0].label === '总时间' && state.totals[1].label === '运动时间'
+      && state.totals[2].label === '休息时间'
       && state.selectedIndex === 2 && state.highlightLines >= 2 && state.modeButton === '简要',
     `${state.expanded}/${state.headers.join('|')}/${state.selectedIndex}`);
+
+  const stickyAlignment = await page.evaluate(async () => {
+    const scroller = document.querySelector('.splits-scroll');
+    scroller.scrollTop = Math.min(80, scroller.scrollHeight - scroller.clientHeight);
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    const header = document.querySelector('.splits-table thead th');
+    const row = document.querySelector('.splits-table tbody tr:nth-child(4)');
+    const tops = [...row.cells].map((cell) => cell.getBoundingClientRect().top);
+    return {
+      headerOffset: Math.round(header.getBoundingClientRect().top - scroller.getBoundingClientRect().top),
+      headerHeight: Math.round(header.getBoundingClientRect().height),
+      rowOffset: Math.round(Math.max(...tops) - Math.min(...tops)),
+      firstLabel: header.textContent,
+    };
+  });
+  check('the sticky icon header stays aligned while rows scroll',
+    stickyAlignment.headerOffset <= 2 && stickyAlignment.headerHeight <= 40
+      && stickyAlignment.rowOffset <= 1 && stickyAlignment.firstLabel === '圈',
+    JSON.stringify(stickyAlignment));
 
   await page.setViewportSize({ width: 360, height: 740 });
   await waitForLayout(page);
@@ -323,9 +370,20 @@ async function main() {
   const heartRate = await page.evaluate(() => ({
     headers: [...document.querySelectorAll('.splits-table th')].map((node) => node.textContent),
     value: document.querySelector('.splits-table tbody tr .split-heartRate')?.textContent,
+    widths: [...document.querySelectorAll('.splits-table th')]
+      .map((node) => Math.round(node.getBoundingClientRect().width)),
+    panelWidth: Math.round(document.getElementById('splits').getBoundingClientRect().width),
+    totals: [...document.querySelectorAll('.split-total')].map((node) => ({
+      value: node.querySelector('strong').textContent,
+      label: node.querySelector('span').textContent,
+    })),
   }));
   check('a FIT with heart rate adds the detailed heart-rate column',
-    heartRate.headers.includes('平均心率') && /^\d+ bpm$/.test(heartRate.value || ''),
+    heartRate.headers.includes('心率') && /^\d+ bpm$/.test(heartRate.value || '')
+      && heartRate.widths.join('|') === '28|54|54|60|40|40|52|64|72'
+      && heartRate.panelWidth <= 510
+      && heartRate.totals.map((item) => item.value).join('|') === '1:00:00|0:55:00|0:05:00'
+      && heartRate.totals[2].label === '休息时间',
     JSON.stringify(heartRate));
 
   check('no page errors', pageErrors.length === 0, pageErrors.join(' | '));

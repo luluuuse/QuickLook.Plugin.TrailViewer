@@ -1,5 +1,6 @@
 import { t } from './i18n.js';
 import { formatCoord, formatters } from './format.js';
+import { iconElement } from './icons.js';
 
 function resolvePhotoUrl(url, src) {
   if (/^data:image\//i.test(url) || /^https?:\/\//i.test(url)) return url;
@@ -40,9 +41,10 @@ export function createWaypointContent({ el, src, photoViewer, pointPopup }) {
       const thumb = el('img');
       thumb.alt = '';
       thumb.decoding = 'async';
+      const errorIcon = iconElement('warning', { className: 'photo-error-icon' });
       thumb.onerror = () => button.classList.add('failed');
       thumb.src = url;
-      button.append(thumb);
+      button.append(thumb, errorIcon);
       button.addEventListener('click', (event) => {
         event.stopPropagation();
         closePopup?.();

@@ -1,7 +1,20 @@
 // A separate, collapsed-by-default split panel below the route summary. Only the entry is in the DOM until
 // the user asks for the per-kilometre data; the full SplitData model is prepared for the detailed phase.
+import { iconElement } from './icons.js';
 
 const BASIC_COLUMNS = Object.freeze(['index', 'distance', 'time', 'movingSpeed']);
+
+const COLUMN_WIDTHS = Object.freeze({
+  index: 28,
+  distance: 54,
+  time: 54,
+  cumulativeTime: 60,
+  ascent: 40,
+  descent: 40,
+  heartRate: 52,
+  movingSpeed: 64,
+  verticalSpeed: 72,
+});
 
 export const DETAIL_COLUMNS = Object.freeze([
   'index',
@@ -14,32 +27,6 @@ export const DETAIL_COLUMNS = Object.freeze([
   'movingSpeed',
   'verticalSpeed',
 ]);
-
-function svgIcon(kind) {
-  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-  svg.setAttribute('viewBox', '0 0 24 24');
-  svg.setAttribute('aria-hidden', 'true');
-  svg.classList.add(kind === 'chevron' ? 'split-chevron' : 'split-icon');
-  const paths = {
-    route: ['M3 18l5-9 5 4 7-9'],
-    index: ['M5 5h14', 'M5 12h14', 'M5 19h14'],
-    distance: ['M3 18l5-9 5 4 7-9'],
-    time: ['M12 4a8 8 0 1 0 0 16 8 8 0 0 0 0-16Z', 'M12 8v5l3 2'],
-    cumulativeTime: ['M12 4a8 8 0 1 0 0 16 8 8 0 0 0 0-16Z', 'M12 8v5l3 2', 'M4 4l2 2'],
-    ascent: ['M12 19V6', 'M6 12l6-6 6 6'],
-    descent: ['M12 5v13', 'M6 12l6 6 6-6'],
-    heartRate: ['M12 20S4 15.7 4 9.8A4.3 4.3 0 0 1 12 7a4.3 4.3 0 0 1 8 2.8C20 15.7 12 20 12 20Z'],
-    movingSpeed: ['M4 17a9 9 0 1 1 16 0', 'M12 14l4-5'],
-    verticalSpeed: ['M5 17a8 8 0 1 1 14 0', 'M12 14l3-6', 'M10 5h4', 'M12 3v4'],
-    chevron: ['M7 10l5 5 5-5'],
-  };
-  for (const definition of paths[kind] || paths.index) {
-    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-    path.setAttribute('d', definition);
-    svg.append(path);
-  }
-  return svg;
-}
 
 function headerCell(el, kind, label) {
   const cell = el('th');
@@ -147,10 +134,19 @@ export function createSplitsView({
     const colgroup = el('colgroup');
     for (const column of columns) {
       const col = el('col', `split-column-${column}`);
+      col.style.width = `${COLUMN_WIDTHS[column]}px`;
       colgroup.append(col);
     }
+    const tableWidth = columns.reduce((sum, column) => sum + COLUMN_WIDTHS[column], 0);
+    table.style.width = `${tableWidth}px`;
+    panel.style.setProperty('--split-table-width', `${tableWidth}px`);
     for (const column of columns) {
-      headRow.append(headerCell(el, column, labels[column]));
+      const cell = headerCell(el, column, labels[column]);
+      if (column === 'heartRate') {
+        cell.title = t('splits.heartRateTitle');
+        cell.setAttribute('aria-label', cell.title);
+      }
+      headRow.append(cell);
     }
     head.append(headRow);
 
@@ -212,7 +208,7 @@ export function createSplitsView({
     scroller.append(table);
     content.append(scroller);
 
-    const totals = el('div', 'splits-totals');
+    const totals = el('div', `splits-totals ${mode}`);
     const totalCell = el('div', 'split-total');
     totalCell.append(
       el('strong', null, timeText(summary.durationSeconds, formatTimer, true)),
@@ -224,6 +220,22 @@ export function createSplitsView({
       el('span', null, t('splits.movingTime')),
     );
     totals.append(totalCell, movingCell);
+    if (mode === 'detailed') {
+      const recordedRest = summary.pausedSeconds;
+      const derivedRest = summary.durationSeconds !== null && summary.movingDurationSeconds !== null
+        ? Math.max(0, summary.durationSeconds - summary.movingDurationSeconds)
+        : null;
+      const restCell = el('div', 'split-total');
+      restCell.append(
+        el('strong', null, timeText(
+          Number.isFinite(recordedRest) ? recordedRest : derivedRest,
+          formatTimer,
+          true,
+        )),
+        el('span', null, t('splits.restTime')),
+      );
+      totals.append(restCell);
+    }
     content.append(totals);
     return content;
   }
@@ -248,9 +260,9 @@ export function createSplitsView({
 
     const label = el('span', 'split-toggle-label');
     label.id = 'splits-title';
-    label.append(svgIcon('route'), el('span', null, t('splits.title')));
+    label.append(iconElement('route', { className: 'split-icon' }), el('span', null, t('splits.title')));
     const count = el('span', 'split-toggle-count', t('splits.count', { count: data.splits.length }));
-    toggle.append(label, count, svgIcon('chevron'));
+    toggle.append(label, count, iconElement('chevron-down', { className: 'split-chevron' }));
     toggle.addEventListener('click', () => setExpanded(!expanded));
     header.append(toggle);
     if (expanded) {

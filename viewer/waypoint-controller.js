@@ -4,10 +4,8 @@ import { createWaypointOverview } from './waypoint-overview.js';
 import { classifyWaypoint } from './waypoint-insights.js';
 import { sampleScreenPoints } from './waypoint-sampling.js';
 import { readStored, writeStored } from './storage.js';
+import { iconElement, setIcon, symbolMarkup } from './icons.js';
 
-const PHOTO_BADGE = '<circle cx="23" cy="7.5" r="5.6" fill="#ffffff" stroke="#1b1b1b" stroke-width="1.2"/>'
-  + '<rect x="20.4" y="6.4" width="5.4" height="3.7" rx="0.8" fill="#1b1b1b"/>'
-  + '<circle cx="23" cy="8.25" r="1.15" fill="#ffffff"/>';
 const PINS_KEY = 'pins';
 const MAX_DOTS = 20000;
 const OVERVIEW_MERGE_METERS = 25;
@@ -17,11 +15,12 @@ const WAYPOINT_SPACING_PIXELS = 34;
 function pinIcon(L, withPhoto) {
   return L.divIcon({
     className: withPhoto ? 'gpx-pin has-photo' : 'gpx-pin',
-    html: '<svg viewBox="0 0 30 34" width="24" height="27">'
-      + '<path d="M12 1C6 1 1.5 5.6 1.5 11.5 1.5 19.5 12 33 12 33s10.5-13.5 10.5-21.5C22.5 5.6 18 1 12 1z"'
-      + ' fill="#f5c400" stroke="#1b1b1b" stroke-width="1.5"/>'
-      + '<circle cx="12" cy="11.5" r="4" fill="#1b1b1b"/>'
-      + `${withPhoto ? PHOTO_BADGE : ''}</svg>`,
+    html: '<span class="pin-symbol-wrap">'
+      + symbolMarkup('waypoint', { width: 24, height: 27, className: 'data-symbol pin-symbol' })
+      + (withPhoto
+        ? symbolMarkup('camera', { width: 11, height: 11, className: 'data-symbol pin-camera' })
+        : '')
+      + '</span>',
     iconSize: [24, 27],
     iconAnchor: [10, 26],
     popupAnchor: [0, -24],
@@ -414,7 +413,7 @@ export function createWaypointController({
         button.setAttribute('aria-pressed', String(shown));
         button.dataset.pins = 'toggle';
         labelNode = el('span', null, t('pins.label'));
-        button.append(el('span', 'dot'), labelNode);
+        button.append(iconElement('pin'), labelNode);
         button.addEventListener('click', () => set(!shown, true));
         bar.append(button);
         control.relabel();
@@ -450,9 +449,7 @@ export function createWaypointController({
         button.title = t('overview.openTitle');
         button.setAttribute('aria-label', t('overview.openTitle'));
         button.dataset.waypoints = 'overview';
-        button.innerHTML = '<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">'
-          + '<path d="M3 3h10M3 8h10M3 13h10" stroke="currentColor" stroke-width="1.6"'
-          + ' stroke-linecap="round"/></svg>';
+        setIcon(button, 'list');
         button.append(el('span', null, t('overview.label')));
         button.addEventListener('click', () => overview.toggle(overviewItems(), stopIndex));
         overview.attachButton(button);

@@ -28,7 +28,7 @@ const measure = (page) => page.evaluate(() => {
   };
   add('info', '#info');
   add('splits', '#splits');
-  add('export', '.export-switch');
+  add('tools', '.toolbox-switch');
   add('zoom', '.leaflet-control-zoom');
   add('layers', '.layer-switch');
   add('pins', '.pins-switch');
@@ -124,6 +124,7 @@ async function main() {
     '.layer-switch',
     '.pins-switch',
     '.waypoint-overview-switch',
+    '.toolbox-switch',
     '.lang-switch',
   ].map((selector) => document.querySelector(selector))
     .filter(Boolean)
@@ -151,7 +152,7 @@ async function main() {
   // 2. The other side of the breakpoint: a wide window keeps the old arrangement.
   const wide = await openAt(1200, 800);
   const wm = await measure(wide);
-  check('a wide window keeps the export button', !!wm.parts.export, wm.parts.export ? 'shown' : 'hidden');
+  check('a wide window keeps the toolbox', !!wm.parts.tools, wm.parts.tools ? 'shown' : 'hidden');
   check('and the card keeps its own width',
     wm.parts.info.r - wm.parts.info.l < wm.w * 0.4, `${wm.parts.info.r - wm.parts.info.l} of ${wm.w}`);
   check('the wide window has no overlaps', clashes(wm.parts).length === 0, clashes(wm.parts).join(' ') || 'clean');
@@ -191,7 +192,7 @@ async function main() {
 
   const squat = await openAt(1100, 1000);
   const squatM = await measure(squat);
-  check('a landscape window of the same size keeps the export button', !!squatM.parts.export);
+  check('a landscape window of the same size keeps the toolbox', !!squatM.parts.tools);
   check('and the card keeps its own width',
     squatM.parts.info.r - squatM.parts.info.l < squatM.w * 0.4,
     `${squatM.parts.info.r - squatM.parts.info.l} of ${squatM.w}`);
@@ -203,8 +204,8 @@ async function main() {
   check('a 360 px window still has no overlaps', clashes(tm.parts).length === 0, clashes(tm.parts).join(' ') || 'clean');
   check('and it uses the docked tool band', tm.layout === 'docked', tm.layout);
   check('the compact map tools share one row',
-    new Set([tm.parts.layers.t, tm.parts.pins.t, tm.parts.overview.t, tm.parts.lang.t]).size === 1,
-    `${tm.parts.layers.t}/${tm.parts.pins.t}/${tm.parts.overview.t}/${tm.parts.lang.t}`);
+    new Set([tm.parts.tools.t, tm.parts.layers.t, tm.parts.pins.t, tm.parts.overview.t, tm.parts.lang.t]).size === 1,
+    `${tm.parts.tools.t}/${tm.parts.layers.t}/${tm.parts.pins.t}/${tm.parts.overview.t}/${tm.parts.lang.t}`);
   check('the compact layer entry keeps a full accessible label',
     await tiny.$eval('.layer-menu-toggle', (node) => Boolean(node.getAttribute('aria-label'))
       && Boolean(node.dataset.short) && Math.round(node.getBoundingClientRect().height) === 28));

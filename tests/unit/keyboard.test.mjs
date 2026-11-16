@@ -6,6 +6,20 @@ function makeController(overrides = {}) {
   const calls = [];
   let selectedLayer = 'road.osm';
   let selectedCategory = 'road';
+  let measurementActive = overrides.measurementActive ?? false;
+  const measurement = {
+    active: () => measurementActive,
+    start: () => {
+      measurementActive = true;
+      calls.push('measure-start');
+    },
+    stop: () => {
+      measurementActive = false;
+      calls.push('measure-stop');
+    },
+    undo: () => calls.push('measure-undo'),
+    redo: () => calls.push('measure-redo'),
+  };
   const controller = createKeyboardController({
     LAYERS: { road: {}, terrain: {}, satellite: {}, none: {} },
     photoViewer: { isOpen: () => overrides.photoOpen ?? false },
@@ -14,6 +28,7 @@ function makeController(overrides = {}) {
       toggle: () => calls.push('pins'),
       stepByKey: (delta) => calls.push(`step:${delta}`),
     },
+    measurement: () => measurement,
     overlay: () => ({
       togglePanel: () => calls.push('panel'),
       close: () => calls.push('close-panel'),
@@ -31,7 +46,7 @@ function makeController(overrides = {}) {
     fit: () => calls.push('fit'),
     toggleChrome: () => calls.push('chrome'),
   });
-  return { controller, calls, layer: () => selectedLayer };
+  return { controller, calls, layer: () => selectedLayer, measurement };
 }
 
 function keyEvent(key, extra = {}) {
@@ -135,4 +150,35 @@ test('direct host keys follow the same guarded routing', () => {
     'export',
     'panel',
   ]);
+});
+
+test('M toggles measurement through both the page and host routes', () => {
+  const { controller, calls, measurement } = makeController();
+
+  controller.onKeyDown(keyEvent('m'));
+  assert.equal(measurement.active(), true);
+  controller.pressKey('m');
+  assert.equal(measurement.active(), false);
+
+  assert.deepEqual(calls, ['measure-start', 'measure-stop']);
+});
+
+test('measurement history uses Ctrl+Z and Ctrl+Shift+Z only while active', () => {
+  const inactive = makeController();
+  const ignored = keyEvent('z', { ctrlKey: true });
+  inactive.controller.onKeyDown(ignored);
+  assert.equal(ignored.prevented, 0);
+  assert.deepEqual(inactive.calls, []);
+
+  const { controller, calls } = makeController({ measurementActive: true });
+  const undo = keyEvent('z', { ctrlKey: true });
+  const redo = keyEvent('z', { ctrlKey: true, shiftKey: true });
+  controller.onKeyDown(undo);
+  controller.onKeyDown(redo);
+  controller.pressKey('z');
+  controller.pressKey('Z');
+
+  assert.equal(undo.prevented, 1);
+  assert.equal(redo.prevented, 1);
+  assert.deepEqual(calls, ['measure-undo', 'measure-redo', 'measure-undo', 'measure-redo']);
 });

@@ -11,7 +11,6 @@ import { createPhotoViewer } from './photo-viewer.js';
 import { createProfileController } from './profile-controller.js';
 import {
   LAYERS,
-  createExportControl,
   createLanguageControl,
   createLayerSwitcher,
   createLocateControl,
@@ -34,6 +33,9 @@ import { createOverlayExport } from './overlay-export.js';
 import { createKeyboardController } from './keyboard-controller.js';
 import { createMapView } from './map-view.js';
 import { createUiFeedback } from './ui-feedback.js';
+import { createMeasurement } from './measure.js';
+import { createToolbox } from './toolbox.js';
+import { installLeafletIcons } from './icons.js';
 import { gradeAwareHikeSeconds } from './track-analysis.js';
 
 const L = window.L;
@@ -188,11 +190,14 @@ const profileController = createProfileController({
   revealPoint: (latlng) => mapViewController?.revealPoint(latlng),
 });
 let overlayExport = null;
+let toolboxController = null;
+let measurementController = null;
 let mapViewController = null;
 let layerSwitch = null;
 const uiFeedback = createUiFeedback({
   t,
   overlay: () => overlayExport,
+  toolbox: () => toolboxController,
   afterShow: () => mapViewController?.refreshControls(),
 });
 const showToast = uiFeedback.showToast;
@@ -201,6 +206,7 @@ const keyboardController = createKeyboardController({
   LAYERS,
   photoViewer,
   waypointController,
+  measurement: () => measurementController,
   overlay: () => overlayExport,
   layerSwitch: () => layerSwitch,
   fit: () => mapViewController?.fit(),
@@ -307,6 +313,7 @@ async function main() {
 
   const map = L.map('map', { keyboard: false, worldCopyJump: false });
   map.getContainer().tabIndex = -1;
+  installLeafletIcons(map, { closeLabel: () => t('tool.close') });
   map.attributionControl.setPrefix('<a href="https://leafletjs.com" target="_blank">Leaflet</a>');
   L.control.scale({ imperial: false, position: 'bottomleft' }).addTo(map);
   mapViewController = createMapView({ map, isChromeHidden: uiFeedback.isHidden });
@@ -332,14 +339,45 @@ async function main() {
     elevations,
     fileName,
     onSettingsChange: syncPreferences,
+    onPanelOpen: () => toolboxController?.close(),
+  });
+  const measurement = createMeasurement({
+    L,
+    map,
+    t,
+    formatDistance,
+    gpx,
+    segments: tracks.segments,
+    onLayoutChange: () => mapViewController?.refreshControls({ refitHome: false }),
+  });
+  measurementController = measurement;
+  let reportedMeasurementActive = null;
+  const reportMeasurementState = () => {
+    const active = measurement.active();
+    if (active === reportedMeasurementActive) return;
+    reportedMeasurementActive = active;
+    post(`measure-state\t${active ? '1' : '0'}`);
+  };
+  measurement.subscribe(reportMeasurementState);
+  reportMeasurementState();
+  toolboxController = createToolbox({
+    L,
+    map,
+    el,
+    t,
+    formatDistance,
+    measurement,
+    exportAvailable: overlayExport.available,
+    onExport: () => {
+      if (!overlayExport.panelOpen()) overlayExport.togglePanel();
+    },
+    onOpen: () => overlayExport.close(),
+    onLayoutChange: () => mapViewController?.refreshControls({ refitHome: false }),
   });
 
   // First of the corner controls, so it stands leftmost: "where the map looks" before "what the map shows".
   const locateCtrl = createLocateControl({ L, map, el, t, onLocate: () => mapViewController.fit() });
-  const exportCtrl = overlayExport.available()
-    ? createExportControl({ L, map, el, t, onExport: () => void overlayExport.save() })
-    : null;
-  if (exportCtrl) map.on('click', () => overlayExport.close());
+  if (overlayExport.available()) map.on('click', () => overlayExport.close());
   const warnTiandituTemporarily = () => {
     if (tiandituTransientShown) return;
     tiandituTransientShown = true;
@@ -390,7 +428,8 @@ async function main() {
     splitController.render(splitData, summary);
     switcher.relabel();
     locateCtrl.relabel();
-    exportCtrl?.relabel();
+    measurement.relabel();
+    toolboxController.relabel();
     waypointController.relabel();
     langControl.relabel();
     repaintLocalized();
@@ -497,6 +536,23 @@ async function main() {
     panelOpen: () => overlayExport.panelOpen(),
     exported: (path) => showToast(t('export.done', { name: String(path).split(/[\\/]/).pop() }), 4000),
     exportFailed: (detail) => showToast(t('export.failed', { detail }), 4000),
+    measure: {
+      active: measurement.active,
+      start: measurement.start,
+      stop: measurement.stop,
+      add: measurement.addAt,
+      endSection: measurement.endSection,
+      undo: measurement.undo,
+      redo: measurement.redo,
+      clear: measurement.clear,
+      canUndo: measurement.canUndo,
+      canRedo: measurement.canRedo,
+      summary: measurement.summary,
+      sections: measurement.sections,
+      snapAt: measurement.snapAt,
+      toolboxOpen: toolboxController.isOpen,
+      openToolbox: toolboxController.open,
+    },
   };
   window.trailViewer = api;
   window.gpxViewer = api; // Remove after one compatibility release.

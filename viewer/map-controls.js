@@ -2,6 +2,7 @@
 // application's globals.
 
 import { readStored, writeStored } from './storage.js';
+import { iconElement, iconMarkup, setIcon } from './icons.js';
 
 export const LAYERS = {
   road: {
@@ -270,6 +271,7 @@ export function createLayerSwitcher({
   let menuOpen = false;
   const categoryButtons = {};
   const providerButtons = {};
+  const providerLabels = {};
   const lastProvider = {};
   for (const category of Object.keys(LAYERS)) lastProvider[category] = defaultProvider(category);
   let menuToggle;
@@ -310,6 +312,7 @@ export function createLayerSwitcher({
       const checked = candidate === current;
       button.classList.toggle('selected', checked);
       button.setAttribute('aria-checked', String(checked));
+      providerLabels[candidate].check.hidden = !checked;
     }
   }
 
@@ -460,12 +463,11 @@ export function createLayerSwitcher({
       menuToggle.setAttribute('aria-haspopup', 'dialog');
       menuToggle.setAttribute('aria-expanded', 'false');
       menuToggle.setAttribute('aria-controls', 'layer-source-menu');
-      menuToggle.innerHTML = '<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">'
-        + '<path d="M8 1.8l6 3.1-6 3.1-6-3.1 6-3.1zM2 8l6 3.1L14 8M2 11.2l6 3.1 6-3.1"'
-        + ' fill="none" stroke="currentColor" stroke-width="1.35" stroke-linejoin="round"'
-        + ' stroke-linecap="round"/></svg>';
+      menuToggle.innerHTML = iconMarkup('layers');
       menuLabel = el('span', 'layer-menu-label');
-      menuToggle.append(menuLabel);
+      const menuChevron = iconElement('chevron-down', { size: 12 });
+      menuChevron.classList.add('layer-menu-chevron');
+      menuToggle.append(menuLabel, menuChevron);
       menuToggle.addEventListener('click', () => {
         if (menuOpen) closeMenu({ restoreFocus: true });
         else openMenu();
@@ -479,8 +481,9 @@ export function createLayerSwitcher({
       const headingId = 'layer-source-heading';
       menu.setAttribute('aria-labelledby', headingId);
       const header = el('div', 'layer-menu-header');
-      backButton = el('button', 'layer-menu-icon-button layer-menu-back', '‹');
+      backButton = el('button', 'layer-menu-icon-button layer-menu-back');
       backButton.type = 'button';
+      setIcon(backButton, 'chevron-left');
       backButton.hidden = true;
       backButton.title = t('layer.backToLayers');
       backButton.setAttribute('aria-label', t('layer.backToLayers'));
@@ -492,14 +495,11 @@ export function createLayerSwitcher({
       settingsButton.type = 'button';
       settingsButton.title = t('layer.openSettings');
       settingsButton.setAttribute('aria-label', t('layer.openSettings'));
-      settingsButton.innerHTML = '<svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">'
-        + '<circle cx="8" cy="8" r="2.25" fill="none" stroke="currentColor" stroke-width="1.4"/>'
-        + '<path d="M8 1.4v1.8M8 12.8v1.8M1.4 8h1.8M12.8 8h1.8M3.35 3.35l1.27 1.27'
-        + 'M11.38 11.38l1.27 1.27M12.65 3.35l-1.27 1.27M4.62 11.38l-1.27 1.27"'
-        + ' fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round"/></svg>';
+      setIcon(settingsButton, 'settings');
       settingsButton.addEventListener('click', () => showSettings());
-      closeButton = el('button', 'layer-menu-icon-button layer-menu-close', '×');
+      closeButton = el('button', 'layer-menu-icon-button layer-menu-close');
       closeButton.type = 'button';
+      setIcon(closeButton, 'close');
       closeButton.title = t('layer.closeMenu');
       closeButton.setAttribute('aria-label', t('layer.closeMenu'));
       closeButton.addEventListener('click', () => closeMenu({ restoreFocus: true }));
@@ -535,15 +535,21 @@ export function createLayerSwitcher({
       providerList.setAttribute('aria-label', t('layer.sourceHeading'));
       for (const [category, definition] of Object.entries(LAYERS)) {
         for (const provider of Object.values(definition.providers)) {
-          const button = el('button', 'layer-provider-option', t(provider.label));
+          const button = el('button', 'layer-provider-option');
           button.type = 'button';
           button.setAttribute('role', 'radio');
           button.dataset.provider = provider.key;
           button.dataset.category = category;
           button.setAttribute('aria-checked', 'false');
           button.hidden = true;
+          const check = el('span', 'layer-selected-icon');
+          check.hidden = true;
+          check.append(iconElement('check', { size: 12 }));
+          const label = el('span', 'layer-provider-label', t(provider.label));
+          button.append(check, label);
           button.addEventListener('click', () => select(provider.key, true, { restoreFocus: true }));
           providerButtons[provider.key] = button;
+          providerLabels[provider.key] = { check, label };
           providerList.append(button);
         }
       }
@@ -623,8 +629,8 @@ export function createLayerSwitcher({
         closeButton.title = t('layer.closeMenu');
         closeButton.setAttribute('aria-label', t('layer.closeMenu'));
       }
-      for (const [key, button] of Object.entries(providerButtons)) {
-        button.textContent = t(PROVIDERS[key].provider.label);
+      for (const [key] of Object.entries(providerButtons)) {
+        providerLabels[key].label.textContent = t(PROVIDERS[key].provider.label);
       }
       const labels = menu?.querySelectorAll('.layer-section-label');
       if (labels?.[0]) labels[0].textContent = t('layer.typeHeading');
@@ -678,10 +684,7 @@ export function createLocateControl({ L, map, el, t, onLocate }) {
       button.title = t('locate.title');
       button.setAttribute('aria-label', t('locate.title'));
       button.dataset.locate = 'route';
-      button.innerHTML = '<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">'
-        + '<circle cx="8" cy="8" r="4.2" fill="none" stroke="currentColor" stroke-width="1.6"/>'
-        + '<path d="M8 0.9v3.2M8 11.9v3.2M0.9 8h3.2M11.9 8h3.2" fill="none" stroke="currentColor"'
-        + ' stroke-width="1.6" stroke-linecap="round"/></svg>';
+      setIcon(button, 'locate');
       button.addEventListener('click', () => onLocate());
       bar.append(button);
       L.DomEvent.disableClickPropagation(bar);
@@ -695,39 +698,6 @@ export function createLocateControl({ L, map, el, t, onLocate }) {
       if (!button) return;
       button.title = t('locate.title');
       button.setAttribute('aria-label', t('locate.title'));
-    },
-  };
-}
-
-export function createExportControl({ L, map, el, t, onExport }) {
-  let button = null;
-  const Control = L.Control.extend({
-    options: { position: 'topleft' },
-    onAdd() {
-      const bar = el('div', 'export-switch leaflet-bar');
-      button = el('button');
-      button.type = 'button';
-      button.title = t('export.title');
-      button.setAttribute('aria-label', t('export.title'));
-      button.dataset.export = 'overlay';
-      button.innerHTML = '<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">'
-        + '<rect x="1.6" y="3.1" width="12.8" height="9.8" rx="1.6" fill="none" stroke="currentColor"'
-        + ' stroke-width="1.5"/><path d="M2.8 10.9l3.1-3.2 2.1 2.1 2.9-3 2.3 2.4" fill="none"'
-        + ' stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>'
-        + '<circle cx="11.1" cy="5.9" r="1.05" fill="currentColor"/></svg>';
-      button.addEventListener('click', () => onExport());
-      bar.append(button);
-      L.DomEvent.disableClickPropagation(bar);
-      return bar;
-    },
-  });
-  map.addControl(new Control());
-
-  return {
-    relabel() {
-      if (!button) return;
-      button.title = t('export.title');
-      button.setAttribute('aria-label', t('export.title'));
     },
   };
 }

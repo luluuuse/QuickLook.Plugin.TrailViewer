@@ -2,6 +2,7 @@ import { formatDistance, formatElevation } from './format.js';
 import { t, units } from './i18n.js';
 import { classifyWaypoint, INSIGHT_KEYS } from './waypoint-insights.js';
 import { readStored, removeStored, writeStored } from './storage.js';
+import { iconElement, setIcon } from './icons.js';
 
 const OVERRIDE_KEY = 'waypoint-insights';
 const MANUAL_IMPORTANT = new Set(['danger', 'water', 'camp', 'supply', 'exit']);
@@ -157,8 +158,9 @@ export function createWaypointOverview({ el, onSelect, onLayoutChange }) {
       if (filterTrigger.getAttribute('aria-expanded') === 'true') closePopover();
       else openMenu(filterTrigger, filterMenu);
     });
-    closeButton = el('button', 'close', '\u00d7');
+    closeButton = el('button', 'close');
     closeButton.type = 'button';
+    setIcon(closeButton, 'close');
     closeButton.title = t('overview.close');
     closeButton.setAttribute('aria-label', t('overview.close'));
     closeButton.addEventListener('click', close);
@@ -217,7 +219,7 @@ export function createWaypointOverview({ el, onSelect, onLayoutChange }) {
       ? 'overview.important' : `insight.${current.key}`)} ${current.count}`;
     filterTrigger.replaceChildren(
       el('span', 'waypoint-filter-label', `${t('overview.filter')} · ${currentLabel}`),
-      el('span', 'waypoint-filter-chevron', '\u25be'),
+      iconElement('chevron-down', { size: 12, className: 'waypoint-filter-chevron' }),
     );
     filterTrigger.lastElementChild.setAttribute('aria-hidden', 'true');
     filterTrigger.title = t('overview.filterTitle');
@@ -287,8 +289,9 @@ export function createWaypointOverview({ el, onSelect, onLayoutChange }) {
       const name = stop.point.name || t('label.waypoint');
       const actions = el('span', 'waypoint-heading-actions');
       const override = overrides[pointKey(stop.point)];
-      const correct = el('button', 'waypoint-correct-button', '\u270e');
+      const correct = el('button', 'waypoint-correct-button');
       correct.type = 'button';
+      setIcon(correct, 'edit', { size: 12 });
       correct.title = t('overview.correct');
       correct.setAttribute('aria-label', `${t('overview.correct')}: ${name}`);
       correct.setAttribute('aria-haspopup', 'menu');

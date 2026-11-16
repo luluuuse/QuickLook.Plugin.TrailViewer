@@ -81,6 +81,15 @@ async function main() {
   check('no terrain tile before it is asked for', requestsFor('/cyclosm/').length === 0);
 
   await openLayers();
+  const layerSurface = await page.locator('.layer-source-menu').evaluate((node) => {
+    const style = getComputedStyle(node);
+    return { background: style.backgroundColor, filter: style.backdropFilter };
+  });
+  check('the map layer panel uses the shared translucent tool surface',
+    layerSurface.background === 'rgba(24, 24, 24, 0.78)'
+      && layerSurface.filter.includes('blur(14px)')
+      && layerSurface.filter.includes('saturate(0.9)'),
+    JSON.stringify(layerSurface));
   const categoryLabels = await page.$$eval('.layer-category-button', (nodes) => nodes.map((node) => node.textContent));
   check('the layer panel exposes four map types', categoryLabels.length === 4, categoryLabels.join('/'));
   check('the former Map category is now Road',

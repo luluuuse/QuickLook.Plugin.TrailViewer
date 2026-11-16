@@ -4,6 +4,7 @@ using QuickLook.Common.Helpers;
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -34,11 +35,13 @@ internal sealed class TrailViewerPanel : UserControl, IDisposable
     private readonly DispatcherTimer _timeout;
     private string _path;
     private string _name;
+    private string _fileRoot;
     private string _unpackedFolder;
     private readonly OverlayTransfer _overlay = new();
     private WebView2 _webView;
     private GlobalKeys _keys;
     private volatile bool _onScreen;
+    private volatile bool _measureActive;
     private bool _finished;
 
     public TrailViewerPanel()
@@ -56,8 +59,10 @@ internal sealed class TrailViewerPanel : UserControl, IDisposable
 
     public void Load(string path)
     {
+        _measureActive = false;
         _path = path;
         _name = Path.GetFileName(path);
+        _fileRoot = Path.GetDirectoryName(path);
 
         if (!IsWebView2Available())
         {
@@ -72,6 +77,7 @@ internal sealed class TrailViewerPanel : UserControl, IDisposable
             {
                 _unpackedFolder = KmzArchive.CreateFolder();
                 _path = KmzArchive.ExtractDocument(path, _unpackedFolder);
+                _fileRoot = _unpackedFolder;
                 Trace($"unpacked {_name} to {_path}");
             }
             catch (Exception ex) when (ex is InvalidDataException or IOException
@@ -98,9 +104,9 @@ internal sealed class TrailViewerPanel : UserControl, IDisposable
         _webView.Loaded += (_, _) => { _onScreen = IsVisible; FocusViewer(); };
         // QuickLook shows its preview without activating it (ShowActivated="False") and reads Space, Esc and
         // the arrows through a global keyboard hook of its own, so a WPF handler only ever sees a key after
-        // someone clicks into the preview. These three keys are caught below the application instead.
+        // someone clicks into the preview. The viewer keys are caught below the application instead.
         var hookClock = Stopwatch.StartNew();
-        _keys = new GlobalKeys(() => _onScreen, OnGlobalKey);
+        _keys = new GlobalKeys(() => _onScreen, () => _measureActive, OnGlobalKey);
         _keys.Start();
         Trace($"keyboard hook ready in {hookClock.ElapsedMilliseconds} ms (installed={_keys.Installed})");
         // Kept as a fallback: when the hook is unavailable, a preview that did get the keyboard still works.
@@ -187,7 +193,7 @@ internal sealed class TrailViewerPanel : UserControl, IDisposable
             // Allow = served as if with "Access-Control-Allow-Origin: *", so the page (another origin) can fetch
             // the file. The page treats everything in the file as text and has a Content-Security-Policy.
             core.SetVirtualHostNameToFolderMapping(AppHost, ViewerFolder, CoreWebView2HostResourceAccessKind.Allow);
-            core.SetVirtualHostNameToFolderMapping(FileHost, Path.GetDirectoryName(_path),
+            core.SetVirtualHostNameToFolderMapping(FileHost, _fileRoot,
                 CoreWebView2HostResourceAccessKind.Allow);
 
             var tiandituKey = TiandituKeyStore.Load();
@@ -197,7 +203,7 @@ internal sealed class TrailViewerPanel : UserControl, IDisposable
                     "window.__TRAILVIEWER_RUNTIME_CONFIG__ = Object.freeze({"
                     + $"tiandituKey: '{tiandituKey}', direct: true }});");
             }
-            _webView.Source = new Uri(BuildViewerUrl(_path, _name));
+            _webView.Source = new Uri(BuildViewerUrl(_path, _name, _fileRoot));
             Trace("navigating to " + _webView.Source);
         }
         catch (Exception ex)
@@ -211,11 +217,20 @@ internal sealed class TrailViewerPanel : UserControl, IDisposable
     /// The name shown in the page. A KMZ is named after the archive the user opened, not after the
     /// document inside it, while the URL still points at the unpacked file.
     /// </param>
-    internal static string BuildViewerUrl(string path, string displayName = null)
+    internal static string BuildViewerUrl(string path, string displayName = null, string fileRoot = null)
     {
         var file = Path.GetFileName(path);
         var name = displayName ?? file;
-        var source = $"https://{FileHost}/{Uri.EscapeDataString(file)}{VersionStamp(path)}";
+        var root = Path.GetFullPath(fileRoot ?? Path.GetDirectoryName(path));
+        var fullPath = Path.GetFullPath(path);
+        var prefix = root.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+            + Path.DirectorySeparatorChar;
+        var relative = fullPath.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)
+            ? fullPath.Substring(prefix.Length)
+            : file;
+        var sourcePath = string.Join("/",
+            relative.Replace('\\', '/').Split('/').Select(Uri.EscapeDataString));
+        var source = $"https://{FileHost}/{sourcePath}{VersionStamp(path)}";
         var preferences = ViewerPreferences.Query();
         var suffix = string.IsNullOrEmpty(preferences) ? string.Empty : "&" + preferences;
         return $"https://{AppHost}/index.html?src={Uri.EscapeDataString(source)}"
@@ -262,6 +277,7 @@ internal sealed class TrailViewerPanel : UserControl, IDisposable
 
     private void OnNavigationCompleted(object sender, CoreWebView2NavigationCompletedEventArgs e)
     {
+        _measureActive = false;
         Trace($"navigation completed: success={e.IsSuccess} status={e.WebErrorStatus}");
         if (!e.IsSuccess && e.WebErrorStatus != CoreWebView2WebErrorStatus.OperationCanceled)
         {
@@ -304,7 +320,7 @@ internal sealed class TrailViewerPanel : UserControl, IDisposable
     }
 
     /// <summary>
-    /// W, Q, E and S, taken before WPF routes them. Measured: the hand-over above does not win against QuickLook's
+    /// W, Q, E, S, M and measuring history, taken before WPF routes them. Measured: the hand-over above does not win against QuickLook's
     /// view window, so a fresh preview still sends keys to the window -- where W means "next file". Catching
     /// the key at pre-processing stops that, and the page is asked to do what it would have done anyway.
     /// When the page does hold the keyboard this handler never runs: the browser owns its own window, so the
@@ -316,10 +332,14 @@ internal sealed class TrailViewerPanel : UserControl, IDisposable
             return;
         if (key.RoutedEvent != Keyboard.PreviewKeyDownEvent || key.IsRepeat)
             return;
-        // Shift is spoken for by one key only: Shift+X opens the export panel while X on its own exports with
-        // the settings already chosen. The page learns the difference from the case of the letter.
-        var shifted = key.KeyboardDevice.Modifiers == ModifierKeys.Shift && key.Key == Key.X;
-        if (key.KeyboardDevice.Modifiers != ModifierKeys.None && !shifted)
+        // X has a shifted panel action; Z is ours only with Control, and only while measurement is active.
+        var modifiers = key.KeyboardDevice.Modifiers;
+        var shiftedExport = modifiers == ModifierKeys.Shift && key.Key == Key.X;
+        var measureHistory = key.Key == Key.Z
+            && (modifiers == ModifierKeys.Control || modifiers == (ModifierKeys.Control | ModifierKeys.Shift));
+        if (modifiers != ModifierKeys.None && !shiftedExport && !measureHistory)
+            return;
+        if (measureHistory && !_measureActive)
             return;
 
         var window = Window.GetWindow(this);
@@ -333,7 +353,11 @@ internal sealed class TrailViewerPanel : UserControl, IDisposable
             case Key.Q: name = "q"; break;
             case Key.E: name = "e"; break;
             case Key.S: name = "s"; break;
-            case Key.X: name = shifted ? "X" : "x"; break;
+            case Key.X: name = shiftedExport ? "X" : "x"; break;
+            case Key.M: name = "m"; break;
+            case Key.Z when measureHistory:
+                name = (modifiers & ModifierKeys.Shift) != 0 ? "Z" : "z";
+                break;
             default: return;
         }
 
@@ -383,6 +407,8 @@ internal sealed class TrailViewerPanel : UserControl, IDisposable
             Finish(message.Substring("error:".Length), "");
         else if (message.StartsWith("settings\t", StringComparison.Ordinal))
             ViewerPreferences.SaveFromQuery(message.Substring("settings\t".Length));
+        else if (message == "measure-state\t1" || message == "measure-state\t0")
+            _measureActive = message.EndsWith("\t1", StringComparison.Ordinal);
         else if (message.StartsWith("tianditu-key\tconfigure", StringComparison.Ordinal))
         {
             ConfigureTiandituKey(IsEnglishMessage(message));

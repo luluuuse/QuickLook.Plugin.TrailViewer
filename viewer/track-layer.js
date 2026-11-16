@@ -7,6 +7,7 @@ import {
   sliceRouteByDistance,
 } from './track-analysis.js';
 import { formatDistance } from './format.js';
+import { iconMarkup, symbolMarkup } from './icons.js';
 
 const COLORS = ['#ff5a36', '#2f9bff', '#f5c400', '#c23cff', '#18c964', '#ff3d9a', '#00c2c7', '#ff9f1a'];
 const ROUTE_COLOR = '#ffffff';
@@ -17,7 +18,9 @@ function distanceIcon(L, sample) {
     : '';
   return L.divIcon({
     className: 'gpx-distance',
-    html: `<span class="gpx-direction" style="--bearing:${sample.bearing.toFixed(1)}deg"></span>`
+    html: `<span class="gpx-direction" style="--bearing:${sample.bearing.toFixed(1)}deg">`
+      + symbolMarkup('direction', { width: 12, height: 12, className: 'data-symbol gpx-direction-symbol' })
+      + '</span>'
       + (label ? `<span class="gpx-km">${label}</span>` : ''),
     iconSize: [34, 34],
     iconAnchor: [17, 17],
@@ -71,21 +74,27 @@ function overlaps(box, boxes) {
 function gapIcon(L, eventCount) {
   const clustered = eventCount > 1;
   const label = clustered ? `\u00d7${eventCount}` : '!';
-  const width = clustered ? Math.max(27, 15 + label.length * 6) : 18;
+  const width = clustered ? Math.max(35, 23 + label.length * 6) : 18;
   return L.divIcon({
     className: clustered ? 'gpx-gap-marker clustered' : 'gpx-gap-marker',
-    html: `<span aria-hidden="true">${label}</span>`,
+    html: `<span aria-hidden="true">${iconMarkup('warning', { size: 12 })}`
+      + `${clustered ? `<b>${label}</b>` : ''}</span>`,
     iconSize: [width, 18],
     iconAnchor: [width / 2, 9],
   });
 }
 
+function anomalyWidth(eventCount, detailed) {
+  const label = detailed && eventCount > 1 ? `GPS \u00d7${eventCount}` : 'GPS';
+  return Math.max(42, 25 + label.length * 6);
+}
+
 function anomalyIcon(L, eventCount, detailed) {
   const label = detailed && eventCount > 1 ? `GPS \u00d7${eventCount}` : 'GPS';
-  const width = Math.max(29, 11 + label.length * 6);
+  const width = anomalyWidth(eventCount, detailed);
   return L.divIcon({
     className: 'gpx-anomaly-marker',
-    html: `<span aria-hidden="true">${label}</span>`,
+    html: `<span aria-hidden="true">${iconMarkup('activity', { size: 12 })}<b>${label}</b></span>`,
     iconSize: [width, 18],
     iconAnchor: [width / 2, 9],
   });
@@ -229,7 +238,7 @@ export function createTrackLayer({ L, el, localized, t, pointPopup, onFocusBound
             }).addTo(anomalyLineLayer);
           }
           const detailed = zoom > 12;
-          const labelWidth = detailed ? Math.max(29, 11 + `GPS \u00d7${eventCount}`.length * 6) : 29;
+          const labelWidth = anomalyWidth(eventCount, detailed);
           const labelX = Math.max(28, Math.min(size.x - 28, cluster.x + 22));
           const labelBox = { x: labelX, y: cluster.y, width: labelWidth, height: 18 };
           if (overlaps(labelBox, anomalyLabels) || (zoom <= 12 && anomalyLabels.length >= 3)) continue;
@@ -344,8 +353,8 @@ export function createTrackLayer({ L, el, localized, t, pointPopup, onFocusBound
         if (last && showEnds) {
           const marker = L.circleMarker([last.lat, last.lon], {
             radius: 8,
-            color: '#ffffff',
-            weight: 3,
+            color: '#1b1b1b',
+            weight: 1.5,
             fillColor: '#e5243b',
             fillOpacity: 1,
             className: 'gpx-end',
@@ -355,8 +364,8 @@ export function createTrackLayer({ L, el, localized, t, pointPopup, onFocusBound
         if (first && showEnds) {
           const marker = L.circleMarker([first.lat, first.lon], {
             radius: 5,
-            color: '#ffffff',
-            weight: 2,
+            color: '#1b1b1b',
+            weight: 1.5,
             fillColor: '#18c964',
             fillOpacity: 1,
             className: 'gpx-start',

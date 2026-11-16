@@ -54,7 +54,7 @@ async function main() {
     layerTitle: document.querySelector('.layer-menu-toggle')?.title || '',
     pinsTitle: document.querySelector('.pins-switch button')?.title || '',
     fitTitle: document.querySelector('.locate-switch button')?.title || '',
-    exportTitle: document.querySelector('.export-switch button')?.title || '',
+    exportTitle: document.querySelector('.toolbox-action[data-tool="export"]')?.title || '',
     infoLive: document.getElementById('info')?.getAttribute('aria-live') || '',
     summaryKeys: document.querySelectorAll('#info .keys').length,
   }));
@@ -78,7 +78,7 @@ async function main() {
   check('the background buttons name Q and E', /Q\s*\/\s*E/.test(s.layerTitle), s.layerTitle);
   check('the marker button names W', /\(W\)/.test(s.pinsTitle), s.pinsTitle);
   check('the fit button names C', /\(C\)/.test(s.fitTitle), s.fitTitle);
-  check('and the export button names X', /\(X\)/.test(s.exportTitle), s.exportTitle);
+  check('and the export tool names X', /\(X\s*\/\s*Shift\+X\)/.test(s.exportTitle), s.exportTitle);
   check('the summary does not carry them either', s.summaryKeys === 0, `${s.summaryKeys}`);
   check('the summary announces changes politely', s.infoLive === 'polite', s.infoLive);
   check('the background starts on the road source', s.layer === 'road.osm' && s.layerCategory === 'road', s.layer);

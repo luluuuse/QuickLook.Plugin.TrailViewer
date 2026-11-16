@@ -5,7 +5,7 @@
 | 层级 | 位置 | 重点 |
 |---|---|---|
 | 纯单元测试 | `tests/unit/` | 格式、几何、SemVer、剖面、导航和解析算法 |
-| 浏览器测试 | `tests/*-test.cjs` | 地图、分段表、交互、布局、照片、导出、语言和可访问性 |
+| 浏览器测试 | `tests/*-test.cjs` | 地图、图标系统、测距、分段表、交互、布局、照片、导出、语言和可访问性 |
 | 夹具检测 | `tests/viewer-test.cjs`, `tests/fixtures/` | GPX/KML/KMZ/FIT 解析和格式边界 |
 | 宿主自测 | `tools/Harness/SelfTests.cs` | KMZ、偏好、DPAPI 密钥、导出状态机和缓存身份 |
 | live smoke | `tests/smoke/` | CyclOSM、OpenHikingMap、OpenTopoMap 真实瓦片端点，独立于主 CI |
@@ -24,6 +24,14 @@ npm run test:live
 
 `npm test` 先跑所有纯单元测试，再逐个执行浏览器套件。失败时 `tests/support/artifacts.cjs` 写入截图、
 `result.json` 和 Playwright `trace.zip` 到 `test-results/<suite>/`。
+
+当前专项入口：
+
+- `tests/unit/icons.test.mjs`：图标注册表、尺寸、描边和未知图标回退。
+- `tests/icons-test.cjs`：全部控件/数据符号、Leaflet 适配、激活态和纯文字分段列头。
+- `tests/measure-test.cjs`：多段测距、吸附、快捷键、透明标签、右侧布局和导出互斥。
+- `tests/export-test.cjs`：导出版式、透明 PNG、设置面板关闭按钮和宿主保存流程。
+- `tests/terrain-test.cjs`：地图类型图源过滤、面板透明度、天地图密钥与 403 降级。
 
 ## 测试原则
 

@@ -47,8 +47,8 @@ function attachScrub({
   const { points, total, svg, plot, chart, guide, dot, readout, value, meta, yOf } = state;
   const marker = L.circleMarker([0, 0], {
     radius: 7,
-    color: '#ffffff',
-    weight: 2.5,
+    color: '#1b1b1b',
+    weight: 1.5,
     fillColor: '#e5243b',
     fillOpacity: 1,
     interactive: false,

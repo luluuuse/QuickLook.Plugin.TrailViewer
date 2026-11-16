@@ -63,7 +63,10 @@ async function main() {
       accessibleName: button ? button.getAttribute('aria-label') : '',
       label: button ? button.textContent.trim() : '',
       title: button ? button.title : '',
-      dot: button ? getComputedStyle(button.querySelector('.dot')).backgroundColor : '',
+      icon: button?.querySelector('svg')?.dataset.icon || '',
+      iconColor: button?.querySelector('svg') ? getComputedStyle(button.querySelector('svg')).color : '',
+      background: button ? getComputedStyle(button).backgroundColor : '',
+      shadow: button ? getComputedStyle(button).boxShadow : '',
       selected: document.querySelectorAll('.gpx-pin.selected').length,
       cards: document.querySelectorAll('.leaflet-popup').length,
       index: window.trailViewer.nav.index(),
@@ -91,9 +94,14 @@ async function main() {
   // The key is part of the tooltip now that there is no bar to spell it out on.
   check('the tooltip offers to hide them', s.title === 'Hide markers and anomaly labels (W)', s.title);
   check('and screen readers get the same action name', s.accessibleName === s.title, s.accessibleName);
+  check('the marker control uses the shared pin icon', s.icon === 'pin' && s.iconColor === 'rgb(143, 217, 255)',
+    `${s.icon}/${s.iconColor}`);
+  check('its active state uses the shared blue surface and underline',
+    s.background === 'rgb(35, 79, 121)' && /inset/.test(s.shadow), `${s.background} ${s.shadow}`);
 
   // 2. Hiding takes the pins off the map and leaves everything else alone.
   await page.locator('.pins-switch button').click();
+  await page.mouse.move(600, 400);
   await waitForLayout(page);
   s = await state();
   check('the pins are gone from the page', s.pins === 0, `${s.pins}`);
@@ -105,7 +113,7 @@ async function main() {
   check('the switch is off', s.visible === false && s.active === false);
   check('the switch exposes its off state', s.pressed === 'false', s.pressed);
   check('the tooltip now offers to show them', s.title === 'Show markers and anomaly labels (W)', s.title);
-  check('the dot is hollow while they are hidden', s.dot === 'rgba(0, 0, 0, 0)', s.dot);
+  check('the pin icon is muted while markers are hidden', s.iconColor === 'rgb(154, 154, 154)', s.iconColor);
 
   // 3. A key press outranks the hidden state: the pins come back and the first one is selected.
   await press('ArrowRight');
@@ -114,7 +122,7 @@ async function main() {
   check('the profile dots come back with them', s.profileHidden === 0, `${s.profileHidden}`);
   check('and selects the first marker', s.index === 0 && s.selected === 1, `${s.index}/${s.selected}`);
   check('the switch follows the arrow', s.active === true);
-  check('the dot is filled again', s.dot !== 'rgba(0, 0, 0, 0)', s.dot);
+  check('the pin icon becomes active again', s.iconColor === 'rgb(143, 217, 255)', s.iconColor);
 
   // 4. The choice survives a reload: hidden stays hidden.
   await page.locator('.pins-switch button').click();

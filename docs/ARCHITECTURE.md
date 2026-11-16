@@ -10,7 +10,7 @@ QuickLook
   → TrailViewerPanel / WebView2
   → viewer/index.html
   → GPX/KML/FIT parser
-  → summary + per-kilometre splits + track layer + waypoint controller + profile
+  → summary + per-kilometre splits + track layer + waypoint controller + measurement + profile
   → map focus / safe-area layout
 ```
 
@@ -28,14 +28,22 @@ QuickLook
 | `viewer/profile-*.js` | 剖面数据、SVG 和地图光标 |
 | `viewer/map-view.js`, `viewer/map-focus.js` | 安全区域、取景、选中点避让和三态布局 |
 | `viewer/map-controls.js` | 底图类别、具体图源、图源菜单与署名 |
+| `viewer/measure.js` | 多段手动测距、屏幕像素吸附、测距图层和实时距离 |
+| `viewer/toolbox.js` | 距离测量与现有叠加图导出的统一工具箱入口 |
+| `viewer/icons.js` | 统一 UI 图标与地图数据符号注册表、Leaflet 原生控件图标适配 |
 | `viewer/export*.js` | 离屏画布、版式和 PNG 分块传输 |
 
 模块通过显式参数注入依赖，不共享可变全局状态。`window.trailViewer` 仅用于浏览器测试和宿主诊断。
 
+工具箱、测距、导出和地图图层面板统一使用半透明工具表面，避免面板完全遮断底图上下文。测距的点新增、
+分段、清空、撤回和重做使用内部快照历史；宿主只在测距激活时接管 `Ctrl+Z` / `Ctrl+Shift+Z`，
+避免覆盖资源管理器的普通撤回。工具箱/测距与导出面板互斥显示；图源列表只渲染当前地图类型的来源。
+
 ## 宿主边界
 
 `src/TrailViewerPanel.cs` 负责 WebView2、文件读取和快捷键路由；`OverlayTransfer.cs` 负责导出分块状态机；
-`ViewerPreferences.cs` 负责跨版本偏好文件；`KmzArchive.cs` 负责受限解包。
+`ViewerPreferences.cs` 负责跨版本偏好文件；`KmzArchive.cs` 负责受限解包：保留 KML 的内部相对目录，
+并把 KML 引用的本地图片按同一目录结构写入临时文件夹，让虚拟文件主机可以直接响应照片 URL。
 `TiandituKeyStore.cs` 使用当前 Windows 用户的 DPAPI 保存天地图密钥。宿主在页面创建前注入当前预览的
 运行时配置，页面直接请求天地图官方 WMTS；宿主不代理瓦片，也没有逐瓦片 WebMessage 往返。
 
@@ -45,6 +53,7 @@ QuickLook
 ready    <summary>
 error:<text>
 settings <query-string>
+measure-state <0|1>
 export   <id> <count> <name>
 exportchunk <id> <index> <count> <base64>
 exportdone  <id> <count>
@@ -69,7 +78,7 @@ exportdone  <id> <count>
 
 ## 地图聚焦
 
-`map-view.js` 测量信息卡、顶部工具、速览、剖面、比例尺和版权行的实际矩形，得到可用地图区域。
+`map-view.js` 测量信息卡、顶部工具、工具箱、速览、剖面、比例尺和版权行的实际矩形，得到可用地图区域。
 `map-focus.js` 提供纯几何计算：舒适区、居中位移和最小避让。所有初始取景、图钉切换、弹窗和剖面光标共用
 这套规则。
 

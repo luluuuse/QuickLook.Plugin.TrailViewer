@@ -108,6 +108,7 @@ export function createMapView({ map, isChromeHidden }) {
       '#splits',
       '#profile',
       '#export',
+      '#toolbox-panel',
       '.waypoint-overview',
       '.leaflet-top.leaflet-left',
       '.leaflet-top.leaflet-right',
@@ -215,6 +216,7 @@ export function createMapView({ map, isChromeHidden }) {
       mapRect(document.querySelector('#map .leaflet-top.leaflet-left')),
       mapRect(document.querySelector('#map .leaflet-top.leaflet-right')),
       mapRect(document.getElementById('export')),
+      mapRect(document.getElementById('toolbox-panel')),
     ].filter(Boolean);
     let top = topBoxes.reduce((largest, rect) => Math.max(largest, rect.bottom), 0);
 

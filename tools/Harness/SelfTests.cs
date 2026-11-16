@@ -21,6 +21,8 @@ internal static class SelfTests
         {
             TestKmzDetection(root);
             TestKmzExtraction(root, temporary);
+            TestKmzResources(root, temporary);
+            TestKmzResourceLimits(temporary);
             TestKmzTraversal(temporary);
             TestKmzLimit(root, temporary);
             TestPreferences(temporary);
@@ -68,14 +70,133 @@ internal static class SelfTests
             var folder = Path.Combine(temporary, "extract-" + Guid.NewGuid().ToString("n"));
             Directory.CreateDirectory(folder);
             var extracted = KmzArchive.ExtractDocument(Path.Combine(fixtures, name), folder);
-            var wanted = Path.Combine(folder, Path.GetFileNameWithoutExtension(name) + ".kml");
+            var parent = name == "kmz-nested.kmz" ? "files" : "";
+            var wanted = Path.Combine(folder, parent, Path.GetFileNameWithoutExtension(name) + ".kml");
             Check($"{name} keeps its archive name", extracted == wanted, extracted);
             Check($"{name} contains a KML root", File.ReadAllText(extracted).Contains("<kml"), extracted);
-            Check($"{name} leaves no partial file", Directory.GetFiles(folder).Length == 1);
+            Check($"{name} leaves no partial file",
+                Directory.GetFiles(folder, "*", SearchOption.AllDirectories).Length == 1);
         }
 
         ExpectInvalidData("an archive without KML is rejected", () =>
             KmzArchive.ExtractDocument(Path.Combine(fixtures, "kmz-no-kml.kmz"), temporary));
+    }
+
+    private static void TestKmzResources(string root, string temporary)
+    {
+        var photo = File.ReadAllBytes(Path.Combine(root, "tests", "fixtures", "photo.png"));
+
+        var flatArchive = Path.Combine(temporary, "photo-resources.kmz");
+        using (var archive = ZipFile.Open(flatArchive, ZipArchiveMode.Create))
+        {
+            WriteEntry(archive, "doc.kml",
+                "<kml xmlns=\"http://www.opengis.net/kml/2.2\"><Document><Placemark><description><![CDATA["
+                + "<img src=\"files/photo%20one.png?cache=1&amp;size=large\" />"
+                + "<a href=\"icons/icon.png\">icon</a>]]></description><Point><coordinates>0,0</coordinates>"
+                + "</Point></Placemark></Document></kml>");
+            WriteEntry(archive, "files/photo one.png", photo);
+            WriteEntry(archive, "icons/icon.png", photo);
+            WriteEntry(archive, "not-referenced.png", photo);
+        }
+
+        var flatFolder = Path.Combine(temporary, "photo-resources");
+        Directory.CreateDirectory(flatFolder);
+        var flatDocument = KmzArchive.ExtractDocument(flatArchive, flatFolder);
+        Check("KMZ keeps the document at its original relative directory",
+            flatDocument == Path.Combine(flatFolder, "photo-resources.kml"), flatDocument);
+        Check("KMZ extracts an encoded image path beside the document",
+            File.Exists(Path.Combine(flatFolder, "files", "photo one.png")));
+        Check("KMZ extracts references from href attributes",
+            File.Exists(Path.Combine(flatFolder, "icons", "icon.png")));
+        Check("KMZ leaves unreferenced resources out of the preview folder",
+            !File.Exists(Path.Combine(flatFolder, "not-referenced.png")));
+        Check("KMZ copies image bytes without changing them",
+            File.ReadAllBytes(Path.Combine(flatFolder, "files", "photo one.png")).SequenceEqual(photo));
+
+        var nestedArchive = Path.Combine(temporary, "nested-resources.kmz");
+        using (var archive = ZipFile.Open(nestedArchive, ZipArchiveMode.Create))
+        {
+            WriteEntry(archive, "album/doc.kml",
+                "<kml xmlns=\"http://www.opengis.net/kml/2.2\"><Document><Placemark><description><![CDATA["
+                + "<img src=\"media/local.png\" />"
+                + "<img src=\"../shared/photo.png\" />"
+                + "<img src=\"../../escape.png\" />"
+                + "]]></description><Point><coordinates>0,0</coordinates></Point></Placemark></Document></kml>");
+            WriteEntry(archive, "album/media/local.png", photo);
+            WriteEntry(archive, "shared/photo.png", photo);
+            WriteEntry(archive, "escape.png", photo);
+        }
+
+        var nestedFolder = Path.Combine(temporary, "nested-resources");
+        Directory.CreateDirectory(nestedFolder);
+        var nestedDocument = KmzArchive.ExtractDocument(nestedArchive, nestedFolder);
+        Check("nested KMZ document keeps its parent directory",
+            nestedDocument == Path.Combine(nestedFolder, "album", "nested-resources.kml"), nestedDocument);
+        Check("nested KMZ extracts an image beside the document",
+            File.Exists(Path.Combine(nestedFolder, "album", "media", "local.png")));
+        Check("nested KMZ resolves a parent-relative image inside the archive root",
+            File.Exists(Path.Combine(nestedFolder, "shared", "photo.png")));
+        Check("nested KMZ rejects a reference above the archive root",
+            !File.Exists(Path.Combine(nestedFolder, "escape.png")));
+
+        var viewerUrl = new Uri(TrailViewerPanel.BuildViewerUrl(nestedDocument, "nested-resources.kmz", nestedFolder));
+        var source = viewerUrl.Query.TrimStart('?').Split('&')
+            .First((part) => part.StartsWith("src=", StringComparison.Ordinal))
+            .Substring(4);
+        var sourceUrl = Uri.UnescapeDataString(source);
+        Check("KMZ viewer URL includes the preserved document directory",
+            sourceUrl.IndexOf("/album/nested-resources.kml?", StringComparison.OrdinalIgnoreCase) >= 0, sourceUrl);
+    }
+
+    private static void TestKmzResourceLimits(string temporary)
+    {
+        var oversized = Path.Combine(temporary, "oversized-resource.kmz");
+        using (var archive = ZipFile.Open(oversized, ZipArchiveMode.Create))
+        {
+            WriteEntry(archive, "doc.kml",
+                "<kml><Document><Placemark><description><![CDATA[<img src=\"files/large.jpg\" />"
+                + "]]></description></Placemark></Document></kml>");
+            var entry = archive.CreateEntry("files/large.jpg", CompressionLevel.Optimal);
+            using var stream = entry.Open();
+            var buffer = new byte[81920];
+            long remaining = 30L * 1024 * 1024 + 1;
+            while (remaining > 0)
+            {
+                var count = (int)Math.Min(buffer.Length, remaining);
+                stream.Write(buffer, 0, count);
+                remaining -= count;
+            }
+        }
+
+        var oversizedFolder = Path.Combine(temporary, "oversized-resource");
+        Directory.CreateDirectory(oversizedFolder);
+        ExpectInvalidData("a KMZ image over 30 MB is rejected", () =>
+            KmzArchive.ExtractDocument(oversized, oversizedFolder));
+        Check("an oversized KMZ image leaves no partial files",
+            Directory.GetFiles(oversizedFolder, "*", SearchOption.AllDirectories).Length == 0);
+
+        var tooMany = Path.Combine(temporary, "too-many-resources.kmz");
+        var description = new StringBuilder();
+        using (var archive = ZipFile.Open(tooMany, ZipArchiveMode.Create))
+        {
+            for (var i = 0; i < 201; i++)
+            {
+                var name = $"files/image-{i}.png";
+                description.Append($"<img src=\"{name}\" />");
+                WriteEntry(archive, name, new byte[] { 0 });
+            }
+            WriteEntry(archive, "doc.kml",
+                "<kml><Document><Placemark><description><![CDATA["
+                + description
+                + "]]></description></Placemark></Document></kml>");
+        }
+
+        var tooManyFolder = Path.Combine(temporary, "too-many-resources");
+        Directory.CreateDirectory(tooManyFolder);
+        ExpectInvalidData("a KMZ over the 200-image limit is rejected", () =>
+            KmzArchive.ExtractDocument(tooMany, tooManyFolder));
+        Check("a resource-limit failure removes the KML and copied images",
+            Directory.GetFiles(tooManyFolder, "*", SearchOption.AllDirectories).Length == 0);
     }
 
     private static void TestKmzTraversal(string temporary)
@@ -327,6 +448,20 @@ internal static class SelfTests
         stream.Position = 0;
         using var reader = new StreamReader(stream, Encoding.UTF8, true, 1024, true);
         return reader.ReadToEnd();
+    }
+
+    private static void WriteEntry(ZipArchive archive, string name, string text)
+    {
+        var entry = archive.CreateEntry(name, CompressionLevel.Optimal);
+        using var writer = new StreamWriter(entry.Open(), new UTF8Encoding(false));
+        writer.Write(text);
+    }
+
+    private static void WriteEntry(ZipArchive archive, string name, byte[] bytes)
+    {
+        var entry = archive.CreateEntry(name, CompressionLevel.Optimal);
+        using var stream = entry.Open();
+        stream.Write(bytes, 0, bytes.Length);
     }
 
     private static void ExpectInvalidData(string what, Action action)

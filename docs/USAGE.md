@@ -1,6 +1,6 @@
 # 使用说明 / Usage
 
-本文承接 README，说明地图、标记点、剖面和导出功能。
+本文承接 README，说明地图、标记点、剖面、测距和导出功能。
 
 ## 中文
 
@@ -9,13 +9,14 @@
 在资源管理器中选中 `.gpx`、`.kml`、`.kmz` 或 `.fit`，按 <kbd>Space</kbd>。在线底图需要网络；选择“无底图”时
 轨迹直接绘制在本地网格上。
 
-FIT 第一版读取活动和路线中的 GPS 记录、时间、海拔、会话用时及 `course_point` 路线点。圈数、心率、
-步频、功率、温度、训练步骤和完整设备指标暂不展示。
+FIT 读取活动和路线中的 GPS 记录、时间、海拔、会话用时及 `course_point` 路线点。简要模式聚焦路线
+基础数据；步频、功率、温度、训练步骤和完整设备指标暂不展示。
 
 ### 地图与标记点
 
 - 顶部“图层”入口显示当前底图类型；面板中分为 **路网**、**地形**、**卫星** 和 **无底图** 四类，
-  下方再选择该类型的图源。<kbd>Q</kbd> / <kbd>E</kbd> 可直接循环切换类型。
+  下方只列出当前类型对应的图源。<kbd>Q</kbd> / <kbd>E</kbd> 可直接循环切换类型。
+- 图层面板使用与工具箱一致的半透明背景和背景模糊，不完全遮断下方地图。
 - 路网使用 OpenStreetMap HOT。地形菜单提供 CyclOSM、OpenHikingMap 和 OpenTopoMap；再次进入某一类别时
   会恢复该类别上次选择的图源。
 - 路网和卫星菜单提供天地图。首次选择时按提示配置天地图开发者密钥；密钥由当前 Windows 用户凭据加密，
@@ -29,11 +30,31 @@ FIT 第一版读取活动和路线中的 GPS 记录、时间、海拔、会话�
   和下拉箭头，完整名称仍可通过悬停提示和无障碍标签读取。
 - `列表` 打开标记点速览；支持语义筛选、合并近点和人工纠正。
 - 点击或键盘 `Enter` 可放大 GPS 异常和数据缺口标签。
+- 点击照片缩略图进入全览后，右上角显示当前显示尺寸相对原图像素的真实百分比，例如原图为
+  2560 px 宽、窗口中显示 640 px 时显示 `25%`。滚轮按绝对比例缩放，最高 800%；点击百分比恢复
+  适应窗口，放大后可拖拽平移，切换照片时会重新适应窗口。
 
 ### 海拔剖面
 
 剖面按坡度着色，最高点和最低点直接标在曲线上。鼠标沿曲线移动可查看海拔、里程和时间；点击可固定光标。
 剖面会参与地图安全区域计算，被选中的地图点不会被剖面遮住。
+
+### 距离测量
+
+打开右上角 **工具箱**，选择 **距离测量**：
+
+- <kbd>M</kbd> 可直接开始测距；测距中再次按 <kbd>M</kbd> 结束测距。
+- 测距面板固定贴近窗口右侧；打开叠加图导出时会自动关闭工具箱/测距面板，避免两个面板重叠。
+- 右键在地图上添加测距点；左键仍用于拖动地图，滚轮按当前位置缩放。
+- <kbd>Ctrl</kbd>+<kbd>Z</kbd> 撤回最后一个操作，
+  <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> 重做。
+- 靠近已有标记点或轨迹采样点时自动吸附，并显示目标类型；吸附使用屏幕上的 14 px 范围。
+- **结束本段** 后，下一次右键从新一段开始。工具箱分别显示每段距离、点数与全部路线总距离。
+- **撤销打点** 删除最后一个点，**清空** 删除全部测距线；**结束测距** 退出打点状态但保留当前结果。
+- **在地图中心打点** 提供不依赖右键的键盘操作路径。
+- 地图上的段距离标签使用半透明底色，避免遮住测距线、轨迹和底图道路。
+
+测距结果仅保存在当前预览的内存中，不会写回轨迹文件，也不会随叠加图导出。
 
 ### 每公里分段
 
@@ -49,11 +70,14 @@ FIT 第一版读取活动和路线中的 GPS 记录、时间、海拔、会话�
   并用青色覆盖强调；再次点击同一圈或收起面板可清除强调。`Enter` / `Space` 不是本功能的快捷键。
 - 标题栏默认显示“详细”切换键。点击后增加累计时间、累计上升/下降、平均心率、运动速度和垂直速度；
   文件没有有效心率数据时，平均心率列完全隐藏。
+- 展开时蓝色激活背景覆盖完整标题栏；各数据列头保持纯文字，不增加装饰图标。
 
 ### 导出叠加图
 
-<kbd>X</kbd> 按上次设置直接导出，<kbd>Shift</kbd>+<kbd>X</kbd> 打开设置：
+也可从 **工具箱 → 叠加图导出** 打开设置。<kbd>X</kbd> 按上次设置直接导出，
+<kbd>Shift</kbd>+<kbd>X</kbd> 打开设置：
 
+- 设置面板右上角的关闭按钮可关闭面板；地图点击、<kbd>X</kbd> 和导出完成仍可关闭设置。
 - 方版：1536×1536
 - 竖版：1080×1920
 - 横版：2048×1536
@@ -80,6 +104,8 @@ set are not displayed yet.
 
 - Basemaps are grouped into **Road**, **Terrain**, **Satellite** and **No map**; <kbd>Q</kbd> / <kbd>E</kbd>
   switches category.
+- The source list contains only providers for the active category, and the panel uses the shared translucent,
+  blurred tool surface.
 - Road uses OpenStreetMap HOT. The Terrain menu offers CyclOSM, OpenHikingMap and OpenTopoMap, and remembers
   the source last selected in that category.
 - The Road and Satellite menus offer Tianditu. Enter a user-owned developer key when first prompted; it is
@@ -90,11 +116,37 @@ set are not displayed yet.
 - The map recentres when the selected pin approaches an edge, the summary, toolbars or the profile.
 - **List** opens the waypoint overview with filters, nearby-point merging and local manual corrections.
 - Click or press Enter on a GPS anomaly or data-gap label to zoom to it.
+- In the full-size photo viewer, the top-right percentage is the displayed width divided by the source width:
+  a 2560 px photo shown at 640 px reads 25%, and 100% means 1:1 pixels. Use the wheel to zoom up to 800%,
+  drag a zoomed photo to pan, click the percentage to fit the window again, or change photos to start over.
 
 ### Elevation profile
 
 The profile is coloured by gradient and labels its highest and lowest points. Move over the chart for elevation,
 distance and time; click to pin the scrubber. Its height participates in the map's safe-area calculation.
+
+### Distance measurement
+
+Open **Toolbox** in the upper-right corner and choose **Measure distance**:
+
+- <kbd>M</kbd> starts measuring directly; press it again while measuring to finish.
+- The measurement panel stays against the right edge. Opening overlay export closes it so the two panels never
+  overlap.
+- Right-click adds a point. Left-drag still pans the map, and the wheel zooms at the pointer.
+- <kbd>Ctrl</kbd>+<kbd>Z</kbd> undoes the last change;
+  <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> redoes it.
+- Nearby waypoints and recorded track samples snap to their exact coordinates within a 14 px screen radius;
+  the target type is shown while hovering.
+- **End section** finishes the current line, and the next right-click starts a separate section. The toolbox
+  shows every section subtotal, its point count and the overall distance.
+- **Undo point** removes the last point, **Clear** removes all measurements, and **Finish measuring** leaves
+  the current result visible while turning off point collection.
+- **Add at map centre** provides a keyboard-operable alternative to right-click.
+- Section-distance labels use a translucent backing so the measured line, recorded track and basemap remain
+  visible underneath.
+
+Measurements stay in memory for the current preview. They are not written into the track file or included in
+the overlay export.
 
 ### Per-kilometre splits
 
@@ -109,12 +161,15 @@ action.
 
 The header's **Details** control adds cumulative time, cumulative ascent/descent, average heart rate, moving
 speed and vertical speed. When the file has no valid heart-rate data, that column is omitted entirely.
+The active header surface spans the full panel width, and metric column headers remain text-only.
 
 ### Overlay export
 
-<kbd>X</kbd> exports with the previous settings; <kbd>Shift</kbd>+<kbd>X</kbd> opens the settings panel. Square,
-portrait and landscape PNGs are written beside the source track with transparent backgrounds and optional ink
-and backing.
+The same panel is also available from **Toolbox → Export overlay**. <kbd>X</kbd> exports with the previous
+settings; <kbd>Shift</kbd>+<kbd>X</kbd> opens the settings panel. Square, portrait and landscape PNGs are
+written beside the source track with transparent backgrounds and optional ink and backing.
+The close button in the panel header dismisses it; clicking the map, pressing <kbd>X</kbd>, or completing an
+export also closes it.
 
 ### Large files and privacy
 

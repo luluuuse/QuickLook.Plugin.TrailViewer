@@ -5,6 +5,7 @@ export function createKeyboardController({
   LAYERS,
   photoViewer,
   waypointController,
+  measurement: getMeasurement,
   overlay: getOverlay,
   layerSwitch: getLayerSwitch,
   fit,
@@ -20,6 +21,17 @@ export function createKeyboardController({
 
   function pressKey(name) {
     if (photoViewer.isOpen()) return;
+    const measurement = getMeasurement?.();
+    if (name === 'm') {
+      if (measurement?.active()) measurement.stop();
+      else measurement?.start();
+      return;
+    }
+    if (name === 'z' || name === 'Z') {
+      if (name === 'z') measurement?.undo();
+      else measurement?.redo();
+      return;
+    }
     if (name === 'c') {
       fit();
       return;
@@ -47,12 +59,24 @@ export function createKeyboardController({
   }
 
   function onKeyDown(event) {
-    if (event.ctrlKey || event.altKey || event.metaKey) return;
     const target = event.target;
     if (target?.closest?.('input, textarea, select, [contenteditable="true"]')) return;
     const key = event.key.toLowerCase();
     const photoOpen = photoViewer.isOpen();
-    if (!photoOpen && (key === 'w' || key === 'x' || key === 's' || key === 'c' || LAYER_KEYS[key])) {
+    const measurement = getMeasurement?.();
+    if (!photoOpen && event.ctrlKey && !event.altKey && !event.metaKey
+      && key === 'z' && measurement?.active()) {
+      event.preventDefault();
+      if (event.repeat) return;
+      if (event.shiftKey) measurement.redo();
+      else measurement.undo();
+      return;
+    }
+    if (event.ctrlKey || event.altKey || event.metaKey) return;
+    const shiftedExport = key === 'x' && event.shiftKey;
+    const plainShortcut = !event.shiftKey
+      && (key === 'w' || key === 'x' || key === 's' || key === 'c' || key === 'm' || LAYER_KEYS[key]);
+    if (!photoOpen && (plainShortcut || shiftedExport)) {
       if (event.repeat) return;
       event.preventDefault();
       pressKey(key === 'x' && event.shiftKey ? 'X' : key);

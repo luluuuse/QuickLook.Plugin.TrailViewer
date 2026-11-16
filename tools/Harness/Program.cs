@@ -23,6 +23,8 @@ internal static class Program
             return HookKey(args[1], args.Length > 2 ? args[2] : "w");
         if (args.Length >= 2 && args[0] == "hookprobe")
             return HookProbe(args[1]);
+        if (args.Length >= 2 && args[0] == "contextmenu")
+            return ContextMenu(args[1]);
         if (args.Length >= 1 && args[0] == "selftest")
             return SelfTests.Run();
 
@@ -32,6 +34,7 @@ internal static class Program
         Console.WriteLine("       TrailViewer.Harness wpfkey <file> [w|q|e|z]");
         Console.WriteLine("       TrailViewer.Harness hookkey <file> [w|q|e|z]");
         Console.WriteLine("       TrailViewer.Harness hookprobe <file>");
+        Console.WriteLine("       TrailViewer.Harness contextmenu <file>");
         Console.WriteLine("       TrailViewer.Harness selftest");
         return 2;
     }
@@ -77,7 +80,8 @@ internal static class Program
             await Task.Delay(300); // let the window actually become the foreground one
             var before = await panel.RunScriptAsync(
                 "JSON.stringify({pins: window.trailViewer.pins.visible(), layer: window.trailViewer.layer(),"
-                + " chrome: document.body.classList.contains('chrome-hidden')})");
+                + " chrome: document.body.classList.contains('chrome-hidden'),"
+                + " measure: window.trailViewer.measure.active()})");
 
             var swallowed = panel.HandleGlobalKeyForTest(name[0]);
             var reason = panel.HookReason;
@@ -86,7 +90,8 @@ internal static class Program
 
             var after = await panel.RunScriptAsync(
                 "JSON.stringify({pins: window.trailViewer.pins.visible(), layer: window.trailViewer.layer(),"
-                + " chrome: document.body.classList.contains('chrome-hidden')})");
+                + " chrome: document.body.classList.contains('chrome-hidden'),"
+                + " measure: window.trailViewer.measure.active()})");
 
             // The guard in the other direction: with no preview on screen the same key must be let through.
             panel.MarkOnScreen(false);
@@ -165,6 +170,7 @@ internal static class Program
             {
                 "q" => Key.Q,
                 "e" => Key.E,
+                "m" => Key.M,
                 "z" => Key.Z, // a key the viewer does not bind: it must pass through untouched
                 _ => Key.W,
             };
@@ -242,6 +248,68 @@ internal static class Program
             Console.WriteLine($"HOOKPROBE installed={panel.HookInstalled} calls {before}->{after}"
                 + $" delivered={after > before}");
             exitCode = after > before ? 0 : 1;
+            app.Shutdown();
+        };
+
+        window.Loaded += (_, _) =>
+        {
+            timeout.Start();
+            panel.Load(Path.GetFullPath(file));
+        };
+        app.Run(window);
+        panel.Dispose();
+        return exitCode;
+    }
+
+    /// <summary>
+    /// Verifies the one host-sensitive measuring gesture: a real right-click still reaches the page after
+    /// WebView2 has disabled its native context menu. The point is collected through the same Leaflet event
+    /// and snap path as a user click, not by calling addAt directly.
+    /// </summary>
+    private static int ContextMenu(string file)
+    {
+        if (!DocumentDetector.CanPreview(file))
+        {
+            Console.WriteLine("NOT HANDLED " + file);
+            return 3;
+        }
+
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        TrailViewerPanel.Trace = line => Console.WriteLine($"[{clock.ElapsedMilliseconds,6} ms] {line}");
+        var exitCode = 1;
+        var app = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
+        var panel = new TrailViewerPanel();
+        var window = new Window { Width = 1200, Height = 800, Title = "TrailViewer harness", Content = panel };
+        var timeout = new DispatcherTimer { Interval = TimeSpan.FromSeconds(60) };
+        timeout.Tick += (_, _) =>
+        {
+            Console.WriteLine("TIMEOUT");
+            app.Shutdown();
+        };
+
+        panel.Finished += async error =>
+        {
+            timeout.Stop();
+            if (error != null)
+            {
+                Console.WriteLine("ERROR " + error);
+                app.Shutdown();
+                return;
+            }
+
+            await panel.RunScriptAsync("window.trailViewer.measure.start()");
+            await panel.Core.CallDevToolsProtocolMethodAsync("Input.dispatchMouseEvent",
+                "{\"type\":\"mousePressed\",\"x\":600,\"y\":400,\"button\":\"right\",\"buttons\":2,\"clickCount\":1}");
+            await panel.Core.CallDevToolsProtocolMethodAsync("Input.dispatchMouseEvent",
+                "{\"type\":\"mouseReleased\",\"x\":600,\"y\":400,\"button\":\"right\",\"buttons\":0,\"clickCount\":1}");
+            await Task.Delay(250);
+
+            var result = await panel.RunScriptAsync(
+                "String(window.trailViewer.measure.summary().pointCount)");
+            var points = result.Trim().Trim('"');
+            var reached = points == "1";
+            Console.WriteLine($"CONTEXTMENU realRightClickReachedPage={reached} points={points}");
+            exitCode = reached ? 0 : 1;
             app.Shutdown();
         };
 

@@ -1,7 +1,17 @@
 // The compact export settings dialog. The caller owns persisted settings and the final export action.
-export function createExportPanel({ L, el, t, node, settings, onChange, onExport }) {
+import { iconElement } from './icons.js';
+
+export function createExportPanel({ L, el, t, node, settings, onChange, onExport, onOpen }) {
   const title = el('h2', null, t('export.panel'));
   title.id = 'export-title';
+  const closeButton = el('button', 'export-close');
+  closeButton.type = 'button';
+  closeButton.append(iconElement('close'));
+  closeButton.title = t('tool.close');
+  closeButton.setAttribute('aria-label', t('tool.close'));
+  closeButton.addEventListener('click', () => close());
+  const header = el('div', 'export-header');
+  header.append(title, closeButton);
   node.setAttribute('role', 'dialog');
   node.setAttribute('aria-labelledby', title.id);
 
@@ -50,12 +60,13 @@ export function createExportPanel({ L, el, t, node, settings, onChange, onExport
   const go = el('button', 'go', t('export.go'));
   go.type = 'button';
   go.addEventListener('click', () => onExport());
-  node.replaceChildren(title, sizeRow, inkRow, scrimRow, go);
+  node.replaceChildren(header, sizeRow, inkRow, scrimRow, go);
   L.DomEvent.disableClickPropagation(node);
 
   let previousFocus = null;
   const open = () => {
     if (!node.hidden) return;
+    onOpen?.();
     previousFocus = document.activeElement;
     node.hidden = false;
     requestAnimationFrame(() => go.focus({ preventScroll: true }));
@@ -78,6 +89,8 @@ export function createExportPanel({ L, el, t, node, settings, onChange, onExport
     toggle() { if (node.hidden) open(); else close(); },
     relabel() {
       title.textContent = t('export.panel');
+      closeButton.title = t('tool.close');
+      closeButton.setAttribute('aria-label', t('tool.close'));
       go.textContent = t('export.go');
       for (const { label, labelKey, pick, buttons, values } of pickers) {
         label.textContent = t(labelKey);

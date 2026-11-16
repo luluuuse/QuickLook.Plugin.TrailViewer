@@ -5,7 +5,7 @@
 Preview GPX, KML, KMZ and FIT tracks directly in QuickLook on Windows. Press <kbd>Space</kbd> on a track file
 in Explorer to see the route, waypoints, photos and elevation profile without opening a map application.
 
-![A track with the route summary, waypoint overview and elevation profile](docs/screenshot-map.jpg)
+![Current route summary, split entry, map tools and elevation profile](docs/screenshot-map.png)
 
 ## Quick start
 
@@ -22,6 +22,8 @@ Common controls:
 | Show/hide map markers | <kbd>W</kbd> |
 | Change map layer | <kbd>Q</kbd> / <kbd>E</kbd> |
 | Hide interface chrome | <kbd>S</kbd> |
+| Start/finish measuring | <kbd>M</kbd> |
+| Measuring undo / redo | <kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> |
 | Export overlay image | <kbd>X</kbd> / <kbd>Shift</kbd>+<kbd>X</kbd> |
 
 ## Highlights
@@ -34,17 +36,26 @@ Common controls:
   and moving speed for every kilometre, with total/moving-time totals. Selecting a row focuses and highlights
   that part of the route on the map. A one-click details mode adds cumulative time, ascent/descent, average
   heart rate, moving speed and vertical speed.
-- **Waypoints and photos:** route-ordered navigation, yellow pins, photo albums and a searchable overview
-  with local danger/water/camp/exit insight labels.
+- **Waypoints and photos:** route-ordered navigation, yellow pins, photo albums with true source-pixel
+  percentages, wheel zoom up to 800% and drag-to-pan, plus a searchable overview with local
+  danger/water/camp/exit insight labels.
 - **Elevation profile:** gradient-coloured terrain, waypoint dots, scrub readout and a layout that preserves
   the vertical scale across window sizes.
+- **Manual measurement:** the toolbox supports multi-section point-to-point distance measurement. Right-click
+  adds a point while left-drag pans and the wheel zooms; nearby waypoints and recorded track samples snap
+  automatically. Section subtotals and the overall distance update on the map.
 - **Map focus:** opening the file and selecting a waypoint keep the relevant content inside the region not
   covered by the summary, toolbars, waypoint list or profile.
+- **Unified icons:** map controls, task panels, the split entry, the waypoint overview, the photo viewer and
+  map data symbols follow one reusable icon specification; per-kilometre data headers remain text-only.
 - **Responsive UI:** measured `inline`, `wrapped` and `docked` layouts for narrow windows, bilingual UI and
   persistent map/marker/export preferences.
 - **Map sources:** Road keeps the OpenStreetMap HOT base, while Terrain offers CyclOSM, OpenHikingMap and
-  OpenTopoMap in a compact source menu. Tianditu road and satellite imagery are available with a user-owned key.
-- **Overlay export:** square, portrait and landscape PNG layouts with selectable ink and backing.
+  OpenTopoMap in a compact source menu. Tianditu road and satellite imagery are available with a user-owned key;
+  the source panel shows only providers from the active map type.
+- **Unified toolbox:** distance measurement and overlay export share one entry. Export offers square,
+  portrait and landscape PNG layouts with selectable ink and backing. Task panels use a translucent surface on
+  the right and measurement/export cannot remain open together.
 
 Detailed behaviour, advanced controls and export examples are in [docs/USAGE.md](docs/USAGE.md).
 
@@ -84,6 +95,7 @@ More diagnostic details are in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) and
 Start with [CONTRIBUTING.md](CONTRIBUTING.md). The main references are:
 
 - [Architecture](docs/ARCHITECTURE.md)
+- [Icon system](docs/ICON_SYSTEM.md)
 - [Development setup](docs/DEVELOPMENT.md)
 - [Testing](docs/TESTING.md)
 - [Releasing](docs/RELEASING.md)

@@ -304,6 +304,12 @@ async function main() {
   check('the export panel is a labelled dialog',
     await page.locator('#export').getAttribute('role') === 'dialog'
       && await page.locator('#export').getAttribute('aria-labelledby') === 'export-title');
+  check('the export panel has a close button with the shared icon',
+    await page.locator('#export .export-close svg[data-icon="close"]').count() === 1);
+  await page.click('#export .export-close');
+  check('the close button dismisses the export panel',
+    await page.evaluate(() => window.trailViewer.panelOpen()) === false);
+  await page.evaluate(() => window.trailViewer.pressKey('X'));
 
   const shapes = await page.locator('#export .pick').first().locator('.option').allTextContents();
   check('the panel offers three shapes, named for what they are',
