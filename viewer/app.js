@@ -36,6 +36,14 @@ import { createMapView } from './map-view.js';
 import { createUiFeedback } from './ui-feedback.js';
 import { createMeasurement } from './measure.js';
 import { createToolbox } from './toolbox.js';
+import {
+  WEATHER_TARGETS,
+  availableTargets,
+  openExternal,
+  weatherTarget,
+  windyUrl,
+  zoomFor,
+} from './weather.js';
 import { installLeafletIcons } from './icons.js';
 import { gradeAwareHikeSeconds } from './track-analysis.js';
 
@@ -402,6 +410,19 @@ async function main() {
     exportAvailable: overlayExport.available,
     onExport: () => {
       if (!overlayExport.panelOpen()) overlayExport.togglePanel();
+    },
+    weatherAvailable: () => availableTargets(gpx).length > 0,
+    weatherModes: availableTargets(gpx).length > 0 ? [...WEATHER_TARGETS] : [],
+    weatherHasElevation: () => availableTargets(gpx).includes('highest'),
+    onWeather: (mode) => {
+      const target = weatherTarget(gpx, mode);
+      const url = windyUrl(target, zoomFor(mode));
+      if (!url) {
+        showToast(t(mode === 'highest' ? 'weather.noElevation' : 'weather.unavailable'), 4000);
+        return;
+      }
+      openExternal(url);
+      showToast(t('weather.opened'), 3500);
     },
     onOpen: () => overlayExport.close(),
     onLayoutChange: () => mapViewController?.refreshControls({ refitHome: false }),

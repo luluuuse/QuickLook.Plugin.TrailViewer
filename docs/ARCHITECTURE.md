@@ -30,11 +30,26 @@ QuickLook
 | `viewer/map-view.js`, `viewer/map-focus.js` | 安全区域、取景、选中点避让和三态布局 |
 | `viewer/map-controls.js` | 底图类别、具体图源、图源菜单与署名 |
 | `viewer/measure.js` | 多段手动测距、屏幕像素吸附、测距图层和实时距离 |
-| `viewer/toolbox.js` | 距离测量与现有叠加图导出的统一工具箱入口 |
+| `viewer/toolbox.js` | 距离测量、叠加图导出与轨迹天气的统一工具箱入口 |
+| `viewer/weather.js` | 起点/终点/最高点的目标点计算、海拔可用性判断、Windy 外链生成和外链打开 |
 | `viewer/icons.js` | 统一 UI 图标与地图数据符号注册表、Leaflet 原生控件图标适配 |
 | `viewer/export*.js` | 离屏画布、版式和 PNG 分块传输 |
 
 模块通过显式参数注入依赖，不共享可变全局状态。`window.trailViewer` 仅用于浏览器测试和宿主诊断。
+
+轨迹天气不内嵌第三方地图，也不请求第三方接口：`weather.js` 根据所选点位计算坐标和缩放级别——起点/终点
+取首末记录点，最高点取海拔最大的记录点，三者统一固定 14 级——拼出 Windy 分享链接，
+再由宿主的 `NavigationStarting` 处理把 https 链接交给系统浏览器。Windy 的查询串只解析
+`?[overlay,]lat,lon,zoom`，其余参数会被丢弃；**只有把同一个点同时写进路径（`/lat/lon?...`）才会展开
+点位天气面板**，纯查询串形式只移动地图中心。因此链接固定使用路径形式，“定位准不准”再由缩放级别决定。
+
+查询串首段是图层，默认写 `clouds`：云量最直接回答“晒还是雾”，也保留点位面板。图层名由 Windy 决定
+（`clouds`、`wind`、`rain`、`temp` 等），写错会被静默忽略并退回风场，所以 `WINDY_OVERLAY` 是常量。
+
+最高点只认可信的海拔：路网 KML 会主动跳过海拔，部分 2D 轨迹根本没有 `ele`，而全 0 的平坦导出虽然带着
+高度字段却没有峰顶可言。因此 `highestPoint` 要求至少两个有效读数且全程高差 ≥ 1 米，否则该分段禁用，
+不把任意采样点当作最高点。页面 CSP 保持 `default-src 'none'`，不新增
+`frame-src` 或 `connect-src`。
 
 工具箱、测距、导出和地图图层面板统一使用半透明工具表面，避免面板完全遮断底图上下文。测距的点新增、
 分段、清空、撤回和重做使用内部快照历史；宿主只在测距激活时接管 `Ctrl+Z` / `Ctrl+Shift+Z`，

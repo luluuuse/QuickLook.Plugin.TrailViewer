@@ -17,6 +17,115 @@ Added / Changed / Deprecated / Removed / Fixed / Security 分类；没有内容�
 
 - None.
 
+## 1.21.14 — 2026-11-17
+
+> 这是 `v1.21.0` 之后的首个公开版本。以下内容累积 `1.21.1` 至 `1.21.14` 的新增、变更、修复和性能改进。
+>
+> This is the first public release after `v1.21.0`. The notes below cumulatively cover additions, changes,
+> fixes and performance work from `1.21.1` through `1.21.14`.
+
+### 中文
+
+#### 新增
+
+- 工具箱新增 **轨迹天气**：在系统默认浏览器中打开 Windy，并直接展开该点的逐小时天气面板（温度、体感、
+  雨、风、阵风、风向），不需要再自己在地图上找位置。
+- 天气提供“起点 / 终点 / 最高点”三种点位，均为具体位置并统一使用 14 级街道视角；最高点取全程海拔最大的
+  记录点，文件没有海拔或全程高差不足 1 米时该分段禁用。
+- 三种点位使用与地图一致的语义图标（绿色起点、红色终点、琥珀色峰顶），分段条并入天气按钮卡片。
+- 天气默认打开云层图层，便于判断日照与雾况；需要风或降水时在 Windy 内切换。
+- 预览页不内嵌第三方地图，不需要 Windy API 密钥，页面 CSP 保持不变。
+
+#### 变更
+
+- 自动识别由大量独立路线合并而成的**路网 KML**，不再把全网误算为一次连续行程；路网模式不显示无意义的
+  全局均速、休息时间、每公里表和合并剖面，但保留路线、标注点、照片、测距与导出。
+- 路网轨迹改用 Canvas 绘制，只处理当前视口并按缩放级别简化几何；最大 27 MB 路网实测首屏约从 3.21 秒
+  降至 2.70 秒，JS 堆峰值约从 114 MB 降至 85 MB，总览绘制点从 99,009 个降至 1,277 个。
+- 新增共享只读轨迹模型，分段长度和累计里程只计算一次，供摘要、地图、剖面、导航、导出和每公里分析复用。
+- 每公里统计改为**首次展开面板时计算**，并使用单调区间游标与二分时间定位；3,300 公里轨迹约 45 ms。
+- 摘要的距离、高程和时间范围合并为一次逐点扫描；缺口与异常诊断在同一预览内复用；公里标记复用预计算
+  分段长度，缩放时不再重新求总里程。
+- 航点按视口做空间查询，只为当前屏幕采样创建 Leaflet 图钉；5,000 个航点仍保留全部导航项。
+- 测距吸附索引改为首次使用时创建，并复用标记点控制器的航点索引。
+- 地图平移和缩放不再重新测量整套 DOM 布局；距离标记按缩放级别缓存采样。
+- 摘要与每公里分析共用运动阈值和心率口径，并在每条记录段边界重置运动状态；段间时间统一计入休息时间。
+- 全程与每公里平均心率统一为有效点读数的算术平均值。
+- 测试运行器支持按套件名称选择专项测试；新增 `test:quick` 与 `test:suite` 命令，未匹配名称直接报错。
+
+#### 修复
+
+- 修复带照片的标记点放大查看后，点击图片外区域返回时地图可能重新计算可用区域并突然跳动的问题。
+- 修复从 KMZ 导出的叠加图被写入临时解包目录、关闭预览后丢失的问题；现在保存在原始 KMZ 同级目录。
+- 修复 20 万点心率轨迹统计时的调用栈溢出。
+- 修复连续平移时缺口与异常 tooltip 让语言节点列表持续增长的问题。
+- 修复 WebView2 关闭及 COM 回调异常未被识别的问题，关闭预览时不再产生未处理异常。
+- GPX、KML、KMZ 和 FIT 统一限制为 64 MB，超限文件在启动 WebView 前给出明确错误。
+
+#### 说明
+
+- 天气查询在浏览器侧完成，轨迹坐标会随链接发送给 Windy；不使用该入口时不会发起任何外部请求。
+- 没有坐标的文件（例如无 GPS 的训练文件）会禁用天气入口，并在悬停提示中说明原因。
+
+### English
+
+#### Added
+
+- Added **Route weather** to the toolbox: it opens Windy in the default browser with that point's hourly
+  forecast panel already expanded (temperature, feels-like, rain, wind, gusts, direction), so the place no
+  longer has to be found on the map by hand.
+- Weather offers three points — Start, End and Summit — each a single place opened at level 14. The summit is
+  the recorded point with the greatest elevation, and that segment is disabled when a file has no elevation or
+  less than a metre of relief.
+- The three points carry the map's own semantics (green start, red end, amber summit), and the segmented picker
+  is merged into the weather action card.
+- Windy opens on the cloud layer, which is the quickest read on sun versus fog; wind and rain are one click
+  away inside Windy.
+- The preview embeds no third-party map, needs no Windy API key and keeps its Content-Security-Policy unchanged.
+
+#### Changed
+
+- Route-network KML files made from many independent tracks are detected automatically instead of being treated
+  as one continuous trip. Network mode omits meaningless global moving speed, rest time, the split table and
+  the merged profile while retaining routes, waypoints, photos, measurement and export.
+- Network tracks use the Canvas renderer, process only the current viewport and simplify geometry per zoom. The
+  largest 27 MB network now reaches first paint in about 2.70 seconds instead of 3.21 seconds, with peak JS
+  heap reduced from roughly 114 MB to 85 MB and the overview drawing about 1,277 points instead of 99,009.
+- Added a shared read-only route model so segment lengths and cumulative distance are measured once for the
+  summary, map, profile, navigation, export and split analysis.
+- Per-kilometre analysis is calculated on first expansion and uses a monotonic interval cursor with binary time
+  lookup; the 3,300-kilometre regression runs in about 45 ms.
+- The summary collects distance, elevation range and time range in one point pass; gap and anomaly diagnostics
+  are reused within a preview; distance markers reuse precomputed segment lengths instead of rescanning on zoom.
+- Waypoints are queried by viewport and only markers needed by the current screen sample create Leaflet DOM;
+  5,000 waypoints still retain every navigation stop.
+- Measurement snapping indexes are created on first use and reuse the marker controller's waypoint index.
+- Map panning and zooming no longer remeasure the full DOM layout, and distance markers cache samples per zoom.
+- The summary and split analysis share one movement threshold configuration and reset movement at every
+  recorded segment; time between segments is counted as rest.
+- Whole-route and per-kilometre average heart rate use the arithmetic mean of valid point readings.
+- The test runner can select a focused subset by suite name and rejects unmatched names; added `test:quick`
+  and `test:suite`.
+
+#### Fixed
+
+- Fixed the map sometimes recalculating its available area and jumping after closing a full-size photo opened
+  from a photo waypoint.
+- Fixed overlays exported from KMZ files being written into the temporary extraction folder and lost when the
+  preview closes; exports now go beside the original KMZ.
+- Fixed call-stack overflow when summarising 200,000 heart-rate readings.
+- Fixed gap and anomaly tooltips growing the language-node list during repeated panning.
+- Fixed WebView2 shutdown and COM callback errors going unrecognised, which produced unhandled exceptions when
+  a preview closed.
+- GPX, KML, KMZ and FIT inputs now share a 64 MB limit and fail clearly before WebView starts.
+
+#### Notes
+
+- The weather lookup happens in the browser, so the route coordinates travel with the link to Windy. Nothing is
+  requested externally unless the entry is used.
+- Files without coordinates (a GPS-free workout, for example) disable the weather entry and explain why in its
+  tooltip.
+
 ## 1.21.13 — 2026-11-17
 
 ### 中文

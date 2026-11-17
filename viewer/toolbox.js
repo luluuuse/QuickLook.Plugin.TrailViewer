@@ -1,4 +1,4 @@
-import { iconElement, iconMarkup, setIcon } from './icons.js';
+import { iconElement, iconMarkup, setIcon, weatherMarkMarkup } from './icons.js';
 
 /**
  * One map-corner entry for task tools. The measurement controller owns state; this module only exposes it
@@ -13,6 +13,10 @@ export function createToolbox({
   measurement,
   exportAvailable,
   onExport,
+  onWeather,
+  weatherAvailable,
+  weatherModes = [],
+  weatherHasElevation = () => true,
   onOpen,
   onLayoutChange,
 }) {
@@ -26,6 +30,9 @@ export function createToolbox({
   let sectionList = null;
   let measureButton = null;
   let exportButton = null;
+  let weatherButton = null;
+  let weatherPicker = null;
+  let weatherMode = weatherModes[0] || 'start';
   let measureTitle = null;
   let listHeading = null;
   let instruction = null;
@@ -52,6 +59,17 @@ export function createToolbox({
     exportButton.disabled = !exportAvailable();
     exportButton.title = exportAvailable() ? t('toolbox.exportHint') : t('export.empty');
     exportButton.setAttribute('aria-label', exportButton.title);
+    weatherButton.disabled = !weatherAvailable();
+    weatherButton.title = weatherAvailable() ? t('toolbox.weatherHint') : t('weather.unavailable');
+    weatherButton.setAttribute('aria-label', weatherButton.title);
+    for (const option of weatherPicker.querySelectorAll('[data-weather-mode]')) {
+      option.setAttribute('aria-pressed', String(option.dataset.weatherMode === weatherMode));
+    }
+    weatherPicker.hidden = !weatherAvailable() || weatherModes.length === 0;
+    // The summit segment disappears when a file carries no elevation instead of opening a point it cannot find.
+    for (const option of weatherPicker.querySelectorAll('[data-weather-mode]')) {
+      option.disabled = Boolean(option.dataset.weatherMode === 'highest' && !weatherHasElevation());
+    }
 
     measureTotal.textContent = formatDistance(summary.totalMeters);
     measureMeta.textContent = t('measure.summary', {
@@ -176,7 +194,41 @@ export function createToolbox({
         closePanel();
         onExport();
       });
-      mainView.append(measureButton, exportButton);
+
+      weatherButton = el('button', 'toolbox-action');
+      weatherButton.type = 'button';
+      weatherButton.dataset.tool = 'weather';
+      weatherButton.innerHTML = `<span class="toolbox-action-icon">${iconMarkup('weather')}</span>`
+        + '<span><strong></strong><small></small></span>';
+      weatherButton.querySelector('strong').textContent = t('toolbox.weather');
+      weatherButton.querySelector('small').textContent = t('toolbox.weatherHint');
+      weatherButton.addEventListener('click', () => {
+        closePanel();
+        onWeather?.(weatherMode);
+      });
+
+      // The three points share the action card: the card is the control, and the segments choose which point
+      // it opens. Keeping them inside one border is what stops the picker reading as a second, unrelated tool.
+      weatherPicker = el('div', 'toolbox-weather-picker');
+      weatherPicker.setAttribute('role', 'group');
+      weatherPicker.setAttribute('aria-label', t('toolbox.weatherTarget'));
+      for (const mode of weatherModes) {
+        const option = el('button', 'toolbox-weather-mode');
+        option.type = 'button';
+        option.dataset.weatherMode = mode;
+        option.innerHTML = `${weatherMarkMarkup(mode, { size: 16 })}`
+          + `<span class="toolbox-weather-mode-label">${t(`weather.mode.${mode}`)}</span>`;
+        option.setAttribute('aria-pressed', String(mode === weatherMode));
+        option.addEventListener('click', () => {
+          weatherMode = mode;
+          render();
+        });
+        weatherPicker.append(option);
+      }
+      weatherPicker.hidden = weatherModes.length === 0;
+      const weatherRow = el('div', 'toolbox-weather-card');
+      weatherRow.append(weatherButton, weatherPicker);
+      mainView.append(measureButton, exportButton, weatherRow);
 
       measureView = el('section', 'toolbox-measure');
       measureView.hidden = true;
@@ -240,6 +292,14 @@ export function createToolbox({
     close: () => closePanel(),
     toggle: () => (open ? closePanel() : openPanel()),
     isOpen: () => open,
+    weatherMode: () => weatherMode,
+    isWeatherModeEnabled: (mode) => !(mode === 'highest' && !weatherHasElevation()),
+    setWeatherMode(mode) {
+      if (!weatherModes.includes(mode)) return false;
+      weatherMode = mode;
+      render();
+      return true;
+    },
     relabel() {
       document.getElementById('toolbox-heading').textContent = t('toolbox.title');
       closeButton.title = t('toolbox.close');
@@ -247,6 +307,15 @@ export function createToolbox({
       measureButton.querySelector('small').textContent = t('toolbox.measureHint');
       exportButton.querySelector('strong').textContent = t('toolbox.export');
       exportButton.querySelector('small').textContent = t('toolbox.exportHint');
+      weatherButton.querySelector('strong').textContent = t('toolbox.weather');
+      weatherButton.querySelector('small').textContent = t('toolbox.weatherHint');
+      weatherButton.title = weatherAvailable() ? t('toolbox.weatherHint') : t('weather.unavailable');
+      weatherButton.setAttribute('aria-label', weatherButton.title);
+      weatherPicker.setAttribute('aria-label', t('toolbox.weatherTarget'));
+      for (const option of weatherPicker.querySelectorAll('[data-weather-mode]')) {
+        const label = option.querySelector('.toolbox-weather-mode-label');
+        if (label) label.textContent = t(`weather.mode.${option.dataset.weatherMode}`);
+      }
       measureTitle.textContent = t('measure.active');
       instruction.textContent = t('measure.instruction');
       listHeading.textContent = t('measure.sections');

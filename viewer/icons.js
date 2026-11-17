@@ -53,7 +53,44 @@ const UI_ICONS = Object.freeze({
     + 'a5.5 5.5 0 0 0-7.8 7.8l1.1 1.1L12 21l7.8-7.5 1.1-1.1a5.5 5.5 0 0 0-.1-7.8Z"/>',
   'circle-help': '<circle cx="12" cy="12" r="9"/><path d="M9.7 9a2.5 2.5 0 1 1 3.7 2.2'
     + 'c-.9.5-1.4 1.1-1.4 2.1"/><path d="M12 17v.01"/>',
+  weather: '<path d="M7.5 18a4.5 4.5 0 0 1-.3-8.99 6 6 0 0 1 11.3 1.6A3.9 3.9 0 0 1 17.6 18Z"/>'
+    + '<path d="M9.5 21h5"/><path d="M11 15.5l-1.5 2.5"/><path d="M15 15.5 13.5 18"/>',
 });
+
+/**
+ * Weather point markers. These carry the map's own semantics (green start, red end, amber summit), so the
+ * segmented picker can be read by shape and colour instead of three words that look alike at 16 px.
+ */
+const WEATHER_MARKS = Object.freeze({
+  start: '<circle cx="12" cy="12" r="7" fill="#18c964" stroke="#0d3d21" stroke-width="1.5"/>'
+    + '<path d="M10 8.4 16.2 12 10 15.6Z" fill="#0d3d21" stroke="none"/>',
+  // A filled rounded square with an inset block: the stop counterpart to the start marker's play triangle,
+  // so the pair reads as begin/end rather than as two unrelated shapes.
+  end: '<rect x="4.5" y="4.5" width="15" height="15" rx="3" fill="#e5243b" stroke="#3d0d13" stroke-width="1.5"/>'
+    + '<rect x="9" y="9" width="6" height="6" rx="1" fill="#3d0d13" stroke="none"/>',
+  highest: '<path d="M12 3.4 21.2 19.6H2.8Z" fill="#f5c400" stroke="#3d3108" stroke-width="1.5"/>'
+    + '<path d="M8.4 14.4 12 8.4l3.6 6" fill="none" stroke="#3d3108" stroke-width="1.5"/>',
+});
+
+export const WEATHER_MARK_NAMES = Object.freeze(Object.keys(WEATHER_MARKS));
+
+/** Static SVG markup for a weather point marker. Unknown names fall back to the start marker. */
+export function weatherMarkMarkup(name, { size = DEFAULT_ICON_SIZE, className = 'weather-mark' } = {}) {
+  const resolved = Object.hasOwn(WEATHER_MARKS, name) ? name : 'start';
+  const pixels = dimensions(size);
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${ICON_VIEWBOX}" width="${pixels}"`
+    + ` height="${pixels}" class="${attr(className)}" data-weather-mark="${resolved}" aria-hidden="true">`
+    + `${WEATHER_MARKS[resolved]}</svg>`;
+}
+
+/** @returns {SVGElement} */
+export function weatherMarkElement(name, options = {}) {
+  const host = document.createElement('span');
+  host.innerHTML = weatherMarkMarkup(name, options);
+  const mark = host.firstElementChild;
+  if (!(mark instanceof SVGElement)) throw new Error(`weather mark ${name} could not be created`);
+  return mark;
+}
 
 const DATA_SYMBOLS = Object.freeze({
   waypoint: {

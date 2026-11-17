@@ -1555,6 +1555,89 @@ body.failed #map {
   line-height: 1.3;
 }
 
+/* Weather is one control, not an action plus a detached switch: the card owns the border and the three point
+   segments sit inside it, divided by hairlines rather than by a gap. */
+.toolbox-weather-card {
+  display: grid;
+  overflow: hidden;
+  border: 1px solid #3f4a52;
+  border-radius: 5px;
+  background: #303030;
+}
+
+.toolbox-weather-card .toolbox-action {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.toolbox-weather-card .toolbox-action:hover:not(:disabled) {
+  border-color: transparent;
+  background: #383838;
+}
+
+.toolbox-weather-picker {
+  display: flex;
+  border-top: 1px solid #3f4a52;
+  background: #262626;
+}
+
+.toolbox-weather-picker[hidden] {
+  display: none;
+}
+
+.toolbox-weather-mode {
+  display: flex;
+  flex: 1 1 0;
+  min-width: 0;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 5px 2px;
+  border: 0;
+  border-right: 1px solid #3f4a52;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 10.5px;
+  white-space: nowrap;
+}
+
+.toolbox-weather-mode:last-child {
+  border-right: 0;
+}
+
+.toolbox-weather-mode svg {
+  display: block;
+  flex: none;
+}
+
+.toolbox-weather-mode-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.toolbox-weather-mode:hover {
+  background: #333;
+  color: #fff;
+}
+
+.toolbox-weather-mode[aria-pressed="true"] {
+  background: #234f79;
+  color: #fff;
+  font-weight: 600;
+}
+
+.toolbox-weather-mode:disabled {
+  color: #5c5c5c;
+  cursor: default;
+}
+
+.toolbox-weather-mode:disabled svg {
+  opacity: 0.45;
+}
+
 .toolbox-measure {
   display: flex;
   flex-direction: column;

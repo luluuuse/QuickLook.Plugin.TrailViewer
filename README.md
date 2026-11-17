@@ -25,6 +25,7 @@ Common controls:
 | Start/finish measuring | <kbd>M</kbd> |
 | Measuring undo / redo | <kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> |
 | Export overlay image | <kbd>X</kbd> / <kbd>Shift</kbd>+<kbd>X</kbd> |
+| Open route weather | Toolbox → Route weather |
 
 ## Highlights
 
@@ -57,9 +58,12 @@ Common controls:
 - **Map sources:** Road keeps the OpenStreetMap HOT base, while Terrain offers CyclOSM, OpenHikingMap and
   OpenTopoMap in a compact source menu. Tianditu road and satellite imagery are available with a user-owned key;
   the source panel shows only providers from the active map type.
-- **Unified toolbox:** distance measurement and overlay export share one entry. Export offers square,
-  portrait and landscape PNG layouts with selectable ink and backing. Task panels use a translucent surface on
-  the right and measurement/export cannot remain open together.
+- **Unified toolbox:** distance measurement, overlay export and route weather share one entry. Export offers
+  square, portrait and landscape PNG layouts with selectable ink and backing. Task panels use a translucent
+  surface on the right and measurement/export cannot remain open together.
+- **Route weather:** opens Windy in your browser with that point's hourly forecast already expanded. Choose
+  start, end or summit; each opens at street level, and the summit segment is disabled when the file carries no
+  usable elevation. Windy opens on the cloud layer, and no third-party map is embedded in the preview.
 
 Detailed behaviour, advanced controls and export examples are in [docs/USAGE.md](docs/USAGE.md).
 

@@ -7,8 +7,10 @@ import {
   ICON_STROKE,
   ICON_VIEWBOX,
   UI_ICON_NAMES,
+  WEATHER_MARK_NAMES,
   iconMarkup,
   symbolMarkup,
+  weatherMarkMarkup,
 } from '../../viewer/icons.js';
 
 test('the icon registry is unique and covers every shared control', () => {
@@ -45,6 +47,23 @@ test('compact icons stay on the same geometry with the documented size', () => {
   assert.match(svg, new RegExp(`width="${COMPACT_ICON_SIZE}"`));
   assert.match(svg, /icon-compact/);
   assert.match(svg, new RegExp(`stroke-width="${ICON_STROKE}"`));
+});
+
+test('the weather picker has one marker per target', () => {
+  assert.deepEqual([...WEATHER_MARK_NAMES], ['start', 'end', 'highest']);
+  for (const name of WEATHER_MARK_NAMES) {
+    const svg = weatherMarkMarkup(name);
+    assert.match(svg, new RegExp(`data-weather-mark="${name}"`), name);
+    assert.match(svg, new RegExp(`viewBox="${ICON_VIEWBOX}"`), name);
+    assert.match(svg, /aria-hidden="true"/, name);
+  }
+});
+
+test('weather markers carry the map semantics and fall back to start', () => {
+  assert.match(weatherMarkMarkup('start'), /#18c964/);
+  assert.match(weatherMarkMarkup('end'), /#e5243b/);
+  assert.match(weatherMarkMarkup('highest'), /#f5c400/);
+  assert.match(weatherMarkMarkup('not-a-mode'), /data-weather-mark="start"/);
 });
 
 test('unknown names fail visibly through the local fallback icon', () => {

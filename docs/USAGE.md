@@ -60,6 +60,21 @@ FIT 读取活动和路线中的 GPS 记录、时间、海拔、心率、会话�
 
 测距结果仅保存在当前预览的内存中，不会写回轨迹文件，也不会随叠加图导出。
 
+### 轨迹天气
+
+工具箱中的 **轨迹天气** 会在系统默认浏览器中打开 [Windy](https://www.windy.com/)，并**直接展开该点的逐小时
+天气预报面板**（温度、体感、降雨、风、阵风、风向），不需要再自己在 Windy 里找位置。按钮下方的分段选择
+决定定位到哪个点：
+
+- **起点 / 终点**：第一个或最后一个记录点，固定 14 级街道视角。
+- **最高点**：全程海拔最大的记录点，同样 14 级。文件没有海拔数据，或全程高差不足 1 米（例如全 0 的
+  平坦导出），该分段会禁用，不会拿一个任意点冒充峰顶。
+- 三个点位都用与地图一致的语义图标：绿色起点、红色终点、琥珀色峰顶。
+- 打开后默认显示**云层**，便于判断日照与雾况；需要风、降水或温度时在 Windy 内切换图层。
+- 预览页不内嵌第三方地图，也不需要 Windy API 密钥；点击该入口前不会发起任何外部请求。
+- 没有坐标的文件（例如无 GPS 的训练文件）会禁用该入口和分段选择，悬停提示会说明原因。
+- 选定点的坐标会随链接发送给 Windy；如果不想让坐标离开本机，请不要使用该入口。
+
 ### 每公里分段
 
 带时间戳的轨迹会在简介下方显示独立的“每公里”折叠项。文件打开时默认收起，不显示具体行；点击后才
@@ -171,6 +186,26 @@ Open **Toolbox** in the upper-right corner and choose **Measure distance**:
 
 Measurements stay in memory for the current preview. They are not written into the track file or included in
 the overlay export.
+
+### Route weather
+
+**Route weather** in the toolbox opens [Windy](https://www.windy.com/) in the default browser **with that
+point's hourly forecast panel already expanded** (temperature, feels-like, rain, wind, gusts, direction), so the
+place does not have to be found again inside Windy. The segmented picker under the action decides which point
+it lands on:
+
+- **Start** and **End** jump straight to the first or last recorded point at level 14.
+- **Summit** is the recorded point with the greatest elevation, also at level 14. The segment is disabled when
+  the file has no elevation or less than a metre of relief across the whole route (a flat all-zero export),
+  so an arbitrary sample is never presented as the summit.
+- All three points use the map's own semantics: green start, red end, amber summit.
+- Windy opens on the **cloud** layer, which is the quickest read on sun versus fog; wind, rain and temperature
+  are one click away inside Windy.
+- The preview embeds no third-party map and needs no Windy API key; no external request happens before the
+  entry is used.
+- Files without coordinates (a GPS-free workout, for example) disable both the entry and the picker, and the
+  tooltip explains why.
+- The chosen point travels with the link to Windy. Do not use the entry if the coordinates must stay local.
 
 ### Per-kilometre splits
 

@@ -43,7 +43,7 @@ npm run test:live
 |---|---|
 | 照片、附件弹窗、全览返回 | `photo focus` |
 | 剖面、心率、速览或高程 | `profile ve scrub` |
-| 测距、工具箱 | `measure portrait` |
+| 测距、工具箱、轨迹天气 | `measure portrait`，并运行单元测试 |
 | 标记点、导航和列表 | `nav pins insights` |
 | 图层、缩放和定位 | `terrain zoom locate` |
 | 图标 | `icons`，并运行单元测试 |
@@ -67,6 +67,7 @@ node scripts/pack.cjs
 当前专项入口：
 
 - `tests/unit/icons.test.mjs`：图标注册表、尺寸、描边和未知图标回退。
+- `tests/unit/weather.test.mjs`：轨迹中心、单点、无坐标文件、缩放级别和 Windy 链接格式。
 - `tests/icons-test.cjs`：全部控件/数据符号、Leaflet 适配、激活态和纯文字分段列头。
 - `tests/measure-test.cjs`：多段测距、吸附、快捷键、透明标签、右侧布局和导出互斥。
 - `tests/profile-test.cjs`：坡度剖面、可选心率开关/双轴/缺口、悬停读数和窄窗布局。
