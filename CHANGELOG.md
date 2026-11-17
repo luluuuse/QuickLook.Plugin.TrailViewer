@@ -17,12 +17,427 @@ Added / Changed / Deprecated / Removed / Fixed / Security 分类；没有内容�
 
 - None.
 
-## 1.21.14 — 2026-11-17
+## 1.21.30 — 2026-11-18
 
-> 这是 `v1.21.0` 之后的首个公开版本。以下内容累积 `1.21.1` 至 `1.21.14` 的新增、变更、修复和性能改进。
->
-> This is the first public release after `v1.21.0`. The notes below cumulatively cover additions, changes,
-> fixes and performance work from `1.21.1` through `1.21.14`.
+### 中文
+
+#### 新增
+
+- **定制图源**：新增最多 20 个用户 HTTPS 瓦片图源，支持名称、瓦片地址、256/512 px、缩放范围、子域、
+  署名和 TMS。可直接粘贴两步路 `{$x}`、`{$y}`、`{$z}` 地址，`@2x` / `%402x` 自动使用 512 px。
+- 定制图源提供独立管理页、添加/编辑子页、空状态、加载状态、二次删除确认和错误提示；至少有一个图源后，
+  分类入口用于常规选择，管理入口单独提供。
+- 定制图源由宿主保存到应用数据目录的 `custom-sources.json`，正常覆盖升级后仍会保留；首次升级会迁移旧
+  `localStorage` 数据。
+- 工具面板、图层面板与标记点列表统一顶部位置和标题栏高度，并加入互斥与键盘焦点回归。
+
+#### 变更
+
+- 地图类型保留为路网、地形、卫星、定制四类并保持单行；分类使用路线节点、等高线、地球和配置滑杆图标，
+  增加悬停说明。顶部图层入口显示当前类别文字和类别图标，具体图源名称放在悬停提示中。
+- 图层入口使用清晰八齿齿轮；图层面板宽度调整为 320 px、右对齐窗口，窄窗保持可用。
+- 无底图模式移入图层标题栏，位于设置齿轮左侧，使用空白网格图标；激活时顶部显示“网格”，颜色与其他激活
+  控件一致。地图设置页只保留天地图密钥卡。
+- 轨迹天气三点使用彩色地图图钉方案，分别以绿色播放箭头、红色方框和黄色山峰表示起点、终点、顶点。
+  “最高点”标签改为“顶点 / Peak”。
+- 定制图源表单明确区分次要“取消”和主操作“保存并应用”；高级字段默认折叠。
+
+#### 修复
+
+- 修复编辑活动定制图源后仍使用旧地址、删除后列表残留、取消表单后校验状态残留及空类别缺少添加入口的问题。
+- 修复定制图源输入框打字被全局快捷键吞掉，以及从输入框拖选文字到面板外时编辑页误关闭的问题。
+- 修复定制图源切换或删除后确认按钮消失、重新打开后状态不显示及激活样式被通用按钮样式覆盖的问题。
+
+### English
+
+#### Added
+
+- **Custom sources** now support up to 20 user HTTPS tile sources with name, URL, 256/512 px tiles, zoom range,
+  subdomains, attribution and TMS. Two-step `{$x}`, `{$y}` and `{$z}` addresses can be pasted directly, and
+  `@2x` / `%402x` automatically selects 512 px.
+- Added a dedicated source manager, add/edit pages, empty state, loading states, two-step delete confirmation and
+  error reporting. Once at least one source exists, the category opens the normal picker and management remains a
+  separate action.
+- The host stores custom sources in `custom-sources.json` under local application data, preserving them across
+  normal overwrite upgrades and migrating the old `localStorage` list on first use.
+- The toolbox, layer panel and waypoint list now share one top anchor and header height, with mutual exclusion and
+  keyboard-focus coverage.
+
+#### Changed
+
+- Kept Road, Terrain, Satellite and Custom in one row, with route-node, contour, globe and slider icons plus
+  hover descriptions. The top layer entry keeps the category text and matching icon; the active source name
+  appears in the tooltip.
+- Replaced the map-settings glyph with a clear eight-tooth gear and narrowed/right-aligned the layer panel to
+  320 px while keeping narrow windows usable.
+- Moved No-map mode into the layer title bar before Settings, using the blank-grid icon. The top entry reads Grid
+  while active and uses the shared active colour. Map settings now contains only the Tianditu key card.
+- Route weather uses coloured map-pin marks for start, end and peak: green play arrow, red square and amber
+  mountain. The visible Summit label is now Peak.
+- The custom-source form now clearly separates secondary Cancel from primary Save and apply, with advanced fields
+  collapsed by default.
+
+#### Fixed
+
+- Fixed edited custom sources retaining the old URL, deleted entries lingering, stale validation after Cancel and
+  the empty category lacking an add action.
+- Fixed custom-source typing being swallowed by global shortcuts and text selection dragging outside the panel
+  closing the editor.
+- Fixed custom-source selection/deletion confirmation disappearing, source state missing after reopening and the
+  active-state colour being overridden by generic button styles.
+
+## 1.21.29 — 2026-11-18
+
+### 中文
+
+#### 变更
+
+- 无底图模式激活时，顶部图层入口文字由“无底图”改为“网格”，窄窗简称由“无”改为“网”；功能与切换逻辑
+  保持不变。
+
+### English
+
+#### Changed
+
+- When no-map mode is active, the top layer entry now reads Grid (short label G) instead of No map (N). The mode
+  and switching behaviour are unchanged.
+
+## 1.21.28 — 2026-11-18
+
+### 中文
+
+#### 变更
+
+- 地图图源的“自定义”中文名称统一改为“定制”，包括分类名称、窄窗简称、图源管理页标题、空状态和提示文案。
+  内部 `custom` 标识和已保存数据保持不变。
+
+### English
+
+#### Changed
+
+- Updated the Chinese Custom map-source terminology from 自定义 to 定制 throughout category labels, the compact
+  label, manager headings, empty states and notices. Internal `custom` identifiers and saved data are unchanged.
+
+## 1.21.27 — 2026-11-18
+
+### 中文
+
+#### 修复
+
+- 明确顶部图层入口的显示规则：文字固定显示当前“路网 / 地形 / 卫星 / 自定义”类别，图标同步显示该类别的
+  地图结构图标；具体图源名称保留在悬停提示和无障碍标签中。
+
+### English
+
+#### Fixed
+
+- Clarified the top layer entry: its text remains Road, Terrain, Satellite or Custom while the matching map
+  structure icon changes with the category. The active source name stays in the tooltip and accessible label.
+
+## 1.21.26 — 2026-11-18
+
+### 中文
+
+#### 变更
+
+- 顶部图层入口的图标和文字改为跟随当前具体图源，而不是只显示“路网 / 地形 / 卫星 / 自定义”分类。
+  例如 OpenStreetMap 显示路线节点图标，CyclOSM 显示等高线图标，自定义图源显示其名称。
+- 窄窗使用各图源简称；自定义图源显示名称前四个字符，完整名称继续保留在悬停提示和无障碍标签中。
+
+### English
+
+#### Changed
+
+- The top layer entry now follows the active source rather than only its category: OpenStreetMap shows the route
+  icon, CyclOSM the contour icon, and custom sources show their own names.
+- Narrow windows use a per-source short label. Custom names use their first four characters while the full name
+  remains available in the tooltip and accessible label.
+
+## 1.21.25 — 2026-11-18
+
+### 中文
+
+#### 变更
+
+- 无底图模式从地图设置移到图层面板标题栏，使用 A 方案空白网格图标，位于设置齿轮左侧，并提供悬停提示与
+  激活态。地图设置页现在只保留天地图密钥卡。
+- 轨迹天气分段标签由“最高点”改为“顶点”，英文标签由 Summit 改为 Peak；内部 `highest` 模式标识保持
+  兼容。
+
+### English
+
+#### Changed
+
+- Moved No-map mode from Map settings to the layer-panel title bar. It now uses the selected A blank-grid icon
+  immediately before Settings, with a tooltip and active state. Map settings now contains only the Tianditu key
+  card.
+- Renamed the route-weather “Summit” segment to “Peak” (“顶点” in Chinese) while retaining the compatible internal
+  `highest` mode identifier.
+
+## 1.21.24 — 2026-11-17
+
+### 中文
+
+#### 变更
+
+- 地图设置改用清晰的八齿齿轮图标。
+- 路网、地形、卫星和自定义四类图源加入 B 方案地图结构图标，并为每个分类提供悬停提示。
+- 轨迹天气的起点、终点和最高点改用彩色地图图钉 B 方案：统一图钉轮廓，分别嵌入播放箭头、停止方框和
+  山峰线条，同时保留绿色、红色和黄色语义。
+
+### English
+
+#### Changed
+
+- Replaced the map-settings glyph with a clear eight-tooth gear.
+- Added the selected B map-structure icons and hover descriptions to Road, Terrain, Satellite and Custom.
+- Route weather now uses the selected coloured map-pin B set: one pin silhouette with a play arrow, stop square
+  or summit line, retaining green, red and amber semantics.
+
+## 1.21.23 — 2026-11-17
+
+### 中文
+
+#### 变更
+
+- 地图设置中的无底图模式移除可见说明文字，只保留图标、标题和开关；解释仍保留在悬停与无障碍标签中。
+- 天地图密钥压缩为单行状态卡：配置、更换和移除改为图标按钮，移除 Windows 凭据及密钥共用说明，状态只显示
+  “尚未配置”或“已配置”。
+
+### English
+
+#### Changed
+
+- Removed the visible note under No-map mode in Map settings, leaving the icon, title and switch; the explanation
+  remains in its tooltip and accessible label.
+- Compacted the Tianditu key control into one row. Configure, change and remove are icon buttons, the Windows
+  credential and shared-key notes are gone, and the status reads only Not configured or Configured.
+
+## 1.21.22 — 2026-11-17
+
+### 中文
+
+#### 新增
+
+- 自定义图源改由宿主保存到本地应用数据目录的 `custom-sources.json`，不再依赖随构建哈希变化的 WebView
+  域名；正常覆盖安装新版本后仍会保留。首次升级会把旧 `localStorage` 列表迁移到宿主文件。
+- 新增工具箱、图层和标记点列表的互斥与共同顶部定位回归。
+
+#### 变更
+
+- 工具箱、图层和标记点列表统一使用工具栏下方的共享顶部锚点及 `40px` 标题栏高度；普通窗口与 360 px
+  窄窗的顶部位置一致。
+- 三个浮动窗口任意时刻只保留一个：打开其中一个会关闭另外两个，关闭过程不会抢走新窗口的键盘焦点。
+
+### English
+
+#### Added
+
+- Custom sources are now stored by the host in `custom-sources.json` under local application data instead of
+  relying only on the content-hashed WebView origin. A normal overwrite upgrade retains them, and the first
+  upgrade migrates the old `localStorage` list into the host file.
+- Added regression coverage for shared top positioning and mutual exclusion across the toolbox, layer panel and
+  waypoint list.
+
+#### Changed
+
+- The toolbox, layer panel and waypoint list now share one top anchor below the toolbar and a `40px` header
+  height in both regular and 360 px narrow windows.
+- Only one of the three floating panels can remain open: opening one closes the other two without stealing
+  keyboard focus from the newly opened panel.
+
+## 1.21.21 — 2026-11-17
+
+### 中文
+
+#### 变更
+
+- 地图图源面板由 360 px 缩窄为 320 px，并由跟随图层按钮改为相对窗口右侧 `10px` 对齐；360 px 窄窗仍保持
+  320 px 宽度和右侧对齐。窗口尺寸变化时，已打开的面板会重新对齐到图层按钮下方。
+
+### English
+
+#### Changed
+
+- Narrowed the map source panel from 360 px to 320 px and aligned it 10 px from the window's right edge instead
+  of the layer button. The 320 px width and right alignment are retained in a 360 px window.
+
+## 1.21.20 — 2026-11-17
+
+### 中文
+
+#### 修复
+
+- 修复在自定义图源文字输入框中开始拖选、并在窗口或面板外松开鼠标时，编辑页被地图点击误关闭的问题。
+  现在只有在地图上首次按下鼠标时才会关闭图层面板，文本选择过程中的结束点击不会关闭编辑器。
+
+### English
+
+#### Fixed
+
+- Fixed the custom-source editor closing when a text selection started inside a field and the mouse was released
+  outside the window or panel. The layer panel now closes on the initial map press, not on the completion click
+  from a text-selection drag.
+
+## 1.21.19 — 2026-11-17
+
+### 中文
+
+#### 修复
+
+- 自定义图源表单的 **取消** 改为低调幽灵按钮，**保存并应用** 改为蓝色实心主按钮；两者使用不同宽度、边框、
+  背景和字重，避免整条操作栏上的两个按钮难以区分。
+
+### English
+
+#### Fixed
+
+- In the custom-source form, **Cancel** is now a subdued ghost button and **Save and apply** is a blue filled
+  primary button, with distinct widths, borders, backgrounds and font weights.
+
+## 1.21.18 — 2026-11-17
+
+### 中文
+
+#### 变更
+
+- 图层分类恢复为单行四等宽布局，路网、地形、卫星和自定义在常规窗口及 360 px 窄窗中保持同一行。
+
+### English
+
+#### Changed
+
+- Restored the four map categories to one equal-width row: Road, Terrain, Satellite and Custom remain on the
+  same row in regular and 360 px narrow windows.
+
+## 1.21.17 — 2026-11-17
+
+### 中文
+
+#### 变更
+
+- 自定义图源分类按数量区分入口：没有图源时直接显示管理页空状态；至少保存一个图源后，单击分类或重新打开
+  图层面板都显示常规图源选择界面。
+- 常规图源选择界面的“地图图源”标题旁新增 **管理图源** 入口，用于进入现有的添加、编辑、删除和状态页面。
+
+### English
+
+#### Changed
+
+- The Custom category now chooses its destination by source count: with no sources it opens the empty manager,
+  while one or more saved sources make category clicks and later openings show the regular source picker.
+- Added a **Manage sources** action beside the source heading for entering the existing add, edit, delete and
+  status page.
+
+## 1.21.16 — 2026-11-17
+
+### 中文
+
+#### 新增
+
+- 自定义图源改为独立的列表与管理页：标题栏直接添加，整行切换图源，编辑和删除使用图标按钮；删除需要再次
+  点击确认。
+- 图源状态统一显示为“加载中 / 已加载 / 部分可用 / 不可用”，来源与授权说明默认折叠，空列表提供明确入口。
+
+#### 变更
+
+- 添加和编辑使用独立表单子页，基础项先展示，子域、署名与 TMS 收进高级选项；保存后回到列表并应用图源。
+- 支持直接粘贴两步路格式的 `{$x}`、`{$y}`、`{$z}` 占位符，自动转换为 Leaflet 的 `{x}`、`{y}`、`{z}`；
+  地址含 `@2x` 或 `%402x` 时自动选择 512 px。
+
+#### 修复
+
+- 修复删除图源第一次点击后确认按钮随面板关闭、无法完成二次确认的问题。
+
+### English
+
+#### Added
+
+- Custom sources now have a dedicated list and management page: add from the title bar, select from the full row,
+  and use icon buttons to edit or delete. Deletion requires a second confirmation click.
+- Source state is shown consistently as Loading, Ready, Partially available or Unavailable. The source/licence
+  note is collapsed by default, and an empty list provides a clear action.
+
+#### Changed
+
+- Adding and editing use a separate form page with basic fields first and subdomains, attribution and TMS under
+  advanced options. Saving returns to the list and applies the source.
+- Two-step `{$x}`, `{$y}` and `{$z}` placeholders are converted automatically to Leaflet's `{x}`, `{y}` and `{z}`;
+  an address containing `@2x` or `%402x` selects 512 px automatically.
+
+#### Fixed
+
+- Fixed the delete confirmation disappearing after the first click because the panel closed while it re-rendered.
+
+## 1.21.15 — 2026-11-17
+
+### 中文
+
+#### 新增
+
+- **自定义**地图类型新增独立图源管理页：支持添加、选择、编辑和删除自己的瓦片图源，最多保存 20 个。
+- 图源表单包含名称、HTTPS 瓦片地址、256/512 瓦片大小、缩放范围、子域、署名和 TMS；512 px 图源同时使用
+  正确的 512 CSS 像素尺寸和负缩放偏移。
+- 自定义图源加载失败会在图源列表和提示中显示状态，但不会自动切换到其他底图。
+
+#### 变更
+
+- **无底图**不再占用主图源栏，改为 **地图设置 → 显示模式 → 无底图模式**；主栏保留路网、地形、卫星、
+  自定义四类。
+- <kbd>Q</kbd> / <kbd>E</kbd> 循环四个地图类别；无底图模式下按任一背景切换键会恢复上次使用的地图图源。
+- 图层面板在 360 px 窄窗下固定到当前图层按钮下方并保持在窗口内，自定义列表与编辑页使用单一滚动区，
+  保存与取消始终可见。
+- 自定义地址只接受 HTTPS，与页面 CSP 保持一致；表单操作改为明确的“取消 / 保存并应用”。
+
+#### 修复
+
+- 修复在自定义图源输入框中输入 `W`、`Q`、`E`、`S`、`C`、`M`、`X` 时被全局快捷键吞掉、
+  无法输入的问题：页面在文本字段获得焦点时通知宿主，全局钩子随即放行。
+- 修复编辑当前自定义图源后仍使用旧地址的问题；保存后立即替换活动图层。
+- 修复删除图源后列表残留、取消表单后校验状态残留，以及空自定义类别没有添加入口的问题。
+- 修正天气入口的完成提示，明确打开的是所选点位，而不是轨迹中心。
+
+#### 说明
+
+- 插件不内置任何第三方端点；自定义图源的可用性与授权由用户自行确认。
+
+### English
+
+#### Added
+
+- The **Custom** map type now has its own source manager for adding, selecting, editing and deleting up to 20
+  user tile sources.
+- The source form includes a name, HTTPS tile URL, 256/512 tile size, zoom range, subdomains, attribution and
+  TMS. A 512 px source now uses the correct 512 CSS-pixel size together with its negative zoom offset.
+- Failed custom tiles show their state in the source list and in a warning, without falling back to another
+  basemap.
+
+#### Changed
+
+- **No map** no longer occupies the main source bar. It is now
+  **Map settings → Display mode → No-map mode**, leaving Road, Terrain, Satellite and Custom.
+- <kbd>Q</kbd> / <kbd>E</kbd> cycles the four map categories. Pressing either key while no-map is active restores
+  the last map source.
+- In a 360 px window the layer panel is fixed below the layer button and kept inside the viewport. The custom
+  list and editor use one scroll region while Cancel and Save remain visible.
+- Custom addresses require HTTPS to match the viewer CSP, and the form uses explicit Cancel and Save and apply
+  actions.
+
+#### Fixed
+
+- Fixed `W`, `Q`, `E`, `S`, `C`, `M` and `X` being swallowed by the global shortcut hook while typing in a
+  custom-source field: the page now reports text-field focus and the hook stands down.
+- Fixed the active layer retaining the old URL after editing a custom source; saving now replaces it immediately.
+- Fixed removed sources remaining in the list, stale validation after cancelling the form, and the empty custom
+  category lacking an add action.
+- Corrected the weather completion message to name the selected point instead of the route centre.
+
+#### Notes
+
+- The plugin ships no third-party endpoint; the availability and licence of a custom source are the user's own
+  responsibility.
+
+## 1.21.14 — 2026-11-17
 
 ### 中文
 
@@ -32,35 +447,10 @@ Added / Changed / Deprecated / Removed / Fixed / Security 分类；没有内容�
   雨、风、阵风、风向），不需要再自己在地图上找位置。
 - 天气提供“起点 / 终点 / 最高点”三种点位，均为具体位置并统一使用 14 级街道视角；最高点取全程海拔最大的
   记录点，文件没有海拔或全程高差不足 1 米时该分段禁用。
-- 三种点位使用与地图一致的语义图标（绿色起点、红色终点、琥珀色峰顶），分段条并入天气按钮卡片。
+- 三种点位使用与地图一致的语义图标（绿色起点、红色终点、琥珀色峰顶），分段条并入天气按钮卡片，
+  读作一个控件而不是两个。
 - 天气默认打开云层图层，便于判断日照与雾况；需要风或降水时在 Windy 内切换。
 - 预览页不内嵌第三方地图，不需要 Windy API 密钥，页面 CSP 保持不变。
-
-#### 变更
-
-- 自动识别由大量独立路线合并而成的**路网 KML**，不再把全网误算为一次连续行程；路网模式不显示无意义的
-  全局均速、休息时间、每公里表和合并剖面，但保留路线、标注点、照片、测距与导出。
-- 路网轨迹改用 Canvas 绘制，只处理当前视口并按缩放级别简化几何；最大 27 MB 路网实测首屏约从 3.21 秒
-  降至 2.70 秒，JS 堆峰值约从 114 MB 降至 85 MB，总览绘制点从 99,009 个降至 1,277 个。
-- 新增共享只读轨迹模型，分段长度和累计里程只计算一次，供摘要、地图、剖面、导航、导出和每公里分析复用。
-- 每公里统计改为**首次展开面板时计算**，并使用单调区间游标与二分时间定位；3,300 公里轨迹约 45 ms。
-- 摘要的距离、高程和时间范围合并为一次逐点扫描；缺口与异常诊断在同一预览内复用；公里标记复用预计算
-  分段长度，缩放时不再重新求总里程。
-- 航点按视口做空间查询，只为当前屏幕采样创建 Leaflet 图钉；5,000 个航点仍保留全部导航项。
-- 测距吸附索引改为首次使用时创建，并复用标记点控制器的航点索引。
-- 地图平移和缩放不再重新测量整套 DOM 布局；距离标记按缩放级别缓存采样。
-- 摘要与每公里分析共用运动阈值和心率口径，并在每条记录段边界重置运动状态；段间时间统一计入休息时间。
-- 全程与每公里平均心率统一为有效点读数的算术平均值。
-- 测试运行器支持按套件名称选择专项测试；新增 `test:quick` 与 `test:suite` 命令，未匹配名称直接报错。
-
-#### 修复
-
-- 修复带照片的标记点放大查看后，点击图片外区域返回时地图可能重新计算可用区域并突然跳动的问题。
-- 修复从 KMZ 导出的叠加图被写入临时解包目录、关闭预览后丢失的问题；现在保存在原始 KMZ 同级目录。
-- 修复 20 万点心率轨迹统计时的调用栈溢出。
-- 修复连续平移时缺口与异常 tooltip 让语言节点列表持续增长的问题。
-- 修复 WebView2 关闭及 COM 回调异常未被识别的问题，关闭预览时不再产生未处理异常。
-- GPX、KML、KMZ 和 FIT 统一限制为 64 MB，超限文件在启动 WebView 前给出明确错误。
 
 #### 说明
 
@@ -78,46 +468,10 @@ Added / Changed / Deprecated / Removed / Fixed / Security 分类；没有内容�
   the recorded point with the greatest elevation, and that segment is disabled when a file has no elevation or
   less than a metre of relief.
 - The three points carry the map's own semantics (green start, red end, amber summit), and the segmented picker
-  is merged into the weather action card.
+  is merged into the weather action card instead of reading as a second, unrelated control.
 - Windy opens on the cloud layer, which is the quickest read on sun versus fog; wind and rain are one click
   away inside Windy.
 - The preview embeds no third-party map, needs no Windy API key and keeps its Content-Security-Policy unchanged.
-
-#### Changed
-
-- Route-network KML files made from many independent tracks are detected automatically instead of being treated
-  as one continuous trip. Network mode omits meaningless global moving speed, rest time, the split table and
-  the merged profile while retaining routes, waypoints, photos, measurement and export.
-- Network tracks use the Canvas renderer, process only the current viewport and simplify geometry per zoom. The
-  largest 27 MB network now reaches first paint in about 2.70 seconds instead of 3.21 seconds, with peak JS
-  heap reduced from roughly 114 MB to 85 MB and the overview drawing about 1,277 points instead of 99,009.
-- Added a shared read-only route model so segment lengths and cumulative distance are measured once for the
-  summary, map, profile, navigation, export and split analysis.
-- Per-kilometre analysis is calculated on first expansion and uses a monotonic interval cursor with binary time
-  lookup; the 3,300-kilometre regression runs in about 45 ms.
-- The summary collects distance, elevation range and time range in one point pass; gap and anomaly diagnostics
-  are reused within a preview; distance markers reuse precomputed segment lengths instead of rescanning on zoom.
-- Waypoints are queried by viewport and only markers needed by the current screen sample create Leaflet DOM;
-  5,000 waypoints still retain every navigation stop.
-- Measurement snapping indexes are created on first use and reuse the marker controller's waypoint index.
-- Map panning and zooming no longer remeasure the full DOM layout, and distance markers cache samples per zoom.
-- The summary and split analysis share one movement threshold configuration and reset movement at every
-  recorded segment; time between segments is counted as rest.
-- Whole-route and per-kilometre average heart rate use the arithmetic mean of valid point readings.
-- The test runner can select a focused subset by suite name and rejects unmatched names; added `test:quick`
-  and `test:suite`.
-
-#### Fixed
-
-- Fixed the map sometimes recalculating its available area and jumping after closing a full-size photo opened
-  from a photo waypoint.
-- Fixed overlays exported from KMZ files being written into the temporary extraction folder and lost when the
-  preview closes; exports now go beside the original KMZ.
-- Fixed call-stack overflow when summarising 200,000 heart-rate readings.
-- Fixed gap and anomaly tooltips growing the language-node list during repeated panning.
-- Fixed WebView2 shutdown and COM callback errors going unrecognised, which produced unhandled exceptions when
-  a preview closed.
-- GPX, KML, KMZ and FIT inputs now share a 64 MB limit and fail clearly before WebView starts.
 
 #### Notes
 
@@ -125,7 +479,6 @@ Added / Changed / Deprecated / Removed / Fixed / Security 分类；没有内容�
   requested externally unless the entry is used.
 - Files without coordinates (a GPS-free workout, for example) disable the weather entry and explain why in its
   tooltip.
-
 ## 1.21.13 — 2026-11-17
 
 ### 中文

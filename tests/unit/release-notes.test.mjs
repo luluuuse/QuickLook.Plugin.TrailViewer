@@ -49,7 +49,9 @@ test('cumulative notes use the curated current section and omit superseded histo
 - Previous public release.
 `;
   const notes = releaseNotes.extractReleaseNotesSince(cumulative, '1.2.0', 'v1.0.0');
-  assert.match(notes, /Since v1\.0\.0/);
+  // The notes are the change list itself: no "Since vX.Y.Z" banner and no version-range preamble.
+  assert.doesNotMatch(notes, /Since v1\.0\.0/);
+  assert.doesNotMatch(notes, /自 v1\.0\.0 以来/);
   assert.match(notes, /Current fix/);
   assert.doesNotMatch(notes, /Earlier fix/);
   assert.doesNotMatch(notes, /New feature/);

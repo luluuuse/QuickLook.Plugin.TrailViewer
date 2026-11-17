@@ -40,6 +40,27 @@ async function main() {
   check('the toolbox contains distance measurement and overlay export',
     await page.locator('.toolbox-action[data-tool="measure"]').count() === 1
       && await page.locator('.toolbox-action[data-tool="export"]').count() === 1);
+  check('the toolbox contains the route weather card',
+    await page.locator('.toolbox-action[data-tool="weather"]').count() === 1
+      && (await page.$$eval('.toolbox-weather-mode', (nodes) => nodes.map((node) => node.textContent)))
+        .join('/') === 'Start/End/Peak');
+  check('a file with elevation enables all three weather points',
+    !(await page.locator('[data-weather-mode="highest"]').isDisabled())
+      && !(await page.locator('[data-weather-mode="start"]').isDisabled()));
+  await page.locator('[data-weather-mode="end"]').click();
+  check('the weather target exposes its selected state',
+    await page.locator('[data-weather-mode="end"]').getAttribute('aria-pressed') === 'true');
+  const weatherIcons = await page.$$eval('.toolbox-weather-mode svg', (nodes) => nodes.map((node) => ({
+    name: node.dataset.weatherMark,
+    fill: node.getAttribute('fill'),
+    stroke: node.getAttribute('stroke'),
+    width: node.getAttribute('width'),
+  })));
+  check('route weather uses the selected coloured map-point icons',
+    weatherIcons.map((item) => item.name).join('|') === 'start|end|highest'
+      && weatherIcons.every((item) => item.fill === null
+        && item.stroke === null && item.width === '16'),
+    JSON.stringify(weatherIcons));
   const toolboxSurface = await page.locator('#toolbox-panel').evaluate((node) => {
     const style = getComputedStyle(node);
     return { background: style.backgroundColor, filter: style.backdropFilter };

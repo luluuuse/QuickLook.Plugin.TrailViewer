@@ -20,7 +20,7 @@ function loadOverrides() {
  * Scrollable waypoint overview. It is deliberately a list rather than a search box: hikers scan the route in
  * order, then click the camp, pass or photo stop they need.
  */
-export function createWaypointOverview({ el, onSelect, onLayoutChange }) {
+export function createWaypointOverview({ el, onSelect, onLayoutChange, onOpen }) {
   let panel = null;
   let filterTrigger = null;
   let filterMenu = null;
@@ -370,6 +370,7 @@ export function createWaypointOverview({ el, onSelect, onLayoutChange }) {
 
   function open(items, index) {
     if (!panel) build();
+    onOpen?.();
     currentItems = items;
     selectedIndex = index;
     render();
@@ -379,12 +380,12 @@ export function createWaypointOverview({ el, onSelect, onLayoutChange }) {
     onLayoutChange?.();
   }
 
-  function close() {
+  function close({ restoreFocus = true } = {}) {
     if (!panel || panel.hidden) return;
     closePopover();
     panel.hidden = true;
     toggleButton?.setAttribute('aria-expanded', 'false');
-    toggleButton?.focus({ preventScroll: true });
+    if (restoreFocus) toggleButton?.focus({ preventScroll: true });
     onLayoutChange?.();
   }
 

@@ -43,6 +43,7 @@ internal sealed class TrailViewerPanel : UserControl, IDisposable
     private WebView2 _webView;
     private GlobalKeys _keys;
     private volatile bool _onScreen;
+    private volatile bool _textInput;
     private volatile bool _measureActive;
     private bool _finished;
 
@@ -125,7 +126,7 @@ internal sealed class TrailViewerPanel : UserControl, IDisposable
         // the arrows through a global keyboard hook of its own, so a WPF handler only ever sees a key after
         // someone clicks into the preview. The viewer keys are caught below the application instead.
         var hookClock = Stopwatch.StartNew();
-        _keys = new GlobalKeys(() => _onScreen, () => _measureActive, OnGlobalKey);
+        _keys = new GlobalKeys(() => _onScreen, () => _measureActive, () => _textInput, OnGlobalKey);
         _keys.Start();
         Trace($"keyboard hook ready in {hookClock.ElapsedMilliseconds} ms (installed={_keys.Installed})");
         // Kept as a fallback: when the hook is unavailable, a preview that did get the keyboard still works.
@@ -216,11 +217,19 @@ internal sealed class TrailViewerPanel : UserControl, IDisposable
                 CoreWebView2HostResourceAccessKind.Allow);
 
             var tiandituKey = TiandituKeyStore.Load();
+            var runtimeConfig = new System.Collections.Generic.List<string>();
             if (!string.IsNullOrEmpty(tiandituKey))
+            {
+                runtimeConfig.Add($"tiandituKey: '{tiandituKey}', direct: true");
+            }
+            var customSources = CustomSourceStore.LoadJson();
+            if (customSources != null)
+                runtimeConfig.Add("customSources: " + customSources);
+            if (runtimeConfig.Count > 0)
             {
                 await core.AddScriptToExecuteOnDocumentCreatedAsync(
                     "window.__TRAILVIEWER_RUNTIME_CONFIG__ = Object.freeze({"
-                    + $"tiandituKey: '{tiandituKey}', direct: true }});");
+                    + string.Join(", ", runtimeConfig) + "});");
             }
             _webView.Source = new Uri(BuildViewerUrl(_path, _name, _fileRoot));
             Trace("navigating to " + _webView.Source);
@@ -426,8 +435,13 @@ internal sealed class TrailViewerPanel : UserControl, IDisposable
             Finish(message.Substring("error:".Length), "");
         else if (message.StartsWith("settings\t", StringComparison.Ordinal))
             ViewerPreferences.SaveFromQuery(message.Substring("settings\t".Length));
+        else if (message.StartsWith("custom-sources\t", StringComparison.Ordinal))
+            CustomSourceStore.SaveJson(message.Substring("custom-sources\t".Length));
         else if (message == "measure-state\t1" || message == "measure-state\t0")
             _measureActive = message.EndsWith("\t1", StringComparison.Ordinal);
+        else if (message == "text-input\t1" || message == "text-input\t0")
+            // A focused page field must receive its letters: the global hook sees them before the WebView does.
+            _textInput = message.EndsWith("\t1", StringComparison.Ordinal);
         else if (message.StartsWith("tianditu-key\tconfigure", StringComparison.Ordinal))
         {
             ConfigureTiandituKey(IsEnglishMessage(message));
@@ -616,7 +630,10 @@ internal sealed class TrailViewerPanel : UserControl, IDisposable
     /// <summary>The trace is read by a person watching the harness: a chunk of base64 is not worth a line.</summary>
     private static string Summarise(string message) =>
         message.StartsWith("exportchunk\t", StringComparison.Ordinal)
-            ? "exportchunk ..." : message;
+            ? "exportchunk ..."
+            : message.StartsWith("custom-sources\t", StringComparison.Ordinal)
+                ? "custom-sources ..."
+                : message;
 
     // The overlay arrives as base64 in pieces, because a large PNG is close to the size where one
     // postMessage starts to be unreliable. The id, sequence and count make a lost or duplicated piece visible
@@ -805,6 +822,12 @@ internal sealed class TrailViewerPanel : UserControl, IDisposable
     /// <summary>Test harness only: pretend the preview is on screen, whatever the visual tree says.</summary>
     internal void MarkOnScreen(bool onScreen) => _onScreen = onScreen;
 
+    /// <summary>Test harness only: pretend a page text field holds the keyboard.</summary>
+    internal void MarkTextInput(bool active) => _textInput = active;
+
+    /// <summary>Test harness only: does the panel believe a page text field is focused?</summary>
+    internal bool TextInputActive => _textInput;
+
     /// <summary>Test harness only: push a key through the hook filter without touching the input queue.</summary>
     internal bool HandleGlobalKeyForTest(char key, bool keyUp = false) =>
         _keys?.HandleForTest(char.ToUpperInvariant(key), keyUp) ?? false;
@@ -813,6 +836,7 @@ internal sealed class TrailViewerPanel : UserControl, IDisposable
     {
         _finished = true; // no callbacks after the preview is closed
         _onScreen = false;
+        _textInput = false;
         _timeout.Stop();
         InputManager.Current.PreProcessInput -= OnPreProcessInput;
         _keys?.Dispose();

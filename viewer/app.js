@@ -14,6 +14,7 @@ import {
   LAYERS,
   createLanguageControl,
   createLayerSwitcher,
+  loadCustomProviders,
   createLocateControl,
   savedLayer,
 } from './map-controls.js';
@@ -83,6 +84,10 @@ function fileNameFromSource(source) {
 
 function post(message) {
   window.chrome?.webview?.postMessage(message);
+}
+
+function persistCustomSources(entries) {
+  if (hasQuickLookHost) post(`custom-sources\t${JSON.stringify(entries)}`);
 }
 
 function el(tag, className, text) {
@@ -190,6 +195,11 @@ const waypointController = createWaypointController({
     { popup },
   ),
   onLayoutChange: () => mapViewController?.refreshControls(),
+  onOverviewOpen: () => {
+    toolboxController?.close();
+    layerSwitch?.close();
+    overlayExport?.close();
+  },
   setProfilePinsVisible: (visible) => {
     for (const pin of profilePins) pin.node.hidden = !visible;
   },
@@ -378,7 +388,11 @@ async function main() {
     routeModel,
     fileName,
     onSettingsChange: syncPreferences,
-    onPanelOpen: () => toolboxController?.close(),
+    onPanelOpen: () => {
+      toolboxController?.close();
+      waypointController.closeOverview(false);
+      layerSwitch?.close();
+    },
   });
   const measurement = createMeasurement({
     L,
@@ -424,7 +438,11 @@ async function main() {
       openExternal(url);
       showToast(t('weather.opened'), 3500);
     },
-    onOpen: () => overlayExport.close(),
+    onOpen: () => {
+      waypointController.closeOverview(false);
+      layerSwitch?.close();
+      overlayExport.close();
+    },
     onLayoutChange: () => mapViewController?.refreshControls({ refitHome: false }),
   });
 
@@ -443,6 +461,12 @@ async function main() {
     layerSwitch?.keyRejected();
     showToast(t('layer.tiandituRejected'), 5000);
   };
+  // The user's own sources must be registered before the switcher builds its provider list. The host file wins;
+  // ordinary browser runs keep using localStorage.
+  const initialCustomSources = loadCustomProviders(undefined, runtimeConfig.customSources);
+  if (hasQuickLookHost && runtimeConfig.customSources === undefined && initialCustomSources.length > 0) {
+    persistCustomSources(initialCustomSources);
+  }
   const switcher = createLayerSwitcher({
     L,
     map,
@@ -452,6 +476,14 @@ async function main() {
     onRemember: syncPreferences,
     tiandituDirectKey: initialDirectTiandituKey,
     onTiandituDirectError: () => queueMicrotask(warnTiandituTemporarily),
+    onCustomError: () => showToast(t('layer.customError'), 5000),
+    onOpen: () => {
+      toolboxController?.close();
+      waypointController.closeOverview(false);
+      overlayExport.close();
+    },
+    onCustomSave: persistCustomSources,
+    customSources: initialCustomSources,
     onConfigureTianditu: () => {
       if (hasQuickLookHost) post(`tianditu-key\tconfigure\t${getLang()}`);
       else showToast(t('layer.tiandituHostOnly'), 5000);
@@ -471,6 +503,22 @@ async function main() {
   const scrub = profile ? profileController.attach(map, profile) : null;
   installSpaceGuard();
   document.addEventListener('keydown', onKeyDown);
+
+  // The host installs a low-level keyboard hook that swallows W/Q/E/S/C/X/M before the page ever sees them, so
+  // typing into a text field would otherwise be eaten. Report focus changes and let the hook stand down.
+  const textFieldOf = (node) => node instanceof Element
+    && Boolean(node.closest('input, textarea, select, [contenteditable="true"]'));
+  let textInputReported = null;
+  const reportTextInput = (active) => {
+    if (active === textInputReported) return;
+    textInputReported = active;
+    post(`text-input\t${active ? '1' : '0'}`);
+  };
+  document.addEventListener('focusin', (event) => reportTextInput(textFieldOf(event.target)));
+  document.addEventListener('focusout', (event) => {
+    // focusout fires before the next focusin, so only clear when nothing inside a field keeps the focus.
+    if (!textFieldOf(event.relatedTarget)) reportTextInput(false);
+  });
 
   // A language switch repaints the page where it stands: same map, same view, same selection. Everything
   // that is generated from that state is rebuilt from the same values, so nothing has to be reparsed.

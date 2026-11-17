@@ -6,8 +6,8 @@ individual feature modules.
 The map-layer panel follows the same translucent tool-surface tokens as the toolbox, measurement and
 overlay-export panels.
 
-Toolbox/measurement and overlay-export panels are mutually exclusive. Opening one closes the other; the
-map-layer menu filters its source list to the active map type.
+The toolbox, layer panel and waypoint list are mutually exclusive and share one top anchor. Overlay export also
+closes the floating panels. The map-layer menu filters its source list to the active map type.
 
 ## Visual contract
 
@@ -38,11 +38,10 @@ decorative and always `aria-hidden="true"`.
   `symbolElement()` for SVG data symbols; simple circles and paths rendered by Leaflet continue to use the
   shared numeric values.
 - **Weather marks** (`WEATHER_MARKS`) label the three route-weather points and sit in their own registry because
-  they are neither a control nor map geometry: a filled green start, a filled red end and a filled amber summit.
-  They keep the `24×24` grid and a dark `1.5` outline, but they are rendered inside the toolbox, so they carry
-  their own fill instead of `currentColor`. Use `weatherMarkMarkup()` or `weatherMarkElement()`. The start and
-  end marks are deliberately a shape pair — play triangle inside a circle, inset block inside a rounded square —
-  so "begin" and "finish" stay distinguishable at 16 px without relying on colour alone.
+  they are neither a control nor map geometry: a filled green start pin, a filled red end pin and a filled amber
+  peak pin. They share one map-pin silhouette and a dark `1.5` outline. Use `weatherMarkMarkup()` or
+  `weatherMarkElement()`. Play arrow, stop square and mountain line keep the three meanings distinguishable at
+  16 px without relying on colour alone.
 
 Never use a filled UI icon for status colour. Never remove semantic data fill merely to match a toolbar control.
 
@@ -66,9 +65,10 @@ should receive the same adapter rather than overriding the vendored file.
 
 ## Initial registry families
 
-- Map controls: zoom, locate, layers, settings, marker pin, list, close, check and chevrons.
+- Map controls: zoom, locate, grid/no-map, eight-tooth settings gear, marker pin, list, close, check and chevrons.
+- Map source categories: route nodes, contour lines, globe and configuration sliders.
 - Toolbox and measurement: toolbox, ruler, image download, finish section, centre point, undo, redo, clear and stop.
-- Route weather: the cloud action icon plus the start, end and summit marks.
+- Route weather: the cloud action icon plus the coloured start, end and peak map-pin marks.
 - Splits: the route toggle and chevron; metric table headers intentionally remain text-only.
 - Overview and photos: filter, edit, close, previous and next.
 - Status and data: waypoint, camera, direction, warning, activity, start/end, profile pins and scrubber.

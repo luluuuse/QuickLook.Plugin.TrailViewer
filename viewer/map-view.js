@@ -198,6 +198,11 @@ export function createMapView({ map, isChromeHidden }) {
         ? Math.max(120, innerWidth - 20)
         : Math.max(minWrapped, wrappedRoom)));
     }
+    const toolsBottom = tools
+      ? Math.max(0, ...[...tools.children].map((node) => node.getBoundingClientRect().bottom))
+      : 0;
+    const floatingTop = Math.max(54, toolsBottom + 4);
+    setVariable('--floating-panel-top', cssPixels(floatingTop));
 
     const profileHeight = shown(document.getElementById('profile'))
       ? document.getElementById('profile').getBoundingClientRect().height

@@ -25,13 +25,15 @@ function extractReleaseNotes(markdown, version) {
 function extractReleaseNotesSince(markdown, version, sinceVersion) {
   const current = findVersionHeading(markdown, version);
   const previous = findVersionHeading(markdown, sinceVersion);
-  const sinceLabel = sinceVersion.replace(/^v/, '');
   if (current.index >= previous.index) {
     throw new Error(`CHANGELOG.md order puts ${version} at or after ${sinceVersion}`);
   }
   // The current version section is the curated net delta. Intermediate development sections may contain
   // behaviour that was later removed or replaced, so they are not copied into the public release notes.
-  return `# 自 v${sinceLabel} 以来 / Since v${sinceLabel}\n\n${extractReleaseNotes(markdown, version)}`;
+  //
+  // No "Since vX.Y.Z" banner: the notes are read as the change list itself, and a range heading above it only
+  // repeats what the tag already says. The section starts at its own first heading.
+  return extractReleaseNotes(markdown, version);
 }
 
 function findVersionHeading(markdown, version) {

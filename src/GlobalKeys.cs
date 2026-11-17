@@ -42,6 +42,7 @@ internal sealed class GlobalKeys : IDisposable
 
     private readonly Func<bool> _onScreen;
     private readonly Func<bool> _measureActive;
+    private readonly Func<bool> _textInputActive;
     private readonly Action<string> _onKey;
     private readonly HookProc _callback; // held in a field: the GC must not collect the thunk the OS calls
     private readonly ManualResetEventSlim _ready = new(false);
@@ -58,10 +59,19 @@ internal sealed class GlobalKeys : IDisposable
 
     /// <param name="onScreen">Asked on the hook thread: is there a preview to act on right now?</param>
     /// <param name="onKey">Called on the hook thread with a viewer key name. Must not block.</param>
-    public GlobalKeys(Func<bool> onScreen, Func<bool> measureActive, Action<string> onKey)
+    /// <param name="textInputActive">
+    /// Asked on the hook thread: is a text field inside the page focused? A global hook sees the key before the
+    /// WebView does, so without this a letter typed into the map-settings form would be swallowed as a shortcut.
+    /// </param>
+    public GlobalKeys(
+        Func<bool> onScreen,
+        Func<bool> measureActive,
+        Func<bool> textInputActive,
+        Action<string> onKey)
     {
         _onScreen = onScreen;
         _measureActive = measureActive;
+        _textInputActive = textInputActive;
         _onKey = onKey;
         _callback = Filter;
     }
@@ -134,6 +144,7 @@ internal sealed class GlobalKeys : IDisposable
         if ((!plainAction && !shiftedExport && !measureHistory) || !SafeOnScreen() || !HostIsForeground())
         {
             Reason = !plainAction && !shiftedExport && !measureHistory ? "modifier"
+                : TextInputActive() ? "text-input"
                 : !SafeOnScreen() ? "off-screen" : "foreground=" + ForegroundName();
             return Next(code, wParam, lParam);
         }
@@ -164,7 +175,22 @@ internal sealed class GlobalKeys : IDisposable
     {
         try
         {
+            // A focused text field owns every letter: let the key through so the page can type it.
+            if (TextInputActive())
+                return false;
             return _onScreen();
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private bool TextInputActive()
+    {
+        try
+        {
+            return _textInputActive != null && _textInputActive();
         }
         catch
         {

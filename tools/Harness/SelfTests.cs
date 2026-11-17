@@ -28,6 +28,7 @@ internal static class SelfTests
             TestSourceSafety(temporary);
             TestViewerShutdownFilter();
             TestPreferences(temporary);
+            TestCustomSources(temporary);
             TestProductIdentity(temporary);
             TestTianditu(temporary);
             TestViewerBuildId(temporary);
@@ -314,6 +315,39 @@ internal static class SelfTests
             ViewerPreferences.QueryFromFile(path).Contains("layer=satellite.tianditu"),
             ViewerPreferences.QueryFromFile(path));
         Check("no temporary preference files are left",
+            !Directory.GetFiles(Path.GetDirectoryName(path), "*.tmp").Any()
+            && !Directory.GetFiles(Path.GetDirectoryName(path), "*.old").Any());
+    }
+
+    private static void TestCustomSources(string temporary)
+    {
+        var path = Path.Combine(temporary, "custom-sources", "custom-sources.json");
+        var valid = "[{\"id\":\"custom.windy\",\"name\":\"Windy\",\"url\":"
+            + "\"https://tiles.example/{z}/{x}/{y}.png\",\"tileSize\":512,\"minZoom\":1,"
+            + "\"maxZoom\":20,\"subdomains\":\"a1-\",\"attribution\":\"Example\",\"tms\":true}]";
+        Check("custom sources start absent", CustomSourceStore.LoadJsonFromFile(path) == null);
+        Check("a valid custom source list is saved", CustomSourceStore.SaveJsonToFile(valid, path));
+        var loaded = CustomSourceStore.LoadJsonFromFile(path);
+        Check("custom sources survive a fresh host read",
+            loaded != null && loaded.Contains("\"custom.windy\"") && loaded.Contains("\"tileSize\":512")
+            && loaded.Contains("\"subdomains\":\"a1\"") && loaded.Contains("\"tms\":true"),
+            loaded);
+
+        File.WriteAllText(path, valid, new UTF8Encoding(false));
+        var before = File.ReadAllText(path);
+        Check("invalid custom source JSON is rejected without replacing the file",
+            !CustomSourceStore.SaveJsonToFile("not json", path)
+            && File.ReadAllText(path) == before);
+        Check("oversized custom source data is rejected",
+            !CustomSourceStore.SaveJsonToFile("[" + new string('x', 128 * 1024) + "]", path));
+
+        var duplicates = "["
+            + "{\"id\":\"custom.same\",\"name\":\"One\",\"url\":\"https://a/{z}/{x}/{y}\"},"
+            + "{\"id\":\"custom.same\",\"name\":\"Two\",\"url\":\"https://b/{z}/{x}/{y}\"}]";
+        Check("host persistence validates and de-duplicates custom sources",
+            CustomSourceStore.SaveJsonToFile(duplicates, path)
+            && Regex.Matches(CustomSourceStore.LoadJsonFromFile(path), "\"id\":").Count == 1);
+        Check("custom source writes leave no temporary files",
             !Directory.GetFiles(Path.GetDirectoryName(path), "*.tmp").Any()
             && !Directory.GetFiles(Path.GetDirectoryName(path), "*.old").Any());
     }

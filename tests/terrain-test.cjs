@@ -70,10 +70,12 @@ async function main() {
 
   const layerEntry = await page.locator('.layer-menu-toggle').evaluate((node) => ({
     label: node.querySelector('.layer-menu-label').textContent,
+    icon: node.querySelector('svg')?.dataset.icon,
     expanded: node.getAttribute('aria-expanded'),
   }));
   check('the four map types share one visible layer entry',
-    layerEntry.label === 'Road' && layerEntry.expanded === 'false', JSON.stringify(layerEntry));
+    layerEntry.label === 'Road' && layerEntry.icon === 'layer-road'
+      && layerEntry.expanded === 'false', JSON.stringify(layerEntry));
   check('the road source is the default',
     await page.evaluate(() => window.trailViewer.layer()) === 'road.osm');
   check('the source menu starts closed',
@@ -93,7 +95,7 @@ async function main() {
   const categoryLabels = await page.$$eval('.layer-category-button', (nodes) => nodes.map((node) => node.textContent));
   check('the layer panel exposes four map types', categoryLabels.length === 4, categoryLabels.join('/'));
   check('the former Map category is now Road',
-    categoryLabels.join('/') === 'Road/Terrain/Satellite/No map', categoryLabels.join('/'));
+    categoryLabels.join('/') === 'Road/Terrain/Satellite/Custom', categoryLabels.join('/'));
   check('the layer entry exposes its expanded state',
     await page.getAttribute('.layer-menu-toggle', 'aria-expanded') === 'true');
   check('the active map type is checked in the layer panel',
@@ -106,15 +108,23 @@ async function main() {
     await page.locator('.layer-source-menu button[data-provider="road.tianditu"]')
       .evaluate((node) => node.classList.contains('locked') && node.dataset.locked === 'true'));
   check('the layer list leaves key management to map settings',
-    await page.locator('.layer-main-view .layer-key-action').count() === 0);
+    await page.locator('.layer-main-view .layer-key-actions .layer-key-action').count() === 0);
   await page.locator('.layer-settings-button').click();
   await waitForLayout(page);
+  check('no-map control is no longer inside map settings',
+    await page.locator('.layer-settings-view [data-no-map]').count() === 0);
+  check('map settings no longer shows the key scope or encryption note',
+    await page.locator('.layer-settings-view:not([hidden]) .layer-setting-note').count() === 0);
+  // The settings page now also holds the custom-source form, so scope the key assertions to its own section.
   check('map settings still hides key removal before setup',
-    await page.locator('.layer-settings-view:not([hidden]) .layer-key-action:not([hidden])')
+    await page.locator('.layer-settings-view:not([hidden]) .layer-key-actions .layer-key-action:visible')
       .evaluateAll((nodes) => nodes.length === 1
-        && nodes[0].textContent === 'Configure Tianditu key…'));
+        && nodes[0].textContent === ''
+        && nodes[0].title === 'Configure Tianditu key…'
+        && nodes[0].querySelector('svg')?.dataset.icon === 'plus'));
   check('map settings reports the key as missing',
-    await page.locator('.layer-setting-status').getAttribute('data-configured') === 'false');
+    await page.locator('.layer-setting-status').getAttribute('data-configured') === 'false'
+      && await page.locator('.layer-setting-status').textContent() === 'Not configured');
   await page.keyboard.press('Escape');
   check('Escape returns from settings to the layer list',
     await page.locator('.layer-settings-view').evaluate((node) => node.hidden)
@@ -127,6 +137,10 @@ async function main() {
   await waitForTiles(page, 'cyclosm');
   check('opening Terrain selects the remembered CyclOSM default',
     await page.evaluate(() => window.trailViewer.layer()) === 'terrain.cyclosm');
+  check('the layer entry follows the current terrain category icon',
+    await page.locator('.layer-menu-toggle').evaluate((node) =>
+      node.querySelector('.layer-menu-label').textContent === 'Terrain'
+      && node.querySelector('svg')?.dataset.icon === 'layer-terrain'));
   check('the Terrain category is active',
     await page.locator('.layer-category-button[data-layer="terrain"]').evaluate((node) => node.classList.contains('active')));
   check('the layer panel is labelled',
@@ -162,6 +176,10 @@ async function main() {
   await waitForTiles(page, 'openhikingmap');
   const hiking = requestsFor('/openhikingmap/');
   check('OpenHikingMap is selected', await page.evaluate(() => window.trailViewer.layer()) === 'terrain.openHiking');
+  check('the layer entry keeps the terrain category text as the source changes',
+    await page.locator('.layer-menu-toggle').evaluate((node) =>
+      node.querySelector('.layer-menu-label').textContent === 'Terrain'
+      && node.querySelector('svg')?.dataset.icon === 'layer-terrain'));
   check('OpenHikingMap uses the documented no-query URL',
     hiking.length > 0 && hiking.every((request) => new URL(request.url).pathname.match(/^\/openhikingmap\/\d+\/\d+\/\d+\.png$/))
       && hiking.every((request) => new URL(request.url).search === ''));
@@ -196,14 +214,49 @@ async function main() {
 
   await page.evaluate(() => window.trailViewer.selectLayer('none'));
   await page.waitForFunction(() => document.body.classList.contains('no-map'));
-  check('No map remains available through the category API',
+  check('No map remains available through the compatibility API',
     await page.evaluate(() => window.trailViewer.layer()) === 'none');
+  await openLayers();
+  await waitForLayout(page);
+  check('the no-map grid icon sits immediately before map settings',
+    await page.locator('[data-no-map]').evaluate((button) => {
+      const settings = document.querySelector('.layer-settings-button');
+      return button.nextElementSibling === settings
+        && button.querySelector('svg')?.dataset.icon === 'map-grid'
+        && button.getAttribute('aria-checked') === 'true'
+        && document.querySelector('.layer-menu-label').textContent === 'Grid'
+        && /无底图|No-map/i.test(button.title);
+    }));
+  const noMapActiveStyle = await page.locator('[data-no-map]').evaluate((button) => {
+    const style = getComputedStyle(button);
+    return {
+      background: style.backgroundColor,
+      color: style.color,
+      shadow: style.boxShadow,
+    };
+  });
+  check('the active no-map icon uses the shared blue active state',
+    noMapActiveStyle.background === 'rgb(35, 79, 121)'
+      && noMapActiveStyle.color === 'rgb(143, 217, 255)'
+      && noMapActiveStyle.shadow.includes('rgb(47, 155, 255)'),
+    JSON.stringify(noMapActiveStyle));
+  check('no-map mode does not repeat itself as a provider row',
+    await page.locator('.layer-main-view .layer-menu-section').nth(1)
+      .evaluate((node) => node.hidden && node.getClientRects().length === 0));
+  await page.locator('[data-no-map]').click();
+  await waitForLayout(page);
+  check('turning no-map off restores the previous map source',
+    await page.evaluate(() => window.trailViewer.layer()) === 'terrain.openTopo'
+      && !(await page.locator('body').evaluate((node) => node.classList.contains('no-map'))));
+  await page.locator('[data-no-map]').click();
+  await waitForLayout(page);
+  await page.keyboard.press('Escape');
 
   await page.locator('.lang-switch button').click();
   await waitForLayout(page);
   await openLayers();
   const zhLabels = await page.$$eval('.layer-category-button', (nodes) => nodes.map((node) => node.textContent));
-  check('the categories are translated', zhLabels.join('/') === '路网/地形/卫星/无底图', zhLabels.join('/'));
+  check('the categories are translated', zhLabels.join('/') === '路网/地形/卫星/定制', zhLabels.join('/'));
   await page.locator('.layer-category-button[data-layer="terrain"]').click();
   await waitForLayout(page);
   check('the Chinese source menu is translated',
@@ -220,8 +273,9 @@ async function main() {
   await openLayers();
   await waitForLayout(page);
   const narrowMenu = await page.locator('.layer-source-menu').boundingBox();
-  check('the source menu stays inside a narrow window',
-    narrowMenu && narrowMenu.x >= 0 && narrowMenu.x + narrowMenu.width <= 360
+  check('the source menu stays 320 px wide and right-aligned in a narrow window',
+    narrowMenu && Math.abs(narrowMenu.width - 320) < 1
+      && Math.abs(narrowMenu.x + narrowMenu.width - 350) < 1
       && narrowMenu.y >= 0 && narrowMenu.y + narrowMenu.height <= 740,
     JSON.stringify(narrowMenu));
   await page.screenshot({ path: shot || path.join(root, 'terrain-layer.png') });
@@ -250,11 +304,16 @@ async function main() {
   await page.locator('.layer-settings-button').click();
   await waitForLayout(page);
   check('a configured key exposes change and remove actions',
-    await page.locator('.layer-settings-view:not([hidden]) .layer-key-action:not([hidden])')
+    await page.locator('.layer-settings-view:not([hidden]) .layer-key-actions .layer-key-action:visible')
       .evaluateAll((nodes) => nodes.length === 2
-        && /更换/.test(nodes[0].textContent) && /移除/.test(nodes[1].textContent)));
+        && nodes.every((node) => node.textContent === '')
+        && /^(Change Tianditu key…|更换天地图密钥…)$/.test(nodes[0].title)
+        && nodes[0].querySelector('svg')?.dataset.icon === 'edit'
+        && /^(Remove saved key|移除已保存密钥)$/.test(nodes[1].title)
+        && nodes[1].querySelector('svg')?.dataset.icon === 'clear'));
   check('map settings reports the key as configured',
-    await page.locator('.layer-setting-status').getAttribute('data-configured') === 'true');
+    await page.locator('.layer-setting-status').getAttribute('data-configured') === 'true'
+      && /^(Configured|已配置)$/.test(await page.locator('.layer-setting-status').textContent()));
   await page.keyboard.press('Escape');
 
   await page.evaluate(() => window.trailViewer.selectLayer('satellite.tianditu'));
@@ -279,7 +338,7 @@ async function main() {
   await waitForLayout(page);
   check('selecting an unconfigured Tianditu source opens map settings',
     await page.locator('.layer-settings-view').evaluate((node) => !node.hidden));
-  await page.locator('.layer-settings-view .layer-key-action:not([hidden])').click();
+  await page.locator('.layer-settings-view .layer-key-actions .layer-key-action:not([hidden])').first().click();
   await waitForLayout(page);
   check('a standalone browser explains that Tianditu needs the QuickLook host',
     await page.locator('#toast').evaluate((node) => !node.hidden
@@ -307,9 +366,11 @@ async function main() {
   await runtimePage.locator('.layer-settings-button').click();
   await waitForLayout(runtimePage);
   check('runtime direct mode keeps Tianditu key management available',
-    await runtimePage.locator('.layer-settings-view:not([hidden]) .layer-key-action:not([hidden])')
+    await runtimePage.locator('.layer-settings-view:not([hidden]) .layer-key-actions .layer-key-action:visible')
       .evaluateAll((nodes) => nodes.length === 2
-        && /更换/.test(nodes[0].textContent) && /移除/.test(nodes[1].textContent)));
+        && nodes.every((node) => node.textContent === '')
+        && /^(Change Tianditu key…|更换天地图密钥…)$/.test(nodes[0].title)
+        && /^(Remove saved key|移除已保存密钥)$/.test(nodes[1].title)));
   await runtimePage.evaluate(() => window.trailViewer.tiandituResponse(503));
   check('a temporary Tianditu response keeps the key and layer',
     await runtimePage.evaluate(() => window.trailViewer.tiandituTransport()) === 'direct'

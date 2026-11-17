@@ -28,17 +28,18 @@ QuickLook
 | `viewer/waypoint-insights.js` | 本地航点语义分类 |
 | `viewer/profile-*.js` | 剖面数据、坡度着色、可选心率双轴、SVG 和地图光标 |
 | `viewer/map-view.js`, `viewer/map-focus.js` | 安全区域、取景、选中点避让和三态布局 |
-| `viewer/map-controls.js` | 底图类别、具体图源、图源菜单与署名 |
+| `viewer/map-controls.js` | 底图类别、具体图源、图源菜单、地图设置页与署名 |
+| `viewer/custom-layers.js` | 用户定制图源的模板校验、本地存储和 Leaflet 图层构造 |
 | `viewer/measure.js` | 多段手动测距、屏幕像素吸附、测距图层和实时距离 |
 | `viewer/toolbox.js` | 距离测量、叠加图导出与轨迹天气的统一工具箱入口 |
-| `viewer/weather.js` | 起点/终点/最高点的目标点计算、海拔可用性判断、Windy 外链生成和外链打开 |
+| `viewer/weather.js` | 起点、终点、顶点的目标点计算、海拔可用性判断、Windy 外链生成和外链打开 |
 | `viewer/icons.js` | 统一 UI 图标与地图数据符号注册表、Leaflet 原生控件图标适配 |
 | `viewer/export*.js` | 离屏画布、版式和 PNG 分块传输 |
 
 模块通过显式参数注入依赖，不共享可变全局状态。`window.trailViewer` 仅用于浏览器测试和宿主诊断。
 
 轨迹天气不内嵌第三方地图，也不请求第三方接口：`weather.js` 根据所选点位计算坐标和缩放级别——起点/终点
-取首末记录点，最高点取海拔最大的记录点，三者统一固定 14 级——拼出 Windy 分享链接，
+取首末记录点，顶点取海拔最大的记录点，三者统一固定 14 级——拼出 Windy 分享链接，
 再由宿主的 `NavigationStarting` 处理把 https 链接交给系统浏览器。Windy 的查询串只解析
 `?[overlay,]lat,lon,zoom`，其余参数会被丢弃；**只有把同一个点同时写进路径（`/lat/lon?...`）才会展开
 点位天气面板**，纯查询串形式只移动地图中心。因此链接固定使用路径形式，“定位准不准”再由缩放级别决定。
@@ -46,19 +47,36 @@ QuickLook
 查询串首段是图层，默认写 `clouds`：云量最直接回答“晒还是雾”，也保留点位面板。图层名由 Windy 决定
 （`clouds`、`wind`、`rain`、`temp` 等），写错会被静默忽略并退回风场，所以 `WINDY_OVERLAY` 是常量。
 
-最高点只认可信的海拔：路网 KML 会主动跳过海拔，部分 2D 轨迹根本没有 `ele`，而全 0 的平坦导出虽然带着
+顶点只认可信的海拔：路网 KML 会主动跳过海拔，部分 2D 轨迹根本没有 `ele`，而全 0 的平坦导出虽然带着
 高度字段却没有峰顶可言。因此 `highestPoint` 要求至少两个有效读数且全程高差 ≥ 1 米，否则该分段禁用，
-不把任意采样点当作最高点。页面 CSP 保持 `default-src 'none'`，不新增
+不把任意采样点当作顶点。页面 CSP 保持 `default-src 'none'`，不新增
 `frame-src` 或 `connect-src`。
+
+定制图源由 `custom-layers.js` 负责：只接受 HTTPS 且必须含 `{z}`/`{x}`/`{y}` 的模板，读取时逐条
+重新校验，任何损坏或过期的条目会被丢弃而不会让预览失败。插件**不内置任何第三方端点**，也不代理请求：
+地址是否可用、是否被服务方允许（来源校验、白名单、配额）由用户自行确认，因此加载失败时只提示、不降级。
+定制列表、添加和编辑采用独立子页，保存时替换当前活动图层；署名按纯文本转义。入口按图源数量分流：
+空列表直接进入管理页，非空列表的分类点击和再次打开都回到常规图源选择器，标题旁的“管理图源”进入管理页。
+列表行负责选择，图标按钮负责编辑与二次确认删除；瓦片加载成功/失败事件聚合成“加载中 / 已加载 / 部分可用
+/ 不可用”状态。图源列表由宿主写入应用数据目录的 `custom-sources.json`，通过运行时配置注入页面；页面保存
+后发送完整列表并由宿主原子写入。浏览器运行时继续使用 `localStorage`，首次升级会从旧存储迁移到宿主文件。
+两步路 `{$x}`/`{$y}`/`{$z}` 在唯一校验入口中归一化，含 `@2x`/`%402x` 的地址同时选择 512 px。无底图是
+低频显示模式，不占地图类别，由图层面板标题栏中、设置齿轮左侧的网格图标切换，`Q` / `E` 只循环四个
+在线/定制类别。
 
 工具箱、测距、导出和地图图层面板统一使用半透明工具表面，避免面板完全遮断底图上下文。测距的点新增、
 分段、清空、撤回和重做使用内部快照历史；宿主只在测距激活时接管 `Ctrl+Z` / `Ctrl+Shift+Z`，
 避免覆盖资源管理器的普通撤回。工具箱/测距与导出面板互斥显示；图源列表只渲染当前地图类型的来源。
+工具箱、图层面板和标记点列表的顶部位置由地图布局统一写出的 `--floating-panel-top` 决定；任一窗口打开
+时会先关闭另外两个，标记点列表因互斥被关闭时不恢复自己的按钮焦点。
+顶部图层入口由 `updateMenuButton` 更新类别文字和类别图标，具体图源名称只进入 tooltip 和无障碍名称；
+图源切换和语言切换共用这一入口。
 
 ## 宿主边界
 
 `src/TrailViewerPanel.cs` 负责 WebView2、文件读取和快捷键路由；`OverlayTransfer.cs` 负责导出分块状态机；
-`ViewerPreferences.cs` 负责跨版本偏好文件；`KmzArchive.cs` 负责受限解包：保留 KML 的内部相对目录，
+`ViewerPreferences.cs` 负责跨版本偏好文件；`CustomSourceStore.cs` 负责校验并原子保存定制图源；
+`KmzArchive.cs` 负责受限解包：保留 KML 的内部相对目录，
 并把 KML 引用的本地图片按同一目录结构写入临时文件夹，让虚拟文件主机可以直接响应照片 URL。
 宿主保留原始输入路径用于导出定位，KMZ 解包路径只供页面预览；所有输入类型在创建 WebView 前统一检查
 64 MB 上限。
@@ -71,13 +89,19 @@ QuickLook
 ready    <summary>
 error:<text>
 settings <query-string>
+custom-sources <json-array>
 measure-state <0|1>
+text-input   <0|1>
 export   <id> <count> <name>
 exportchunk <id> <index> <count> <base64>
 exportdone  <id> <count>
 ```
 
 页面协议版本位于 `Directory.Build.props`，与产品版本独立。
+
+`text-input` 上报页面内文本字段的焦点状态。宿主的全局键盘钩子在操作系统层拦截 `W/Q/E/S/C/X/M`，
+比 WebView 更早拿到按键，因此输入框里打字会被当成快捷键；钩子读到该状态为 1 时直接放行，
+页面关闭预览时宿主也会复位，避免状态残留。
 
 直连模式需要页面在请求瓦片时持有 `tk`，因此密钥会存在于当前 WebView 的内存和官方瓦片请求 URL 中。
 密钥在磁盘上由 DPAPI 加密；宿主不会把明文写入 viewer 地址、LocalStorage、日志或安装包。

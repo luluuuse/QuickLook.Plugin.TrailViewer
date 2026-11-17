@@ -45,7 +45,7 @@ npm run test:live
 | 剖面、心率、速览或高程 | `profile ve scrub` |
 | 测距、工具箱、轨迹天气 | `measure portrait`，并运行单元测试 |
 | 标记点、导航和列表 | `nav pins insights` |
-| 图层、缩放和定位 | `terrain zoom locate` |
+| 图层、定制图源、缩放和定位 | `terrain custom-source zoom locate` |
 | 图标 | `icons`，并运行单元测试 |
 | 导出 | `export` |
 | GPX/KML/FIT 解析与轨迹标记 | `viewer route-info`，并运行单元测试 |
@@ -67,13 +67,20 @@ node scripts/pack.cjs
 当前专项入口：
 
 - `tests/unit/icons.test.mjs`：图标注册表、尺寸、描边和未知图标回退。
-- `tests/unit/weather.test.mjs`：轨迹中心、单点、无坐标文件、缩放级别和 Windy 链接格式。
+- `tests/unit/weather.test.mjs`：起点、终点、顶点、无坐标文件、缩放级别和 Windy 链接格式。
 - `tests/icons-test.cjs`：全部控件/数据符号、Leaflet 适配、激活态和纯文字分段列头。
-- `tests/measure-test.cjs`：多段测距、吸附、快捷键、透明标签、右侧布局和导出互斥。
+  另覆盖地图设置八齿齿轮、标题栏无底图网格、四类图源 B 方案图标和分类悬停提示。
+- `tests/measure-test.cjs`：多段测距、吸附、快捷键、透明标签、右侧布局、导出互斥和彩色天气图钉。
 - `tests/profile-test.cjs`：坡度剖面、可选心率开关/双轴/缺口、悬停读数和窄窗布局。
 - `tests/route-info-test.cjs`：距离标记、缺口/异常聚类和重复平移时的语言节点稳定性。
 - `tests/export-test.cjs`：导出版式、透明 PNG、设置面板关闭按钮和宿主保存流程。
-- `tests/terrain-test.cjs`：地图类型图源过滤、面板透明度、天地图密钥与 403 降级。
+- `tests/terrain-test.cjs`：四类图源过滤、无底图显示模式、面板透明度、天地图密钥与 403 降级。
+  另覆盖无底图说明移除、天地图密钥单行布局、图标操作和键盘可访问名称。
+- 图源切换同时验证顶部入口的类别文字、类别图标和具体来源 tooltip。
+- `tests/custom-source-test.cjs`：Windy 512 px 图源添加、两步路占位符转换、HTTPS 校验、列表/编辑子页、
+  单行四分类、非空分类的常规选择器、重新打开分流、管理入口、图标操作、二次删除确认、持久化、删除回退和
+  主次按钮样式、跨面板文字拖动选择、320 px 面板宽度与右对齐，以及宿主配置注入和保存消息。
+- `tests/floating-panels-test.cjs`：工具箱、图层和标记点列表的共享顶部/标题几何与三者互斥。
 - `tests/runner-test.cjs`：专项筛选、套件列表、未知名称和未知参数处理。
 - `tests/network-test.cjs`：生成式多路线路网、时间对象跳过、拖动中视口刷新、LOD Canvas、标注点虚拟化及性能预算。
 - `tests/measure-test.cjs`：测距索引懒加载、航点吸附、轨迹吸附、地图手势和面板布局。

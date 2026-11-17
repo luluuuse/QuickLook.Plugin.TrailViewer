@@ -62,6 +62,7 @@ node scripts/pack.cjs
 | 偏好文件 | `%APPDATA%\pooi.moe\QuickLook\TrailViewer\viewer-settings.txt` |
 | 天地图密钥（DPAPI） | `%APPDATA%\pooi.moe\QuickLook\TrailViewer\secrets\tianditu.bin` |
 | WebView2 profile | `%APPDATA%\pooi.moe\QuickLook\TrailViewer_WebView2` |
+| 定制图源 | `%APPDATA%\pooi.moe\QuickLook\TrailViewer\custom-sources.json` |
 | 日志 | `%LOCALAPPDATA%\TrailViewer\log.txt` |
 | KMZ 临时目录 | `%TEMP%\TrailViewer\<guid>` |
 

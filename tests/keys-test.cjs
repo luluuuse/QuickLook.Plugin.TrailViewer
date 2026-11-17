@@ -114,9 +114,7 @@ async function main() {
   const order = [
     ['e', 'terrain.cyclosm', 'terrain'],
     ['e', 'satellite.esri', 'satellite'],
-    ['e', 'none', 'none'],
     ['e', 'road.osm', 'road'],
-    ['q', 'none', 'none'],
     ['q', 'satellite.esri', 'satellite'],
   ];
   for (const [key, want, category] of order) {
@@ -125,6 +123,11 @@ async function main() {
     check(`${key} -> ${want}`, s.layer === want && s.layerCategory === category && s.activeLayer === category,
       `${s.layer}/${s.layerCategory}/${s.activeLayer}`);
   }
+  await page.evaluate(() => window.trailViewer.selectLayer('none'));
+  await waitForLayout(page);
+  await press('e');
+  s = await state();
+  check('Q / E leaves no-map mode and restores a map source', s.layer !== 'none', s.layer);
 
   // 4. A photo covers the map: the three keys stand down until it is closed.
   await page.locator('.gpx-pin[title="Album"]').click();
@@ -208,7 +211,7 @@ async function main() {
   check('W on such a file does not throw', pageErrors.length === 0, pageErrors.join('; '));
   check('and changes nothing', (await state()).hasControl === false);
   // Q and E still work there: the background does not depend on the file's contents.
-  const layerOrder = ['road.osm', 'terrain.cyclosm', 'satellite.esri', 'none'];
+  const layerOrder = ['road.osm', 'terrain.cyclosm', 'satellite.esri'];
   const next = layerOrder[(layerOrder.indexOf(s.layer) + 1) % layerOrder.length];
   await press('e');
   s = await state();

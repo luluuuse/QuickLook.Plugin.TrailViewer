@@ -21,9 +21,25 @@ const UI_ICONS = Object.freeze({
     + '<path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>',
   layers: '<path d="m12 3 9 5-9 5-9-5 9-5Z"/><path d="m3 12 9 5 9-5"/>'
     + '<path d="m3 16 9 5 9-5"/>',
-  settings: '<circle cx="12" cy="12" r="3"/>'
-    + '<path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9 7 7M17 17l2.1 2.1'
-    + 'M19.1 4.9 17 7M7 17l-2.1 2.1"/>',
+  'map-grid': '<rect x="3" y="3" width="18" height="18" rx="2"/>'
+    + '<path d="M3 9h18M3 15h18M9 3v18M15 3v18"/>',
+  settings: '<path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25'
+    + 'a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1'
+    + 'a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38'
+    + 'a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20'
+    + 'a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25'
+    + 'a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08'
+    + 'a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38'
+    + 'a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4'
+    + 'a2 2 0 0 0-2-2Z"/><circle cx="12" cy="12" r="3"/>',
+  'layer-road': '<path d="M3 19c5 0 4-9 9-9s4-7 9-7"/>'
+    + '<circle cx="3" cy="19" r="1.8"/><circle cx="21" cy="3" r="1.8"/>',
+  'layer-terrain': '<path d="M3 16c3-5 6-6 9-2s5 2 9-1"/>'
+    + '<path d="M3 20c4-7 10-8 18-2"/><path d="M8 12c1-3 3-4 5-3"/>',
+  'layer-satellite': '<circle cx="12" cy="12" r="8"/><path d="M4 12h16"/>'
+    + '<path d="M12 4c3 3 3 13 0 16M12 4c-3 3-3 13 0 16"/>',
+  'layer-custom': '<path d="M4 7h10M18 7h2M4 17h2M10 17h10"/>'
+    + '<circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/>',
   'chevron-down': '<path d="m6 9 6 6 6-6"/>',
   'chevron-left': '<path d="m15 18-6-6 6-6"/>',
   close: '<path d="M6 6l12 12M18 6 6 18"/>',
@@ -57,19 +73,18 @@ const UI_ICONS = Object.freeze({
     + '<path d="M9.5 21h5"/><path d="M11 15.5l-1.5 2.5"/><path d="M15 15.5 13.5 18"/>',
 });
 
-/**
- * Weather point markers. These carry the map's own semantics (green start, red end, amber summit), so the
- * segmented picker can be read by shape and colour instead of three words that look alike at 16 px.
- */
+/** The selected map-pin weather marks keep semantic colour while sharing one pin silhouette. */
 const WEATHER_MARKS = Object.freeze({
-  start: '<circle cx="12" cy="12" r="7" fill="#18c964" stroke="#0d3d21" stroke-width="1.5"/>'
-    + '<path d="M10 8.4 16.2 12 10 15.6Z" fill="#0d3d21" stroke="none"/>',
-  // A filled rounded square with an inset block: the stop counterpart to the start marker's play triangle,
-  // so the pair reads as begin/end rather than as two unrelated shapes.
-  end: '<rect x="4.5" y="4.5" width="15" height="15" rx="3" fill="#e5243b" stroke="#3d0d13" stroke-width="1.5"/>'
-    + '<rect x="9" y="9" width="6" height="6" rx="1" fill="#3d0d13" stroke="none"/>',
-  highest: '<path d="M12 3.4 21.2 19.6H2.8Z" fill="#f5c400" stroke="#3d3108" stroke-width="1.5"/>'
-    + '<path d="M8.4 14.4 12 8.4l3.6 6" fill="none" stroke="#3d3108" stroke-width="1.5"/>',
+  start: '<path d="M12 22s7-6.2 7-13a7 7 0 0 0-14 0c0 6.8 7 13 7 13Z"'
+    + ' fill="#18c964" stroke="#0d3d21" stroke-width="1.5"/>'
+    + '<path d="m9.8 6.6 5.2 2.9-5.2 2.9Z" fill="#0d3d21" stroke="none"/>',
+  end: '<path d="M12 22s7-6.2 7-13a7 7 0 0 0-14 0c0 6.8 7 13 7 13Z"'
+    + ' fill="#e5243b" stroke="#3d0d13" stroke-width="1.5"/>'
+    + '<rect x="8.6" y="6.6" width="6.8" height="6.8" rx="1" fill="#3d0d13" stroke="none"/>',
+  highest: '<path d="M12 22s7-6.2 7-13a7 7 0 0 0-14 0c0 6.8 7 13 7 13Z"'
+    + ' fill="#f5c400" stroke="#3d3108" stroke-width="1.5"/>'
+    + '<path d="m7.5 12 2.5-3 1.8 1.7 1.4-1.8 3.3 3.1" fill="none"'
+    + ' stroke="#3d3108" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>',
 });
 
 export const WEATHER_MARK_NAMES = Object.freeze(Object.keys(WEATHER_MARKS));

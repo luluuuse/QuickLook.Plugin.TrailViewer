@@ -14,7 +14,18 @@ export function createKeyboardController({
   function cycleLayer(step) {
     const switcher = getLayerSwitch();
     if (!switcher) return;
-    const keys = Object.keys(LAYERS);
+    if (switcher.current() === 'none' && switcher.resumeMap) {
+      switcher.resumeMap();
+      return;
+    }
+    // A category with no provider (Custom, until the user adds one) is not a stop on the Q/E walk: landing
+    // there would show an empty source list and leave the map unchanged. A category that declares no provider
+    // map at all is left alone, so a caller that only names categories still cycles through all of them.
+    const keys = Object.keys(LAYERS)
+      .filter((key) => !LAYERS[key].settingsOnly)
+      .filter((key) => LAYERS[key].providers === undefined
+        || Object.keys(LAYERS[key].providers).length > 0);
+    if (keys.length === 0) return;
     const at = keys.indexOf(switcher.currentCategory());
     switcher.select(keys[(at + step + keys.length) % keys.length], true);
   }

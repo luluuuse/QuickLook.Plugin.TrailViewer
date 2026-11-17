@@ -21,6 +21,7 @@ test('the icon registry is unique and covers every shared control', () => {
     'chevron-down', 'chevron-left', 'close', 'check', 'pin', 'list', 'finish-section',
     'center-point', 'undo', 'redo', 'clear', 'stop', 'route', 'filter', 'edit',
     'arrow-left', 'arrow-right', 'warning', 'activity',
+    'layer-road', 'layer-terrain', 'layer-satellite', 'layer-custom', 'map-grid',
   ]) {
     assert.ok(UI_ICON_NAMES.includes(name), name);
   }
@@ -59,11 +60,20 @@ test('the weather picker has one marker per target', () => {
   }
 });
 
-test('weather markers carry the map semantics and fall back to start', () => {
+test('weather markers use the selected coloured map pins and fall back to start', () => {
   assert.match(weatherMarkMarkup('start'), /#18c964/);
   assert.match(weatherMarkMarkup('end'), /#e5243b/);
   assert.match(weatherMarkMarkup('highest'), /#f5c400/);
+  for (const name of WEATHER_MARK_NAMES) {
+    assert.match(weatherMarkMarkup(name), /stroke-width="1.5"/, name);
+  }
   assert.match(weatherMarkMarkup('not-a-mode'), /data-weather-mark="start"/);
+});
+
+test('the map settings registry uses the outlined gear', () => {
+  const svg = iconMarkup('settings');
+  assert.match(svg, /M12\.22 2/);
+  assert.match(svg, /<circle cx="12" cy="12" r="3"\/>/);
 });
 
 test('unknown names fail visibly through the local fallback icon', () => {

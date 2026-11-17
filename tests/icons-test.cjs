@@ -57,7 +57,7 @@ async function main() {
     zoomIn: window.__readIcon('.leaflet-control-zoom-in svg'),
     zoomOut: window.__readIcon('.leaflet-control-zoom-out svg'),
     locate: window.__readIcon('.locate-switch svg'),
-    layers: window.__readIcon('.layer-menu-toggle svg[data-icon="layers"]'),
+    layers: window.__readIcon('.layer-menu-toggle svg[data-icon="layer-road"]'),
     layerChevron: window.__readIcon('.layer-menu-chevron'),
     toolbox: window.__readIcon('.toolbox-switch > button svg'),
     pins: window.__readIcon('.pins-switch svg'),
@@ -66,8 +66,8 @@ async function main() {
   check('Leaflet zoom controls use plus and minus icons',
     expectedDefault(top.zoomIn, 'plus') && expectedDefault(top.zoomOut, 'minus'),
     JSON.stringify(top));
-  check('locate, layers, toolbox, pins and list use the shared default size',
-    expectedDefault(top.locate, 'locate') && expectedDefault(top.layers, 'layers')
+  check('locate, current source, toolbox, pins and list use the shared default size',
+    expectedDefault(top.locate, 'locate') && expectedDefault(top.layers, 'layer-road')
       && expectedDefault(top.toolbox, 'toolbox') && expectedDefault(top.pins, 'pin')
       && expectedDefault(top.list, 'list'), JSON.stringify(top));
   check('the layer dropdown uses the compact shared chevron',
@@ -87,11 +87,13 @@ async function main() {
   await page.click('.layer-menu-toggle');
   const layerPanel = await page.evaluate(() => ({
     settings: window.__readIcon('.layer-settings-button svg'),
+    noMap: window.__readIcon('[data-no-map] svg'),
     close: window.__readIcon('.layer-menu-close svg'),
     selected: window.__readIcon('.layer-provider-option.selected .layer-selected-icon svg'),
   }));
-  check('layer settings, close and selected-state icons share the system',
-    expectedDefault(layerPanel.settings, 'settings') && expectedDefault(layerPanel.close, 'close')
+  check('layer no-map, settings, close and selected-state icons share the system',
+    expectedDefault(layerPanel.noMap, 'map-grid')
+      && expectedDefault(layerPanel.settings, 'settings') && expectedDefault(layerPanel.close, 'close')
       && expectedCompact(layerPanel.selected, 'check'), JSON.stringify(layerPanel));
   const visibleProviders = await page.evaluate(() => [...document.querySelectorAll(
     '.layer-provider-option:not([hidden]) .layer-provider-label',
@@ -99,6 +101,15 @@ async function main() {
   check('the layer menu shows only providers from the active map type',
     visibleProviders.join('|') === 'OpenStreetMap HOT|Tianditu road',
     visibleProviders.join('|'));
+  const categoryIcons = await page.$$eval('.layer-category-button', (nodes) => nodes.map((node) => ({
+    name: node.querySelector('svg')?.dataset.icon,
+    title: node.title,
+  })));
+  check('the four map categories use the selected structure icons and hover labels',
+    categoryIcons.map((item) => item.name).join('|')
+      === 'layer-road|layer-terrain|layer-satellite|layer-custom'
+      && categoryIcons.every((item) => item.title.length > 0),
+    JSON.stringify(categoryIcons));
   await page.click('.layer-settings-button');
   const back = await page.evaluate(() => window.__readIcon('.layer-menu-back svg'));
   check('the layer settings back action uses the shared chevron',

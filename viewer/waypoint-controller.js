@@ -75,6 +75,7 @@ export function createWaypointController({
   onVisibilityChange,
   onFocus,
   onLayoutChange,
+  onOverviewOpen,
   setProfilePinsVisible,
 }) {
   let map = null;
@@ -97,6 +98,7 @@ export function createWaypointController({
     el,
     onSelect: (index) => selectNode(index),
     onLayoutChange,
+    onOpen: onOverviewOpen,
   });
   let overviewCache = null;
   let shown = savedVisibility();
@@ -596,7 +598,7 @@ export function createWaypointController({
     hasOverview: () => listControl !== null,
     overviewOpen: () => overview.isOpen(),
     openOverview: () => overview.open(overviewItems(), stopIndex),
-    closeOverview: () => overview.close(),
+    closeOverview: (restoreFocus = true) => overview.close({ restoreFocus }),
     refreshMapMarks: renderWaypointPins,
     relabel,
     openStop() {

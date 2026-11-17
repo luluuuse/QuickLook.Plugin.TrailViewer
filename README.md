@@ -57,13 +57,18 @@ Common controls:
   persistent map/marker/export preferences.
 - **Map sources:** Road keeps the OpenStreetMap HOT base, while Terrain offers CyclOSM, OpenHikingMap and
   OpenTopoMap in a compact source menu. Tianditu road and satellite imagery are available with a user-owned key;
-  the source panel shows only providers from the active map type.
+  the Custom category has a dedicated source list and editor for HTTPS tiles, including two-step placeholders and
+  512 px addresses. The host persists custom sources across overwrite upgrades. The source panel shows only
+  providers from the active map type. The top layer entry shows the active category icon and label, while the
+  low-frequency no-map mode uses the Grid icon in the layer title bar.
 - **Unified toolbox:** distance measurement, overlay export and route weather share one entry. Export offers
   square, portrait and landscape PNG layouts with selectable ink and backing. Task panels use a translucent
   surface on the right and measurement/export cannot remain open together.
+- **Unified floating panels:** the toolbox, layer panel and waypoint list share one top position and header
+  height, and only one can remain open.
 - **Route weather:** opens Windy in your browser with that point's hourly forecast already expanded. Choose
-  start, end or summit; each opens at street level, and the summit segment is disabled when the file carries no
-  usable elevation. Windy opens on the cloud layer, and no third-party map is embedded in the preview.
+  start, end or peak; each opens at street level, and the peak segment is disabled when the file carries no
+  reliable elevation. Windy opens on the cloud layer, and no third-party map is embedded in the preview.
 
 Detailed behaviour, advanced controls and export examples are in [docs/USAGE.md](docs/USAGE.md).
 
@@ -86,14 +91,15 @@ Each input file is limited to 64 MB.
 ## Privacy
 
 The plugin sends no track data to a server. Opening a file reads that file locally. Online basemaps contact
-their tile providers when selected; **No map** renders the route on a local grid. Preferences are stored in
+their tile providers when selected, and custom sources contact the addresses you configure. **No-map mode**
+renders the route on a local grid. Route weather sends the selected point to Windy. Preferences are stored in
 the user's local application data and are not tied to the versioned WebView cache.
 
 ## Troubleshooting
 
 - If the preview still looks like the selected file as XML text, confirm the plugin is installed and enabled.
 - If an upgrade does not appear, exit QuickLook from the tray completely and start it again.
-- If online tiles are blank, check network access or switch to **No map**.
+- If online tiles are blank, check network access or enable **Grid** (No-map mode).
 - Esc closes QuickLook previews; use the preview close button when needed.
 
 More diagnostic details are in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) and

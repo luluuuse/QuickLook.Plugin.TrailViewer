@@ -6,8 +6,8 @@
 
 ### 打开文件
 
-在资源管理器中选中 `.gpx`、`.kml`、`.kmz` 或 `.fit`，按 <kbd>Space</kbd>。在线底图需要网络；选择“无底图”时
-轨迹直接绘制在本地网格上。
+在资源管理器中选中 `.gpx`、`.kml`、`.kmz` 或 `.fit`，按 <kbd>Space</kbd>。在线底图需要网络；选择
+“网格”（无底图模式）时轨迹直接绘制在本地网格上。
 
 FIT 读取活动和路线中的 GPS 记录、时间、海拔、心率、会话用时及 `course_point` 路线点。简要模式聚焦
 路线基础数据；步频、功率、温度、训练步骤和完整设备指标暂不展示。
@@ -16,15 +16,53 @@ FIT 读取活动和路线中的 GPS 记录、时间、海拔、心率、会话�
 
 ### 地图与标记点
 
-- 顶部“图层”入口显示当前底图类型；面板中分为 **路网**、**地形**、**卫星** 和 **无底图** 四类，
-  下方只列出当前类型对应的图源。<kbd>Q</kbd> / <kbd>E</kbd> 可直接循环切换类型。
+- 顶部“图层”入口的文字显示当前 **路网 / 地形 / 卫星 / 定制** 类别，图标同步使用该类别的地图结构图标；
+  具体图源名称保留在悬停提示中。面板中分为这四类，
+  每类带路线节点、等高线、地球或配置滑杆图标及悬停说明；下方只列出当前类型对应的图源。
+  <kbd>Q</kbd> / <kbd>E</kbd> 可直接循环切换类型。
+- **无底图模式**使用图层面板标题栏中的空白网格图标，位于设置齿轮左侧。开启后只显示轨迹、测距和坐标网格，
+  不下载在线瓦片；顶部入口显示“网格”。关闭或按背景切换键会恢复上次使用的地图图源。图标提供悬停说明和
+  蓝色激活态。
 - 图层面板使用与工具箱一致的半透明背景和背景模糊，不完全遮断下方地图。
+- 工具箱、图层面板和标记点列表使用相同的顶部位置与标题栏高度；三者互斥，打开一个会自动关闭另外两个。
 - 路网使用 OpenStreetMap HOT。地形菜单提供 CyclOSM、OpenHikingMap 和 OpenTopoMap；再次进入某一类别时
   会恢复该类别上次选择的图源。
 - 路网和卫星菜单提供天地图。首次选择时按提示配置天地图开发者密钥；密钥由当前 Windows 用户凭据加密，
   后续打开无需再次输入。
 - 天地图密钥管理位于图层面板右上角齿轮打开的 **地图设置** 页；已配置时提供 **更换密钥** 和
-  **移除密钥**，主图层列表只显示地图类型和图源。
+  **移除密钥** 图标操作，主图层列表只显示地图类型和图源。密钥状态压缩为“尚未配置 / 已配置”，不再展示
+  技术加密说明。
+
+### 定制图源
+
+图层面板最多保存 20 个定制图源。没有图源时，单击 **定制** 类别会直接打开管理页空状态；至少保存
+一个图源后，单击该类别或重新打开图层面板会显示常规图源选择列表，用于直接切换底图。需要添加、编辑或
+删除时，点击“地图图源”标题旁的 **管理图源** 进入管理页。
+
+管理页标题栏右侧的 **+** 用于添加；点击列表行切换图源，右侧铅笔和删除按钮分别编辑、删除。删除需要再次
+点击确认，避免误操作。编辑与添加使用独立子页，保存后回到管理列表并立即应用当前图源。
+
+- **名称**：显示在图源列表和顶部入口的悬停提示中。
+- **瓦片地址**：必须包含 `{z}`、`{x}`、`{y}` 占位符，可选 `{s}`；只接受 HTTPS 地址。
+  例如 `https://example.com/tiles/{z}/{x}/{y}.png`。也可直接粘贴两步路格式的 `{$x}`、`{$y}`、`{$z}`，
+  保存前会自动转换为 Leaflet 占位符。
+- **瓦片大小**：256 或 512。地址含 `@2x` 或 `%402x` 时会自动选择 512；512 图源同时使用 512 CSS 像素
+  尺寸和负的缩放偏移，避免瓦片被压缩或放大。
+- **缩放级别**：最小与最大级别，默认 1–19。
+- **高级选项**：默认折叠。子域在地址里用了 `{s}` 时必须填写，例如 `abc`；署名作为纯文本显示在地图
+  右下角的版权行；仅当服务使用 TMS 的 Y 轴方向时勾选翻转 Y。
+
+保存后图源会出现在 **定制** 列表，选中即渲染。列表状态依次为 **加载中**、**已加载**、**部分可用**
+或 **不可用**；失败时只提示，**不会**自动切换回其他底图，避免把配置问题误判为服务故障。
+
+**来源与授权说明**默认折叠。定制图源由用户自行提供，插件不内置任何第三方端点，也不校验其可用性与授权；
+地址是否被服务方允许（例如来源校验、Referer 白名单）需要用户自行确认。
+
+定制图源由宿主保存在本机应用数据目录，不再依赖会随版本变化的 WebView 存储域名；正常覆盖安装新版本后
+仍会保留。首次使用这一存储方式时，旧页面存储中的图源会自动迁移。
+
+#### 标记点
+
 - <kbd>←</kbd> <kbd>→</kbd> 或 <kbd>A</kbd> <kbd>D</kbd> 按累计里程顺序切换标记点。
 - 绿色起点、红色终点与重合的黄色图钉共享同一导航节点。
 - 图钉靠近窗口边缘、信息卡、工具栏或剖面时，地图会平滑回中。
@@ -67,9 +105,9 @@ FIT 读取活动和路线中的 GPS 记录、时间、海拔、心率、会话�
 决定定位到哪个点：
 
 - **起点 / 终点**：第一个或最后一个记录点，固定 14 级街道视角。
-- **最高点**：全程海拔最大的记录点，同样 14 级。文件没有海拔数据，或全程高差不足 1 米（例如全 0 的
+- **顶点**：全程海拔最大的记录点，同样 14 级。文件没有可靠海拔，或全程高差不足 1 米（例如全 0 的
   平坦导出），该分段会禁用，不会拿一个任意点冒充峰顶。
-- 三个点位都用与地图一致的语义图标：绿色起点、红色终点、琥珀色峰顶。
+- 三个点位使用统一地图图钉轮廓：绿色播放箭头表示起点、红色方框表示终点、琥珀色山峰表示顶点。
 - 打开后默认显示**云层**，便于判断日照与雾况；需要风、降水或温度时在 Windy 内切换图层。
 - 预览页不内嵌第三方地图，也不需要 Windy API 密钥；点击该入口前不会发起任何外部请求。
 - 没有坐标的文件（例如无 GPS 的训练文件）会禁用该入口和分段选择，悬停提示会说明原因。
@@ -123,8 +161,8 @@ Canvas 绘制路线，并跳过普通轨迹点圆点、公里数字和路网级�
 
 ### Open a file
 
-Select a `.gpx`, `.kml`, `.kmz` or `.fit` file in Explorer and press <kbd>Space</kbd>. Online basemaps require network
-access; **No map** renders the route on a local grid.
+Select a `.gpx`, `.kml`, `.kmz` or `.fit` file in Explorer and press <kbd>Space</kbd>. Online basemaps require
+network access; **Grid** (No-map mode) renders the route on a local grid.
 
 The first FIT version reads GPS records, time, elevation, heart rate, session totals and `course_point` markers
 from activities and courses. Laps, cadence, power, temperature, workout steps and the full device metric set are
@@ -135,15 +173,61 @@ so malformed or padded files cannot exhaust memory.
 
 ### Map and waypoints
 
-- Basemaps are grouped into **Road**, **Terrain**, **Satellite** and **No map**; <kbd>Q</kbd> / <kbd>E</kbd>
-  switches category.
+- Basemaps are grouped into **Road**, **Terrain**, **Satellite** and **Custom**;
+  <kbd>Q</kbd> / <kbd>E</kbd> switches category.
+- The top layer entry keeps the current Road, Terrain, Satellite or Custom label and matching category icon;
+  the active source name is shown in the tooltip.
+- **No-map mode** uses the blank-grid icon in the layer-panel title bar, immediately before Map settings. It
+  shows only the route, measurement and coordinate grid without downloading tiles; turning it off or pressing
+  a background key restores the last map source. The top entry reads Grid. The icon has a tooltip and a blue
+  active state.
 - The source list contains only providers for the active category, and the panel uses the shared translucent,
   blurred tool surface.
+- The toolbox, layer panel and waypoint list share one top position and header height. They are mutually
+  exclusive: opening one closes the other two.
 - Road uses OpenStreetMap HOT. The Terrain menu offers CyclOSM, OpenHikingMap and OpenTopoMap, and remembers
   the source last selected in that category.
 - The Road and Satellite menus offer Tianditu. Enter a user-owned developer key when first prompted; it is
   encrypted for the current Windows user and does not need to be entered for later previews.
-- With a key configured, the bottom of the Road or Satellite source menu offers **Change key** and **Remove key**.
+- With a key configured, **Map settings** offers **Change key** and **Remove key** icon actions. The status reads
+  only Not configured or Configured, without technical encryption copy.
+
+### Custom sources
+
+The layer panel stores up to 20 custom raster sources. With no sources, clicking **Custom** opens the empty
+manager. Once at least one source is saved, clicking the category or reopening the layer panel shows the regular
+source picker for switching basemaps. Use **Manage sources** beside the source heading to add, edit or delete
+entries.
+
+In the manager, use **+** in the title bar to add a source; click a row to select it, and use the pencil or delete
+buttons to edit or remove it. Deletion needs a second confirmation click. Adding and editing use a separate page,
+and saving returns to the manager list and applies the source immediately.
+
+- **Name** — shown in the source list and the top-entry tooltip.
+- **Tile URL** — must contain `{z}`, `{x}` and `{y}`; `{s}` is optional. Only HTTPS addresses are
+  accepted, for example `https://example.com/tiles/{z}/{x}/{y}.png`. Two-step `{$x}`, `{$y}` and `{$z}`
+  placeholders can also be pasted and are converted to Leaflet placeholders before saving.
+- **Tile size** — 256 or 512. An address containing `@2x` or `%402x` selects 512 automatically. A 512 px
+  source uses the correct 512 CSS-pixel size together with a negative zoom offset so tiles are neither
+  compressed nor enlarged.
+- **Zoom range** — minimum and maximum level, 1–19 by default.
+- **Advanced options** — collapsed by default. Fill in subdomains when the URL uses `{s}`, for example `abc`;
+  attribution is printed as plain text in the map credit line; enable Flip Y only for a TMS source.
+
+A saved source appears in the **Custom** list and renders as soon as it is selected. Its state reads **Loading**,
+**Ready**, **Partially available** or **Unavailable**. If tiles fail, the viewer only warns you to check the
+address and the service's restrictions; it does **not** silently fall back to another basemap.
+
+The **source and licence note** is collapsed by default. Custom sources are yours. The plugin ships no
+third-party endpoint and does not verify availability or licence; whether a service allows this app
+(referer checks, allow-lists, quotas) is for you to confirm.
+
+The host stores custom sources in local application data rather than the versioned WebView origin, so normal
+overwrite upgrades retain them. Sources in the old page storage are migrated the first time the durable store
+is used.
+
+#### Waypoints
+
 - <kbd>←</kbd> <kbd>→</kbd> or <kbd>A</kbd> <kbd>D</kbd> navigate by cumulative route distance.
 - Green starts and red ends share one navigation node with coincident yellow pins.
 - The map recentres when the selected pin approaches an edge, the summary, toolbars or the profile.
@@ -195,10 +279,11 @@ place does not have to be found again inside Windy. The segmented picker under t
 it lands on:
 
 - **Start** and **End** jump straight to the first or last recorded point at level 14.
-- **Summit** is the recorded point with the greatest elevation, also at level 14. The segment is disabled when
+- **Peak** is the recorded point with the greatest elevation, also at level 14. The segment is disabled when
   the file has no elevation or less than a metre of relief across the whole route (a flat all-zero export),
-  so an arbitrary sample is never presented as the summit.
-- All three points use the map's own semantics: green start, red end, amber summit.
+  so an arbitrary sample is never presented as the peak.
+- All three points use one map-pin silhouette: green play arrow for start, red square for end and amber mountain
+  for peak.
 - Windy opens on the **cloud** layer, which is the quickest read on sun versus fog; wind, rain and temperature
   are one click away inside Windy.
 - The preview embeds no third-party map and needs no Windy API key; no external request happens before the
