@@ -67,7 +67,9 @@ should receive the same adapter rather than overriding the vendored file.
 
 - Map controls: zoom, locate, grid/no-map, eight-tooth settings gear, marker pin, list, close, check and chevrons.
 - Map source categories: route nodes, contour lines, globe and configuration sliders.
-- Toolbox and measurement: toolbox, ruler, image download, finish section, centre point, undo, redo, clear and stop.
+- Toolbox and measurement: toolbox, ruler, coordinates, folded map for overlay export, stacked photo for
+  attachment export, cloud all-photo export, folder embedded-photo export, copy, finish section, centre point,
+  undo, redo, clear and stop.
 - Route weather: the cloud action icon plus the coloured start, end and peak map-pin marks.
 - Splits: the route toggle and chevron; metric table headers intentionally remain text-only.
 - Overview and photos: filter, edit, close, previous and next.

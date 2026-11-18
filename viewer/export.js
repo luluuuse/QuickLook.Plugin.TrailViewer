@@ -351,6 +351,42 @@ function paintScrim(ctx, box, wash) {
   ctx.restore();
 }
 
+function ellipsize(ctx, value, maxWidth) {
+  const text = String(value || '');
+  if (!text || ctx.measureText(text).width <= maxWidth) return text;
+  const suffix = '\u2026';
+  let low = 0;
+  let high = text.length;
+  while (low < high) {
+    const middle = Math.ceil((low + high) / 2);
+    if (ctx.measureText(text.slice(0, middle) + suffix).width <= maxWidth) low = middle;
+    else high = middle - 1;
+  }
+  return text.slice(0, low).trimEnd() + suffix;
+}
+
+/** The route name and date identify a share image without competing with the primary distance figure. */
+function heading(ctx, title, meta, box, pen) {
+  if (!title && !meta) return;
+  const row = box.row;
+  const size = row ? 34 : 30;
+  const align = row ? 'right' : 'left';
+  const x = row ? box.width * 0.95 : box.width * 0.056;
+  const maxWidth = row ? box.width * 0.4 : box.width * 0.88;
+  const top = row ? box.height * 0.062 : box.height * 0.052;
+
+  ctx.fillStyle = pen.text;
+  ctx.textAlign = align;
+  ctx.font = `600 ${size}px ${FONT}`;
+  ctx.fillText(ellipsize(ctx, title, maxWidth), x, top);
+  if (meta) {
+    ctx.fillStyle = pen.faint;
+    ctx.font = `400 18px ${FONT}`;
+    ctx.fillText(ellipsize(ctx, meta, maxWidth), x, top + size * 1.12);
+  }
+  ctx.textAlign = 'left';
+}
+
 function badge(ctx, [x, y], fill, text) {
   ctx.beginPath();
   ctx.arc(x, y, 16, 0, Math.PI * 2);
@@ -558,14 +594,14 @@ function figures(ctx, rows, box, pen) {
  * formatted, so the drawing code knows nothing about languages or units. `ends` are the two words in the
  * start and end badges, and `size` / `scrim` / `ink` are the three settings the panel offers.
  */
-export function drawOverlay({ segments, rows, ends, size, scrim, ink }) {
+export function drawOverlay({ segments, rows, ends, title, meta, size, scrim, ink, preview = false }) {
   const pen = PENS[ink] || PENS[DEFAULT_INK];
   const preset = presetOf(size);
   const box = layout(preset.width, preset.height);
-  // The composition is 1080 wide; the file is what the photo wants. Everything below is in composition
-  // pixels, so the line and the type keep their weight whatever the output size. `pixels` is the long edge,
-  // which is the height for the three portrait shapes and the width for the landscape one.
-  const scale = preset.pixels / Math.max(preset.width, preset.height);
+  // Drawing at preview resolution avoids allocating a full 2K canvas for every tool click.
+  const scale = preview
+    ? Math.min(236 / preset.width, 112 / preset.height)
+    : preset.pixels / Math.max(preset.width, preset.height);
 
   const canvas = document.createElement('canvas');
   canvas.width = Math.round(box.width * scale);
@@ -576,6 +612,7 @@ export function drawOverlay({ segments, rows, ends, size, scrim, ink }) {
   ctx.lineCap = 'round';
 
   if (scrim && scrim !== 'none') paintScrim(ctx, box, pen.wash);
+  heading(ctx, title, meta, box, pen);
 
   const fullLines = segments.filter((line) => line.length > 0);
   const lines = fullLines.map(decimate);
@@ -598,9 +635,11 @@ export function drawOverlay({ segments, rows, ends, size, scrim, ink }) {
     paintRoute(ctx, placed, minEle, maxEle, flat);
     const firstLine = placed[0].map((p) => p.xy);
     const lastLine = placed[placed.length - 1].map((p) => p.xy);
-    const [start, end] = separate(badgeAt(firstLine, false), badgeAt(lastLine, true), 40);
-    badge(ctx, start, '#2ecc40', ends.start);
-    badge(ctx, end, '#ff2d00', ends.end);
+    if (ends) {
+      const [start, end] = separate(badgeAt(firstLine, false), badgeAt(lastLine, true), 40);
+      badge(ctx, start, '#2ecc40', ends.start);
+      badge(ctx, end, '#ff2d00', ends.end);
+    }
   }
 
   if (box.row) figures(ctx, rows, box, pen);

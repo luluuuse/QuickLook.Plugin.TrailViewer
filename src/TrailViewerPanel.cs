@@ -5,6 +5,7 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -40,6 +41,7 @@ internal sealed class TrailViewerPanel : UserControl, IDisposable
     private string _fileRoot;
     private string _unpackedFolder;
     private readonly OverlayTransfer _overlay = new();
+    private AttachmentExport _attachments;
     private WebView2 _webView;
     private GlobalKeys _keys;
     private volatile bool _onScreen;
@@ -64,6 +66,7 @@ internal sealed class TrailViewerPanel : UserControl, IDisposable
     {
         _measureActive = false;
         _sourcePath = Path.GetFullPath(path);
+        _attachments?.Dispose();
         _path = _sourcePath;
         _name = Path.GetFileName(_sourcePath);
         _fileRoot = Path.GetDirectoryName(_sourcePath);
@@ -108,6 +111,7 @@ internal sealed class TrailViewerPanel : UserControl, IDisposable
                 return;
             }
         }
+        _attachments = new AttachmentExport(_sourcePath, _fileRoot);
 
         _webView = new WebView2
         {
@@ -360,12 +364,11 @@ internal sealed class TrailViewerPanel : UserControl, IDisposable
             return;
         if (key.RoutedEvent != Keyboard.PreviewKeyDownEvent || key.IsRepeat)
             return;
-        // X has a shifted panel action; Z is ours only with Control, and only while measurement is active.
+        // Z is ours only with Control, and only while measurement is active.
         var modifiers = key.KeyboardDevice.Modifiers;
-        var shiftedExport = modifiers == ModifierKeys.Shift && key.Key == Key.X;
         var measureHistory = key.Key == Key.Z
             && (modifiers == ModifierKeys.Control || modifiers == (ModifierKeys.Control | ModifierKeys.Shift));
-        if (modifiers != ModifierKeys.None && !shiftedExport && !measureHistory)
+        if (modifiers != ModifierKeys.None && !measureHistory)
             return;
         if (measureHistory && !_measureActive)
             return;
@@ -381,7 +384,6 @@ internal sealed class TrailViewerPanel : UserControl, IDisposable
             case Key.Q: name = "q"; break;
             case Key.E: name = "e"; break;
             case Key.S: name = "s"; break;
-            case Key.X: name = shiftedExport ? "X" : "x"; break;
             case Key.M: name = "m"; break;
             case Key.Z when measureHistory:
                 name = (modifiers & ModifierKeys.Shift) != 0 ? "Z" : "z";
@@ -429,6 +431,20 @@ internal sealed class TrailViewerPanel : UserControl, IDisposable
             AppendExport(message.Substring("exportchunk\t".Length));
         else if (message.StartsWith("exportdone\t", StringComparison.Ordinal))
             FinishExport(message.Substring("exportdone\t".Length));
+        else if (message.StartsWith("clipboard\t", StringComparison.Ordinal))
+            CopyToClipboard(message.Substring("clipboard\t".Length));
+        else if (message.StartsWith("attachmentbegin\t", StringComparison.Ordinal))
+            BeginAttachment(message.Substring("attachmentbegin\t".Length));
+        else if (message.StartsWith("attachmentlocal\t", StringComparison.Ordinal))
+            CopyLocalAttachment(message.Substring("attachmentlocal\t".Length));
+        else if (message.StartsWith("attachmentresume\t", StringComparison.Ordinal))
+            ResumeAttachments(message.Substring("attachmentresume\t".Length));
+        else if (message.StartsWith("attachmentchunk\t", StringComparison.Ordinal))
+            AppendAttachment(message.Substring("attachmentchunk\t".Length));
+        else if (message.StartsWith("attachmentdone\t", StringComparison.Ordinal))
+            FinishAttachment(message.Substring("attachmentdone\t".Length));
+        else if (message.StartsWith("attachmentlink\t", StringComparison.Ordinal))
+            _ = DownloadAttachmentAsync(message.Substring("attachmentlink\t".Length));
         else if (message == "ready" || message.StartsWith("ready\t", StringComparison.Ordinal))
             Finish(null, message.Length > 6 ? message.Substring(6) : "");
         else if (message.StartsWith("error:", StringComparison.Ordinal))
@@ -450,6 +466,150 @@ internal sealed class TrailViewerPanel : UserControl, IDisposable
         {
             RemoveTiandituKey(IsEnglishMessage(message));
         }
+    }
+
+    private void CopyToClipboard(string body)
+    {
+        var split = body.IndexOf('\t');
+        var id = split > 0 ? body.Substring(0, split) : "";
+        if (split <= 0 || id.Length > 80)
+            return;
+
+        string text;
+        try
+        {
+            text = Uri.UnescapeDataString(body.Substring(split + 1));
+        }
+        catch (UriFormatException)
+        {
+            SendClipboardResult(id, false, "clipboard text was invalid");
+            return;
+        }
+        if (text.Length > 32000)
+        {
+            SendClipboardResult(id, false, "clipboard text is too large");
+            return;
+        }
+
+        try
+        {
+            Clipboard.SetText(text);
+            SendClipboardResult(id, true, "");
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or ExternalException)
+        {
+            SendClipboardResult(id, false, ex.Message);
+        }
+    }
+
+    private void SendClipboardResult(string id, bool ok, string detail)
+    {
+        _ = SendToViewer($"clipboardResult('{Escape(id)}','{(ok ? 1 : 0)}',"
+            + $"'{Uri.EscapeDataString(detail ?? "")}')");
+    }
+
+    private void BeginAttachment(string body)
+    {
+        try
+        {
+            _attachments.BeginUpload(body);
+        }
+        catch (Exception ex) when (ex is InvalidDataException or FormatException)
+        {
+            SendAttachmentFailure(_attachments.CurrentBatch, _attachments.CurrentIndex, ex.Message);
+        }
+    }
+
+    private void AppendAttachment(string body)
+    {
+        try
+        {
+            _attachments.AppendUpload(body);
+        }
+        catch (Exception ex) when (ex is InvalidDataException or FormatException or IOException)
+        {
+            SendAttachmentFailure(_attachments.CurrentBatch, _attachments.CurrentIndex, ex.Message);
+        }
+    }
+
+    private void CopyLocalAttachment(string body)
+    {
+        AttachmentResult result;
+        try
+        {
+            result = _attachments.CopyLocal(body);
+        }
+        catch (Exception ex) when (ex is InvalidDataException or FormatException)
+        {
+            var parts = body.Split(new[] { '\t' }, 3);
+            var index = parts.Length > 1 && int.TryParse(parts[1], out var parsed) ? parsed : -1;
+            SendAttachmentFailure(parts.Length > 0 ? parts[0] : "", index, ex.Message);
+            return;
+        }
+        _ = SendAttachmentResultAsync(result);
+    }
+
+    private void ResumeAttachments(string body)
+    {
+        try
+        {
+            var result = _attachments.Resume(body);
+            var indices = string.Join(",", result.Completed);
+            _ = SendToViewer($"attachmentResume('{Escape(result.Batch)}','{indices}',"
+                + $"'{Uri.EscapeDataString(result.Folder ?? "")}')");
+        }
+        catch (Exception ex) when (ex is InvalidDataException or FormatException)
+        {
+            var batch = body.Split('\t')[0];
+            _ = SendToViewer($"attachmentResume('{Escape(batch)}','','')");
+            Trace("attachment resume failed: " + ex.Message);
+        }
+    }
+
+    private void FinishAttachment(string body)
+    {
+        AttachmentResult result;
+        try
+        {
+            result = _attachments.CompleteUpload(body);
+        }
+        catch (Exception ex) when (ex is InvalidDataException or FormatException or IOException
+            or UnauthorizedAccessException or NotSupportedException)
+        {
+            SendAttachmentFailure(_attachments.CurrentBatch, _attachments.CurrentIndex, ex.Message);
+            return;
+        }
+        _ = SendAttachmentResultAsync(result);
+    }
+
+    private async System.Threading.Tasks.Task DownloadAttachmentAsync(string body)
+    {
+        AttachmentResult result;
+        try
+        {
+            result = await _attachments.DownloadAsync(body);
+        }
+        catch (Exception ex) when (ex is InvalidDataException or FormatException or UriFormatException)
+        {
+            var parts = body.Split(new[] { '\t' }, 3);
+            var index = parts.Length > 1 && int.TryParse(parts[1], out var parsed) ? parsed : -1;
+            SendAttachmentFailure(parts.Length > 0 ? parts[0] : "", index, ex.Message);
+            return;
+        }
+        await SendAttachmentResultAsync(result);
+    }
+
+    private void SendAttachmentFailure(string batch, int index, string detail)
+    {
+        _ = SendAttachmentResultAsync(new AttachmentResult(batch, index, false, "", detail));
+    }
+
+    private async System.Threading.Tasks.Task SendAttachmentResultAsync(AttachmentResult result)
+    {
+        var call = $"attachmentResult('{Escape(result.Batch)}',{result.Index},'{(result.Ok ? 1 : 0)}',"
+            + $"'{Uri.EscapeDataString(result.Path ?? "")}',"
+            + $"'{Uri.EscapeDataString(result.Detail ?? "")}')";
+        await SendToViewer(call).ConfigureAwait(false);
     }
 
     private static bool IsEnglishMessage(string message) =>
@@ -631,6 +791,10 @@ internal sealed class TrailViewerPanel : UserControl, IDisposable
     private static string Summarise(string message) =>
         message.StartsWith("exportchunk\t", StringComparison.Ordinal)
             ? "exportchunk ..."
+            : message.StartsWith("attachmentchunk\t", StringComparison.Ordinal)
+                ? "attachmentchunk ..."
+            : message.StartsWith("clipboard\t", StringComparison.Ordinal)
+                ? "clipboard ..."
             : message.StartsWith("custom-sources\t", StringComparison.Ordinal)
                 ? "custom-sources ..."
                 : message;
@@ -842,6 +1006,8 @@ internal sealed class TrailViewerPanel : UserControl, IDisposable
         _keys?.Dispose();
         _keys = null;
         _overlay.Dispose();
+        _attachments?.Dispose();
+        _attachments = null;
         if (_webView != null)
         {
             _webView.CoreWebView2InitializationCompleted -= OnInitialized;

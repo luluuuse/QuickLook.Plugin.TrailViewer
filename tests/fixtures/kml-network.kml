@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>West Lake route network</name>
+    <ExtendedData>
+      <Data name="segment_count"><value>20</value></Data>
+    </ExtendedData>
+    <Placemark><LineString><coordinates>120.120,30.230 120.121,30.231</coordinates></LineString></Placemark>
+    <Placemark><LineString><coordinates>120.122,30.232 120.123,30.233</coordinates></LineString></Placemark>
+    <Placemark><LineString><coordinates>120.124,30.234 120.125,30.235</coordinates></LineString></Placemark>
+    <Placemark><LineString><coordinates>120.126,30.236 120.127,30.237</coordinates></LineString></Placemark>
+    <Placemark><LineString><coordinates>120.128,30.238 120.129,30.239</coordinates></LineString></Placemark>
+    <Placemark><LineString><coordinates>120.130,30.240 120.131,30.241</coordinates></LineString></Placemark>
+    <Placemark><LineString><coordinates>120.132,30.242 120.133,30.243</coordinates></LineString></Placemark>
+    <Placemark><LineString><coordinates>120.134,30.244 120.135,30.245</coordinates></LineString></Placemark>
+    <Placemark><LineString><coordinates>120.136,30.246 120.137,30.247</coordinates></LineString></Placemark>
+    <Placemark><LineString><coordinates>120.138,30.248 120.139,30.249</coordinates></LineString></Placemark>
+    <Placemark><LineString><coordinates>120.140,30.250 120.141,30.251</coordinates></LineString></Placemark>
+    <Placemark><LineString><coordinates>120.142,30.252 120.143,30.253</coordinates></LineString></Placemark>
+    <Placemark><LineString><coordinates>120.144,30.254 120.145,30.255</coordinates></LineString></Placemark>
+    <Placemark><LineString><coordinates>120.146,30.256 120.147,30.257</coordinates></LineString></Placemark>
+    <Placemark><LineString><coordinates>120.148,30.258 120.149,30.259</coordinates></LineString></Placemark>
+    <Placemark><LineString><coordinates>120.150,30.260 120.151,30.261</coordinates></LineString></Placemark>
+    <Placemark><LineString><coordinates>120.152,30.262 120.153,30.263</coordinates></LineString></Placemark>
+    <Placemark><LineString><coordinates>120.154,30.264 120.155,30.265</coordinates></LineString></Placemark>
+    <Placemark><LineString><coordinates>120.156,30.266 120.157,30.267</coordinates></LineString></Placemark>
+    <Placemark><LineString><coordinates>120.158,30.268 120.159,30.269</coordinates></LineString></Placemark>
+  </Document>
+</kml>

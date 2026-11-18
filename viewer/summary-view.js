@@ -6,6 +6,7 @@ import {
   formatRange,
   formatSpeed,
 } from './format.js';
+import { setIcon } from './icons.js';
 import { readStored, writeStored } from './storage.js';
 
 const DETAILS_KEY = 'infoDetails';
@@ -14,7 +15,48 @@ function savedDetailsMode() {
   return readStored(DETAILS_KEY) === 'full' ? 'full' : 'compact';
 }
 
-export function createSummaryView({ el, fileName, photosOf, onLayoutChange }) {
+/** Plain text for the share action. Missing values are omitted instead of turning into misleading placeholders. */
+export function trackSummaryText(gpx, summary, elevations, fileName) {
+  const lines = [gpx.name || fileName];
+  if (summary.segments > 0 || summary.routes > 0) {
+    lines.push(`${t(!summary.network && summary.segments > 0 ? 'info.distance' : 'info.routeLength')}: `
+      + formatDistance(summary.distanceMeters));
+  }
+  if (summary.network) {
+    const contents = [];
+    if (summary.routes > 0) contents.push(units(summary.routes, 'route'));
+    if (summary.segments > 0) contents.push(units(summary.segments, 'segment'));
+    if (summary.waypoints > 0) contents.push(units(summary.waypoints, 'waypoint'));
+    if (contents.length > 0) lines.push(`${t('info.contents')}: ${contents.join(t('list.separator'))}`);
+    return lines.join('\n');
+  }
+
+  const range = formatRange(summary.start, summary.end);
+  if (range) lines.push(`${t('info.date')}: ${range}`);
+  if (summary.durationSeconds !== null) {
+    lines.push(`${t('info.totalTime')}: ${formatDuration(summary.durationSeconds)}`);
+  }
+  if (summary.movingDurationSeconds !== null
+    && summary.movingDurationSeconds !== summary.durationSeconds) {
+    lines.push(`${t('info.movingTime')}: ${formatDuration(summary.movingDurationSeconds)}`);
+  }
+  const speedSeconds = summary.movingDurationSeconds || summary.durationSeconds;
+  if (speedSeconds > 0 && summary.distanceMeters > 0) {
+    lines.push(`${t(summary.movingDurationSeconds ? 'info.movingSpeed' : 'info.speed')}: `
+      + formatSpeed(summary.distanceMeters / speedSeconds));
+  }
+  if (elevations && summary.elevation) {
+    lines.push(`${t('info.ascent')}: ${formatElevation(elevations.ascent)}`);
+    lines.push(`${t('info.descent')}: ${formatElevation(elevations.descent)}`);
+    lines.push(`${t('summary.peak')}: ${formatElevation(elevations.max)}`);
+  }
+  if (summary.points > 0) lines.push(`${t('info.points')}: ${summary.points.toLocaleString()}`);
+  return lines.join('\n');
+}
+
+export function createSummaryView({
+  el, fileName, photosOf, onCopySummary, onLayoutChange,
+}) {
   let detailsMode = savedDetailsMode();
 
   return function renderInfo(gpx, summary, elevations, estimateSeconds) {
@@ -43,7 +85,23 @@ export function createSummaryView({ el, fileName, photosOf, onLayoutChange }) {
         onLayoutChange?.();
       });
     });
-    headingRow.append(heading, detailsButton);
+    const copyButton = el('button', 'info-copy');
+    copyButton.type = 'button';
+    setIcon(copyButton, 'copy');
+    copyButton.title = t('summary.copy');
+    copyButton.setAttribute('aria-label', t('summary.copy'));
+    copyButton.addEventListener('click', async () => {
+      if (!onCopySummary || copyButton.disabled) return;
+      copyButton.disabled = true;
+      try {
+        await onCopySummary(trackSummaryText(gpx, summary, elevations, fileName));
+      } catch {
+        // The application reports failures through the shared toast.
+      } finally {
+        if (copyButton.isConnected) copyButton.disabled = false;
+      }
+    });
+    headingRow.append(heading, copyButton, detailsButton);
     box.append(headingRow);
 
     const stats = el('div', 'stats');

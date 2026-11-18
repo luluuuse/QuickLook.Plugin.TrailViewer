@@ -207,6 +207,11 @@ async function main() {
   await waitForLayout(page);
   check('the manage action opens the custom source manager',
     await page.locator('.layer-custom-view').evaluate((node) => !node.hidden));
+  check('the custom source manager omits the source and licence note',
+    await page.locator('.layer-custom-help').count() === 0
+      && !/来源与授权说明|Source and licence/.test(
+        await page.locator('.layer-custom-view').textContent(),
+      ));
   await page.locator('[data-custom-select]').click();
   check('switching a saved source keeps the custom management page open',
     await page.locator('.layer-custom-view').evaluate((node) => !node.hidden)

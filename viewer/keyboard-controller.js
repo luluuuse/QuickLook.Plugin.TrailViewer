@@ -6,7 +6,6 @@ export function createKeyboardController({
   photoViewer,
   waypointController,
   measurement: getMeasurement,
-  overlay: getOverlay,
   layerSwitch: getLayerSwitch,
   fit,
   toggleChrome,
@@ -47,16 +46,6 @@ export function createKeyboardController({
       fit();
       return;
     }
-    if (name === 'x' || name === 'X') {
-      const overlay = getOverlay();
-      if (name === 'X') {
-        overlay?.togglePanel();
-      } else {
-        overlay?.close();
-        void overlay?.save();
-      }
-      return;
-    }
     if (name === 's') {
       toggleChrome();
       return;
@@ -84,13 +73,12 @@ export function createKeyboardController({
       return;
     }
     if (event.ctrlKey || event.altKey || event.metaKey) return;
-    const shiftedExport = key === 'x' && event.shiftKey;
     const plainShortcut = !event.shiftKey
-      && (key === 'w' || key === 'x' || key === 's' || key === 'c' || key === 'm' || LAYER_KEYS[key]);
-    if (!photoOpen && (plainShortcut || shiftedExport)) {
+      && (key === 'w' || key === 's' || key === 'c' || key === 'm' || LAYER_KEYS[key]);
+    if (!photoOpen && plainShortcut) {
       if (event.repeat) return;
       event.preventDefault();
-      pressKey(key === 'x' && event.shiftKey ? 'X' : key);
+      pressKey(key);
       return;
     }
     const delta = STEP_KEYS[key];

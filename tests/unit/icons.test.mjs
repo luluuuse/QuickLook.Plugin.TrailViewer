@@ -17,7 +17,9 @@ test('the icon registry is unique and covers every shared control', () => {
   assert.equal(new Set(UI_ICON_NAMES).size, UI_ICON_NAMES.length);
   assert.equal(new Set(DATA_SYMBOL_NAMES).size, DATA_SYMBOL_NAMES.length);
   for (const name of [
-    'toolbox', 'ruler', 'image-down', 'plus', 'minus', 'locate', 'layers', 'settings',
+    'toolbox', 'ruler', 'overlay-export', 'photo-export', 'image-export-all', 'image-export-local',
+    'copy', 'coordinates',
+    'plus', 'minus', 'locate', 'layers', 'settings',
     'chevron-down', 'chevron-left', 'close', 'check', 'pin', 'list', 'finish-section',
     'center-point', 'undo', 'redo', 'clear', 'stop', 'route', 'filter', 'edit',
     'arrow-left', 'arrow-right', 'warning', 'activity',

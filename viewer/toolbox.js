@@ -1,8 +1,8 @@
 import { iconElement, iconMarkup, setIcon, weatherMarkMarkup } from './icons.js';
+import { formatCoord, formatElevation } from './format.js';
 
 /**
- * One map-corner entry for task tools. The measurement controller owns state; this module only exposes it
- * and hands the existing overlay exporter its original settings panel.
+ * One map-corner entry for task tools. Every tool page shares this panel, header and back navigation.
  */
 export function createToolbox({
   L,
@@ -11,8 +11,15 @@ export function createToolbox({
   t,
   formatDistance,
   measurement,
+  copyText,
+  showToast,
+  coordinatePoints = () => ({}),
+  focusCoordinate = (point) => point,
+  onCoordinateWeather,
+  attachmentItems = [],
+  onExportAttachments,
   exportAvailable,
-  onExport,
+  mountExportView,
   onWeather,
   weatherAvailable,
   weatherModes = [],
@@ -29,6 +36,8 @@ export function createToolbox({
   let measureMeta = null;
   let sectionList = null;
   let measureButton = null;
+  let coordinateButton = null;
+  let attachmentButton = null;
   let exportButton = null;
   let weatherButton = null;
   let weatherPicker = null;
@@ -43,6 +52,191 @@ export function createToolbox({
   let clearButton = null;
   let stopButton = null;
   let closeButton = null;
+  let headNote = null;
+  let coordinateView = null;
+  let coordinateBack = null;
+  let coordinateInstruction = null;
+  let coordinateType = null;
+  let coordinateResult = null;
+  let coordinateOutput = null;
+  let coordinateElevation = null;
+  let coordinateWeatherButton = null;
+  let copiedCoordinatePoint = null;
+  let coordinateHighlight = null;
+  let pickHint = null;
+  let pickHintTimer = 0;
+  let highlightTimer = 0;
+  let attachmentView = null;
+  let attachmentBack = null;
+  let attachmentMeta = null;
+  let attachmentInstruction = null;
+  let attachmentExportAllButton = null;
+  let attachmentExportLocalButton = null;
+  let attachmentProgress = null;
+  let attachmentResult = null;
+  let exportView = null;
+  let exportBack = null;
+  let exportSettingsPanel = null;
+  let view = 'main';
+  let picking = false;
+  let exportingAttachments = false;
+
+  function coordinateElevationText(point) {
+    const elevation = Number(point?.ele);
+    return Number.isFinite(elevation)
+      ? t('coordinates.elevation', { elevation: formatElevation(elevation) })
+      : t('coordinates.elevationUnavailable');
+  }
+
+  function paintCoordinate(target = null, coordinate = '', elevation = '') {
+    coordinateResult.hidden = !coordinate;
+    coordinateOutput.textContent = coordinate;
+    coordinateElevation.textContent = elevation;
+    if (coordinateWeatherButton) coordinateWeatherButton.hidden = !coordinate;
+    if (target) coordinateResult.dataset.target = target;
+  }
+
+  function stopPicking() {
+    if (!picking) return;
+    picking = false;
+    clearTimeout(pickHintTimer);
+    clearTimeout(highlightTimer);
+    panel?.classList.remove('is-picking');
+    map.getContainer().classList.remove('is-coordinate-picking');
+    if (pickHint) pickHint.hidden = true;
+    if (coordinateHighlight) map.removeLayer(coordinateHighlight);
+    coordinateHighlight = null;
+    if (coordinateInstruction) coordinateInstruction.textContent = t('coordinates.instruction');
+  }
+
+  function showPickHint(autoHide) {
+    if (!pickHint) return;
+    clearTimeout(pickHintTimer);
+    pickHint.hidden = false;
+    if (autoHide) {
+      pickHintTimer = setTimeout(() => {
+        if (pickHint) pickHint.hidden = true;
+      }, 1800);
+    }
+  }
+
+  function beginPicking() {
+    if (!panel) return;
+    picking = true;
+    map.closePopup();
+    panel.classList.add('is-picking');
+    map.getContainer().classList.add('is-coordinate-picking');
+    showPickHint(false);
+    render();
+  }
+
+  function showView(next) {
+    if (next !== 'coordinate') stopPicking();
+    view = next;
+    render();
+  }
+
+  function showCoordinateOnMap(point, targetKey, coordinate, snapped, ephemeral = false) {
+    clearTimeout(highlightTimer);
+    if (coordinateHighlight) map.removeLayer(coordinateHighlight);
+    const halo = L.circleMarker([point.lat, point.lon], {
+      radius: 20,
+      color: '#2f9bff',
+      weight: 2,
+      opacity: 0.95,
+      fill: false,
+      interactive: false,
+      className: 'coordinate-focus-halo',
+      pane: 'markerPane',
+    });
+    const dot = L.circleMarker([point.lat, point.lon], {
+      radius: 6,
+      color: '#07141a',
+      weight: 2,
+      fillColor: '#8fd9ff',
+      fillOpacity: 1,
+      interactive: false,
+      className: 'coordinate-focus-dot',
+      pane: 'markerPane',
+    });
+    const label = el('div', 'coordinate-focus-label');
+    label.append(
+      el('strong', null, t(`coordinates.${targetKey}`)),
+      el('small', 'coordinate-focus-details',
+        snapped ? `${t('coordinates.snapMarker')} \u00b7 ${coordinate}` : coordinate),
+      el('small', 'coordinate-focus-elevation', coordinateElevationText(point)),
+    );
+    const tag = L.marker([point.lat, point.lon], {
+      interactive: false,
+      keyboard: false,
+      zIndexOffset: 2400,
+      icon: L.divIcon({
+        className: 'coordinate-focus-tag',
+        html: label.outerHTML,
+        iconAnchor: [-14, 25],
+      }),
+    });
+    coordinateHighlight = L.layerGroup([halo, dot, tag]).addTo(map);
+    if (ephemeral) {
+      highlightTimer = setTimeout(() => {
+        if (coordinateHighlight) map.removeLayer(coordinateHighlight);
+        coordinateHighlight = null;
+      }, 1800);
+    }
+  }
+
+  async function copyCoordinate(point, targetKey, {
+    focus = false, snapped = false, ephemeral = false,
+  } = {}) {
+    if (!point) return;
+    const coordinate = formatCoord(point);
+    copiedCoordinatePoint = { lat: Number(point.lat), lon: Number(point.lon), ele: point.ele };
+    paintCoordinate(targetKey, coordinate, coordinateElevationText(point));
+    showCoordinateOnMap(point, targetKey, coordinate, snapped, ephemeral);
+    if (focus) focusCoordinate(point);
+    try {
+      await copyText(coordinate);
+    } catch (error) {
+      showToast(t('coordinates.copyFailed', { detail: error.message }), 4000);
+    }
+  }
+
+  async function exportAttachments(includeExternal) {
+    if (exportingAttachments || !onExportAttachments) return;
+    const total = includeExternal
+      ? attachmentItems.length
+      : attachmentItems.filter((item) => item.kind !== 'external').length;
+    if (total === 0) return;
+    exportingAttachments = true;
+    attachmentResult.hidden = true;
+    attachmentProgress.hidden = false;
+    attachmentProgress.textContent = t('attachments.progress', { completed: 0, total });
+    render();
+    try {
+      const result = await onExportAttachments(includeExternal, ({ completed, total }) => {
+        attachmentProgress.textContent = t('attachments.progress', { completed, total });
+      });
+      showToast(t('attachments.done', {
+        success: result.succeeded,
+        failed: result.failed,
+        skipped: result.skipped || 0,
+      }), 5000);
+      if (result.folder) {
+        attachmentResult.textContent = t('attachments.folder', {
+          name: String(result.folder).split(/[\\/]/).pop(),
+        });
+        attachmentResult.hidden = false;
+      }
+    } catch (error) {
+      showToast(t('attachments.failed', { detail: error.message }), 5000);
+      attachmentResult.textContent = error.message;
+      attachmentResult.hidden = false;
+    } finally {
+      exportingAttachments = false;
+      attachmentProgress.hidden = true;
+      render();
+    }
+  }
 
   function render() {
     if (!panel) return;
@@ -56,6 +250,44 @@ export function createToolbox({
 
     measureButton.querySelector('strong').textContent = t(active
       ? 'measure.active' : summary.pointCount > 0 ? 'measure.resume' : 'measure.start');
+    const targets = coordinatePoints();
+    coordinateView.querySelectorAll('[data-coordinate]').forEach((option) => {
+      const mode = option.dataset.coordinate;
+      if (mode === 'center') {
+        option.title = t('coordinates.centerHint');
+        option.setAttribute('aria-label', option.title);
+        return;
+      }
+      option.disabled = !targets[mode];
+      option.title = targets[mode]
+        ? `${t(`coordinates.${mode}`)}: ${formatCoord(targets[mode])}`
+        : t('coordinates.unavailable');
+      option.setAttribute('aria-label', option.title);
+    });
+    coordinateInstruction.textContent = t(picking ? 'coordinates.pick' : 'coordinates.instruction');
+    attachmentButton.disabled = attachmentItems.length === 0;
+    attachmentButton.title = attachmentItems.length > 0
+      ? t('attachments.summary', {
+        total: attachmentItems.length,
+        embedded: attachmentItems.filter((item) => item.kind !== 'external').length,
+        external: attachmentItems.filter((item) => item.kind === 'external').length,
+      })
+      : t('attachments.none');
+    attachmentButton.setAttribute('aria-label', attachmentButton.title);
+    coordinateButton.title = t('toolbox.coordinatesHint');
+    coordinateButton.setAttribute('aria-label', coordinateButton.title);
+    attachmentMeta.textContent = t('attachments.summary', {
+      total: attachmentItems.length,
+      embedded: attachmentItems.filter((item) => item.kind !== 'external').length,
+      external: attachmentItems.filter((item) => item.kind === 'external').length,
+    });
+    const embeddedCount = attachmentItems.filter((item) => item.kind !== 'external').length;
+    attachmentExportAllButton.disabled = exportingAttachments || attachmentItems.length === 0;
+    attachmentExportLocalButton.disabled = exportingAttachments || embeddedCount === 0;
+    attachmentExportAllButton.title = t('attachments.exportAllTitle', { count: attachmentItems.length });
+    attachmentExportLocalButton.title = t('attachments.exportLocalTitle', { count: embeddedCount });
+    attachmentExportAllButton.setAttribute('aria-label', attachmentExportAllButton.title);
+    attachmentExportLocalButton.setAttribute('aria-label', attachmentExportLocalButton.title);
     exportButton.disabled = !exportAvailable();
     exportButton.title = exportAvailable() ? t('toolbox.exportHint') : t('export.empty');
     exportButton.setAttribute('aria-label', exportButton.title);
@@ -105,9 +337,13 @@ export function createToolbox({
     if (rows.length === 0) rows.push(el('li', 'toolbox-empty', t('measure.empty')));
     sectionList.append(...rows);
 
-    const showMeasure = active;
-    mainView.hidden = showMeasure;
-    measureView.hidden = !showMeasure;
+    if (active) view = 'measure';
+    else if (view === 'measure') view = 'main';
+    mainView.hidden = view !== 'main';
+    measureView.hidden = view !== 'measure';
+    coordinateView.hidden = view !== 'coordinate';
+    attachmentView.hidden = view !== 'attachments';
+    exportView.hidden = view !== 'export';
   }
 
   function openPanel({ focus = true } = {}) {
@@ -120,7 +356,16 @@ export function createToolbox({
     onLayoutChange?.();
     if (focus) {
       requestAnimationFrame(() => {
-        const target = measurement.active() ? stopButton : measureButton;
+        const target = view === 'measure'
+          ? stopButton
+          : view === 'coordinate'
+            ? coordinateView.querySelector('[data-coordinate="start"]:not(:disabled)')
+              || coordinateView.querySelector('[data-coordinate="center"]')
+            : view === 'attachments'
+              ? attachmentBack
+            : view === 'export'
+              ? exportBack
+              : measureButton;
         target?.focus({ preventScroll: true });
       });
     }
@@ -128,6 +373,8 @@ export function createToolbox({
 
   function closePanel({ restoreFocus = false } = {}) {
     if (!open) return;
+    stopPicking();
+    if (view === 'coordinate' || view === 'attachments' || view === 'export') view = 'main';
     open = false;
     panel.hidden = true;
     button.setAttribute('aria-expanded', 'false');
@@ -136,6 +383,7 @@ export function createToolbox({
   }
 
   function startMeasure() {
+    view = 'measure';
     measurement.start();
     render();
     requestAnimationFrame(() => finishButton.focus({ preventScroll: true }));
@@ -168,31 +416,58 @@ export function createToolbox({
       const header = el('div', 'toolbox-header');
       const heading = el('strong', 'toolbox-heading', t('toolbox.title'));
       heading.id = 'toolbox-heading';
+      headNote = el('span', 'toolbox-head-note', t('toolbox.quickStart'));
       closeButton = el('button', 'toolbox-close');
       closeButton.type = 'button';
       setIcon(closeButton, 'close');
       closeButton.addEventListener('click', () => closePanel({ restoreFocus: true }));
-      header.append(heading, closeButton);
+      header.append(heading, headNote, closeButton);
 
       mainView = el('div', 'toolbox-main');
-      measureButton = el('button', 'toolbox-action');
+      const quickGrid = el('div', 'toolbox-quick-grid');
+      quickGrid.setAttribute('role', 'group');
+      quickGrid.setAttribute('aria-label', t('toolbox.quickTools'));
+
+      measureButton = el('button', 'toolbox-action toolbox-quick-action');
       measureButton.type = 'button';
       measureButton.dataset.tool = 'measure';
       measureButton.innerHTML = `<span class="toolbox-action-icon">${iconMarkup('ruler')}</span>`
-        + '<span><strong></strong><small></small></span>';
-      measureButton.querySelector('small').textContent = t('toolbox.measureHint');
+        + '<strong></strong><span class="toolbox-key-chip">M</span>';
       measureButton.addEventListener('click', startMeasure);
 
-      exportButton = el('button', 'toolbox-action');
+      coordinateButton = el('button', 'toolbox-action toolbox-quick-action');
+      coordinateButton.type = 'button';
+      coordinateButton.dataset.tool = 'coordinates';
+      coordinateButton.innerHTML = `<span class="toolbox-action-icon">${iconMarkup('coordinates')}</span>`
+        + '<strong></strong>';
+      coordinateButton.querySelector('strong').textContent = t('toolbox.coordinates');
+      coordinateButton.addEventListener('click', () => {
+        if (measurement.active()) measurement.stop();
+        showView('coordinate');
+        beginPicking();
+      });
+
+      exportButton = el('button', 'toolbox-action toolbox-quick-action');
       exportButton.type = 'button';
       exportButton.dataset.tool = 'export';
-      exportButton.innerHTML = `<span class="toolbox-action-icon">${iconMarkup('image-down')}</span>`
-        + '<span><strong></strong><small></small></span>';
+      exportButton.innerHTML = `<span class="toolbox-action-icon">${iconMarkup('overlay-export')}</span>`
+        + '<strong></strong>';
       exportButton.querySelector('strong').textContent = t('toolbox.export');
-      exportButton.querySelector('small').textContent = t('toolbox.exportHint');
       exportButton.addEventListener('click', () => {
-        closePanel();
-        onExport();
+        if (measurement.active()) measurement.stop();
+        showView('export');
+        requestAnimationFrame(() => exportSettingsPanel?.focus());
+      });
+
+      attachmentButton = el('button', 'toolbox-action toolbox-quick-action');
+      attachmentButton.type = 'button';
+      attachmentButton.dataset.tool = 'attachments';
+      attachmentButton.innerHTML = `<span class="toolbox-action-icon">${iconMarkup('photo-export')}</span>`
+        + '<strong></strong>';
+      attachmentButton.querySelector('strong').textContent = t('toolbox.attachments');
+      attachmentButton.addEventListener('click', () => {
+        if (measurement.active()) measurement.stop();
+        showView('attachments');
       });
 
       weatherButton = el('button', 'toolbox-action');
@@ -228,7 +503,129 @@ export function createToolbox({
       weatherPicker.hidden = weatherModes.length === 0;
       const weatherRow = el('div', 'toolbox-weather-card');
       weatherRow.append(weatherButton, weatherPicker);
-      mainView.append(measureButton, exportButton, weatherRow);
+      quickGrid.append(measureButton, coordinateButton, exportButton, attachmentButton);
+      mainView.append(quickGrid, weatherRow);
+
+      coordinateView = el('section', 'toolbox-subview toolbox-coordinate');
+      coordinateView.hidden = true;
+      coordinateBack = el('button', 'toolbox-back');
+      coordinateBack.type = 'button';
+      coordinateBack.append(iconElement('arrow-left'), el('span', null, t('toolbox.back')));
+      coordinateBack.addEventListener('click', () => showView('main'));
+      coordinateView.append(
+        coordinateBack,
+        el('h2', 'toolbox-subtitle', t('coordinates.title')),
+        el('p', 'toolbox-subhint', t('coordinates.instruction')),
+      );
+      coordinateInstruction = coordinateView.lastElementChild;
+      coordinateType = el('div', 'toolbox-coordinate-type', t('coordinates.type'));
+      coordinateView.append(coordinateType);
+      const coordinateGrid = el('div', 'toolbox-coordinate-grid');
+      const coordinateChoices = [
+        ['start', 'coordinates.start', weatherMarkMarkup('start', { size: 16 })],
+        ['end', 'coordinates.end', weatherMarkMarkup('end', { size: 16 })],
+        ['highest', 'coordinates.highest', weatherMarkMarkup('highest', { size: 16 })],
+        ['center', 'coordinates.center', iconMarkup('locate')],
+      ];
+      for (const [mode, labelKey, icon] of coordinateChoices) {
+        const option = el('button', 'toolbox-coordinate-button');
+        option.type = 'button';
+        option.dataset.coordinate = mode;
+        option.innerHTML = icon + `<span>${t(labelKey)}</span>`;
+        option.addEventListener('click', () => {
+          if (mode === 'center') {
+            const centre = map.getCenter();
+            copyCoordinate({ lat: centre.lat, lon: centre.lng }, mode);
+          } else {
+            copyCoordinate(coordinatePoints()[mode], mode, { focus: true });
+          }
+        });
+        coordinateGrid.append(option);
+      }
+      coordinateView.append(coordinateGrid);
+      coordinateResult = el('div', 'toolbox-coordinate-result');
+      coordinateResult.hidden = true;
+      coordinateOutput = el('code');
+      coordinateElevation = el('small', 'toolbox-coordinate-elevation');
+      coordinateResult.append(
+        el('span', null, t('coordinates.result')),
+        coordinateOutput,
+        coordinateElevation,
+      );
+      coordinateWeatherButton = el('button', 'toolbox-coordinate-weather');
+      coordinateWeatherButton.type = 'button';
+      coordinateWeatherButton.hidden = true;
+      coordinateWeatherButton.append(iconElement('weather'), el('span', null, t('coordinates.weather')));
+      coordinateWeatherButton.title = t('coordinates.weatherHint');
+      coordinateWeatherButton.setAttribute('aria-label', coordinateWeatherButton.title);
+      coordinateWeatherButton.addEventListener('click', () => {
+        if (!copiedCoordinatePoint) return;
+        const point = copiedCoordinatePoint;
+        closePanel();
+        onCoordinateWeather?.(point);
+      });
+      coordinateResult.append(coordinateWeatherButton);
+      coordinateView.append(coordinateResult);
+
+      pickHint = el('div', 'coordinate-pick-hint');
+      pickHint.hidden = true;
+      pickHint.innerHTML = iconMarkup('coordinates');
+      pickHint.append(el('span', null, t('coordinates.pick')));
+      map.getContainer().append(pickHint);
+
+      attachmentView = el('section', 'toolbox-subview toolbox-attachments');
+      attachmentView.hidden = true;
+      attachmentBack = el('button', 'toolbox-back');
+      attachmentBack.type = 'button';
+      attachmentBack.append(iconElement('arrow-left'), el('span', null, t('toolbox.back')));
+      attachmentBack.addEventListener('click', () => showView('main'));
+      attachmentMeta = el('p', 'toolbox-attachment-meta');
+      attachmentInstruction = el('p', 'toolbox-subhint', t('attachments.instruction'));
+      const attachmentActions = el('div', 'toolbox-attachment-actions');
+      attachmentExportAllButton = el('button', 'toolbox-attachment-export all');
+      attachmentExportAllButton.type = 'button';
+      attachmentExportAllButton.append(
+        iconElement('image-export-all'),
+        el('span', null, t('attachments.exportAll')),
+      );
+      attachmentExportAllButton.addEventListener('click', () => exportAttachments(true));
+      attachmentExportLocalButton = el('button', 'toolbox-attachment-export local');
+      attachmentExportLocalButton.type = 'button';
+      attachmentExportLocalButton.append(
+        iconElement('image-export-local'),
+        el('span', null, t('attachments.exportLocal')),
+      );
+      attachmentExportLocalButton.addEventListener('click', () => exportAttachments(false));
+      attachmentActions.append(attachmentExportAllButton, attachmentExportLocalButton);
+      attachmentProgress = el('p', 'toolbox-attachment-progress');
+      attachmentProgress.hidden = true;
+      attachmentProgress.setAttribute('role', 'status');
+      attachmentResult = el('p', 'toolbox-attachment-result');
+      attachmentResult.hidden = true;
+      attachmentView.append(
+        attachmentBack,
+        el('h2', 'toolbox-subtitle', t('attachments.title')),
+        attachmentMeta,
+        attachmentInstruction,
+        attachmentActions,
+        attachmentProgress,
+        attachmentResult,
+      );
+
+      exportView = el('section', 'toolbox-subview toolbox-export');
+      exportView.hidden = true;
+      exportBack = el('button', 'toolbox-back');
+      exportBack.type = 'button';
+      exportBack.append(iconElement('arrow-left'), el('span', null, t('toolbox.back')));
+      exportBack.addEventListener('click', () => showView('main'));
+      exportView.append(
+        exportBack,
+        el('h2', 'toolbox-subtitle', t('export.panel')),
+        el('p', 'toolbox-subhint', t('export.panelHint')),
+      );
+      const exportSettings = el('div', 'toolbox-export-settings');
+      exportSettingsPanel = mountExportView?.(exportSettings) || null;
+      exportView.append(exportSettings);
 
       measureView = el('section', 'toolbox-measure');
       measureView.hidden = true;
@@ -267,17 +664,34 @@ export function createToolbox({
       });
       actions.append(finishButton, centerButton, undoButton, redoButton, clearButton, stopButton);
       measureView.append(measureTitle, measureTotal, measureMeta, instruction, listHeading, sectionList, actions);
-      panel.append(header, mainView, measureView);
+      panel.append(header, mainView, coordinateView, attachmentView, exportView, measureView);
       closeButton.title = t('toolbox.close');
       closeButton.setAttribute('aria-label', t('toolbox.close'));
 
       bar.addEventListener('keydown', (event) => {
         if (event.key !== 'Escape' || !open) return;
         event.preventDefault();
+        if (picking) {
+          stopPicking();
+          render();
+          return;
+        }
+        if (view !== 'main') {
+          showView('main');
+          return;
+        }
         closePanel({ restoreFocus: true });
       });
       bar.append(panel);
       L.DomEvent.disableClickPropagation(bar);
+      map.getContainer().addEventListener('click', (event) => {
+        if (!picking || event.target.closest('.leaflet-control')) return;
+        event.preventDefault();
+        event.stopPropagation();
+        showPickHint(true);
+        const target = measurement.snapMarker(map.mouseEventToLatLng(event));
+        copyCoordinate(target, 'picked', { snapped: target.kind === 'marker', ephemeral: true });
+      }, true);
       map.on('click', () => closePanel());
       return bar;
     },
@@ -292,6 +706,7 @@ export function createToolbox({
     close: () => closePanel(),
     toggle: () => (open ? closePanel() : openPanel()),
     isOpen: () => open,
+    isView: (name) => open && view === name,
     weatherMode: () => weatherMode,
     isWeatherModeEnabled: (mode) => !(mode === 'highest' && !weatherHasElevation()),
     setWeatherMode(mode) {
@@ -302,11 +717,13 @@ export function createToolbox({
     },
     relabel() {
       document.getElementById('toolbox-heading').textContent = t('toolbox.title');
+      headNote.textContent = t('toolbox.quickStart');
       closeButton.title = t('toolbox.close');
       closeButton.setAttribute('aria-label', t('toolbox.close'));
-      measureButton.querySelector('small').textContent = t('toolbox.measureHint');
+      mainView.querySelector('.toolbox-quick-grid').setAttribute('aria-label', t('toolbox.quickTools'));
+      coordinateButton.querySelector('strong').textContent = t('toolbox.coordinates');
       exportButton.querySelector('strong').textContent = t('toolbox.export');
-      exportButton.querySelector('small').textContent = t('toolbox.exportHint');
+      attachmentButton.querySelector('strong').textContent = t('toolbox.attachments');
       weatherButton.querySelector('strong').textContent = t('toolbox.weather');
       weatherButton.querySelector('small').textContent = t('toolbox.weatherHint');
       weatherButton.title = weatherAvailable() ? t('toolbox.weatherHint') : t('weather.unavailable');
@@ -316,6 +733,29 @@ export function createToolbox({
         const label = option.querySelector('.toolbox-weather-mode-label');
         if (label) label.textContent = t(`weather.mode.${option.dataset.weatherMode}`);
       }
+      coordinateBack.querySelector('span').textContent = t('toolbox.back');
+      coordinateView.querySelector('.toolbox-subtitle').textContent = t('coordinates.title');
+      coordinateInstruction.textContent = t(picking ? 'coordinates.pick' : 'coordinates.instruction');
+      coordinateType.textContent = t('coordinates.type');
+      for (const option of coordinateView.querySelectorAll('[data-coordinate]')) {
+        const label = option.querySelector('span');
+        if (label) label.textContent = t(`coordinates.${option.dataset.coordinate}`);
+      }
+      coordinateResult.querySelector('span').textContent = t('coordinates.result');
+      coordinateElevation.textContent = coordinateElevationText(copiedCoordinatePoint);
+      coordinateWeatherButton.querySelector('span').textContent = t('coordinates.weather');
+      coordinateWeatherButton.title = t('coordinates.weatherHint');
+      coordinateWeatherButton.setAttribute('aria-label', coordinateWeatherButton.title);
+      pickHint.querySelector('span').textContent = t('coordinates.pick');
+      attachmentBack.querySelector('span').textContent = t('toolbox.back');
+      attachmentView.querySelector('.toolbox-subtitle').textContent = t('attachments.title');
+      attachmentInstruction.textContent = t('attachments.instruction');
+      attachmentExportAllButton.querySelector('span').textContent = t('attachments.exportAll');
+      attachmentExportLocalButton.querySelector('span').textContent = t('attachments.exportLocal');
+      exportBack.querySelector('span').textContent = t('toolbox.back');
+      exportView.querySelector('.toolbox-subtitle').textContent = t('export.panel');
+      exportView.querySelector('.toolbox-subhint').textContent = t('export.panelHint');
+      exportSettingsPanel?.relabel();
       measureTitle.textContent = t('measure.active');
       instruction.textContent = t('measure.instruction');
       listHeading.textContent = t('measure.sections');

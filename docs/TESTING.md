@@ -43,7 +43,7 @@ npm run test:live
 |---|---|
 | 照片、附件弹窗、全览返回 | `photo focus` |
 | 剖面、心率、速览或高程 | `profile ve scrub` |
-| 测距、工具箱、轨迹天气 | `measure portrait`，并运行单元测试 |
+| 测距、工具箱、坐标、摘要与附件导出 | `measure tools portrait`，并运行单元测试 |
 | 标记点、导航和列表 | `nav pins insights` |
 | 图层、定制图源、缩放和定位 | `terrain custom-source zoom locate` |
 | 图标 | `icons`，并运行单元测试 |
@@ -70,10 +70,15 @@ node scripts/pack.cjs
 - `tests/unit/weather.test.mjs`：起点、终点、顶点、无坐标文件、缩放级别和 Windy 链接格式。
 - `tests/icons-test.cjs`：全部控件/数据符号、Leaflet 适配、激活态和纯文字分段列头。
   另覆盖地图设置八齿齿轮、标题栏无底图网格、四类图源 B 方案图标和分类悬停提示。
-- `tests/measure-test.cjs`：多段测距、吸附、快捷键、透明标签、右侧布局、导出互斥和彩色天气图钉。
+- `tests/measure-test.cjs`：多段测距、吸附、快捷键、透明标签、右侧布局、工具箱内导出页和彩色天气图钉。
+- `tests/tools-test.cjs`：摘要复制、2×2 快捷工具格、坐标拾取、点位海拔备注、附件清单、双导出入口和宿主协议。
+- `tests/unit/copy-coordinates.test.mjs`：摘要字段降级、路网摘要和坐标目标计算。
+- `tests/unit/attachments.test.mjs`：内置/Data URI/外链分类、URL 去重、外链 3 路并发、清单续传和纯内置
+  导出跳过外链。
 - `tests/profile-test.cjs`：坡度剖面、可选心率开关/双轴/缺口、悬停读数和窄窗布局。
 - `tests/route-info-test.cjs`：距离标记、缺口/异常聚类和重复平移时的语言节点稳定性。
-- `tests/export-test.cjs`：导出版式、透明 PNG、设置面板关闭按钮和宿主保存流程。
+- `tests/export-test.cjs`：导出版式、透明 PNG、路线名称与日期、徒步指标顺序、路网语义、工具箱内设置页、
+  实时预览与画布边界、尺寸/墨色/底衬提示、连续多次导出、窄窗布局和宿主保存流程。
 - `tests/terrain-test.cjs`：四类图源过滤、无底图显示模式、面板透明度、天地图密钥与 403 降级。
   另覆盖无底图说明移除、天地图密钥单行布局、图标操作和键盘可访问名称。
 - 图源切换同时验证顶部入口的类别文字、类别图标和具体来源 tooltip。
@@ -83,7 +88,7 @@ node scripts/pack.cjs
 - `tests/floating-panels-test.cjs`：工具箱、图层和标记点列表的共享顶部/标题几何与三者互斥。
 - `tests/runner-test.cjs`：专项筛选、套件列表、未知名称和未知参数处理。
 - `tests/network-test.cjs`：生成式多路线路网、时间对象跳过、拖动中视口刷新、LOD Canvas、标注点虚拟化及性能预算。
-- `tests/measure-test.cjs`：测距索引懒加载、航点吸附、轨迹吸附、地图手势和面板布局。
+- `tests/measure-test.cjs`：测距索引懒加载、航点吸附、轨迹吸附、地图手势、面板布局和共享导出页。
 
 ## 测试原则
 

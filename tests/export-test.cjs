@@ -85,10 +85,12 @@ const measureRow = () => {
   let minY = height;
   let maxX = -1;
   let maxY = -1;
+  let gridMaxX = -1;
   let bandMinX = width;
   let bandMaxX = -1;
   let bandMinY = height;
   let bandMaxY = -1;
+  const gridTop = Math.round(height * 0.19);
   const rows = new Uint16Array(split);
   for (let y = 0; y < height; y += 2) {
     for (let x = 0; x < width; x += 2) {
@@ -100,6 +102,7 @@ const measureRow = () => {
         if (x > maxX) maxX = x;
         if (y < minY) minY = y;
         if (y > maxY) maxY = y;
+        if (y >= gridTop && x > gridMaxX) gridMaxX = x;
       } else {
         band += 1;
         if (x < bandMinX) bandMinX = x;
@@ -118,7 +121,6 @@ const measureRow = () => {
     else lines.push([y, y]);
   }
   // Columns of ink inside the grid half of the block: two clusters means the numbers really are two abreast.
-  const gridTop = Math.round(height * 0.19);
   const hits = [];
   for (let x = 0; x < maxX; x += 2) {
     let hit = false;
@@ -135,7 +137,7 @@ const measureRow = () => {
   }
   return {
     width, height, split, figures, band,
-    minX, minY, maxX, maxY, bandMinX, bandMaxX, bandMinY, bandMaxY,
+    minX, minY, maxX, maxY, gridMaxX, bandMinX, bandMaxX, bandMinY, bandMaxY,
     lines: lines.map(([a, b]) => ({ from: a, to: b, height: b - a })),
     columns,
     corners: [at(0, 0), at(width - 1, 0), at(0, height - 1), at(width - 1, height - 1)],
@@ -161,6 +163,25 @@ async function rowOf(page, base, fixture, options) {
     window.__canvas = await window.trailViewer.overlayCanvas(opts);
     return true;
   }, options || {}).then(() => page.evaluate(measureRow));
+}
+
+async function textOf(page, base, fixture, options) {
+  await page.goto(`${base}/viewer/index.html?src=../tests/fixtures/${encodeURIComponent(fixture)}`);
+  await page.waitForFunction(() => document.body.classList.contains('loaded') || document.body.classList.contains('failed'));
+  return page.evaluate(async (opts) => {
+    const texts = [];
+    const original = CanvasRenderingContext2D.prototype.fillText;
+    CanvasRenderingContext2D.prototype.fillText = function capture(text, ...args) {
+      texts.push(String(text));
+      return original.call(this, text, ...args);
+    };
+    try {
+      await window.trailViewer.overlayCanvas(opts);
+    } finally {
+      CanvasRenderingContext2D.prototype.fillText = original;
+    }
+    return texts;
+  }, options || {});
 }
 
 async function main() {
@@ -189,6 +210,17 @@ async function main() {
   // their own ink from the same rule; nothing in the picture is set in white.
   check('the type is black', loop.dark > 800, `${loop.dark} solid black samples`);
   check('and no white ink is left', loop.light === 0, `${loop.light} white samples`);
+  const loopText = await textOf(page, base, '2026-02-01-alpine-snow-traverse-1793781751910.gpx');
+  check('the exported route name identifies the track',
+    loopText.includes('Alpine snow traverse'), loopText.join(' | '));
+  check('the exported track date identifies the day',
+    loopText.includes('2026.01.05'), loopText.join(' | '));
+  const labels = ['总用时', '上升', '最高海拔', '运动均速'];
+  const labelPositions = labels.map((label) => loopText.indexOf(label));
+  check('hiking metrics put ascent ahead of elevation and speed',
+    labelPositions.every((index) => index >= 0)
+      && labelPositions.every((index, i) => i === 0 || index > labelPositions[i - 1]),
+    labelPositions.join(' '));
 
   // The square: same page, a shorter canvas, and the drawing fills it rather than sitting at the top.
   const square = await overlayOf(page, base, '2026-02-01-alpine-snow-traverse-1793781751910.gpx', { size: '1:1' });
@@ -228,7 +260,7 @@ async function main() {
   check('the rest of the figures are two abreast', wide.columns.length === 2,
     wide.columns.map(([a, b]) => `${a}-${b}`).join(' '));
   check('the block stops inside the top third', wide.maxY < wide.height * 0.37, `ink ends at ${wide.maxY}`);
-  check('and inside the left half', wide.maxX < wide.width * 0.5, `ink ends at ${wide.maxX}`);
+  check('and inside the left half', wide.gridMaxX < wide.width * 0.5, `figures end at ${wide.gridMaxX}`);
   check('the block never reaches down into the track', wide.maxY < wide.bandMinY, `${wide.maxY} < ${wide.bandMinY}`);
 
   // The point of a landscape page: a track that runs wide uses the whole band. A loop can only fill its
@@ -288,65 +320,170 @@ async function main() {
   check('and loses the two height rows', flat.column < loop.column * 0.8,
     `${flat.column} vs ${loop.column}`);
 
+  const networkText = await textOf(page, base, 'kml-network.kml');
+  check('a route network keeps its document name', networkText.includes('West Lake route network'),
+    networkText.join(' | '));
+  check('and is labelled as a network', networkText.includes('线路网'), networkText.join(' | '));
+  check('a network reports route length and segment count',
+    networkText.includes('路线长度') && networkText.includes('轨迹段'), networkText.join(' | '));
+  check('a network does not invent start, end or trip metrics',
+    !networkText.includes('起') && !networkText.includes('终')
+      && !networkText.includes('总用时') && !networkText.includes('最高海拔'),
+    networkText.join(' | '));
+
   // ---------- the panel ----------
   await page.goto(`${base}/viewer/index.html?src=../tests/fixtures/${encodeURIComponent('2026-02-01-alpine-snow-traverse-1793781751910.gpx')}`);
   await page.waitForFunction(() => document.body.classList.contains('loaded'));
 
-  const hiddenFirst = await page.evaluate(() => document.getElementById('export').hidden);
-  check('the panel starts closed', hiddenFirst === true);
+  check('the standalone export panel no longer exists',
+    await page.locator('#export').count() === 0);
   check('black ink is the default', await page.evaluate(() => window.trailViewer.exportSettings().ink) === 'black');
 
   await page.evaluate(() => window.trailViewer.pressKey('X'));
-  check('shift+X opens it', await page.evaluate(() => window.trailViewer.panelOpen()) === true);
-  check('and it is on screen', await page.locator('#export').isVisible());
-  check('opening the panel moves focus to its action',
-    await page.evaluate(() => document.activeElement?.classList.contains('go')) === true);
-  check('the export panel is a labelled dialog',
-    await page.locator('#export').getAttribute('role') === 'dialog'
-      && await page.locator('#export').getAttribute('aria-labelledby') === 'export-title');
-  check('the export panel has a close button with the shared icon',
-    await page.locator('#export .export-close svg[data-icon="close"]').count() === 1);
-  await page.click('#export .export-close');
-  check('the close button dismisses the export panel',
+  check('X no longer opens export settings',
     await page.evaluate(() => window.trailViewer.panelOpen()) === false);
-  await page.evaluate(() => window.trailViewer.pressKey('X'));
+  await page.click('.toolbox-switch button');
+  await page.click('.toolbox-action[data-tool="export"]');
+  check('the export settings are a toolbox page',
+    await page.locator('#toolbox-panel .toolbox-export').isVisible()
+      && await page.evaluate(() => window.trailViewer.panelOpen()) === true);
+  check('opening export settings moves focus to its action',
+    await page.evaluate(() => document.activeElement?.classList.contains('go')) === true);
 
-  const shapes = await page.locator('#export .pick').first().locator('.option').allTextContents();
+  const shapes = await page.locator('.toolbox-export-settings .pick').first().locator('.option').allTextContents();
   check('the panel offers three shapes, named for what they are',
     shapes.join('|') === '方版|竖版|横版', shapes.join('|'));
   check('and no portrait-photo shape is left over',
-    (await page.locator('#export .option[data-value="3:4"]').count()) === 0);
+    (await page.locator('.toolbox-export-settings .option[data-value="3:4"]').count()) === 0);
+  const shapeHints = await page.locator('.toolbox-export-settings .pick').first().locator('.option')
+    .evaluateAll((nodes) => nodes.map((node) => node.title));
+  check('shape choices explain their dimensions and use',
+    shapeHints[0]?.includes('1536 × 1536')
+      && shapeHints[1]?.includes('1080 × 1920')
+      && shapeHints[2]?.includes('2048 × 1536'),
+    shapeHints.join(' | '));
+  const inkHints = await page.locator('.toolbox-export-settings .pick').nth(1).locator('.option')
+    .evaluateAll((nodes) => nodes.map((node) => node.title));
+  check('ink choices explain when to use each colour',
+    /明亮|浅色/.test(inkHints[0]) && /深色|较暗/.test(inkHints[1]), inkHints.join(' | '));
+  const scrimHints = await page.locator('.toolbox-export-settings .pick').nth(2).locator('.option')
+    .evaluateAll((nodes) => nodes.map((node) => node.title));
+  check('backing choices explain transparency and readability',
+    /透明/.test(scrimHints[0]) && /文字/.test(scrimHints[1]), scrimHints.join(' | '));
 
-  await page.click('#export .pick .option[data-value="1:1"]');
+  await page.waitForFunction(() =>
+    document.querySelector('.toolbox-export-preview')?.dataset.state === 'ready');
+  const previewBefore = await page.locator('.toolbox-export-preview canvas').evaluate((canvas) => ({
+    width: canvas.width,
+    height: canvas.height,
+    pixels: canvas.toDataURL(),
+    label: canvas.parentElement.getAttribute('aria-label'),
+  }));
+  check('the export page renders a preview at the chosen aspect ratio',
+    Math.abs(previewBefore.width / previewBefore.height - 9 / 16) < 0.03
+      && previewBefore.label === '叠加图预览',
+    `${previewBefore.width}x${previewBefore.height} ${previewBefore.label}`);
+  const previewOutline = await page.locator('.toolbox-export-preview canvas').evaluate((canvas) => {
+    const style = getComputedStyle(canvas);
+    return { style: style.outlineStyle, width: style.outlineWidth };
+  });
+  check('the preview has a visible image boundary',
+    previewOutline.style === 'solid' && previewOutline.width === '1px',
+    JSON.stringify(previewOutline));
+
+  await page.click('.toolbox-export-settings .pick .option[data-value="1:1"]');
+  await page.waitForFunction(() =>
+    document.querySelector('.toolbox-export-preview')?.dataset.size === '1:1'
+      && document.querySelector('.toolbox-export-preview')?.dataset.state === 'ready');
   check('a click chooses a shape', await page.evaluate(() => window.trailViewer.exportSettings().size) === '1:1');
   check('the chosen shape exposes its pressed state',
-    await page.locator('#export .option[data-value="1:1"]').getAttribute('aria-pressed') === 'true'
-      && await page.locator('#export .option[data-value="9:16"]').getAttribute('aria-pressed') === 'false');
+    await page.locator('.toolbox-export-settings .option[data-value="1:1"]').getAttribute('aria-pressed') === 'true'
+      && await page.locator('.toolbox-export-settings .option[data-value="9:16"]').getAttribute('aria-pressed') === 'false');
   check('the chosen cell is the marked one',
-    await page.locator('#export .pick .option[data-value="1:1"]').evaluate((n) => n.classList.contains('on')));
+    await page.locator('.toolbox-export-settings .pick .option[data-value="1:1"]').evaluate((n) => n.classList.contains('on')));
+  const squarePreview = await page.locator('.toolbox-export-preview canvas').evaluate((canvas) => ({
+    width: canvas.width,
+    height: canvas.height,
+    pixels: canvas.toDataURL(),
+  }));
+  check('the preview follows a shape change',
+    Math.abs(squarePreview.width / squarePreview.height - 1) < 0.03
+      && squarePreview.pixels !== previewBefore.pixels,
+    `${squarePreview.width}x${squarePreview.height}`);
 
-  await page.click('#export .pick .option[data-value="white"]');
+  await page.click('.toolbox-export-settings .pick .option[data-value="white"]');
+  await page.waitForFunction(() =>
+    document.querySelector('.toolbox-export-preview')?.dataset.ink === 'white'
+      && document.querySelector('.toolbox-export-preview')?.dataset.state === 'ready');
   check('and an ink', await page.evaluate(() => window.trailViewer.exportSettings().ink) === 'white');
+  const whitePreview = await page.locator('.toolbox-export-preview canvas').evaluate((canvas) => canvas.toDataURL());
+  check('the preview follows an ink change', whitePreview !== squarePreview.pixels);
 
-  await page.click('#export .pick .option[data-value="soft"]');
+  await page.click('.toolbox-export-settings .pick .option[data-value="soft"]');
+  await page.waitForFunction(() =>
+    document.querySelector('.toolbox-export-preview')?.dataset.scrim === 'soft'
+      && document.querySelector('.toolbox-export-preview')?.dataset.state === 'ready');
   check('and a backing', await page.evaluate(() => window.trailViewer.exportSettings().scrim) === 'soft');
+  const backedPreview = await page.locator('.toolbox-export-preview canvas').evaluate((canvas) => canvas.toDataURL());
+  check('the preview follows a backing change', backedPreview !== whitePreview);
 
   // All three settings are remembered: a reload is what a new preview looks like.
   await page.reload();
   await page.waitForFunction(() => document.body.classList.contains('loaded'));
+  await page.click('.toolbox-switch button');
+  await page.click('.toolbox-action[data-tool="export"]');
   check('the choices survive a reload',
     JSON.stringify(await page.evaluate(() => window.trailViewer.exportSettings()))
       === '{"size":"1:1","ink":"white","scrim":"soft"}');
 
-  // X on its own exports with those settings and keeps the panel out of the way.
-  await page.evaluate(() => window.trailViewer.pressKey('X'));
-  await page.evaluate(() => window.trailViewer.pressKey('x'));
-  check('X closes the panel again', await page.evaluate(() => window.trailViewer.panelOpen()) === false);
+  await page.setViewportSize({ width: 360, height: 740 });
+  const narrow = await page.locator('#toolbox-panel').evaluate((node) => {
+    const box = node.getBoundingClientRect();
+    return { left: box.left, right: box.right, width: innerWidth };
+  });
+  check('the shared export page stays inside a 360 px preview',
+    narrow.left >= 0 && narrow.right <= narrow.width, JSON.stringify(narrow));
 
-  await page.evaluate(() => window.trailViewer.pressKey('X'));
-  await page.click('#export .go');
-  await page.waitForFunction(() => window.trailViewer.panelOpen() === false);
-  check('the export button closes the panel', await page.evaluate(() => window.trailViewer.panelOpen()) === false);
+  await page.evaluate(() => {
+    window.__exportNames = [];
+    window.__exportDone = 0;
+    window.chrome = window.chrome || {};
+    window.chrome.webview = {
+      addEventListener() {},
+      postMessage(message) {
+        if (message.startsWith('export\t')) {
+          window.__exportNames.push(decodeURIComponent(message.split('\t')[3]));
+        } else if (message.startsWith('exportdone\t')) {
+          window.__exportDone += 1;
+        }
+      },
+    };
+  });
+  await page.click('.toolbox-export-settings .go');
+  await page.waitForFunction(() => window.__exportDone >= 1);
+  check('the export button keeps the shared toolbox open',
+    await page.evaluate(() => window.trailViewer.panelOpen()) === true
+      && await page.evaluate(() => window.trailViewer.measure.toolboxOpen()) === true);
+
+  await page.click('.toolbox-export-settings .pick .option[data-value="4:3"]');
+  await page.click('.toolbox-export-settings .pick .option[data-value="black"]');
+  await page.click('.toolbox-export-settings .pick .option[data-value="none"]');
+  await page.waitForFunction(() =>
+    document.querySelector('.toolbox-export-preview')?.dataset.size === '4:3'
+      && document.querySelector('.toolbox-export-preview')?.dataset.ink === 'black'
+      && document.querySelector('.toolbox-export-preview')?.dataset.scrim === 'none'
+      && document.querySelector('.toolbox-export-preview')?.dataset.state === 'ready');
+  await page.click('.toolbox-export-settings .go');
+  await page.waitForFunction(() => window.__exportDone >= 2);
+  const exportNames = await page.evaluate(() => window.__exportNames);
+  check('different styles can be exported consecutively without leaving the tool',
+    exportNames.length === 2
+      && exportNames[0].endsWith('-1x1-white-soft.png')
+      && exportNames[1].endsWith('-4x3-black-none.png')
+      && exportNames[0] !== exportNames[1],
+    exportNames.join(' | '));
+  check('the toolbox remains available after the second export',
+    await page.evaluate(() => window.trailViewer.panelOpen()) === true);
 
   check('no page errors', errors.length === 0, errors.join(' | '));
 

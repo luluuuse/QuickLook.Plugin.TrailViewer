@@ -88,7 +88,7 @@ async function main() {
   check('the photo line is translated', s.values.some((v) => v.includes('张照片，分布在 3 个标记点')),
     s.values[s.values.length - 1]);
   check('the tooltips name the keys in Chinese',
-    /Q \/ E 切换/.test(s.tips) && /（W）/.test(s.tips) && /（C）/.test(s.tips) && /X\s*\/\s*⇧X/.test(s.tips), s.tips);
+    /Q \/ E 切换/.test(s.tips) && /（W）/.test(s.tips) && /（C）/.test(s.tips) && !/⇧X/.test(s.tips), s.tips);
   check('the layer buttons are translated', s.layers.join('/') === '路网/地形/卫星/定制', s.layers.join('/'));
   check('the profile title is translated', s.profile === '海拔', s.profile);
   check('the profile axis is translated but keeps its unit', s.axis.length === 2 && s.axis.every((a) => /^-?\d+ m$/.test(a)), s.axis.join(' / '));
@@ -120,7 +120,7 @@ async function main() {
     s.values.join(' | ').slice(0, 120));
   check('the tooltips follow',
     /Q \/ E switch/.test(s.tips) && /\(W\)/.test(s.tips) && /\(C\)/.test(s.tips)
-      && /X\s*\/\s*Shift\+X/.test(s.tips), s.tips);
+      && !/Shift\+X/.test(s.tips), s.tips);
   check('the layer buttons follow', s.layers.join('/') === 'Road/Terrain/Satellite/Custom', s.layers.join('/'));
   check('the profile follows', s.profile === 'Elevation', s.profile);
   check('and so does its axis', s.axis.every((a) => /^-?\d+ m$/.test(a)), s.axis.join(' / '));

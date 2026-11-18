@@ -120,9 +120,13 @@ async function main() {
   const toolActions = await page.evaluate(() => ({
     measure: window.__readIcon('.toolbox-action[data-tool="measure"] svg'),
     export: window.__readIcon('.toolbox-action[data-tool="export"] svg'),
+    coordinates: window.__readIcon('.toolbox-action[data-tool="coordinates"] svg'),
+    attachments: window.__readIcon('.toolbox-action[data-tool="attachments"] svg'),
   }));
-  check('toolbox operations use ruler and image-download icons',
-    expectedDefault(toolActions.measure, 'ruler') && expectedDefault(toolActions.export, 'image-down'),
+  check('toolbox operations use distinct folded-map, stacked-photo, ruler and coordinate icons',
+    expectedDefault(toolActions.measure, 'ruler') && expectedDefault(toolActions.export, 'overlay-export')
+      && expectedDefault(toolActions.coordinates, 'coordinates')
+      && expectedDefault(toolActions.attachments, 'photo-export'),
     JSON.stringify(toolActions));
   await page.click('.toolbox-action[data-tool="measure"]');
   const measureActions = await page.evaluate(() => [...document.querySelectorAll(

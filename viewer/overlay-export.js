@@ -20,6 +20,11 @@ function remember(key, value) {
   writeStored(key, value);
 }
 
+export function overlayFileName(base, size, ink, scrim, suffix) {
+  const stem = String(base || 'track').replace(/\.[^.]+$/, '');
+  return `${stem}-${suffix}-${size.replace(':', 'x')}-${ink}-${scrim}.png`;
+}
+
 function base64Of(bytes) {
   let text = '';
   const step = 0x8000;
@@ -30,7 +35,6 @@ function base64Of(bytes) {
 }
 
 export function createOverlayExport({
-  L,
   el,
   t,
   post,
@@ -42,7 +46,6 @@ export function createOverlayExport({
   routeModel,
   fileName,
   onSettingsChange,
-  onPanelOpen,
 }) {
   const settings = {
     size: remembered(params, SIZE_KEY, SIZES, '9:16'),
@@ -63,9 +66,22 @@ export function createOverlayExport({
   }
 
   function exportRows() {
+    if (summary.network) {
+      return [
+        { label: t('info.routeLength'), ...splitUnit(formatDistance(summary.distanceMeters)) },
+        { label: t('export.segments'), value: String(summary.segments), unit: '' },
+      ];
+    }
     const rows = [{ label: t('info.distance'), ...splitUnit(formatDistance(summary.distanceMeters)) }];
     if (summary.durationSeconds !== null && summary.durationSeconds !== undefined) {
       rows.push({ label: t('info.totalTime'), value: clock(summary.durationSeconds), unit: '' });
+    }
+    if (elevations) {
+      rows.push({
+        label: t('info.ascent'),
+        value: Math.round(elevations.ascent).toLocaleString(),
+        unit: t('unit.m'),
+      });
     }
     if (elevations) {
       rows.push({
@@ -82,14 +98,25 @@ export function createOverlayExport({
         unit: t('unit.kmh'),
       });
     }
-    if (elevations) {
-      rows.push({
-        label: t('info.ascent'),
-        value: Math.round(elevations.ascent).toLocaleString(),
-        unit: t('unit.m'),
-      });
-    }
     return rows;
+  }
+
+  function title() {
+    const named = gpx.name
+      || gpx.tracks.find((track) => track.name)?.name
+      || gpx.routes?.find((route) => route.name)?.name;
+    const value = String(named || fileName || '').replace(/\.[^.]+$/, '').trim();
+    return value.replace(/\s*-\s*\d{10,}$/, '').trim() || t('export.untitled');
+  }
+
+  function dateLabel() {
+    const date = summary.start;
+    if (!(date instanceof Date) || Number.isNaN(date.getTime())) return '';
+    return [
+      date.getFullYear(),
+      String(date.getMonth() + 1).padStart(2, '0'),
+      String(date.getDate()).padStart(2, '0'),
+    ].join('.');
   }
 
   async function build(options) {
@@ -99,10 +126,13 @@ export function createOverlayExport({
     return drawOverlay({
       segments: lines,
       rows: exportRows(),
-      ends: { start: t('export.start'), end: t('export.end') },
+      title: title(),
+      meta: summary.network ? t('export.network') : dateLabel(),
+      ends: summary.network ? null : { start: t('export.start'), end: t('export.end') },
       size: options?.size ?? settings.size,
       ink: options?.ink ?? settings.ink,
       scrim: options?.scrim ?? settings.scrim,
+      preview: options?.preview === true,
     });
   }
 
@@ -121,8 +151,7 @@ export function createOverlayExport({
       const data = base64Of(new Uint8Array(await blob.arrayBuffer()));
       const chunk = 1 << 18;
       const base = (fileName || 'track').replace(/\.[^.]+$/, '');
-      const shape = snapshot.size.replace(':', 'x');
-      const name = `${base}-${t('export.suffix')}-${shape}.png`;
+      const name = overlayFileName(base, snapshot.size, snapshot.ink, snapshot.scrim, t('export.suffix'));
       const chunks = Math.ceil(data.length / chunk);
       const id = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
       post(`export\t${id}\t${chunks}\t${encodeURIComponent(name)}`);
@@ -137,35 +166,32 @@ export function createOverlayExport({
     }
   }
 
-  if (segments().length > 0) {
+  function mount(node) {
+    if (panel || segments().length === 0) return panel;
     const keys = { size: SIZE_KEY, ink: INK_KEY, scrim: SCRIM_KEY };
     panel = createExportPanel({
-      L,
       el,
       t,
-      node: document.getElementById('export'),
+      node,
       settings,
       onChange: (field, value) => {
         settings[field] = value;
         remember(keys[field], value);
         onSettingsChange?.();
       },
-      onExport: () => {
-        panel.close();
-        void save();
-      },
-      onOpen: onPanelOpen,
+      onPreview: (snapshot) => build({ ...snapshot, preview: true }),
+      onExport: () => void save(),
     });
+    return panel;
   }
 
   return {
-    available: () => panel !== null,
+    available: () => segments().length > 0,
     settings: () => ({ ...settings }),
     save,
     build,
+    mount,
+    focus: () => panel?.focus(),
     relabel: () => panel?.relabel(),
-    close: () => panel?.close(),
-    panelOpen: () => panel?.isOpen() ?? false,
-    togglePanel: () => panel?.toggle(),
   };
 }

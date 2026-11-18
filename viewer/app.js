@@ -26,7 +26,7 @@ import {
   formatters,
 } from './format.js';
 import { createWaypointContent, renderPointPopup } from './waypoint-content.js';
-import { createSummaryView } from './summary-view.js';
+import { createSummaryView, trackSummaryText } from './summary-view.js';
 import { analyseSplits, splitCount } from './split-analysis.js';
 import { createSplitsView } from './split-view.js';
 import { createTrackLayer } from './track-layer.js';
@@ -47,6 +47,8 @@ import {
 } from './weather.js';
 import { installLeafletIcons } from './icons.js';
 import { gradeAwareHikeSeconds } from './track-analysis.js';
+import { attachmentItems, createAttachmentExporter } from './attachments.js';
+import { coordinateTargets } from './coordinates.js';
 
 const L = window.L;
 const params = new URLSearchParams(location.search);
@@ -70,6 +72,10 @@ let runtimeTiandituKey = runtimeConfig.direct === true
 const initialDirectTiandituKey = runtimeTiandituKey;
 let tiandituTransientShown = false;
 let tiandituRejectedShown = false;
+let clipboardSequence = 0;
+const pendingClipboard = new Map();
+let photoAttachments = [];
+let attachmentExporter = null;
 
 function fileNameFromSource(source) {
   if (!source) return t('file.untitled');
@@ -84,6 +90,42 @@ function fileNameFromSource(source) {
 
 function post(message) {
   window.chrome?.webview?.postMessage(message);
+}
+
+function decodeMessage(value) {
+  try {
+    return decodeURIComponent(value || '');
+  } catch {
+    return value || '';
+  }
+}
+
+function clipboardResult(id, ok, detail = '') {
+  const pending = pendingClipboard.get(id);
+  if (!pending) return;
+  pendingClipboard.delete(id);
+  clearTimeout(pending.timer);
+  if (ok) pending.resolve();
+  else pending.reject(new Error(decodeMessage(detail) || 'clipboard write failed'));
+}
+
+async function copyText(text) {
+  if (!hasQuickLookHost) {
+    if (!navigator.clipboard?.writeText) throw new Error('clipboard access is unavailable');
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+  if (text.length > 32000) throw new Error('the copied text is too large');
+  const id = `${Date.now().toString(36)}-${(clipboardSequence += 1).toString(36)}`;
+  const result = new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      pendingClipboard.delete(id);
+      reject(new Error('the clipboard did not respond'));
+    }, 4000);
+    pendingClipboard.set(id, { resolve, reject, timer });
+  });
+  post(`clipboard\t${id}\t${encodeURIComponent(text)}`);
+  return result;
 }
 
 function persistCustomSources(entries) {
@@ -147,13 +189,22 @@ const renderInfo = createSummaryView({
   el,
   fileName,
   photosOf,
+  onCopySummary: async (text) => {
+    try {
+      await copyText(text);
+      showToast(t('summary.copied'), 2500);
+    } catch (error) {
+      showToast(t('summary.copyFailed', { detail: error.message }), 4000);
+      throw error;
+    }
+  },
   onLayoutChange: () => mapViewController?.refreshControls(),
 });
 
 // There used to be a bar of key hints across the top of the map. It took the widest part of the window and
 // pushed the summary and the corner switches apart, so the keys now live where their own control is: the
-// tooltip of the button they stand for (Q/E on the backgrounds, W on the markers, C on the fit button, X on
-// the export button). Keys with no button of their own -- the arrows, A/D, S -- are left unsaid.
+// tooltip of the button they stand for (Q/E on the backgrounds, W on the markers, C on the fit button). Keys
+// with no button of their own -- the arrows, A/D, S -- are left unsaid.
 
 // ---------- map ----------
 
@@ -198,7 +249,6 @@ const waypointController = createWaypointController({
   onOverviewOpen: () => {
     toolboxController?.close();
     layerSwitch?.close();
-    overlayExport?.close();
   },
   setProfilePinsVisible: (visible) => {
     for (const pin of profilePins) pin.node.hidden = !visible;
@@ -225,7 +275,6 @@ let mapViewController = null;
 let layerSwitch = null;
 const uiFeedback = createUiFeedback({
   t,
-  overlay: () => overlayExport,
   toolbox: () => toolboxController,
   afterShow: () => mapViewController?.refreshControls(),
 });
@@ -236,7 +285,6 @@ const keyboardController = createKeyboardController({
   photoViewer,
   waypointController,
   measurement: () => measurementController,
-  overlay: () => overlayExport,
   layerSwitch: () => layerSwitch,
   fit: () => mapViewController?.fit(),
   toggleChrome,
@@ -308,6 +356,8 @@ async function main() {
     }
     routeModel = createRouteModel(gpx);
     summary = summarize(gpx, routeModel);
+    photoAttachments = attachmentItems(gpx, photosOf, src);
+    attachmentExporter = createAttachmentExporter({ post, hasHost: hasQuickLookHost });
     timing.parseMs = performance.now() - started;
   } catch (e) {
     if (e instanceof FitError) {
@@ -376,7 +426,6 @@ async function main() {
   tracks.setAnnotationMarkersVisible(waypointController.visible());
 
   overlayExport = createOverlayExport({
-    L,
     el,
     t,
     post,
@@ -388,11 +437,6 @@ async function main() {
     routeModel,
     fileName,
     onSettingsChange: syncPreferences,
-    onPanelOpen: () => {
-      toolboxController?.close();
-      waypointController.closeOverview(false);
-      layerSwitch?.close();
-    },
   });
   const measurement = createMeasurement({
     L,
@@ -421,10 +465,29 @@ async function main() {
     t,
     formatDistance,
     measurement,
-    exportAvailable: overlayExport.available,
-    onExport: () => {
-      if (!overlayExport.panelOpen()) overlayExport.togglePanel();
+    copyText,
+    showToast,
+    coordinatePoints: () => coordinateTargets(gpx),
+    focusCoordinate: (point) => {
+      const latlng = [point.lat, point.lon];
+      map.stop();
+      map.once('moveend', () => mapViewController.focusSelection(latlng, { animate: true }));
+      map.setView(latlng, Math.max(map.getZoom(), 14), { animate: true });
     },
+    onCoordinateWeather: (point) => {
+      const url = windyUrl(point, zoomFor('start'));
+      if (!url) {
+        showToast(t('weather.unavailable'), 4000);
+        return;
+      }
+      openExternal(url);
+      showToast(t('weather.opened'), 3500);
+    },
+    attachmentItems: photoAttachments,
+    onExportAttachments: (includeExternal, onProgress) =>
+      attachmentExporter.exportAll(photoAttachments, includeExternal, onProgress),
+    exportAvailable: overlayExport.available,
+    mountExportView: overlayExport.mount,
     weatherAvailable: () => availableTargets(gpx).length > 0,
     weatherModes: availableTargets(gpx).length > 0 ? [...WEATHER_TARGETS] : [],
     weatherHasElevation: () => availableTargets(gpx).includes('highest'),
@@ -441,14 +504,12 @@ async function main() {
     onOpen: () => {
       waypointController.closeOverview(false);
       layerSwitch?.close();
-      overlayExport.close();
     },
     onLayoutChange: () => mapViewController?.refreshControls({ refitHome: false }),
   });
 
   // First of the corner controls, so it stands leftmost: "where the map looks" before "what the map shows".
   const locateCtrl = createLocateControl({ L, map, el, t, onLocate: () => mapViewController.fit() });
-  if (overlayExport.available()) map.on('click', () => overlayExport.close());
   const warnTiandituTemporarily = () => {
     if (tiandituTransientShown) return;
     tiandituTransientShown = true;
@@ -480,7 +541,6 @@ async function main() {
     onOpen: () => {
       toolboxController?.close();
       waypointController.closeOverview(false);
-      overlayExport.close();
     },
     onCustomSave: persistCustomSources,
     customSources: initialCustomSources,
@@ -504,7 +564,7 @@ async function main() {
   installSpaceGuard();
   document.addEventListener('keydown', onKeyDown);
 
-  // The host installs a low-level keyboard hook that swallows W/Q/E/S/C/X/M before the page ever sees them, so
+  // The host installs a low-level keyboard hook that swallows W/Q/E/S/C/M before the page ever sees them, so
   // typing into a text field would otherwise be eaten. Report focus changes and let the hook stand down.
   const textFieldOf = (node) => node instanceof Element
     && Boolean(node.closest('input, textarea, select, [contenteditable="true"]'));
@@ -639,9 +699,26 @@ async function main() {
     overlayCanvas: (options) => overlayExport.build(options),
     exportOverlay: () => overlayExport.save(),
     exportSettings: () => overlayExport.settings(),
-    panelOpen: () => overlayExport.panelOpen(),
+    panelOpen: () => toolboxController?.isView('export') ?? false,
     exported: (path) => showToast(t('export.done', { name: String(path).split(/[\\/]/).pop() }), 4000),
     exportFailed: (detail) => showToast(t('export.failed', { detail }), 4000),
+    summaryText: () => trackSummaryText(gpx, summary, elevations, fileName),
+    clipboardResult,
+    coordinates: {
+      targets: () => coordinateTargets(gpx),
+      copy: copyText,
+    },
+    attachments: {
+      items: () => photoAttachments,
+      exportAll: (includeExternal, onProgress) =>
+        attachmentExporter.exportAll(photoAttachments, includeExternal, onProgress),
+      result: (batch, index, ok, path, detail) =>
+        attachmentExporter.result(batch, index, ok, path, detail),
+    },
+    attachmentResult: (batch, index, ok, path, detail) =>
+      attachmentExporter.result(batch, index, ok, decodeMessage(path), decodeMessage(detail)),
+    attachmentResume: (batch, indices, folder) =>
+      attachmentExporter.resumeResult(batch, indices, decodeMessage(folder)),
     measure: {
       active: measurement.active,
       start: measurement.start,
@@ -664,8 +741,23 @@ async function main() {
   window.trailViewer = api;
   window.gpxViewer = api; // Remove after one compatibility release.
   window.chrome?.webview?.addEventListener('message', (event) => {
-    if (typeof event.data !== 'string' || !event.data.startsWith('tianditu-response\t')) return;
-    api.tiandituResponse(Number(event.data.split('\t')[1]));
+    if (typeof event.data !== 'string') return;
+    const parts = event.data.split('\t');
+    if (parts[0] === 'clipboardResult') {
+      clipboardResult(parts[1], parts[2] === '1', parts[3]);
+    } else if (parts[0] === 'attachmentResult') {
+      api.attachments.result(
+        parts[1],
+        Number(parts[2]),
+        parts[3] === '1',
+        decodeMessage(parts[4]),
+        decodeMessage(parts[5]),
+      );
+    } else if (parts[0] === 'attachmentResume') {
+      api.attachmentResume(parts[1], parts[2], decodeMessage(parts[3]));
+    } else if (parts[0] === 'tianditu-response') {
+      api.tiandituResponse(Number(parts[1]));
+    }
   });
   document.body.classList.add('loaded');
   timing.readyMs = performance.now() - started;

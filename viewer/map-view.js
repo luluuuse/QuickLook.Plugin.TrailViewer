@@ -107,7 +107,6 @@ export function createMapView({ map, isChromeHidden }) {
       '#info',
       '#splits',
       '#profile',
-      '#export',
       '#toolbox-panel',
       '.waypoint-overview',
       '.leaflet-top.leaflet-left',

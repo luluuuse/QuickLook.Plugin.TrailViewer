@@ -12,9 +12,19 @@ const UI_ICONS = Object.freeze({
     + 'L2.7 8.7a2.41 2.41 0 0 1 0-3.4l2.6-2.6a2.41 2.41 0 0 1 3.4 0Z"/>'
     + '<path d="m14.5 12.5 2-2"/><path d="m11.5 9.5 2-2"/><path d="m8.5 6.5 2-2"/>'
     + '<path d="m17.5 15.5 2-2"/>',
-  'image-down': '<path d="M10.3 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10'
-    + 'l-3.1-3.1a2 2 0 0 0-2.814.014L6 21"/><path d="m14 19 3 3v-5.5"/>'
-    + '<path d="m17 22 3-3"/><circle cx="9" cy="9" r="2"/>',
+  'overlay-export': '<path d="M3 6.5 8.5 4l7 2.5L21 4v13.5L15.5 20l-7-2.5L3 20Z"/>'
+    + '<path d="M8.5 4v13.5M15.5 6.5V20"/>',
+  'photo-export': '<rect x="4" y="6" width="13" height="12" rx="2"/>'
+    + '<path d="M7 3h10a3 3 0 0 1 3 3v8"/>'
+    + '<path d="m5 16 3.5-3.5 2.5 2.5 2-2 3.5 3.5"/>',
+  'image-export-all': '<path d="M7.2 17h9.4a4.4 4.4 0 0 0 .3-8.8A6 6 0 0 0 5.4 9.4'
+    + ' 3.9 3.9 0 0 0 7.2 17Z"/><path d="M12 9.5v6"/><path d="m9.5 13 2.5 2.5 2.5-2.5"/>',
+  'image-export-local': '<path d="M3 6h7l2 2h9v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/>'
+    + '<path d="M12 9v7"/><path d="m9.5 13.5 2.5 2.5 2.5-2.5"/>',
+  copy: '<rect x="8" y="8" width="12" height="12" rx="2"/>'
+    + '<path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/>',
+  coordinates: '<circle cx="12" cy="12" r="5"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/>'
+    + '<circle cx="12" cy="12" r="1.5"/>',
   plus: '<path d="M12 5v14"/><path d="M5 12h14"/>',
   minus: '<path d="M5 12h14"/>',
   locate: '<circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="1.5"/>'

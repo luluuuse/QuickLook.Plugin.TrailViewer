@@ -87,17 +87,16 @@ async function main() {
     iconGeometry.measure?.width === 16 && iconGeometry.measure?.height === 16
       && iconGeometry.measureStroke === '1.75',
     JSON.stringify(iconGeometry));
-  check('overlay export uses the matching image-download template',
+  check('overlay export uses the folded-map template',
     iconGeometry.exportIcon && iconGeometry.exportStroke === '1.75',
     JSON.stringify(iconGeometry));
   const toolboxRight = await page.locator('#toolbox-panel').evaluate((node) =>
     Math.round(innerWidth - node.getBoundingClientRect().right));
   check('the toolbox panel is anchored to the right edge', toolboxRight === 10, `${toolboxRight}px`);
   await page.evaluate(() => window.trailViewer.pressKey('X'));
-  check('opening export closes the toolbox to prevent overlap',
-    await page.evaluate(() => window.trailViewer.panelOpen())
-      && await page.evaluate(() => !window.trailViewer.measure.toolboxOpen()));
-  await page.evaluate(() => window.trailViewer.pressKey('X'));
+  check('X no longer opens a second export window',
+    await page.evaluate(() => window.trailViewer.panelOpen()) === false
+      && await page.evaluate(() => window.trailViewer.measure.toolboxOpen()) === true);
 
   // 2. Snapping is resolved in screen pixels and uses the source data, not visible pins.
   const snaps = await page.evaluate(() => {
@@ -281,24 +280,18 @@ async function main() {
   check('the centre button provides a keyboard-operable point action',
     await page.evaluate(() => window.trailViewer.measure.summary().pointCount) === 4);
 
-  // 5. Export remains the existing panel, now reached from the toolbox.
+  // 5. Export settings are a page inside the shared toolbox.
   await page.evaluate(() => window.trailViewer.measure.stop());
   await page.click('.toolbox-action[data-tool="export"]');
-  check('the toolbox opens the existing overlay export panel',
-    await page.locator('#export').isVisible());
-  const exportSurface = await page.locator('#export').evaluate((node) => {
-    const style = getComputedStyle(node);
-    return { background: style.backgroundColor, filter: style.backdropFilter };
-  });
-  check('the export tool page uses the same translucent surface',
-    exportSurface.background === toolboxSurface.background
-      && exportSurface.filter === toolboxSurface.filter,
-    JSON.stringify(exportSurface));
-  check('the toolbox closes as the export panel opens',
-    await page.evaluate(() => window.trailViewer.measure.toolboxOpen()) === false);
-  await page.evaluate(() => window.trailViewer.pressKey('X'));
-  check('the existing Shift+X path still closes the export panel',
-    await page.evaluate(() => window.trailViewer.panelOpen()) === false);
+  check('the toolbox opens overlay export as one of its pages',
+    await page.locator('#toolbox-panel .toolbox-export').isVisible()
+      && await page.locator('#export').count() === 0);
+  check('the toolbox stays open while export settings are shown',
+    await page.evaluate(() => window.trailViewer.measure.toolboxOpen()) === true);
+  await page.click('#toolbox-panel .toolbox-export .toolbox-back');
+  check('the export page has the shared back navigation',
+    await page.evaluate(() => window.trailViewer.panelOpen()) === false
+      && await page.evaluate(() => window.trailViewer.measure.toolboxOpen()) === true);
 
   // 6. Language updates the labels without resetting points.
   await page.locator('.lang-switch button').click();

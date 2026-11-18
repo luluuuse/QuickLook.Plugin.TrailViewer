@@ -1247,13 +1247,7 @@ export function createLayerSwitcher({
         submitCustomForm();
       });
 
-      const customHelp = el('details', 'layer-custom-help');
-      const customHelpTitle = el('summary', null, t('layer.customDisclaimerTitle'));
-      customHelpTitle.dataset.labelKey = 'layer.customDisclaimerTitle';
-      const customDisclaimer = el('p', 'layer-setting-note', t('layer.customDisclaimer'));
-      customDisclaimer.dataset.labelKey = 'layer.customDisclaimer';
-      customHelp.append(customHelpTitle, customDisclaimer);
-      customSection.append(customEmpty, customList, customForm, customHelp);
+      customSection.append(customEmpty, customList, customForm);
       customView.append(customCount, customSection);
       menu.append(settingsView, customView);
 

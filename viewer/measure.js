@@ -186,6 +186,7 @@ export function createMeasurement({
     return {
       lat: point.lat,
       lon: point.lon,
+      ele: point.ele,
       kind,
       distancePixels: target.distanceTo(pointScreen),
     };
@@ -195,6 +196,16 @@ export function createMeasurement({
     const marker = nearest(getWaypointIndex(), latlng, 'marker');
     const track = nearest(getTrackIndex(), latlng, 'track');
     return chooseSnap([marker, track].filter(Boolean)) || {
+      lat: Number(latlng.lat),
+      lon: Number(latlng.lng ?? latlng.lon),
+      kind: 'free',
+      distancePixels: Infinity,
+    };
+  }
+
+  function snapMarkerAt(latlng) {
+    const marker = nearest(getWaypointIndex(), latlng, 'marker');
+    return chooseSnap([marker].filter(Boolean)) || {
       lat: Number(latlng.lat),
       lon: Number(latlng.lng ?? latlng.lon),
       kind: 'free',
@@ -364,5 +375,6 @@ export function createMeasurement({
     canRedo: () => redoStack.length > 0,
     indexed: () => Boolean(trackIndex),
     snapAt,
+    snapMarker: snapMarkerAt,
   };
 }

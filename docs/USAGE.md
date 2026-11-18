@@ -55,9 +55,6 @@ FIT 读取活动和路线中的 GPS 记录、时间、海拔、心率、会话�
 保存后图源会出现在 **定制** 列表，选中即渲染。列表状态依次为 **加载中**、**已加载**、**部分可用**
 或 **不可用**；失败时只提示，**不会**自动切换回其他底图，避免把配置问题误判为服务故障。
 
-**来源与授权说明**默认折叠。定制图源由用户自行提供，插件不内置任何第三方端点，也不校验其可用性与授权；
-地址是否被服务方允许（例如来源校验、Referer 白名单）需要用户自行确认。
-
 定制图源由宿主保存在本机应用数据目录，不再依赖会随版本变化的 WebView 存储域名；正常覆盖安装新版本后
 仍会保留。首次使用这一存储方式时，旧页面存储中的图源会自动迁移。
 
@@ -81,12 +78,18 @@ FIT 读取活动和路线中的 GPS 记录、时间、海拔、心率、会话�
 开关，默认关闭；打开后增加红色心率曲线、独立 bpm 范围，悬停读数同时显示当前心率。缺失心率的位置会断开
 曲线，不进行插值。横贯剖面的红色虚线表示全部有效心率读数的算术平均值。
 
+### 轨迹摘要复制
+
+轨迹摘要标题栏中的复制图标会把当前文件整理成可直接粘贴到聊天或攻略中的纯文本。内容根据文件实际数据
+生成，可包含名称、里程、日期、总用时、运动时间、运动均速、累计上升/下降、顶点海拔和点数；缺失字段会
+省略。路网文件只复制里程、路线/分段数量和标记点数量，不伪造全网用时、均速或海拔。
+
 ### 距离测量
 
 打开右上角 **工具箱**，选择 **距离测量**：
 
 - <kbd>M</kbd> 可直接开始测距；测距中再次按 <kbd>M</kbd> 结束测距。
-- 测距面板固定贴近窗口右侧；打开叠加图导出时会自动关闭工具箱/测距面板，避免两个面板重叠。
+- 测距页面固定贴近窗口右侧；叠加图导出等其他工具页复用同一工具箱窗口。
 - 右键在地图上添加测距点；左键仍用于拖动地图，滚轮按当前位置缩放。
 - <kbd>Ctrl</kbd>+<kbd>Z</kbd> 撤回最后一个操作，
   <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> 重做。
@@ -97,6 +100,40 @@ FIT 读取活动和路线中的 GPS 记录、时间、海拔、心率、会话�
 - 地图上的段距离标签使用半透明底色，避免遮住测距线、轨迹和底图道路。
 
 测距结果仅保存在当前预览的内存中，不会写回轨迹文件，也不会随叠加图导出。
+
+### 点位坐标
+
+工具箱 **点位坐标** 打开后立即进入连续地图拾取；面板内固定一行提供起点、终点、顶点和中心：
+
+- 起点、终点使用轨迹或路线的首末记录点；顶点沿用可靠海拔判断。
+- 点击起点、终点或顶点会复制坐标、自动聚焦该点，并在地图上显示脉冲标记和坐标标签。
+- 打开工具即关闭当前图钉弹窗并进入十字准星状态。任意位置都可单击取点；靠近标记点时自动吸附到标记点，
+  离开吸附范围后保持用户实际点击的位置。拾取可连续进行，左键拖动和滚轮缩放不变；关闭坐标窗口即可结束。
+- **中心** 复制当前地图中心坐标，并提供悬停说明。
+
+所有结果按 `纬度, 经度` 六位小数复制，面板说明当前使用 WGS-84，不静默转换为 GCJ-02。
+面板同时显示 **坐标类型：WGS-84**。
+地图强提示和 **最近复制的坐标** 卡片会备注点位海拔；吸附到标记点或轨迹点时读取源数据海拔，
+自由地图点和地图中心没有可靠海拔时显示 **海拔：无数据**。海拔只用于界面说明，不会写入复制文本。
+最近一次复制结果下方提供 **该点天气**，使用与轨迹天气相同的 Windy 链接直接打开该坐标。
+
+### 附件图片导出
+
+工具箱 **附件图片导出** 会统计当前文件的图片：内置相对路径、Data URI 和 HTTPS 外链。
+面板提供两个入口：
+
+- **导出全部图片**：云图标，包含内置图片、Data URI 和 HTTPS 外链。
+- **导出内置图片**：文件夹图标，只导出本地内置图片，不等待任何外网请求。
+
+图片写入源轨迹同级的 `<文件名>-photos` 目录；KMZ 使用压缩包所在目录。
+
+- 文件名包含标记点名称和序号，重名时追加 `-2`、`-3`，不覆盖已有图片。
+- 内置图片由宿主直接复制，不再经过页面 Base64 和分块消息。
+- 外链只在选择全部导出后请求，最多 3 张并发；同一域名只做一次安全检查，单张超时或失败不会阻塞其他图片。
+- 导出目录内的隐藏清单记录已完成图片；关闭窗口后重新打开同一轨迹会跳过已完成项，只补导缺失或失败图片。
+  原轨迹文件被修改后旧清单自动失效。结果会显示新增、跳过已完成和失败数量。
+- 只接受公开 HTTPS 图片，HTTP、带凭据、回环、私网和链路本地地址会被拒绝。
+- 单张图片限制 30 MB，整批最多 200 张、300 MB；界面显示进度、成功/失败数量和最终目录。
 
 ### 轨迹天气
 
@@ -138,19 +175,26 @@ FIT 读取活动和路线中的 GPS 记录、时间、海拔、心率、会话�
 由大量独立路线合并出的两步路路网 KML 会自动进入路网模式。路网会显示全部路线和标注点，但不显示
 全路网运动均速、休息时间、每公里表或合并海拔剖面，因为这些数据不属于同一次连续行程。地图使用
 Canvas 绘制路线，并跳过普通轨迹点圆点、公里数字和路网级异常标记，以降低大文件的内存和交互开销。
-标注点、照片、测距和叠加图导出仍可使用。
+标注点、照片、测距和叠加图导出仍可使用。路网叠加图显示文件名称、路线总长和轨迹段数，不绘制起终点，
+也不显示用时、均速或海拔，避免把多条独立路线误示为一次连续行程。
 
 ### 导出叠加图
 
-也可从 **工具箱 → 叠加图导出** 打开设置。<kbd>X</kbd> 按上次设置直接导出，
-<kbd>Shift</kbd>+<kbd>X</kbd> 打开设置：
+从 **工具箱 → 叠加图导出** 打开设置。该页面与测距、坐标和附件导出共用标题栏、半透明背景、返回键和
+关闭键；不再使用单独的导出窗口或快捷键。
 
-- 设置面板右上角的关闭按钮可关闭面板；地图点击、<kbd>X</kbd> 和导出完成仍可关闭设置。
 - 方版：1536×1536
 - 竖版：1080×1920
 - 横版：2048×1536
+- 三个版式按钮的悬停提示会说明尺寸和适用场景。
+- 设置页内提供低分辨率实时预览；改变版式、墨色或底衬后立即刷新。
+- 预览画布带明暗双层边界，可直接辨认方版、竖版和横版的实际比例。
+- 墨色按钮说明适合明亮或深色背景，底衬按钮说明完全透明或增加文字可读性的区别。
 
-导出文件写在源轨迹同一目录，PNG 透明；可选黑/白墨色和底衬。
+导出文件写在源轨迹同一目录，PNG 透明；可选黑/白墨色和底衬。图片会写入路线名称和日期，普通轨迹按
+距离、总用时、累计上升、最高海拔、运动均速排序。文件名包含版式、墨色和底衬，例如
+`路线-轨迹-1x1-white-soft.png`，同版式的不同样式不会互相覆盖。
+点击导出后设置页保持打开，可以继续切换版式、墨色或底衬并再次导出。
 
 ### 大文件与隐私
 
@@ -218,10 +262,6 @@ A saved source appears in the **Custom** list and renders as soon as it is selec
 **Ready**, **Partially available** or **Unavailable**. If tiles fail, the viewer only warns you to check the
 address and the service's restrictions; it does **not** silently fall back to another basemap.
 
-The **source and licence note** is collapsed by default. Custom sources are yours. The plugin ships no
-third-party endpoint and does not verify availability or licence; whether a service allows this app
-(referer checks, allow-lists, quotas) is for you to confirm.
-
 The host stores custom sources in local application data rather than the versioned WebView origin, so normal
 overwrite upgrades retain them. Sources in the old page storage are migrated the first time the durable store
 is used.
@@ -248,13 +288,20 @@ turning it on adds a red line, its own bpm range and the current reading to the 
 readings split the line rather than inventing values. A dashed horizontal line marks the arithmetic average of
 all valid heart-rate readings.
 
+### Track summary copy
+
+The copy icon in the track-summary heading copies a plain-text summary suitable for chat notes or route
+descriptions. It includes only values the file actually provides: name, distance, date, elapsed and moving
+time, moving average, ascent/descent, peak elevation and point count. Route networks copy distance, route/
+segment counts and waypoint count without inventing whole-network duration, speed or elevation.
+
 ### Distance measurement
 
 Open **Toolbox** in the upper-right corner and choose **Measure distance**:
 
 - <kbd>M</kbd> starts measuring directly; press it again while measuring to finish.
-- The measurement panel stays against the right edge. Opening overlay export closes it so the two panels never
-  overlap.
+- The measurement page stays against the right edge. Overlay export and the other tool pages reuse the same
+  toolbox window.
 - Right-click adds a point. Left-drag still pans the map, and the wheel zooms at the pointer.
 - <kbd>Ctrl</kbd>+<kbd>Z</kbd> undoes the last change;
   <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> redoes it.
@@ -270,6 +317,49 @@ Open **Toolbox** in the upper-right corner and choose **Measure distance**:
 
 Measurements stay in memory for the current preview. They are not written into the track file or included in
 the overlay export.
+
+### Point coordinates
+
+Opening **Toolbox → Point coordinates** starts continuous map picking immediately. Its fixed
+single-row controls offer start, end, peak and map centre:
+
+- Start and end are the first and last recorded route points; Peak uses the same reliable-elevation test as
+  route weather.
+- Start, end and peak copy the coordinate, focus the map and show a pulsing point with a coordinate label.
+- Opening the tool closes the current pin popup and changes the cursor to a crosshair. Any position can be
+  picked repeatedly; nearby markers snap to their exact coordinate while points outside the snap radius stay
+  where clicked. Left-drag and wheel zoom remain unchanged; closing the coordinate window ends picking.
+- **Centre** copies the current map-centre coordinate and has its own hover explanation.
+
+Coordinates copy as six-decimal `latitude, longitude`; the panel identifies WGS-84 and never silently converts
+to GCJ-02 and shows **Coordinate type: WGS-84**. **Weather here** below the latest result uses the same Windy
+link builder as route weather. The map highlight and latest-coordinate card also note point elevation from the
+snapped marker or track sample. Free points and the map centre explicitly say when elevation is unavailable.
+Elevation is display-only and is not included in the clipboard text.
+
+### Attachment photo export
+
+**Toolbox → Export attachment photos** counts embedded relative files, Data URIs and HTTPS
+links and offers two entries:
+
+- **Export all photos** uses the cloud icon and includes embedded files, Data URIs and HTTPS links.
+- **Export embedded photos** uses the folder icon, skips all network work and copies only embedded images.
+
+Files are written to a `<file name>-photos` folder beside the source track; KMZ files use the archive's own
+directory.
+
+- Names contain the marker name and sequence. Duplicate names receive `-2`, `-3` and never overwrite an
+  existing photo.
+- Embedded files are copied directly by the host without page-side Base64 or chunk messages.
+- External links run with at most three workers. Host validation is cached per domain, and one timeout or
+  failure does not block the remaining batch.
+- A hidden manifest records completed images. Reopening the same unchanged track skips those files and retries
+  only missing or failed images; editing the source track invalidates the old manifest. The result reports
+  added, already-completed and failed counts.
+- Only public HTTPS images are accepted. HTTP, credentials, loopback, private-network and link-local
+  destinations are rejected.
+- Each image is limited to 30 MB; a batch is limited to 200 images and 300 MB. The panel reports progress,
+  success/failure counts and the destination folder.
 
 ### Route weather
 
@@ -309,11 +399,19 @@ The active header surface spans the full panel width, and metric column headers 
 
 ### Overlay export
 
-The same panel is also available from **Toolbox → Export overlay**. <kbd>X</kbd> exports with the previous
-settings; <kbd>Shift</kbd>+<kbd>X</kbd> opens the settings panel. Square, portrait and landscape PNGs are
-written beside the source track with transparent backgrounds and optional ink and backing.
-The close button in the panel header dismisses it; clicking the map, pressing <kbd>X</kbd>, or completing an
-export also closes it.
+Open **Toolbox → Export overlay**. It is a page in the shared toolbox and uses the same header, translucent
+surface, Back control and close button as the other tools; there is no separate export window or shortcut.
+Square, portrait and landscape PNGs are written beside the source track with transparent backgrounds and
+optional ink and backing. The image includes the route name and date. Standard tracks order statistics as
+distance, elapsed time, ascent, maximum elevation and moving speed.
+
+Route networks show the document name, total route length and segment count without drawing invented start/end
+points or displaying elapsed time, speed and elevation. Hover each shape choice for its dimensions and intended
+use. A live low-resolution preview updates with the shape, ink and backing. Ink choices explain which photo
+contrast they suit, and backing choices explain the transparency/readability tradeoff. File names include shape,
+ink and backing, for example `east-west-traverse-track-1x1-white-soft.png`, so different styles do not
+overwrite one another. The preview frame shows the exact canvas boundary, and the settings remain open after an
+export so another style can be produced immediately.
 
 ### Large files and privacy
 

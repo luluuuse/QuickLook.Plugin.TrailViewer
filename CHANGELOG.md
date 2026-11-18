@@ -17,6 +17,312 @@ Added / Changed / Deprecated / Removed / Fixed / Security 分类；没有内容�
 
 - None.
 
+## 1.23.5 — 2026-11-18
+
+### 中文
+
+#### 新增
+
+- 轨迹摘要新增复制按钮，可复制名称、里程、时间、运动时间、速度、累计升降、顶点海拔和点数；缺失字段与
+  路网文件不会生成虚假统计。
+- 新增 **点位坐标**：打开后立即进入连续地图拾取，支持起点、终点、顶点和中心；任意点靠近标记点时自动
+  吸附，并在地图提示与结果卡中显示点位海拔。自由点和中心没有源海拔时明确显示“海拔：无数据”。
+- 最近复制的坐标可直接打开 **该点天气**；剪贴板只写入 `纬度, 经度`，不把海拔或坐标类型混入文本。
+- 新增 **附件图片导出**，支持内置图片、Data URI 和 HTTPS 外链；提供“导出全部图片”和“导出内置图片”
+  两个入口，并通过隐藏清单续传，只补导缺失或失败图片。
+- 叠加图自动写入路线名称和日期；路网文件显示文档名称、路线总长和轨迹段数，不再伪造起终点、用时或海拔。
+- 叠加图设置新增实时预览、清晰画布边界，以及版式、墨色和底衬的说明性悬停提示；导出后可继续切换样式
+  连续导出，不同墨色和底衬使用不同文件名。
+
+#### 变更
+
+- 工具箱主菜单改为紧凑的 2×2 快捷图标格：距离测量、点位坐标、叠加图导出和附件图片导出保持一键进入，
+  轨迹天气作为下方完整功能条保留；说明保留在悬停提示与无障碍名称中。
+- 叠加图导出设置并入统一工具箱，与测距、坐标和附件导出共用标题栏、半透明背景、返回与关闭逻辑。
+- 徒步分享图指标顺序调整为距离、总用时、累计上升、最高海拔和运动均速。
+- 重绘叠加图为“地图折页”、附件导出为“照片堆叠”，消除两个工具图标的高度相似感。
+- 定制图源管理页移除“来源与授权说明”折叠块。
+
+#### 删除
+
+- 删除叠加图导出的 `X` 和 `Shift+X` 快捷键，导出只从工具箱进入。
+
+#### 安全
+
+- 外链图片只接受公开 HTTPS 地址，拒绝 HTTP、带凭据、回环、私网和链路本地地址；请求只在用户开始导出后
+  发出，并按图片类型、单图大小、总大小和数量限制校验。
+
+#### 修复
+
+- 修复宿主剪贴板与附件回调名未挂到页面 API，导致操作实际成功却提示失败并逐张等待超时的问题。
+- 修复任意拾取点标签暴露内部 `coordinates.any` 键名的问题。
+
+### English
+
+#### Added
+
+- Added a copy button to the track summary for name, distance, elapsed and moving time, speed, ascent,
+  descent, peak elevation and point count. Missing values and route networks never produce invented totals.
+- Added **Point coordinates** with immediate continuous map picking, start/end/peak/centre controls, nearby
+  marker snapping and elevation notes in both the map highlight and latest-coordinate card. Free points and
+  the map centre explicitly report unavailable elevation when no source value exists.
+- The latest coordinate can open **Weather here** directly. Clipboard output remains six-decimal
+  `latitude, longitude`; elevation and coordinate-type context stay in the interface.
+- Added **Export attachment photos** for embedded files, Data URIs and HTTPS links, with separate all-photo and
+  embedded-only actions plus a hidden resume manifest that retries only missing or failed images.
+- Overlay exports now include the route name and date. Route networks show the document name, route length and
+  segment count without inventing trip endpoints, elapsed time or elevation.
+- Overlay settings now offer a live preview, a visible canvas boundary, explanatory layout/ink/backing tooltips,
+  continuous exports without closing the toolbox, and distinct file names for every visual style.
+
+#### Changed
+
+- The toolbox now uses a compact 2×2 quick-launch grid for measurement, coordinates, overlay export and
+  attachment export, with route weather in a full-width strip below. Explanations remain in tooltips and
+  accessible names.
+- Overlay settings are now a page inside the shared toolbox instead of a separate window.
+- Hiking share images order metrics as distance, elapsed time, ascent, maximum elevation and moving speed.
+- Overlay and attachment exports now use distinct folded-map and stacked-photo icons.
+- Removed the source/licence disclosure block from the custom-source manager.
+
+#### Removed
+
+- Removed the `X` and `Shift+X` overlay-export shortcuts. Export is available only from the toolbox.
+
+#### Security
+
+- External photo export accepts only public HTTPS image URLs and starts network work only after the user begins
+  export. HTTP, credentials, loopback, private-network and link-local destinations are blocked, with image-type,
+  per-file, total-size and count validation.
+
+#### Fixed
+
+- Fixed missing host clipboard and attachment acknowledgement names that made successful operations report
+  failure and wait for per-image timeouts.
+- Fixed picked-point labels exposing the internal `coordinates.any` key.
+
+## 1.23.4 — 2026-11-18
+
+### 中文
+
+#### 新增
+
+- 复制点位坐标时，地图强提示和“最近复制的坐标”卡片同时显示该点海拔；吸附到标记点或轨迹点时
+  使用源数据海拔，自由地图点和中心点没有可靠海拔时明确显示“海拔：无数据”。
+
+#### 变更
+
+- 剪贴板内容仍保持纯 `纬度, 经度`，海拔只作为界面备注，不会写入复制文本。
+
+### English
+
+#### Added
+
+- Coordinate copying now shows the point elevation in both the map highlight and the latest-coordinate card.
+  Snapped markers and track points use their source elevation; free map points and the map centre explicitly
+  show that elevation is unavailable.
+
+#### Changed
+
+- Clipboard output remains plain `latitude, longitude`; elevation is display-only and is not added to the copied
+  text.
+
+## 1.23.3 — 2026-11-18
+
+### 中文
+
+#### 变更
+
+- 重新设计工具箱中的两个导出图标：叠加图导出改为“地图折页”，附件图片导出改为“照片堆叠”，
+  消除两者相似的照片轮廓与箭头组合。
+
+### English
+
+#### Changed
+
+- Redesigned the two toolbox export icons: overlay export now uses a folded map, while attachment export
+  uses stacked photos, removing the similar photo-outline-and-arrow treatment.
+
+## 1.23.2 — 2026-11-18
+
+### 中文
+
+#### 变更
+
+- 点击叠加图导出后工具箱保持打开，可连续切换版式、墨色或底衬并再次导出。
+- 导出预览增加清晰的明暗双层图片边界，直接显示方版、竖版和横版的实际画布比例。
+
+### English
+
+#### Changed
+
+- Exporting an overlay keeps the toolbox open so users can switch shape, ink or backing and export again.
+- The preview now has a clear two-tone image boundary that shows the exact square, portrait or wide canvas.
+
+## 1.23.1 — 2026-11-18
+
+### 中文
+
+#### 新增
+
+- 叠加图导出设置新增低分辨率实时预览，版式、墨色或底衬改变后立即更新。
+- 墨色和底衬选项增加解释性悬停提示，说明适用背景、透明度与文字可读性。
+
+#### 修复
+
+- 叠加图文件名现在同时包含版式、墨色和底衬，避免同一轨迹的不同样式互相覆盖。
+
+### English
+
+#### Added
+
+- Overlay export settings now include a low-resolution live preview that updates when the shape, ink or backing
+  changes.
+- Ink and backing choices now explain their intended photo contrast, transparency and text readability on hover.
+
+#### Fixed
+
+- Overlay file names now include shape, ink and backing so different styles of the same track no longer overwrite
+  each other.
+
+## 1.23.0 — 2026-11-18
+
+### 中文
+
+#### 新增
+
+- 叠加图自动写入路线名称和日期；路网文件显示文档名称、路线总长和轨迹段数，不再伪造起终点、用时或海拔统计。
+
+#### 变更
+
+- 叠加图导出设置改为工具箱内部页面，与测距、坐标和附件导出共用标题栏、半透明背景、返回和关闭逻辑。
+- 徒步指标顺序调整为距离、总用时、累计上升、最高海拔和运动均速。
+- 方版、竖版和横版增加输出尺寸与适用场景悬停提示。
+
+#### 删除
+
+- 删除叠加图导出的 `X` 和 `Shift+X` 快捷键；导出只从工具箱进入。
+
+### English
+
+#### Added
+
+- Overlay exports now include the route name and date. Route networks show the document name, total route
+  length and segment count without inventing endpoints, elapsed time or elevation totals.
+
+#### Changed
+
+- Overlay export settings are now a page inside the shared toolbox, using the same header, translucent surface,
+  back navigation and close behavior as the other tools.
+- Hiking statistics are ordered as distance, elapsed time, ascent, maximum elevation and moving speed.
+- Square, portrait and wide choices now explain their output dimensions and intended use on hover.
+
+#### Removed
+
+- Removed the `X` and `Shift+X` overlay-export shortcuts. Export is available only from the toolbox.
+
+## 1.22.0 — 2026-11-18
+
+### 中文
+
+#### 新增
+
+- 轨迹摘要信息框新增复制按钮，可复制名称、里程、时间、运动时间、速度、累计升降、顶点海拔和点数；
+  缺失字段和路网文件不生成虚假统计。
+- 工具箱新增 **点位坐标**，打开后立即进入地图任意点拾取；面板内起点、终点、顶点、中心固定一行。
+  任意点保留自由拾取，靠近标记点时会自动吸附；左键拖动和滚轮缩放保持原有地图行为。
+  起点、终点和顶点会聚焦地图，并以脉冲标记和坐标标签强提示。
+- 最近复制的坐标可直接通过 **该点天气** 在 Windy 中打开，复用轨迹天气的链接与浏览器打开流程。
+- 工具箱新增 **附件图片导出**，汇总内置图片、Data URI 和外链图片，保存到源轨迹同级的
+  `<文件名>-photos` 目录；显示进度、成功数量、失败数量和最终保存目录。
+- 附件导出拆为 **导出全部图片**（云图标）和 **导出内置图片**（文件夹图标）；后者不等待任何网络请求。
+- 附件导出增加任务级续传：隐藏清单记录已完成图片，关闭窗口后重新打开同一轨迹只补导缺失或失败项。
+
+#### 变更
+
+- 工具箱改为“地图分析 / 分享与导出 / 环境信息”三个轻量分组，减少新增工具带来的视觉堆积。
+- 轨迹摘要和点位坐标通过宿主写入 Windows 剪贴板，普通浏览器开发环境继续使用 Clipboard API。
+- 附件图片按标记点名称和序号命名；重名文件自动追加序号，不覆盖已有图片。
+- 内置图片改由宿主直接读取并原子复制，不再经过页面 `fetch → Base64 → 分块 WebMessage`。
+- HTTPS 外链最多 3 张并发，宿主同步使用 3 个下载槽，并缓存同一域名的公共地址检查；单张超时缩短到
+  10 秒，失败不会阻塞后续队列。
+- 清单绑定原轨迹路径、大小和修改时间；每成功一张就原子更新。已删除或大小异常的文件会重新调度，结果
+  显示新增、跳过已完成和失败数量。
+- 坐标复制文本只包含六位小数的纬度、经度，不再附带 `WGS-84 ·` 前缀或成功 Toast；地图上的脉冲点与坐标标签
+  负责反馈结果，避免遮挡。坐标标签背景更透明，并按文本内容自适应宽度。
+- 地图中心模块简称为 **中心**，并补充“复制当前地图中心坐标”的悬停提示。
+- 坐标面板增加固定的 **坐标类型：WGS-84** 提示，拾取说明仅保留鼠标操作。
+- 地图拾取可连续取点；拾取提示和临时点标记显示约 1.8 秒后自动消失，十字准星与拾取状态继续保留到
+  返回或关闭工具。
+- 定制图源管理页移除“来源与授权说明”折叠块。
+
+#### 安全
+
+- 外链导出只接受公开 HTTPS 图片地址，并在用户点击导出后才开始网络请求；HTTP、带凭据地址、回环地址、
+  私网地址和链路本地地址会被拒绝。
+- 外链图片按内容类型、单图大小、总大小和数量限制进行校验；单张失败不会中止其余图片。
+
+#### 修复
+
+- 修复宿主剪贴板和附件回调名未挂到页面 API，导致操作实际成功却等待超时并提示失败的问题；这也消除了
+  图片导出逐张等待 45 秒超时的卡慢。
+- 修复任意拾取点标签显示内部键名 `coordinates.any` 的问题，现显示本地化的“拾取点 / Picked point”。
+
+### English
+
+#### Added
+
+- Added a copy button to the track summary with name, distance, elapsed and moving time, speed, ascent,
+  descent, peak elevation and point count. Missing fields and route networks never produce invented totals.
+- Added **Point coordinates** to the toolbox. Opening it starts arbitrary map picking immediately, with start,
+  end, peak and map centre fixed in one row. Arbitrary points remain free while nearby markers snap; left-drag
+  and wheel zoom keep their normal map behaviour. Start, end and peak focus the map and show a pulsing point
+  with its coordinate label.
+- The latest copied coordinate can open **Weather here** in Windy through the same link and browser path used
+  by route weather.
+- Added **Export attachment photos**, combining embedded files, Data URIs and HTTPS links into a
+  `<file name>-photos` folder beside the source track, with progress, success/failure counts and the final
+  destination.
+- Split attachment export into **Export all photos** (cloud icon) and **Export embedded photos** (folder
+  icon); the embedded-only action performs no network work.
+- Added task-level resume. A hidden manifest records completed photos, so reopening the same unchanged track
+  retries only missing or failed images.
+
+#### Changed
+
+- Grouped the toolbox into lightweight **Map analysis**, **Share and export** and **Environment** sections.
+- Track summaries and point coordinates use the Windows clipboard through the host; browser development keeps
+  using the Clipboard API.
+- Attachment names combine the marker name and sequence. Duplicate names receive a suffix instead of
+  overwriting an existing photo.
+- Embedded photos are now copied directly by the host instead of using page-side `fetch → Base64 → chunked
+  WebMessage`.
+- HTTPS links run with at most three page workers and three host download slots. Public-host validation is
+  cached per domain, request timeout is 10 seconds, and one failure does not block the queue.
+- The manifest binds the source path, size and modification time and is updated atomically after each image.
+  Deleted or size-mismatched files are scheduled again, and results report added, completed and failed counts.
+- Coordinate text now contains only six-decimal latitude and longitude. The `WGS-84 ·` prefix and success toast
+  are gone; the pulsing map point and coordinate label provide unobstructed feedback. The label is more
+  transparent and sizes itself to its text.
+- Renamed the map-centre module to **Centre** and added its own hover explanation.
+- Added the fixed **Coordinate type: WGS-84** badge; pick guidance now describes only mouse actions.
+- Map picking supports consecutive points. Its instruction and transient point marker fade after about 1.8
+  seconds while the crosshair and pick mode stay active until Back or closing the toolbox.
+- Removed the source/licence disclosure block from the custom-source manager.
+
+#### Security
+
+- External photo export accepts only public HTTPS image URLs and starts network requests only after the user
+  presses Export. HTTP, credential-bearing, loopback, private-network and link-local destinations are blocked.
+- External responses are checked by image type and bounded by per-image, total and count limits; one failed
+  image does not abort the rest of the batch.
+
+#### Fixed
+
+- Fixed host clipboard and attachment acknowledgement names missing from the page API, which made successful
+  operations time out and report failure and added a 45-second delay to every attachment image.
+- Fixed arbitrary picked-point labels exposing the internal `coordinates.any` key instead of a localized label.
+
 ## 1.21.30 — 2026-11-18
 
 ### 中文

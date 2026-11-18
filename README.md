@@ -24,7 +24,7 @@ Common controls:
 | Hide interface chrome | <kbd>S</kbd> |
 | Start/finish measuring | <kbd>M</kbd> |
 | Measuring undo / redo | <kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> |
-| Export overlay image | <kbd>X</kbd> / <kbd>Shift</kbd>+<kbd>X</kbd> |
+| Export overlay image | Toolbox → Export overlay |
 | Open route weather | Toolbox → Route weather |
 
 ## Highlights
@@ -49,6 +49,10 @@ Common controls:
 - **Manual measurement:** the toolbox supports multi-section point-to-point distance measurement. Right-click
   adds a point while left-drag pans and the wheel zooms; nearby waypoints and recorded track samples snap
   automatically. Section subtotals and the overall distance update on the map.
+- **Copy and attachment export:** copy a shareable summary from the track card, copy WGS-84 coordinates for
+  the start, end, peak, map centre or any picked point (with nearby marker snapping and elevation notes), and
+  export embedded,
+  Data URI and HTTPS-linked photos beside the source track.
 - **Map focus:** opening the file and selecting a waypoint keep the relevant content inside the region not
   covered by the summary, toolbars, waypoint list or profile.
 - **Unified icons:** map controls, task panels, the split entry, the waypoint overview, the photo viewer and
@@ -61,9 +65,16 @@ Common controls:
   512 px addresses. The host persists custom sources across overwrite upgrades. The source panel shows only
   providers from the active map type. The top layer entry shows the active category icon and label, while the
   low-frequency no-map mode uses the Grid icon in the layer title bar.
-- **Unified toolbox:** distance measurement, overlay export and route weather share one entry. Export offers
-  square, portrait and landscape PNG layouts with selectable ink and backing. Task panels use a translucent
-  surface on the right and measurement/export cannot remain open together.
+- **Unified toolbox:** distance measurement, point coordinates, overlay export, attachment photo export and
+  route weather share one entry: four tools form a 2×2 quick-launch grid, with route weather in a full-width
+  strip below.
+  Every tool page uses the same translucent right-hand window, header, back and close behavior, including
+  overlay export. Overlay export offers square, portrait and landscape PNG layouts with selectable ink and
+  backing with a live preview. The toolbox stays open after export so several styles can be exported in a row;
+  each image includes the route name and date. Route networks show total route length and segment count without
+  inventing trip endpoints or statistics. Attachment photos can copy embedded files quickly or
+  process the complete set with three concurrent external workers. Reopening the same track resumes by skipping
+  completed images and retrying only missing or failed items.
 - **Unified floating panels:** the toolbox, layer panel and waypoint list share one top position and header
   height, and only one can remain open.
 - **Route weather:** opens Windy in your browser with that point's hourly forecast already expanded. Choose

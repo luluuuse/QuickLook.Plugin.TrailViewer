@@ -29,11 +29,6 @@ function makeController(overrides = {}) {
       stepByKey: (delta) => calls.push(`step:${delta}`),
     },
     measurement: () => measurement,
-    overlay: () => ({
-      togglePanel: () => calls.push('panel'),
-      close: () => calls.push('close-panel'),
-      save: () => calls.push('export'),
-    }),
     layerSwitch: () => ({
       current: () => selectedLayer,
       currentCategory: () => selectedCategory,
@@ -70,8 +65,8 @@ function keyEvent(key, extra = {}) {
 test('viewer shortcuts route to their owning controllers', () => {
   const { controller, calls } = makeController();
 
-  for (const key of ['w', 'q', 'e', 's', 'c', 'x', 'X']) {
-    const event = keyEvent(key, { shiftKey: key === 'X' });
+  for (const key of ['w', 'q', 'e', 's', 'c']) {
+    const event = keyEvent(key);
     controller.onKeyDown(event);
     assert.equal(event.prevented, 1, key);
   }
@@ -82,10 +77,18 @@ test('viewer shortcuts route to their owning controllers', () => {
     'layer:road',
     'chrome',
     'fit',
-    'close-panel',
-    'export',
-    'panel',
   ]);
+});
+
+test('X and Shift+X are no longer viewer shortcuts', () => {
+  const { controller, calls } = makeController();
+  for (const event of [keyEvent('x'), keyEvent('X', { shiftKey: true })]) {
+    controller.onKeyDown(event);
+    assert.equal(event.prevented, 0);
+  }
+  controller.pressKey('x');
+  controller.pressKey('X');
+  assert.deepEqual(calls, []);
 });
 
 test('modified, repeated and editable-target keys belong to the host', () => {
@@ -120,7 +123,7 @@ test('arrow navigation remains available while a photo is open', () => {
 test('map shortcuts stand down behind a full-size photo', () => {
   const { controller, calls } = makeController({ photoOpen: true });
 
-  for (const key of ['w', 'q', 'e', 's', 'c', 'x']) {
+  for (const key of ['w', 'q', 'e', 's', 'c']) {
     controller.onKeyDown(keyEvent(key));
   }
   controller.pressKey('w');
@@ -137,8 +140,6 @@ test('direct host keys follow the same guarded routing', () => {
   controller.pressKey('e');
   controller.pressKey('s');
   controller.pressKey('c');
-  controller.pressKey('x');
-  controller.pressKey('X');
 
   assert.deepEqual(calls, [
     'pins',
@@ -146,9 +147,6 @@ test('direct host keys follow the same guarded routing', () => {
     'layer:road',
     'chrome',
     'fit',
-    'close-panel',
-    'export',
-    'panel',
   ]);
 });
 

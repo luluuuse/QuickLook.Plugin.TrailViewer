@@ -34,6 +34,7 @@ internal static class SelfTests
             TestViewerBuildId(temporary);
             TestOverlayTransfer();
             TestAtomicFile(temporary);
+            TestAttachmentExport(temporary);
         }
         finally
         {
@@ -496,6 +497,82 @@ internal static class SelfTests
         AtomicFile.Write(target, second);
         Check("an existing atomic file is replaced", File.ReadAllText(target) == "second");
         Check("no temporary atomic files are left", Directory.GetFiles(folder, "*.tmp").Length == 0);
+    }
+
+    private static void TestAttachmentExport(string temporary)
+    {
+        var source = Path.Combine(temporary, "attachments", "track.gpx");
+        Directory.CreateDirectory(Path.GetDirectoryName(source));
+        File.WriteAllText(source, "<gpx/>");
+        var folder = AttachmentExport.FolderTarget(source);
+        Check("attachment folder sits beside the original track",
+            folder == Path.Combine(temporary, "attachments", "track-photos"), folder);
+
+        using (var export = new AttachmentExport(source))
+        {
+            const string batch = "job-1";
+            export.BeginUpload(batch + "\t0\timage-0\t1\t..%2Fphoto.png");
+            export.AppendUpload("image-0\t0\t1\t" + Base64("first"));
+            var first = export.CompleteUpload(batch + "\t0\timage-0\t1");
+            Check("an uploaded attachment is published", first.Ok && File.Exists(first.Path), first.Detail);
+            Check("an attachment cannot escape the photo folder",
+                Path.GetDirectoryName(first.Path) == folder && File.ReadAllText(first.Path) == "first",
+                first.Path);
+
+            export.BeginUpload(batch + "\t1\timage-1\t1\tphoto.png");
+            export.AppendUpload("image-1\t0\t1\t" + Base64("second"));
+            var second = export.CompleteUpload(batch + "\t1\timage-1\t1");
+            Check("a duplicate attachment name receives a suffix",
+                second.Ok && Path.GetFileName(second.Path) == "photo-2.png", second.Path);
+
+            var embedded = Path.Combine(Path.GetDirectoryName(source), "embedded.png");
+            File.WriteAllText(embedded, "embedded");
+            var local = export.CopyLocal(batch + "\t2\tembedded.png\tembedded.png");
+            Check("an embedded image is copied directly by the host",
+                local.Ok && File.ReadAllText(local.Path) == "embedded", local.Detail);
+            var escaped = export.CopyLocal(batch + "\t3\tescape.png\t..%2Fescape.png");
+            Check("a direct local copy cannot escape the file root", !escaped.Ok);
+
+            using (var resumed = new AttachmentExport(source))
+            {
+                var state = resumed.Resume(batch + "\t0,1,2");
+                Check("resume reads the manifest without rewriting completed images",
+                    state.Completed.SequenceEqual(new[] { 0, 1, 2 }), string.Join(",", state.Completed));
+                Check("resume returns the original export folder", state.Folder == folder, state.Folder);
+            }
+
+            File.Delete(second.Path);
+            using (var resumed = new AttachmentExport(source))
+            {
+                var state = resumed.Resume(batch + "\t0,1,2");
+                Check("a deleted exported image is scheduled again",
+                    state.Completed.SequenceEqual(new[] { 0, 2 }), string.Join(",", state.Completed));
+            }
+
+            var manifest = Path.Combine(folder, ".trailviewer-photo-export.json");
+            Check("the resume manifest is hidden",
+                File.Exists(manifest)
+                && (File.GetAttributes(manifest) & FileAttributes.Hidden) != 0);
+            File.AppendAllText(source, " ");
+            using (var resumed = new AttachmentExport(source))
+            {
+                var state = resumed.Resume(batch + "\t0,1,2");
+                Check("editing the source track invalidates the old manifest", state.Completed.Length == 0);
+            }
+        }
+
+        Check("external images require HTTPS",
+            AttachmentExport.IsAllowedUri("https://images.example/photo.jpg"));
+        Check("HTTP image links are rejected",
+            !AttachmentExport.IsAllowedUri("http://images.example/photo.jpg"));
+        Check("credential-bearing image links are rejected",
+            !AttachmentExport.IsAllowedUri("https://user:secret@images.example/photo.jpg"));
+        Check("loopback image links are rejected",
+            !AttachmentExport.IsAllowedUri("https://127.0.0.1/photo.jpg")
+            && !AttachmentExport.IsAllowedUri("https://localhost/photo.jpg"));
+        Check("private-network image links are rejected",
+            !AttachmentExport.IsAllowedUri("https://192.168.1.4/photo.jpg")
+            && !AttachmentExport.IsAllowedUri("https://[fd00::1]/photo.jpg"));
     }
 
     private static string Base64(string text) =>

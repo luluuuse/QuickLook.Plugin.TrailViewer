@@ -8,7 +8,7 @@ using System.Windows.Threading;
 namespace QuickLook.Plugin.TrailViewer;
 
 /// <summary>
-/// W, Q, E, S, C, X, M and measuring undo/redo, caught below the application instead of inside it. Measured: QuickLook shows its preview
+/// W, Q, E, S, C, M and measuring undo/redo, caught below the application instead of inside it. Measured: QuickLook shows its preview
 /// with ShowActivated="False" and reads its own keys (Space, Esc, arrows) through a global keyboard hook, so the
 /// keyboard never enters this window -- a WPF handler only ever sees a key after someone clicks into the
 /// preview. A raw low-level hook is the only place that always sees it first.
@@ -136,14 +136,13 @@ internal sealed class GlobalKeys : IDisposable
         var win = Down(VkLWin) || Down(VkRWin);
         var plain = !control && !shift && !alt && !win;
         var plainAction = plain && name != "z";
-        // Shift+X opens the export panel. Ctrl+Z and Ctrl+Shift+Z belong to measurement only while its mode is
-        // active, so an inactive preview leaves Explorer's own undo shortcut untouched.
-        var shiftedExport = name == "x" && shift && !control && !alt && !win;
+        // Ctrl+Z and Ctrl+Shift+Z belong to measurement only while its mode is active, so an inactive preview
+        // leaves Explorer's own undo shortcut untouched.
         var measureHistory = name == "z" && control && !alt && !win;
 
-        if ((!plainAction && !shiftedExport && !measureHistory) || !SafeOnScreen() || !HostIsForeground())
+        if ((!plainAction && !measureHistory) || !SafeOnScreen() || !HostIsForeground())
         {
-            Reason = !plainAction && !shiftedExport && !measureHistory ? "modifier"
+            Reason = !plainAction && !measureHistory ? "modifier"
                 : TextInputActive() ? "text-input"
                 : !SafeOnScreen() ? "off-screen" : "foreground=" + ForegroundName();
             return Next(code, wParam, lParam);
@@ -160,7 +159,7 @@ internal sealed class GlobalKeys : IDisposable
 
         try
         {
-            _onKey(shiftedExport ? "X" : measureHistory && shift ? "Z" : name);
+            _onKey(measureHistory && shift ? "Z" : name);
         }
         catch (Exception ex)
         {
@@ -257,7 +256,6 @@ internal sealed class GlobalKeys : IDisposable
         0x45 => "e",
         0x53 => "s",
         0x43 => "c",
-        0x58 => "x",
         0x4D => "m",
         0x5A => "z",
         _ => null,
