@@ -719,6 +719,10 @@ internal static class SelfTests
             ViewerMessages.OverlayExported("/tmp/a b.png") == "overlayExported\t%2Ftmp%2Fa%20b.png"
             && ViewerMessages.OverlayFailed("bad 'file'")
                 == "overlayFailed\tbad%20%27file%27");
+        Check("key and Tianditu callbacks use URL-encoded WebMessages",
+            ViewerMessages.PressKey("m") == "pressKey\tm"
+            && ViewerMessages.SetTiandituKey("0123abcd") == "setTiandituKey\t0123abcd"
+            && ViewerMessages.SetTiandituKey(null) == "setTiandituKey\t");
     }
 
     private static string Base64(string text) =>

@@ -34,8 +34,8 @@ decorative and always `aria-hidden="true"`.
 - **UI icons** have no fill and describe an action or state. Use `iconElement()` for DOM controls,
   `iconMarkup()` for trusted Leaflet HTML, and `setIcon()` when replacing an existing node's content.
 - **Data symbols** describe map information. They keep their semantic red, yellow, green or cyan fill, but use a
-  dark `1.5` outline through the shared `data-symbol` and `symbol-*` classes. Use `symbolMarkup()` or
-  `symbolElement()` for SVG data symbols; simple circles and paths rendered by Leaflet continue to use the
+  dark `1.5` outline through the shared `data-symbol` and `symbol-*` classes. Use `symbolMarkup()` for SVG data
+  symbols; simple circles and paths rendered by Leaflet continue to use the
   shared numeric values. The waypoint pin uses a symmetric `24×32` data grid; its camera badge is positioned
   independently so the pin itself stays optically centred.
 - **Weather marks** (`WEATHER_MARKS`) label the three route-weather points and sit in their own registry because
@@ -58,7 +58,7 @@ Never use a filled UI icon for status colour. Never remove semantic data fill me
 Unknown names fall back to `circle-help` for UI icons, `warning` for data symbols and `start` for weather
 marks, so a missing registration fails visibly without injecting unchecked markup.
 
-`iconElement()`, `symbolElement()` and `weatherMarkElement()` cache one `<template>` per resolved visual
+`iconElement()` and `weatherMarkElement()` cache one `<template>` per resolved visual
 configuration and clone its first SVG child. Repeated tool, layer and map updates therefore do not reparse the
 same trusted SVG markup.
 

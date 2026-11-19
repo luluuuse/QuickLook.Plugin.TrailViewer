@@ -12,8 +12,18 @@
   --surface-raised: #2a2a2a;
   --surface-card: #303030;
   --surface-control: #252525;
+  --surface-muted: #242424;
+  --surface-input: #262626;
+  --surface-row: #292929;
+  --surface-hover: #383838;
   --border-subtle: #3c3c3c;
   --border-control: #444444;
+  --border-strong: #4a4a4a;
+  --border-focus: #555555;
+  --border-muted: #777777;
+  --text-bright: #ffffff;
+  --accent-muted: #356d9d;
+  --accent-tint: rgba(47, 155, 255, 0.18);
   --radius-sm: 4px;
   --radius-md: 8px;
   --radius-lg: 10px;

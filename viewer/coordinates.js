@@ -1,8 +1,6 @@
 import { formatCoord } from './format.js';
 import { highestPoint } from './weather.js';
 
-export const COORDINATE_MODES = Object.freeze(['start', 'end', 'highest']);
-
 function valid(point) {
   return point && Number.isFinite(Number(point.lat)) && Number.isFinite(Number(point.lon))
     ? point

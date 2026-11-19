@@ -1,5 +1,3 @@
-#nullable enable
-
 using QuickLook.Common.Helpers;
 using System;
 using System.Collections.Concurrent;

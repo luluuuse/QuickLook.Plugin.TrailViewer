@@ -8,7 +8,7 @@
 import { readStored, writeStored } from './storage.js';
 
 const STORAGE_KEY = 'lang';
-export const LANGS = ['en', 'zh'];
+const LANGS = ['en', 'zh'];
 
 /**
  * A language named in itself, not in the interface language: "English" stays English on a Chinese page and

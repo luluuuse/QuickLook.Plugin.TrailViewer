@@ -17,6 +17,50 @@ Added / Changed / Deprecated / Removed / Fixed / Security 分类；没有内容�
 
 - None.
 
+## 1.25.8 — 2026-11-20
+
+### 中文
+
+#### 变更
+
+- 宿主启用全局 C# 可空引用类型检查（`<Nullable>enable</Nullable>`），零编译告警并通过全部宿主与协议自测。
+- 将天地图密钥热更新（`setTiandituKey`）与全局快捷键分发（`pressKey`）从 `ExecuteScriptAsync`
+  脚本字符串拼接彻底迁移至 `ViewerBridge.PostMessage`（`PostWebMessageAsString`），并在页面
+  `host-bridge.js` 统一解码分发。
+- 清理 9 个前端模块中的 19 处未使用导出及 `DEFAULT_SCRIM`/`elevationAt`/`storageKey` 等冗余代码，消除
+  `toolbox-coordinates.js` 的业务层 `innerHTML` 拼接。
+- 收敛 `layers.css` 与 `panels.css` 的重复灰度/边框/强调色至 `tokens.css` 变量，移除 4 处冗余
+  `!important`；为 `index.html` 核心入口脚本增加 `modulepreload` 预加载链路。
+- 补齐 `geo.test.mjs`、`gpx.test.mjs`、`kml.test.mjs` 与 `host-bridge.test.mjs` 单元测试。
+
+#### 修复
+
+- 修复 `profile-controller.js` 首次悬停或 `clear()` 后先测量尺寸再显示浮标导致 `0×0` 偏移/裁切的问题。
+- 修复 `TrailViewerPanel.cs` 在快速取消或异常退出时的任务异常捕捉与 KMZ 临时解包目录清理。
+
+### English
+
+#### Changed
+
+- Enabled global C# nullable reference checking (`<Nullable>enable</Nullable>`) across the host assembly with
+  zero compiler warnings.
+- Migrated `setTiandituKey` and `pressKey` host-to-page callbacks from `ExecuteScriptAsync` string interpolation to
+  `ViewerBridge.PostMessage` (`PostWebMessageAsString`) handled directly in `viewer/host-bridge.js`.
+- Removed or internalized 19 unused front-end module exports alongside dead helpers (`DEFAULT_SCRIM`, `elevationAt`,
+  `storageKey`) and replaced template `innerHTML` assembly in `viewer/toolbox-coordinates.js` with cached icon
+  elements.
+- Consolidated repeated grayscale, border and accent values in `layers.css` and `panels.css` into `tokens.css`,
+  removed four redundant `!important` declarations on the splits table, and added `<link rel="modulepreload">`
+  hints for core ESM entry scripts in `viewer/index.html`.
+- Added millisecond-level Node unit suites for `geo.js`, `gpx.js`, `kml.js` and `host-bridge.js`.
+
+#### Fixed
+
+- Fixed profile readout offset/clipping on first hover or after `clear()` caused by measuring hidden `0×0`
+  dimensions before unhiding `#profile`'s readout.
+- Added top-level exception handling to `LoadAsync` and explicit temp-folder cleanup when KMZ extraction is
+  cancelled on preview close.
+
 ## 1.25.7 — 2026-11-20
 
 ### 中文

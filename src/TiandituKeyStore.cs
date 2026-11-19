@@ -18,16 +18,16 @@ internal static class TiandituKeyStore
     internal static string DefaultFilePath => Path.Combine(
         SettingHelper.LocalDataPath, PluginIdentity.Name, "secrets", "tianditu.bin");
 
-    internal static bool IsValid(string key) => KeyPattern.IsMatch((key ?? string.Empty).Trim());
+    internal static bool IsValid(string? key) => KeyPattern.IsMatch((key ?? string.Empty).Trim());
 
-    internal static string Load(string path = null)
+    internal static string? Load(string? path = null)
     {
         return LoadFromFile(path ?? DefaultFilePath);
     }
 
-    internal static bool HasKey(string path = null) => !string.IsNullOrEmpty(Load(path));
+    internal static bool HasKey(string? path = null) => !string.IsNullOrEmpty(Load(path));
 
-    internal static bool Save(string key, string path = null)
+    internal static bool Save(string? key, string? path = null)
     {
         key = (key ?? string.Empty).Trim();
         if (!IsValid(key)) return false;
@@ -51,7 +51,7 @@ internal static class TiandituKeyStore
         }
     }
 
-    internal static bool Delete(string path = null)
+    internal static bool Delete(string? path = null)
     {
         try
         {
@@ -65,7 +65,7 @@ internal static class TiandituKeyStore
         }
     }
 
-    internal static string LoadFromFile(string path)
+    internal static string? LoadFromFile(string path)
     {
         try
         {

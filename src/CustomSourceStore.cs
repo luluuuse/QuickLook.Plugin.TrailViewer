@@ -30,7 +30,7 @@ internal static class CustomSourceStore
     private static readonly string FilePath = Path.Combine(
         SettingHelper.LocalDataPath, PluginIdentity.Name, "custom-sources.json");
 
-    public static string LoadJson()
+    public static string? LoadJson()
     {
         return LoadJsonFromFile(FilePath);
     }
@@ -40,7 +40,7 @@ internal static class CustomSourceStore
         return SaveJsonToFile(json, FilePath);
     }
 
-    internal static string LoadJsonFromFile(string path)
+    internal static string? LoadJsonFromFile(string path)
     {
         lock (Gate)
         {
@@ -64,7 +64,7 @@ internal static class CustomSourceStore
         if (string.IsNullOrWhiteSpace(json) || json.Length > MaxJsonLength)
             return false;
 
-        string normalized;
+        string? normalized;
         try
         {
             normalized = Normalize(json);
@@ -94,7 +94,7 @@ internal static class CustomSourceStore
         }
     }
 
-    private static string Normalize(string json)
+    private static string? Normalize(string json)
     {
         if (!(Serializer.DeserializeObject(json) is object[] raw))
             return null;

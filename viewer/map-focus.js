@@ -13,14 +13,14 @@ export function makeRect(left, top, right, bottom) {
   };
 }
 
-export function rectCenter(rect) {
+function rectCenter(rect) {
   return {
     x: (rect.left + rect.right) / 2,
     y: (rect.top + rect.bottom) / 2,
   };
 }
 
-export function insetRect(rect, left, top = left, right = left, bottom = top) {
+function insetRect(rect, left, top = left, right = left, bottom = top) {
   const inner = makeRect(rect.left + left, rect.top + top, rect.right - right, rect.bottom - bottom);
   if (inner.width <= 0 || inner.height <= 0) {
     const x = (rect.left + rect.right) / 2;
@@ -52,7 +52,7 @@ export function unionRects(rects) {
   );
 }
 
-export function containsRect(outer, inner) {
+function containsRect(outer, inner) {
   return inner.left >= outer.left && inner.top >= outer.top
     && inner.right <= outer.right && inner.bottom <= outer.bottom;
 }

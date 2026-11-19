@@ -1,6 +1,6 @@
 import { symbolMarkup } from './icons.js';
 
-export const SNAP_RETICLE_SIZE = 18;
+const SNAP_RETICLE_SIZE = 18;
 
 /** Maps each snappable target kind to its standardized data-symbol glyph in icons.js. */
 export const SNAP_SYMBOL_NAMES = Object.freeze({

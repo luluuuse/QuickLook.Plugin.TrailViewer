@@ -73,7 +73,7 @@ internal static class ViewerPreferences
         lock (Gate)
         {
             if (!File.Exists(legacy) || File.Exists(current)) return false;
-            string temporary = null;
+            string? temporary = null;
             try
             {
                 Directory.CreateDirectory(Path.GetDirectoryName(current) ?? string.Empty);
@@ -83,7 +83,7 @@ internal static class ViewerPreferences
                 temporary = null;
                 File.Delete(legacy);
                 var legacyDirectory = Path.GetDirectoryName(legacy);
-                if (!string.IsNullOrEmpty(legacyDirectory) && Directory.Exists(legacyDirectory)
+                if (legacyDirectory is { Length: > 0 } && Directory.Exists(legacyDirectory)
                     && !Directory.EnumerateFileSystemEntries(legacyDirectory).Any())
                     Directory.Delete(legacyDirectory);
                 return true;

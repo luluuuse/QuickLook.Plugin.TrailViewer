@@ -1,5 +1,3 @@
-#nullable enable
-
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.Wpf;
 using QuickLook.Common.Helpers;
@@ -106,94 +104,110 @@ internal sealed partial class TrailViewerPanel : UserControl, IDisposable
 
     private async System.Threading.Tasks.Task LoadAsync(string path)
     {
-        _measureActive = false;
-        _sourcePath = Path.GetFullPath(path);
-        _attachments?.Dispose();
-        _path = _sourcePath;
-        _name = Path.GetFileName(_sourcePath);
-        _fileRoot = Path.GetDirectoryName(_sourcePath);
-
-        long sourceBytes;
         try
         {
-            sourceBytes = new FileInfo(_sourcePath).Length;
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-            Fail(Strings.PreviewFailed(ex.Message));
-            return;
-        }
-        if (IsOversized(sourceBytes))
-        {
-            Fail(Strings.FileTooLarge(MaxInputBytes));
-            return;
-        }
+            _measureActive = false;
+            _sourcePath = Path.GetFullPath(path);
+            _attachments?.Dispose();
+            _path = _sourcePath;
+            _name = Path.GetFileName(_sourcePath);
+            _fileRoot = Path.GetDirectoryName(_sourcePath);
 
-        if (!IsWebView2Available())
-        {
-            Fail(Strings.WebView2Missing);
-            return;
-        }
-
-        // A KMZ is unpacked first; from here on everything - the virtual host, the URL - works on the .kml inside.
-        if (KmzArchive.IsKmz(path))
-        {
+            long sourceBytes;
             try
             {
-                _unpackedFolder = await System.Threading.Tasks.Task.Run(
-                    KmzArchive.CreateFolder, _lifecycle.Token);
-                var unpacked = _unpackedFolder;
-                _path = await System.Threading.Tasks.Task.Run(
-                    () => KmzArchive.ExtractDocument(_sourcePath, unpacked, _lifecycle.Token),
-                    _lifecycle.Token);
-                _fileRoot = _unpackedFolder;
-                Trace($"unpacked {_name} to {_path}");
+                sourceBytes = new FileInfo(_sourcePath).Length;
             }
-            catch (OperationCanceledException) when (_finished)
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
+                Fail(Strings.PreviewFailed(ex.Message));
                 return;
             }
-            catch (Exception ex) when (ex is InvalidDataException or IOException
-                or UnauthorizedAccessException or NotSupportedException)
+            if (IsOversized(sourceBytes))
             {
-                DropUnpackedFolder();
-                Fail(Strings.KmzUnreadable(ex.Message));
+                Fail(Strings.FileTooLarge(MaxInputBytes));
                 return;
             }
-        }
-        if (_finished) return;
-        _attachments = new AttachmentExport(_sourcePath, _fileRoot);
 
-        _webView = new WebView2
-        {
-            CreationProperties = new CoreWebView2CreationProperties
+            if (!IsWebView2Available())
             {
-                // Also keeps the chosen map layer (localStorage) between previews.
-                UserDataFolder = UserDataFolder,
-            },
-            DefaultBackgroundColor = System.Drawing.Color.FromArgb(255, 24, 24, 24),
-        };
-        _webView.CoreWebView2InitializationCompleted += OnInitialized;
-        _webView.NavigationCompleted += OnNavigationCompleted;
-        // The window is already up and holding the keyboard by the time the control is in the tree.
-        _webView.Loaded += (_, _) => { _onScreen = IsVisible; FocusViewer(); };
-        // QuickLook shows its preview without activating it (ShowActivated="False") and reads Space, Esc and
-        // the arrows through a global keyboard hook of its own, so a WPF handler only ever sees a key after
-        // someone clicks into the preview. The viewer keys are caught below the application instead.
-        var hookClock = Stopwatch.StartNew();
-        _keys = new GlobalKeys(
-            () => _onScreen, () => _measureActive, () => _textInput, OnGlobalKey);
-        _keys.Start();
-        Trace($"keyboard hook ready in {hookClock.ElapsedMilliseconds} ms (installed={_keys.Installed})");
-        // Kept as a fallback: when the hook is unavailable, a preview that did get the keyboard still works.
-        InputManager.Current.PreProcessInput += OnPreProcessInput;
-        IsVisibleChanged += (_, _) => UpdateOnScreen();
-        Loaded += (_, _) => UpdateOnScreen();
-        Unloaded += (_, _) => _onScreen = false;
-        Content = _webView;
-        _timeout.Start();
-        Trace("WebView2 runtime " + CoreWebView2Environment.GetAvailableBrowserVersionString());
-        _ = EnsureWebViewAsync();
+                Fail(Strings.WebView2Missing);
+                return;
+            }
+
+            // A KMZ is unpacked first; from here on everything - the virtual host, the URL - works on the .kml inside.
+            if (KmzArchive.IsKmz(path))
+            {
+                string? unpacked = null;
+                try
+                {
+                    unpacked = await System.Threading.Tasks.Task.Run(
+                        KmzArchive.CreateFolder, _lifecycle.Token);
+                    _unpackedFolder = unpacked;
+                    _path = await System.Threading.Tasks.Task.Run(
+                        () => KmzArchive.ExtractDocument(_sourcePath, unpacked, _lifecycle.Token),
+                        _lifecycle.Token);
+                    _fileRoot = _unpackedFolder;
+                    Trace($"unpacked {_name} to {_path}");
+                }
+                catch (OperationCanceledException) when (_finished)
+                {
+                    if (unpacked is { Length: > 0 })
+                        KmzArchive.DeleteFolder(unpacked);
+                    DropUnpackedFolder();
+                    return;
+                }
+                catch (Exception ex) when (ex is InvalidDataException or IOException
+                    or UnauthorizedAccessException or NotSupportedException)
+                {
+                    DropUnpackedFolder();
+                    Fail(Strings.KmzUnreadable(ex.Message));
+                    return;
+                }
+            }
+            if (_finished) return;
+            _attachments = new AttachmentExport(_sourcePath, _fileRoot);
+
+            _webView = new WebView2
+            {
+                CreationProperties = new CoreWebView2CreationProperties
+                {
+                    // Also keeps the chosen map layer (localStorage) between previews.
+                    UserDataFolder = UserDataFolder,
+                },
+                DefaultBackgroundColor = System.Drawing.Color.FromArgb(255, 24, 24, 24),
+            };
+            _webView.CoreWebView2InitializationCompleted += OnInitialized;
+            _webView.NavigationCompleted += OnNavigationCompleted;
+            // The window is already up and holding the keyboard by the time the control is in the tree.
+            _webView.Loaded += (_, _) => { _onScreen = IsVisible; FocusViewer(); };
+            // QuickLook shows its preview without activating it (ShowActivated="False") and reads Space, Esc and
+            // the arrows through a global keyboard hook of its own, so a WPF handler only ever sees a key after
+            // someone clicks into the preview. The viewer keys are caught below the application instead.
+            var hookClock = Stopwatch.StartNew();
+            _keys = new GlobalKeys(
+                () => _onScreen, () => _measureActive, () => _textInput, OnGlobalKey);
+            _keys.Start();
+            Trace($"keyboard hook ready in {hookClock.ElapsedMilliseconds} ms (installed={_keys.Installed})");
+            // Kept as a fallback: when the hook is unavailable, a preview that did get the keyboard still works.
+            InputManager.Current.PreProcessInput += OnPreProcessInput;
+            IsVisibleChanged += (_, _) => UpdateOnScreen();
+            Loaded += (_, _) => UpdateOnScreen();
+            Unloaded += (_, _) => _onScreen = false;
+            Content = _webView;
+            _timeout.Start();
+            Trace("WebView2 runtime " + CoreWebView2Environment.GetAvailableBrowserVersionString());
+            _ = EnsureWebViewAsync();
+        }
+        catch (OperationCanceledException) when (_finished)
+        {
+            DropUnpackedFolder();
+        }
+        catch (Exception ex)
+        {
+            DropUnpackedFolder();
+            Fail(Strings.PreviewFailed(ex.Message));
+        }
     }
 
     internal static void PrepareEnvironment()

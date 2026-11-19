@@ -28,7 +28,7 @@ export const SLOPE_FULL = 0.25;
 
 /** Moving average over `window` samples, shrinking at the ends instead of padding with zeros. */
 /** @param {number[]} values @returns {number[]} */
-export function smooth(values, window = SMOOTH_WINDOW) {
+function smooth(values, window = SMOOTH_WINDOW) {
   const half = Math.floor(window / 2);
   const out = new Array(values.length);
   for (let i = 0; i < values.length; i += 1) {
@@ -91,24 +91,6 @@ export function rawElevationGain(values) {
     else descent -= change;
   }
   return { ascent, descent };
-}
-
-/** Elevation at an arbitrary distance, straight between the two samples that bracket it. */
-export function elevationAt(samples, distance) {
-  let low = 0;
-  let high = samples.length - 1;
-  while (low < high) {
-    const mid = (low + high + 1) >> 1;
-    if (samples[mid].along <= distance) low = mid;
-    else high = mid - 1;
-  }
-  const a = samples[low];
-  const b = samples[low + 1];
-  if (!b) return a.ele;
-  const span = b.along - a.along;
-  if (span <= 0) return a.ele;
-  const t = Math.min(1, Math.max(0, (distance - a.along) / span));
-  return a.ele + (b.ele - a.ele) * t;
 }
 
 /** The same route, put down at even distances so a slope can be read over a fixed run of ground. */
@@ -177,7 +159,7 @@ function gradeOf(slope) {
  * the one that held up against a route whose true gradient was known. The gradient is also what the fill
  * colour is drawn from, so the drawing gains detail without the classification losing any.
  */
-export function groundCells(samples, { step = STEP } = {}) {
+function groundCells(samples, { step = STEP } = {}) {
   if (samples.length < 2) return [];
   const grid = resample(samples, step);
   const reach = Math.max(1, Math.round(50 / step));
@@ -304,7 +286,7 @@ export function analyse(samples) {
  * picture shows somewhere rather than a peak the drawing has already averaged away. Eleven percent counts:
  * the threshold is where the legend has always stopped calling a climb gentle.
  */
-export function steepSummary(cells) {
+function steepSummary(cells) {
   let metres = 0;
   let maxSlope = 0;
   for (const cell of cells) {

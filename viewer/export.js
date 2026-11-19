@@ -28,14 +28,13 @@ const MAX_POINTS = 30000;
 
 // Three shapes: a square, a phone screen, and the landscape page. The key is the shape's own proportion and is
 // what the file name carries; what the panel calls it is the i18n layer's business.
-export const PRESETS = [
+const PRESETS = [
   { key: '1:1', width: 1080, height: 1080, pixels: 1536 }, // 1536 x 1536
   { key: '9:16', width: 1080, height: 1920, pixels: 1920 }, // 1080 x 1920
   { key: '4:3', width: 1440, height: 1080, pixels: 2048 }, // 2048 x 1536, the landscape page
 ];
-export const DEFAULT_SIZE = '9:16';
-export const DEFAULT_SCRIM = 'none';
-export const DEFAULT_INK = 'black';
+const DEFAULT_SIZE = '9:16';
+const DEFAULT_INK = 'black';
 export const INKS = ['black', 'white'];
 
 const FONT = '"Segoe UI", "Microsoft YaHei", sans-serif';
@@ -77,7 +76,7 @@ const RAMP = [
 
 const BANDS = 24; // one stroke per band, not one per point: a 20,000 point track is still ~24 draws
 
-export const presetOf = (key) => PRESETS.find((p) => p.key === key)
+const presetOf = (key) => PRESETS.find((p) => p.key === key)
   || PRESETS.find((p) => p.key === DEFAULT_SIZE)
   || PRESETS[0];
 

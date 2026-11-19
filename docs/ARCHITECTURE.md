@@ -182,8 +182,8 @@ attachmentlink  <batch> <index> <name> <encoded-url>
 
 页面协议版本位于 `Directory.Build.props`，与产品版本独立。
 
-宿主向页面返回剪贴板、附件、续传和叠加图结果时统一使用 `PostWebMessageAsString` 的制表符消息，
-不再把结果值拼入 `ExecuteScriptAsync` 源码；布尔值由页面按显式 `'1'` 解析。
+宿主向页面返回剪贴板、附件、续传、叠加图结果、天地图密钥热更新和快捷键通知时统一使用 `PostWebMessageAsString`
+的制表符消息，生产路径不再把参数值拼入 `ExecuteScriptAsync` 源码；布尔值由页面按显式 `'1'` 解析。
 
 `text-input` 上报页面内文本字段的焦点状态。宿主的全局键盘钩子在操作系统层拦截 `W/Q/E/S/C/M/T`，
 比 WebView 更早拿到按键，因此输入框里打字会被当成快捷键；钩子读到该状态为 1 时直接放行，

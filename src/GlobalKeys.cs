@@ -53,8 +53,8 @@ internal sealed class GlobalKeys : IDisposable
 
     private int _calls; // test harness only: how many keys the OS actually routed through the hook
 
-    private Thread _thread;
-    private Dispatcher _dispatcher;
+    private Thread? _thread;
+    private Dispatcher? _dispatcher;
     private IntPtr _hook;
     private bool _disposed;
 
@@ -255,7 +255,7 @@ internal sealed class GlobalKeys : IDisposable
 
     private static bool Down(int vk) => (GetAsyncKeyState(vk) & 0x8000) != 0;
 
-    private static string NameOf(int vk) => vk switch
+    private static string? NameOf(int vk) => vk switch
     {
         0x57 => "w",
         0x51 => "q",
@@ -344,7 +344,7 @@ internal sealed class GlobalKeys : IDisposable
     private static extern IntPtr CallNextHookEx(IntPtr hook, int code, IntPtr wParam, IntPtr lParam);
 
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode)]
-    private static extern IntPtr GetModuleHandle(string moduleName);
+    private static extern IntPtr GetModuleHandle(string? moduleName);
 
     [DllImport("user32.dll")]
     private static extern IntPtr GetForegroundWindow();

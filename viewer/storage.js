@@ -40,7 +40,3 @@ export function removeStored(name) {
     // Storage can be disabled; callers keep working with defaults.
   }
 }
-
-export function storageKey(name) {
-  return fullKey(name);
-}

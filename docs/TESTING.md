@@ -69,6 +69,8 @@ Build workflow 使用声明的最低 Node 20，Release workflow 使用 Node 22�
 当前专项入口：
 
 - `tests/unit/icons.test.mjs`：图标注册表、尺寸、描边和未知图标回退。
+- `tests/unit/geo.test.mjs`、`tests/unit/gpx.test.mjs`、`tests/unit/kml.test.mjs`、`tests/unit/host-bridge.test.mjs`：
+  大圆距离/方位角、GPX/KML 解析边界与 HTML 图片白名单，以及 WebMessage 桥接分发与剪贴板合并失败路径。
 - `tests/unit/weather.test.mjs`：起点、终点、顶点、无坐标文件、缩放级别和 Windy 链接格式。
 - `tests/icons-test.cjs`：全部控件/数据符号、Leaflet 适配、激活态和纯文字分段列头。
   另覆盖六齿设置齿轮、四角取景框、标题栏无底图网格、四类图源 B 方案图标和分类悬停提示。

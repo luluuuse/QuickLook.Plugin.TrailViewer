@@ -7,7 +7,7 @@
     <AssemblyName>QuickLook.Plugin.TrailViewer</AssemblyName>
     <UseWPF>true</UseWPF>
     <LangVersion>latest</LangVersion>
-    <Nullable>disable</Nullable>
+    <Nullable>enable</Nullable>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
     <OutputPath>..\bin\$(Configuration)\</OutputPath>

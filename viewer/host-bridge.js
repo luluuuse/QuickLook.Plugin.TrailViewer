@@ -114,6 +114,10 @@ export function createHostBridge() {
         api.exportFailed(decodeMessage(parts[1]));
       } else if (parts[0] === 'tianditu-response') {
         api.tiandituResponse(Number(parts[1]));
+      } else if (parts[0] === 'setTiandituKey') {
+        api.setTiandituKey(decodeMessage(parts[1]));
+      } else if (parts[0] === 'pressKey') {
+        api.pressKey(decodeMessage(parts[1]));
       }
     });
   }

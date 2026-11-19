@@ -63,7 +63,7 @@
   box-sizing: border-box;
   flex-direction: column;
   padding: 10px;
-  border: 1px solid #444;
+  border: 1px solid var(--border-control);
   border-radius: 5px;
   background: var(--tool-panel-background);
   -webkit-backdrop-filter: var(--tool-panel-filter);
@@ -83,7 +83,7 @@
   align-items: center;
   gap: 6px;
   padding: 0 1px 7px 3px;
-  border-bottom: 1px solid #3c3c3c;
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .layer-source-heading {
@@ -118,7 +118,7 @@
 }
 
 .layer-menu-icon-button:hover {
-  background: #383838;
+  background: var(--surface-hover);
   color: #fff;
 }
 
@@ -142,7 +142,7 @@
 
 .layer-menu-section {
   padding-top: 8px;
-  border-top: 1px solid #3c3c3c;
+  border-top: 1px solid var(--border-subtle);
 }
 
 .layer-menu-section:first-child {
@@ -177,7 +177,7 @@
   width: auto;
   flex: none;
   padding: 2px 5px;
-  color: #8fd9ff;
+  color: var(--icon-active);
   font-size: 11px;
   line-height: 1.4;
 }
@@ -258,7 +258,7 @@
 }
 
 .layer-switch .layer-source-menu button:hover {
-  background: #383838;
+  background: var(--surface-hover);
 }
 
 .layer-switch .layer-source-menu .layer-menu-icon-button {
@@ -328,7 +328,7 @@
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
-  scrollbar-color: #555 transparent;
+  scrollbar-color: var(--border-focus) transparent;
   scrollbar-width: thin;
 }
 
@@ -337,7 +337,7 @@
   flex-direction: column;
   gap: 7px;
   padding-top: 9px;
-  border-top: 1px solid #3c3c3c;
+  border-top: 1px solid var(--border-subtle);
 }
 
 .layer-settings-section:first-child {
@@ -389,7 +389,7 @@
   padding: 8px 9px;
   border: 1px solid #454545;
   border-radius: 5px;
-  background: #262626;
+  background: var(--surface-input);
 }
 
 .layer-key-identity {
@@ -438,7 +438,7 @@
 }
 
 .layer-settings-view .layer-key-action:hover {
-  background: #383838;
+  background: var(--surface-hover);
   color: #fff;
 }
 
@@ -462,7 +462,7 @@
   padding-top: 9px;
   overflow-y: auto;
   overscroll-behavior: contain;
-  scrollbar-color: #555 transparent;
+  scrollbar-color: var(--border-focus) transparent;
   scrollbar-width: thin;
   flex: 1 1 auto;
   flex-direction: column;
@@ -502,7 +502,7 @@
 }
 
 .layer-custom-row.active {
-  border-color: #356d9d;
+  border-color: var(--accent-muted);
   background: rgba(35, 79, 121, 0.55);
 }
 
@@ -543,8 +543,8 @@
 }
 
 .layer-custom-row.active .layer-custom-check {
-  border-color: #2f9bff;
-  background: #2f9bff;
+  border-color: var(--accent);
+  background: var(--accent);
 }
 
 .layer-custom-copy {
@@ -598,7 +598,7 @@
 }
 
 .layer-custom-status.loading::before {
-  background: #8fd9ff;
+  background: var(--icon-active);
 }
 
 .layer-custom-status.limited {
@@ -675,7 +675,7 @@
   place-items: center;
   border-radius: 5px;
   background: #222;
-  color: #8fd9ff;
+  color: var(--icon-active);
 }
 
 .layer-custom-empty p {
@@ -686,9 +686,9 @@
 
 .layer-custom-empty-action {
   padding: 6px 12px;
-  border: 1px solid #356d9d;
+  border: 1px solid var(--accent-muted);
   border-radius: var(--radius-sm);
-  background: #234f79;
+  background: var(--icon-active-background);
   color: #fff;
   cursor: pointer;
   font: inherit;
@@ -718,7 +718,7 @@
   gap: 8px;
   margin: 2px -10px -10px;
   padding: 10px;
-  border-top: 1px solid #3c3c3c;
+  border-top: 1px solid var(--border-subtle);
   background: #202020;
 }
 
@@ -733,7 +733,7 @@
   width: 100%;
   min-height: 32px;
   padding: 6px 10px;
-  border: 1px solid #4a4a4a;
+  border: 1px solid var(--border-strong);
   border-radius: 5px;
   color: #c7c7c7;
   text-align: center;
@@ -747,14 +747,14 @@
 }
 
 .layer-switch .layer-source-menu .layer-custom-save {
-  border-color: #2f9bff;
-  background: #234f79;
+  border-color: var(--accent);
+  background: var(--icon-active-background);
   color: #fff;
   font-weight: 600;
 }
 
 .layer-switch .layer-source-menu .layer-custom-cancel:hover {
-  border-color: #777;
+  border-color: var(--border-muted);
   background: var(--surface-card);
   color: #fff;
 }
@@ -772,7 +772,7 @@
 
 /* Advanced options stay collapsed so the form fits a short window; the summary is the only always-visible row. */
 .layer-custom-advanced {
-  border-top: 1px solid #3c3c3c;
+  border-top: 1px solid var(--border-subtle);
   padding-top: 6px;
 }
 
@@ -833,7 +833,7 @@
   width: 100%;
   box-sizing: border-box;
   padding: 5px 7px;
-  border: 1px solid #4a4a4a;
+  border: 1px solid var(--border-strong);
   border-radius: 3px;
   background: #1f1f1f;
   color: var(--text);
@@ -988,12 +988,12 @@
 }
 
 .waypoint-overview-switch.joined-right {
-  border-left: 1px solid #444;
+  border-left: 1px solid var(--border-control);
   border-radius: 0 var(--toolbar-radius) var(--toolbar-radius) 0;
 }
 
 .waypoint-overview-switch button[aria-expanded="true"] {
-  background: #234f79;
+  background: var(--icon-active-background);
   color: var(--icon-active);
   box-shadow: inset 0 -2px var(--icon-active-line);
 }
@@ -1014,7 +1014,7 @@
   flex-direction: column;
   overflow: hidden;
   padding: 10px 10px 0;
-  border: 1px solid #444;
+  border: 1px solid var(--border-control);
   border-radius: 5px;
   background: var(--panel);
   box-shadow: 0 3px 16px rgba(0, 0, 0, 0.55);
@@ -1063,7 +1063,7 @@
 }
 
 .waypoint-overview-header .close:hover {
-  background: #383838;
+  background: var(--surface-hover);
   color: #fff;
 }
 
@@ -1074,7 +1074,7 @@
   min-width: 0;
   max-width: 172px;
   padding: 3px 6px;
-  border: 1px solid #4a4a4a;
+  border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
   background: #222;
   color: var(--muted);
@@ -1085,12 +1085,12 @@
 
 .waypoint-filter-trigger:hover,
 .waypoint-filter-trigger[aria-expanded="true"] {
-  border-color: #777;
+  border-color: var(--border-muted);
   color: #fff;
 }
 
 .waypoint-filter-trigger[aria-expanded="true"] {
-  border-color: #356d9d;
+  border-color: var(--accent-muted);
   background: var(--icon-active-background);
   color: var(--icon-active);
 }
@@ -1121,7 +1121,7 @@
   width: min(248px, calc(100vw - 16px));
   box-sizing: border-box;
   padding: 7px;
-  border: 1px solid #555;
+  border: 1px solid var(--border-focus);
   border-radius: 5px;
   background: #202020;
   box-shadow: 0 5px 20px rgba(0, 0, 0, 0.65);
@@ -1153,9 +1153,9 @@
 .insight-filter {
   min-width: 0;
   padding: 5px 7px;
-  border: 1px solid #4a4a4a;
+  border: 1px solid var(--border-strong);
   border-radius: 3px;
-  background: #262626;
+  background: var(--surface-input);
   color: var(--muted);
   cursor: pointer;
   font: inherit;
@@ -1168,7 +1168,7 @@
 
 .insight-filter:hover {
   color: #fff;
-  border-color: #777;
+  border-color: var(--border-muted);
 }
 
 .insight-filter.active,
@@ -1181,9 +1181,9 @@
 .waypoint-correct-option {
   min-width: 0;
   padding: 5px 7px;
-  border: 1px solid #4a4a4a;
+  border: 1px solid var(--border-strong);
   border-radius: 3px;
-  background: #262626;
+  background: var(--surface-input);
   color: var(--text);
   cursor: pointer;
   font: inherit;
@@ -1195,7 +1195,7 @@
 }
 
 .waypoint-correct-option:hover {
-  border-color: #777;
+  border-color: var(--border-muted);
   background: #343434;
 }
 
@@ -1283,7 +1283,7 @@
 }
 
 .waypoint-overview-item.selected {
-  background: rgba(47, 155, 255, 0.18);
+  background: var(--accent-tint);
   box-shadow: inset 3px 0 var(--accent);
 }
 
@@ -1305,17 +1305,17 @@
 }
 
 .waypoint-overview-item.insight-danger.selected {
-  background: rgba(47, 155, 255, 0.18);
+  background: var(--accent-tint);
   box-shadow: inset 3px 0 #df5151;
 }
 
 .waypoint-overview-item.insight-water.selected {
-  background: rgba(47, 155, 255, 0.18);
+  background: var(--accent-tint);
   box-shadow: inset 3px 0 #4c91dd;
 }
 
 .waypoint-overview-item.insight-camp.selected {
-  background: rgba(47, 155, 255, 0.18);
+  background: var(--accent-tint);
   box-shadow: inset 3px 0 #43ad72;
 }
 
@@ -1325,16 +1325,16 @@
 .waypoint-overview-item.insight-crossing.selected,
 .waypoint-overview-item.insight-access.selected,
 .waypoint-overview-item.insight-viewpoint.selected {
-  background: rgba(47, 155, 255, 0.18);
+  background: var(--accent-tint);
 }
 
 .waypoint-overview-item.insight-junction.selected {
-  background: rgba(47, 155, 255, 0.18);
+  background: var(--accent-tint);
   box-shadow: inset 3px 0 #d6a329;
 }
 
 .waypoint-overview-item.insight-summit.selected {
-  background: rgba(47, 155, 255, 0.18);
+  background: var(--accent-tint);
   box-shadow: inset 3px 0 #9a72d3;
 }
 
@@ -1387,13 +1387,13 @@
 
 .waypoint-correct-button:hover,
 .waypoint-correct-button[aria-expanded="true"] {
-  border-color: #555;
+  border-color: var(--border-focus);
   background: #343434;
   color: #fff;
 }
 
 .waypoint-correct-button[aria-expanded="true"] {
-  border-color: #356d9d;
+  border-color: var(--accent-muted);
   background: var(--icon-active-background);
   color: var(--icon-active);
   box-shadow: inset 0 -2px var(--icon-active-line);

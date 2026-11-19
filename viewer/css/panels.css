@@ -167,7 +167,7 @@
   flex: none;
   min-width: 34px;
   padding: 1px 5px;
-  border: 1px solid #4a4a4a;
+  border: 1px solid var(--border-strong);
   border-radius: var(--radius-md);
   background: var(--surface-control);
   color: var(--muted);
@@ -179,8 +179,8 @@
 
 .info-details-toggle:hover,
 .info-details-toggle[aria-expanded="true"] {
-  border-color: #777;
-  color: #fff;
+  border-color: var(--border-muted);
+  color: var(--text-bright);
 }
 
 .info-copy {
@@ -190,7 +190,7 @@
   height: 25px;
   padding: 0;
   place-items: center;
-  border: 1px solid #4a4a4a;
+  border: 1px solid var(--border-strong);
   border-radius: 5px;
   background: var(--surface-control);
   color: var(--muted);
@@ -198,8 +198,8 @@
 }
 
 .info-copy:hover:not(:disabled) {
-  border-color: #777;
-  color: #fff;
+  border-color: var(--border-muted);
+  color: var(--text-bright);
 }
 
 .info-copy:disabled {
@@ -456,7 +456,7 @@
   z-index: 3;
   box-sizing: border-box;
   padding: 5px 6px;
-  background: #292929;
+  background: var(--surface-row);
   color: #c7c7c7;
   font-size: 10.5px;
   font-weight: 600;
@@ -478,11 +478,11 @@
   position: sticky;
   left: 0;
   z-index: 2;
-  background: #242424;
+  background: var(--surface-muted);
 }
 
 #splits[data-mode="detailed"] .splits-table th:first-child {
-  background: #292929;
+  background: var(--surface-row);
 }
 
 #splits[data-mode="detailed"] .splits-table tbody tr.fastest td:first-child {
@@ -559,14 +559,14 @@ html[lang="zh-CN"] .splits-table th {
   box-shadow: inset 3px 0 0 #72e7ff;
 }
 
-.splits-table tbody tr.selected .split-number,
-.splits-table tbody tr.selected .split-distance,
-.splits-table tbody tr.selected .split-time {
-  color: #ffffff !important;
+.splits-table tbody tr.selected td.split-number,
+.splits-table tbody tr.selected td.split-distance,
+.splits-table tbody tr.selected td.split-time {
+  color: var(--text-bright);
 }
 
-.split-number {
-  color: #f2f2f2 !important;
+.splits-table td.split-number {
+  color: #f2f2f2;
   font-weight: 600;
 }
 
@@ -576,12 +576,12 @@ html[lang="zh-CN"] .splits-table th {
   font-weight: 500;
 }
 
-.split-speed {
-  color: #c9c9c9 !important;
+.splits-table td.split-speed {
+  color: #c9c9c9;
 }
 
-.splits-table tr.fastest .split-speed {
-  color: #ff626d !important;
+.splits-table tr.fastest td.split-speed {
+  color: #ff626d;
   font-weight: 600;
 }
 
@@ -592,7 +592,7 @@ html[lang="zh-CN"] .splits-table th {
   margin-top: 8px;
   padding: 8px 9px 7px;
   border-radius: var(--radius-sm);
-  background: #242424;
+  background: var(--surface-muted);
 }
 
 .splits-totals.detailed {
@@ -1285,8 +1285,8 @@ body.failed #map {
 
 .leaflet-bar a:hover, .layer-switch button:hover, .locate-switch button:hover, .toolbox-switch button:hover,
 .pins-switch button:hover, .waypoint-overview-switch button:hover {
-  background: #383838;
-  color: #fff;
+  background: var(--surface-hover);
+  color: var(--text-bright);
 }
 
 .leaflet-bar a.leaflet-disabled {

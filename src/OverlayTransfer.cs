@@ -13,9 +13,9 @@ internal sealed class OverlayTransfer : IDisposable
     private const int DefaultMaxBytes = 64 * 1024 * 1024;
 
     private readonly int _maxBytes;
-    private MemoryStream _picture;
-    private string _id;
-    private string _name;
+    private MemoryStream? _picture;
+    private string? _id;
+    private string? _name;
     private int _expectedChunks;
     private int _nextChunk;
     private int _bytes;
@@ -101,7 +101,7 @@ internal sealed class OverlayTransfer : IDisposable
     }
 
     /// <summary>Returns null when no non-empty export is active; invalid completed transfers fail closed.</summary>
-    internal OverlayTransferResult Complete(string body)
+    internal OverlayTransferResult? Complete(string body)
     {
         if (!HasData)
             return null;
@@ -110,7 +110,9 @@ internal sealed class OverlayTransfer : IDisposable
         if (split <= 0 || !int.TryParse(body.Substring(split + 1), out var count)
             || body.Substring(0, split) != _id
             || count != _expectedChunks
-            || _nextChunk != _expectedChunks)
+            || _nextChunk != _expectedChunks
+            || _name == null
+            || _picture == null)
         {
             Reset();
             throw new InvalidDataException("the export did not contain every piece");
@@ -184,7 +186,7 @@ internal static class AtomicFile
         if (string.IsNullOrEmpty(folder))
             throw new IOException("the export folder is missing");
 
-        var temporary = Path.Combine(folder,
+        var temporary = (string?)Path.Combine(folder,
             "." + Path.GetFileName(target) + "." + Guid.NewGuid().ToString("n") + ".tmp");
         try
         {

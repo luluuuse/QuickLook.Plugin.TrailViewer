@@ -1,5 +1,3 @@
-#nullable enable
-
 using Microsoft.Web.WebView2.Core;
 using QuickLook.Common.Helpers;
 using System;
@@ -10,7 +8,8 @@ using System.Windows;
 namespace QuickLook.Plugin.TrailViewer;
 
 internal sealed partial class TrailViewerPanel
-{    private void OnWebMessage(object sender, CoreWebView2WebMessageReceivedEventArgs e)
+{
+    private void OnWebMessage(object sender, CoreWebView2WebMessageReceivedEventArgs e)
     {
         if (!Uri.TryCreate(e.Source, UriKind.Absolute, out var origin) || origin.Host != AppHost)
             return;
@@ -250,30 +249,19 @@ internal sealed partial class TrailViewerPanel
     private void ConfigureTiandituKey(bool english)
     {
         if (TiandituKeyDialog.Show(Window.GetWindow(this), english))
-            _ = NotifyTiandituKeyStateAsync();
+            NotifyTiandituKeyState();
     }
 
     private void RemoveTiandituKey(bool english)
     {
         if (TiandituKeyDialog.Remove(Window.GetWindow(this), english))
-            _ = NotifyTiandituKeyStateAsync();
+            NotifyTiandituKeyState();
     }
 
-    private async System.Threading.Tasks.Task NotifyTiandituKeyStateAsync()
+    private void NotifyTiandituKeyState()
     {
-        try
-        {
-            var core = _webView?.CoreWebView2;
-            if (core == null) return;
-            var key = TiandituKeyStore.Load() ?? string.Empty;
-            await core.ExecuteScriptAsync(
-                "window.trailViewer && window.trailViewer.setTiandituKey("
-                + $"'{key}')");
-        }
-        catch (Exception ex) when (IsViewerShutdown(ex))
-        {
-            // The preview closed while the user was editing the key.
-        }
+        var key = TiandituKeyStore.Load() ?? string.Empty;
+        ViewerBridge.PostMessage(_webView?.CoreWebView2, ViewerMessages.SetTiandituKey(key));
     }
 
     /// <summary>The trace is read by a person watching the harness: a chunk of base64 is not worth a line.</summary>
@@ -318,7 +306,7 @@ internal sealed partial class TrailViewerPanel
     /// <summary>Writes the picture beside the track, or into the plugin's own folder when that one is read-only.</summary>
     private async System.Threading.Tasks.Task FinishExportAsync(string body)
     {
-        OverlayTransferResult picture;
+        OverlayTransferResult? picture;
         try
         {
             picture = _overlay.Complete(body);

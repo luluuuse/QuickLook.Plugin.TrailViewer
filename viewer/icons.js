@@ -248,20 +248,6 @@ export function symbolMarkup(name, {
     + `${symbol.body}${extra}</svg>`;
 }
 
-/** @returns {SVGElement} */
-export function symbolElement(name, options = {}) {
-  const resolved = Object.hasOwn(DATA_SYMBOLS, name) ? name : 'warning';
-  const width = dimensions(options.width);
-  const height = options.height === undefined ? width : dimensions(options.height);
-  const className = options.className || 'data-symbol';
-  const extra = options.extra || '';
-  return elementOfType(
-    `symbol:${resolved}:${width}:${height}:${className}:${extra}`,
-    symbolMarkup(resolved, { width, height, className, extra }),
-    `symbol ${name}`,
-  );
-}
-
 /** Replaces Leaflet's native text glyphs without touching the vendored stylesheet or script. */
 /**
  * @param {any} map

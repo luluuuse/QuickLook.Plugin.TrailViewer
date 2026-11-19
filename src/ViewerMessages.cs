@@ -1,5 +1,3 @@
-#nullable enable
-
 using System;
 
 namespace QuickLook.Plugin.TrailViewer;
@@ -23,6 +21,10 @@ internal static class ViewerMessages
     internal static string OverlayExported(string path) => $"overlayExported\t{Encode(path)}";
 
     internal static string OverlayFailed(string detail) => $"overlayFailed\t{Encode(detail)}";
+
+    internal static string SetTiandituKey(string? key) => $"setTiandituKey\t{Encode(key ?? string.Empty)}";
+
+    internal static string PressKey(string key) => $"pressKey\t{Encode(key)}";
 
     private static string Encode(string value) => Uri.EscapeDataString(value ?? "");
 }

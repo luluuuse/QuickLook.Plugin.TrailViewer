@@ -1,5 +1,3 @@
-#nullable enable
-
 using Microsoft.Web.WebView2.Core;
 using QuickLook.Common.Helpers;
 using System;
@@ -12,7 +10,8 @@ using System.Windows.Input;
 namespace QuickLook.Plugin.TrailViewer;
 
 internal sealed partial class TrailViewerPanel
-{    private async void OnInitialized(object sender, CoreWebView2InitializationCompletedEventArgs e)
+{
+    private async void OnInitialized(object sender, CoreWebView2InitializationCompletedEventArgs e)
     {
         Trace($"WebView2 initialized: success={e.IsSuccess} {e.InitializationException?.Message}");
         if (_webView == null)
@@ -182,10 +181,10 @@ internal sealed partial class TrailViewerPanel
 
     private void UpdateOnScreen() => _onScreen = IsLoaded && IsVisible;
 
-    /// <summary>Called on the hook thread; the script call is marshalled to the UI thread and never awaited.</summary>
+    /// <summary>Called on the hook thread; the message is marshalled to the UI thread and never awaited.</summary>
     private void OnGlobalKey(string name)
     {
-        Dispatcher.BeginInvoke(() => _ = SendKeyToViewer(name));
+        Dispatcher.BeginInvoke(() => SendKeyToViewer(name));
     }
 
     /// <summary>
@@ -231,21 +230,12 @@ internal sealed partial class TrailViewerPanel
         }
 
         key.Handled = true; // nothing downstream sees it: no "next file", no other handler
-        _ = SendKeyToViewer(name);
+        SendKeyToViewer(name);
     }
 
-    private async System.Threading.Tasks.Task SendKeyToViewer(string name)
+    private void SendKeyToViewer(string name)
     {
-        try
-        {
-            var core = _webView?.CoreWebView2;
-            if (core != null)
-                await core.ExecuteScriptAsync($"window.trailViewer && window.trailViewer.pressKey('{name}')");
-        }
-        catch (Exception ex) when (IsViewerShutdown(ex))
-        {
-            // The preview closed between the key and the call; nothing left to press.
-        }
+        ViewerBridge.PostMessage(_webView?.CoreWebView2, ViewerMessages.PressKey(name));
     }
 
 }

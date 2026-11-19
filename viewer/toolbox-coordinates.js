@@ -1,5 +1,5 @@
 import { formatCoord, formatElevation } from './format.js';
-import { iconElement, iconMarkup, weatherMarkMarkup } from './icons.js';
+import { iconElement, weatherMarkElement } from './icons.js';
 import { createSnapIndicator, createSnapReticleMarker } from './snap-indicator.js';
 
 /** Coordinate subview: point targets, free-map picking, snapping and clipboard feedback. */
@@ -36,16 +36,16 @@ export function createCoordinateTool({
 
   const grid = el('div', 'toolbox-coordinate-grid');
   const choices = [
-    ['start', 'coordinates.start', weatherMarkMarkup('start', { size: 16 })],
-    ['end', 'coordinates.end', weatherMarkMarkup('end', { size: 16 })],
-    ['highest', 'coordinates.highest', weatherMarkMarkup('highest', { size: 16 })],
-    ['center', 'coordinates.center', iconMarkup('locate')],
+    { mode: 'start', labelKey: 'coordinates.start', createIcon: () => weatherMarkElement('start', { size: 16 }) },
+    { mode: 'end', labelKey: 'coordinates.end', createIcon: () => weatherMarkElement('end', { size: 16 }) },
+    { mode: 'highest', labelKey: 'coordinates.highest', createIcon: () => weatherMarkElement('highest', { size: 16 }) },
+    { mode: 'center', labelKey: 'coordinates.center', createIcon: () => iconElement('locate') },
   ];
-  for (const [mode, labelKey, icon] of choices) {
+  for (const { mode, labelKey, createIcon } of choices) {
     const option = el('button', 'toolbox-coordinate-button');
     option.type = 'button';
     option.dataset.coordinate = mode;
-    option.innerHTML = icon + `<span>${t(labelKey)}</span>`;
+    option.append(createIcon(), el('span', null, t(labelKey)));
     option.addEventListener('click', () => {
       if (mode === 'center') {
         const centre = map.getCenter();
@@ -77,8 +77,7 @@ export function createCoordinateTool({
 
   const hint = el('div', 'coordinate-pick-hint');
   hint.hidden = true;
-  hint.innerHTML = iconMarkup('coordinates');
-  hint.append(el('span', null, t('coordinates.pick')));
+  hint.append(iconElement('coordinates'), el('span', null, t('coordinates.pick')));
   map.getContainer().append(hint);
 
   function elevationText(point) {

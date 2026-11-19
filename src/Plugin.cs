@@ -6,7 +6,7 @@ namespace QuickLook.Plugin.TrailViewer;
 
 public class Plugin : IViewer
 {
-    private TrailViewerPanel _panel;
+    private TrailViewerPanel? _panel;
 
     // Above the text viewer and generic binary viewers.
     public int Priority => 10;

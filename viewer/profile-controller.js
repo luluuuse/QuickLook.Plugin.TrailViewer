@@ -166,6 +166,7 @@ function attachScrub({
       ? `${Math.round(point.heartRate)} bpm`
       : '';
     const nextReadoutKey = `${valueText}\u0000${metaText}\u0000${heartText}`;
+    readout.hidden = false;
     if (nextReadoutKey !== readoutKey) {
       value.textContent = valueText;
       value.hidden = valueText === '';
@@ -178,7 +179,6 @@ function attachScrub({
       readoutHeight = readout.offsetHeight;
       readoutKey = nextReadoutKey;
     }
-    readout.hidden = false;
 
     const half = readoutWidth / 2 + 2;
     const left = chartRect.width <= readoutWidth

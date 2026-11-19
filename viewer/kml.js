@@ -63,7 +63,7 @@ function isLatLon(lat, lon) {
 
 /** <coordinates> holds "lon,lat[,alt]" tuples separated by whitespace. */
 /** @returns {TrackPoint[]} */
-export function parseCoordinates(raw) {
+function parseCoordinates(raw) {
   const points = [];
   for (const tuple of (raw || '').trim().split(/\s+/)) {
     if (!tuple) continue;
