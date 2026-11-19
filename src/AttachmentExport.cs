@@ -41,6 +41,7 @@ internal sealed class AttachmentExport : IDisposable
     private readonly string _sourceSignature;
     private long _savedBytes;
     private int _savedCount;
+    private bool _disposed;
 
     internal AttachmentExport(string sourcePath, string fileRoot = null)
     {
@@ -83,6 +84,9 @@ internal sealed class AttachmentExport : IDisposable
         return Save(CurrentBatch, CurrentIndex, image.Name, image.Picture);
     }
 
+    internal Task<AttachmentResult> CompleteUploadAsync(string body) =>
+        Task.Run(() => CompleteUpload(body), _cancel.Token);
+
     internal AttachmentResult CopyLocal(string body)
     {
         var parts = body.Split(new[] { '\t' }, 4);
@@ -117,6 +121,9 @@ internal sealed class AttachmentExport : IDisposable
         }
     }
 
+    internal Task<AttachmentResult> CopyLocalAsync(string body) =>
+        Task.Run(() => CopyLocal(body), _cancel.Token);
+
     internal async Task<AttachmentResult> DownloadAsync(string body)
     {
         var parts = body.Split(new[] { '\t' }, 4);
@@ -138,7 +145,14 @@ internal sealed class AttachmentExport : IDisposable
             throw new InvalidDataException("the attachment link was invalid");
         }
 
-        await _downloadSlots.WaitAsync(_cancel.Token).ConfigureAwait(false);
+        try
+        {
+            await _downloadSlots.WaitAsync(_cancel.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            return new AttachmentResult(parts[0], index, false, "", "download canceled");
+        }
         try
         {
             using var image = await DownloadImageAsync(url, _cancel.Token).ConfigureAwait(false);
@@ -219,6 +233,9 @@ internal sealed class AttachmentExport : IDisposable
             return new AttachmentResumeResult(parts[0], completed, folder);
         }
     }
+
+    internal Task<AttachmentResumeResult> ResumeAsync(string body) =>
+        Task.Run(() => Resume(body), _cancel.Token);
 
     internal static bool IsAllowedUri(string value)
     {
@@ -438,9 +455,8 @@ internal sealed class AttachmentExport : IDisposable
                 throw new InvalidDataException($"the image server returned HTTP {(int)response.StatusCode}");
 
             var mediaType = response.Content.Headers.ContentType?.MediaType?.ToLowerInvariant();
-            var extension = ExtensionFor(mediaType);
-            if (extension == null)
-                throw new InvalidDataException("the external link did not return a supported image");
+            if (string.IsNullOrWhiteSpace(mediaType) || !mediaType.StartsWith("image/", StringComparison.Ordinal))
+                throw new InvalidDataException("the external link did not return an image");
             if (response.Content.Headers.ContentLength > MaxImageBytes)
                 throw new InvalidDataException("the image is larger than 30 MB");
 
@@ -459,6 +475,12 @@ internal sealed class AttachmentExport : IDisposable
                     output.Write(buffer, 0, read);
                 }
                 output.Position = 0;
+                var header = new byte[32];
+                var headerLength = output.Read(header, 0, header.Length);
+                output.Position = 0;
+                var extension = ImageExtensionFor(header, headerLength);
+                if (extension == null)
+                    throw new InvalidDataException("the external image content was not recognised");
                 return new DownloadedImage(output, extension);
             }
             catch
@@ -479,7 +501,11 @@ internal sealed class AttachmentExport : IDisposable
         string host = uri.DnsSafeHost;
         var check = _hostChecks.GetOrAdd(host, _ => ValidatePublicHostAsync(host, cancel));
         if (!await check.ConfigureAwait(false))
+        {
+            // A DNS timeout is transient. Do not poison every later image from this host in the batch.
+            _hostChecks.TryRemove(host, out _);
             throw new InvalidDataException("the image host did not resolve to a public address");
+        }
     }
 
     private static async Task<bool> ValidatePublicHostAsync(string host, CancellationToken cancel)
@@ -493,7 +519,7 @@ internal sealed class AttachmentExport : IDisposable
         {
             var addresses = await Task.Run(() => Dns.GetHostAddresses(host), cancel)
                 .ConfigureAwait(false);
-            return addresses.Length > 0 && !addresses.Any(IsBlocked);
+            return addresses.Length > 0 && !addresses.Any(IsBlockedResolved);
         }
         catch (Exception ex) when (ex is System.Net.Sockets.SocketException or OperationCanceledException)
         {
@@ -511,27 +537,57 @@ internal sealed class AttachmentExport : IDisposable
             return bytes[0] == 0 || bytes[0] == 10 || bytes[0] == 127
                 || (bytes[0] == 169 && bytes[1] == 254)
                 || (bytes[0] == 172 && bytes[1] >= 16 && bytes[1] <= 31)
+                || (bytes[0] == 192 && bytes[1] == 0 && (bytes[2] == 0 || bytes[2] == 2))
                 || (bytes[0] == 192 && bytes[1] == 168)
-                || (bytes[0] == 100 && bytes[1] >= 64 && bytes[1] <= 127);
+                || (bytes[0] == 100 && bytes[1] >= 64 && bytes[1] <= 127)
+                || (bytes[0] == 198 && (bytes[1] == 18 || bytes[1] == 19))
+                || (bytes[0] == 198 && bytes[1] == 51 && bytes[2] == 100)
+                || (bytes[0] == 203 && bytes[1] == 0 && bytes[2] == 113)
+                || bytes[0] >= 224;
         }
-        return (bytes[0] & 0xfe) == 0xfc
+        return bytes.All(value => value == 0)
+            || (bytes[0] & 0xfe) == 0xfc
             || (bytes[0] == 0xfe && (bytes[1] & 0xc0) == 0x80)
             || (bytes[0] == 0xfe && (bytes[1] & 0xc0) == 0xc0)
+            || (bytes[0] == 0x20 && bytes[1] == 0x01 && bytes[2] == 0x0d && bytes[3] == 0xb8)
             || bytes[0] == 0xff;
     }
 
-    private static string ExtensionFor(string mediaType)
+    /// <summary>
+    /// Clash/Mihomo TUN commonly maps public hostnames into the 198.18.0.0/15 benchmark range. Literal addresses
+    /// remain blocked; only a hostname resolved through the local network stack may use this proxy range.
+    /// </summary>
+    internal static bool IsBlockedResolved(IPAddress address)
     {
-        return mediaType switch
-        {
-            "image/jpeg" => ".jpg",
-            "image/png" => ".png",
-            "image/webp" => ".webp",
-            "image/gif" => ".gif",
-            "image/bmp" => ".bmp",
-            "image/avif" => ".avif",
-            _ => null,
-        };
+        if (address.IsIPv4MappedToIPv6) address = address.MapToIPv4();
+        var bytes = address.GetAddressBytes();
+        if (address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork
+            && bytes[0] == 198 && (bytes[1] == 18 || bytes[1] == 19))
+            return false;
+        return IsBlocked(address);
+    }
+
+    internal static string ImageExtensionFor(byte[] bytes, int length = -1)
+    {
+        var available = Math.Min(bytes?.Length ?? 0, length < 0 ? bytes?.Length ?? 0 : length);
+        bool Starts(params byte[] prefix) =>
+            available >= prefix.Length
+            && prefix.Select((value, index) => bytes[index] == value).All(match => match);
+
+        if (Starts(0xff, 0xd8, 0xff)) return ".jpg";
+        if (Starts(0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a)) return ".png";
+        if (Starts(0x47, 0x49, 0x46, 0x38) && available >= 6
+            && (bytes[4] == 0x37 || bytes[4] == 0x39) && bytes[5] == 0x61) return ".gif";
+        if (Starts(0x42, 0x4d)) return ".bmp";
+        if (Starts(0x52, 0x49, 0x46, 0x46) && available >= 12
+            && bytes[8] == 0x57 && bytes[9] == 0x45 && bytes[10] == 0x42 && bytes[11] == 0x50)
+            return ".webp";
+        if (available >= 12
+            && bytes[4] == 0x66 && bytes[5] == 0x74 && bytes[6] == 0x79 && bytes[7] == 0x70
+            && bytes[8] == 0x61 && bytes[9] == 0x76 && bytes[10] == 0x69
+            && (bytes[11] == 0x66 || bytes[11] == 0x73))
+            return ".avif";
+        return null;
     }
 
     private static string ExtendName(string name, string extension)
@@ -564,10 +620,12 @@ internal sealed class AttachmentExport : IDisposable
 
     public void Dispose()
     {
+        if (_disposed) return;
+        _disposed = true;
         _cancel.Cancel();
-        _cancel.Dispose();
         _upload.Dispose();
-        _downloadSlots.Dispose();
+        // In-flight downloads still release _downloadSlots in their finally blocks. Keep the semaphore and
+        // cancellation source alive until those tasks finish; both are managed objects and will be collected.
     }
 
     private sealed class DownloadedImage : IDisposable

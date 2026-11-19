@@ -17,6 +17,173 @@ Added / Changed / Deprecated / Removed / Fixed / Security 分类；没有内容�
 
 - None.
 
+## 1.24.0 — 2026-11-19
+
+### 中文
+
+#### 变更
+
+- 在插件初始化时预热共享 WebView2 环境，并保留创建失败时回退到默认环境的路径，缩短首次预览等待。
+- KMZ 解包、本地附件复制、续传扫描、Data URI 落盘和叠加图落盘移出 WPF UI 线程；KMZ 关闭时可取消。
+- KMZ 图片引用扫描改用 `XmlReader` 流式读取，不再把完整 KML 解码成单个 UTF-16 大对象字符串。
+- 统一偏好、定制图源、天地图密钥和文件导出的原子写入实现；快捷键诊断进程名增加有界缓存。
+- 拆分天地图密钥窗口、WebView 消息桥和主面板；新增可空引用检查边界。
+- 前端拆分图源注册表、图层构造、定制图源表单、工具箱坐标页、附件导出页和宿主桥接模块。
+- 4,132 行样式表按 tokens、面板、工具箱、图层、地图数据和照片查看器拆分，统一主要 `z-index` 层级变量。
+- 工具箱坐标页、图层菜单、标记点速览和地图控制增加显式销毁路径及事件清理。
+- `parseGxCoord` 直接解析数字，避免每个轨迹点创建临时字符串和单元素数组。
+
+#### 移除
+
+- 退役 `window.gpxViewer` 测试兼容别名；正式接口仅为 `window.trailViewer`。用户数据迁移分支继续保留，
+  避免旧版本设置和 WebView profile 丢失。
+
+#### 工程
+
+- PR 的浏览器测试拆为 core、map、tools、media、network 五个并行分片；Release 仍执行完整串行门禁。
+- 宿主自测增加共享文本、字节原子写入和异步附件路径覆盖。
+
+### English
+
+#### Changed
+
+- The plugin now prewarms a shared WebView2 environment during initialization, with a default-environment
+  fallback when creation fails.
+- KMZ extraction, local attachment copying, resume scans, Data URI writes and overlay writes no longer block the
+  WPF UI thread; KMZ extraction can be cancelled when the preview closes.
+- KMZ image references are scanned with streaming `XmlReader` input instead of decoding the entire KML into one
+  large UTF-16 string.
+- Preferences, custom sources, the Tianditu key and file exports share the atomic writer; keyboard diagnostics now
+  cache foreground process names with a bound.
+- Tianditu-key UI, the WebView message bridge and the main panel are split into separate host units with a nullable
+  boundary for the new bridge code.
+- The front end now separates the layer registry, provider construction, custom-source form, toolbox coordinate
+  page, attachment-export page and host bridge.
+- The 4,132-line stylesheet is split into tokens, panels, toolbox, layers, map-data and photo-viewer files, with
+  shared variables for the main `z-index` layers.
+- Toolbox coordinates, layer menus, waypoint overview and map controls expose explicit cleanup paths.
+- `parseGxCoord` parses numbers directly, avoiding temporary strings and single-element arrays for every point.
+
+#### Removed
+
+- Retired the `window.gpxViewer` test compatibility alias; the supported API is `window.trailViewer`. User-data
+  migration branches remain so old preferences and WebView profiles are not lost.
+
+#### Engineering
+
+- Pull-request browser tests now run in five parallel shards: core, map, tools, media and network. Releases still
+  run the complete serial gate.
+- Host self-tests now cover shared text/byte atomic writes and asynchronous attachment paths.
+
+## 1.23.10 — 2026-11-19
+
+### 中文
+
+#### 修复
+
+- 修复快速连续复制坐标时宿主剪贴板重试使用同步等待，导致 WPF 界面线程卡死并在数秒后超时的问题。
+  重试现在异步等待，并可在不冻结界面约 1 秒内等待系统剪贴板释放；页面同一时刻只允许一个剪贴板
+  写入在途，连续操作合并为最新坐标。
+
+### English
+
+#### Fixed
+
+- Fixed rapid coordinate copies freezing the WPF UI because clipboard retries waited synchronously.
+  Retries now yield asynchronously for up to about one second without freezing the UI, and the page
+  keeps only one clipboard write in flight while coalescing a burst to its latest coordinate.
+
+## 1.23.9 — 2026-11-19
+
+### 中文
+
+#### 修复
+
+- 修复坐标工具中快速连续点击多个点位时，每个点都立即写入系统剪贴板而造成宿主卡顿和
+  “剪贴板无响应”的问题。现在同一段快速操作只复制最后一个坐标，地图高亮和聚焦反馈保持即时。
+
+### English
+
+#### Fixed
+
+- Fixed rapid coordinate-tool clicks stalling the host and showing "the clipboard did not respond"
+  because every intermediate point was written immediately. A rapid burst now copies only its final
+  coordinate while keeping immediate map highlight and focus feedback.
+
+## 1.23.8 — 2026-11-19
+
+### 中文
+
+#### 修复
+
+- 修复 Mihomo/Clash TUN 将公开图片域名解析到 `198.18.0.0/15` 代理假地址时，全部外链图片被 SSRF
+  防护误判失败的问题。直接以 `198.18.x.x` 作为 URL 主机仍会被拒绝。
+- Windows 剪贴板被其他程序短暂占用时，坐标和摘要复制最多重试 6 次，避免 `CLIPBRD_E_CANT_OPEN`
+  直接打断复制。
+
+### English
+
+#### Fixed
+
+- Fixed all external images failing when a Mihomo/Clash TUN resolves a public image host into the
+  `198.18.0.0/15` proxy fake-IP range. Literal `198.18.x.x` URL hosts remain blocked.
+- Clipboard copies now retry up to six times when Windows is briefly owned by another process, avoiding
+  immediate `CLIPBRD_E_CANT_OPEN` failures.
+
+## 1.23.7 — 2026-11-19
+
+### 中文
+
+#### 修复
+
+- 修复宿主把 `0/1` 作为字符串传给页面时被误判为真值的问题；剪贴板、附件下载、附件续传和叠加图结果
+  现在统一通过 `PostWebMessageAsString` 返回，失败不再显示为成功。
+- 修复关闭预览时附件下载队列仍释放已销毁信号量、排队下载取消后产生未观察任务异常的问题。
+- 修复瞬时 DNS 失败被长期缓存，导致同一域名后续图片在本次导出中全部失败的问题。
+- 修复 WebView2 异步初始化恢复后未复查 View 生命周期的问题。
+- 修复 Node 20 环境下语言检测直接访问未定义 `navigator` 的问题。
+
+#### 安全
+
+- 扩展外链 SSRF 拦截范围，补充多播、保留、基准测试、文档示例、IPv6 未指定和文档地址。
+- HTTPS 外链图片除 `Content-Type` 外校验 JPEG、PNG、GIF、WebP、BMP 或 AVIF 文件头，拒绝伪装成图片的内容。
+
+### English
+
+#### Fixed
+
+- Fixed host `0/1` values being treated as truthy strings in the page. Clipboard, attachment download, resume and
+  overlay-result callbacks now use `PostWebMessageAsString`, so failures no longer appear successful.
+- Fixed attachment shutdown racing with in-flight downloads and queued cancellations producing unobserved task
+  exceptions.
+- Fixed transient DNS failures being cached for the rest of the export batch.
+- Fixed the WebView2 initialization path not rechecking the view lifetime after an await.
+- Fixed language detection on Node 20 when the global `navigator` object is absent.
+
+#### Security
+
+- Expanded external-link SSRF blocking for multicast, reserved, benchmark, documentation, unspecified and
+  documentation IPv6 ranges.
+- External HTTPS images now require a recognised JPEG, PNG, GIF, WebP, BMP or AVIF file signature instead of
+  trusting `Content-Type` alone.
+
+## 1.23.6 — 2026-11-19
+
+### 中文
+
+#### 修复
+
+- 修复选中点位后手动平移地图，再打开或关闭工具箱时，地图被未执行的旧焦点回显拉回原位置的问题。
+  工具箱开合不再触发历史焦点重新定位；摘要展开、窗口缩放等仍需保持当前点位的布局变化保持原行为。
+
+### English
+
+#### Fixed
+
+- Fixed the map jumping back to an older selected point after the user manually panned and then opened or closed
+  the toolbox. Toolbox layout changes no longer replay pending focus reveals, while summary expansion, viewport
+  resizing and other layout changes that should keep the current point visible retain their existing behavior.
+
 ## 1.23.5 — 2026-11-18
 
 ### 中文

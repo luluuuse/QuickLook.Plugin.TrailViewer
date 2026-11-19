@@ -18,7 +18,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '20'
           cache: npm
 
       - name: Install browser test dependencies
@@ -72,21 +72,10 @@ jobs:
           if ($failed) { throw "$failed detection result(s) wrong" }
           "All $($names.Count) fixtures detected as expected"
 
-      - name: Browser and version tests
-        shell: pwsh
+      - name: Unit and version tests
         run: |
-          $edge = "${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe"
-          if (!(Test-Path $edge)) { throw "Microsoft Edge not found at $edge" }
-          $env:CHROMIUM = $edge
-          npm test
-
-      - name: Upload browser diagnostics
-        if: failure()
-        uses: actions/upload-artifact@v7
-        with:
-          name: browser-failure-artifacts
-          path: test-results/
-          if-no-files-found: ignore
+          npm run test:unit
+          npm run test:version
 
       - name: Check that QuickLook.Common is not shipped
         shell: pwsh
@@ -104,3 +93,46 @@ jobs:
         with:
           name: harness
           path: bin/Harness/
+
+  browser:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - group: core
+            selectors: viewer route-info profile splits info-mode focus portrait ve navigation-order runner keys
+          - group: map
+            selectors: terrain custom-source locate zoom icons floating-panels
+          - group: tools
+            selectors: tools measure pins nav scrub insights
+          - group: media
+            selectors: export photo lang artifacts
+          - group: network
+            selectors: network
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - run: npm ci
+
+      - name: Browser tests (${{ matrix.group }})
+        shell: pwsh
+        run: |
+          $edge = "${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe"
+          if (!(Test-Path $edge)) { throw "Microsoft Edge not found at $edge" }
+          $env:CHROMIUM = $edge
+          node scripts/test.cjs ${{ matrix.selectors }}
+
+      - name: Upload browser diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: browser-failure-${{ matrix.group }}
+          path: test-results/
+          if-no-files-found: ignore

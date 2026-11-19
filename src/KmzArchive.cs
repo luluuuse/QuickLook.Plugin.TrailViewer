@@ -4,6 +4,8 @@ using System.IO;
 using System.IO.Compression;
 using System.Net;
 using System.Text.RegularExpressions;
+using System.Threading;
+using System.Xml;
 
 namespace QuickLook.Plugin.TrailViewer;
 
@@ -37,9 +39,14 @@ internal static class KmzArchive
         @"(?:\bsrc|\bhref)\s*=\s*(?:""(?<url>[^""]*)""|'(?<url>[^']*)')",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
-    private static readonly Regex ElementResourcePattern = new(
-        @"<href\b[^>]*>\s*(?<url>.*?)\s*</href\s*>",
-        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Singleline);
+    private static readonly XmlReaderSettings ResourceReaderSettings = new()
+    {
+        DtdProcessing = DtdProcessing.Prohibit,
+        XmlResolver = null,
+        IgnoreComments = true,
+        IgnoreProcessingInstructions = true,
+        CloseInput = true,
+    };
 
     private static readonly string RootFolderName = PluginIdentity.Name;
 
@@ -69,8 +76,10 @@ internal static class KmzArchive
     /// still resolve the same way they do inside the KMZ. Locally referenced images are copied beside it.
     /// </summary>
     /// <exception cref="InvalidDataException">The archive holds no readable KML document.</exception>
-    public static string ExtractDocument(string kmzPath, string folder)
+    public static string ExtractDocument(
+        string kmzPath, string folder, CancellationToken cancel = default)
     {
+        cancel.ThrowIfCancellationRequested();
         using var archive = ZipFile.OpenRead(kmzPath);
         var entry = FindDocument(archive)
             ?? throw new InvalidDataException("the archive holds no .kml file");
@@ -88,9 +97,10 @@ internal static class KmzArchive
         {
             using (var source = entry.Open())
             using (var destination = File.Create(target))
-                CopyBounded(source, destination, MaxDocumentBytes, "the .kml expands past the 64 MB preview limit");
+                CopyBounded(source, destination, MaxDocumentBytes,
+                    "the .kml expands past the 64 MB preview limit", cancel);
 
-            ExtractReferencedImages(archive, entry.FullName, target, folder);
+            ExtractReferencedImages(archive, entry.FullName, target, folder, cancel);
         }
         catch
         {
@@ -106,13 +116,15 @@ internal static class KmzArchive
     /// Zip metadata can lie. Count the bytes that actually leave the decompressor so a crafted archive cannot
     /// turn a small header into an unbounded temporary file before the browser ever sees it.
     /// </summary>
-    private static long CopyBounded(Stream source, Stream destination, long limit, string tooLargeMessage)
+    private static long CopyBounded(
+        Stream source, Stream destination, long limit, string tooLargeMessage, CancellationToken cancel)
     {
         var buffer = new byte[81920];
         long total = 0;
         int read;
         while ((read = source.Read(buffer, 0, buffer.Length)) > 0)
         {
+            cancel.ThrowIfCancellationRequested();
             total += read;
             if (total > limit)
                 throw new InvalidDataException(tooLargeMessage);
@@ -125,17 +137,12 @@ internal static class KmzArchive
         ZipArchive archive,
         string documentEntryName,
         string extractedDocument,
-        string folder)
+        string folder,
+        CancellationToken cancel)
     {
         var documentDirectory = DocumentDirectory(documentEntryName);
-        var text = WebUtility.HtmlDecode(File.ReadAllText(extractedDocument));
-        var references = new HashSet<string>(StringComparer.Ordinal);
+        var references = ReadResourceReferences(extractedDocument, cancel);
         var extracted = new List<string>();
-
-        foreach (Match match in AttributeResourcePattern.Matches(text))
-            references.Add(match.Groups["url"].Value);
-        foreach (Match match in ElementResourcePattern.Matches(text))
-            references.Add(match.Groups["url"].Value);
 
         try
         {
@@ -143,6 +150,7 @@ internal static class KmzArchive
             long totalBytes = 0;
             foreach (var reference in references)
             {
+                cancel.ThrowIfCancellationRequested();
                 if (!TryResolveArchivePath(reference, documentDirectory, out var resourcePath)
                     || !ImageExtensions.Contains(Path.GetExtension(resourcePath)))
                     continue;
@@ -167,7 +175,8 @@ internal static class KmzArchive
                     using var source = entry.Open();
                     using var destination = File.Create(target);
                     written = CopyBounded(source, destination, Math.Min(MaxResourceBytes, remainingTotal),
-                        $"the images in this .kmz exceed the {MaxTotalResourceBytes / (1024 * 1024)} MB limit");
+                        $"the images in this .kmz exceed the {MaxTotalResourceBytes / (1024 * 1024)} MB limit",
+                        cancel);
                 }
                 catch
                 {
@@ -185,6 +194,60 @@ internal static class KmzArchive
                 TryDelete(extracted[i]);
             throw;
         }
+    }
+
+    /// <summary>Scan only the XML events needed for image references; never materialise the whole document.</summary>
+    private static HashSet<string> ReadResourceReferences(string path, CancellationToken cancel)
+    {
+        var references = new HashSet<string>(StringComparer.Ordinal);
+        try
+        {
+            using var reader = XmlReader.Create(path, ResourceReaderSettings);
+            while (reader.Read())
+            {
+                cancel.ThrowIfCancellationRequested();
+                if (reader.NodeType == XmlNodeType.Element)
+                {
+                    if (reader.MoveToFirstAttribute())
+                    {
+                        do
+                        {
+                            if (reader.LocalName.Equals("src", StringComparison.OrdinalIgnoreCase)
+                                || reader.LocalName.Equals("href", StringComparison.OrdinalIgnoreCase))
+                            {
+                                references.Add(WebUtility.HtmlDecode(reader.Value));
+                            }
+                        }
+                        while (reader.MoveToNextAttribute());
+                        reader.MoveToElement();
+                    }
+
+                    if (reader.LocalName.Equals("href", StringComparison.OrdinalIgnoreCase)
+                        && !reader.IsEmptyElement)
+                    {
+                        var value = reader.ReadElementContentAsString();
+                        if (!string.IsNullOrWhiteSpace(value))
+                            references.Add(WebUtility.HtmlDecode(value));
+                        AddAttributeReferences(references, value);
+                    }
+                }
+                else if (reader.NodeType == XmlNodeType.Text || reader.NodeType == XmlNodeType.CDATA)
+                {
+                    AddAttributeReferences(references, WebUtility.HtmlDecode(reader.Value));
+                }
+            }
+        }
+        catch (XmlException ex)
+        {
+            throw new InvalidDataException("the .kml inside is not valid XML", ex);
+        }
+        return references;
+    }
+
+    private static void AddAttributeReferences(HashSet<string> references, string text)
+    {
+        foreach (Match match in AttributeResourcePattern.Matches(text ?? string.Empty))
+            references.Add(match.Groups["url"].Value);
     }
 
     private static void TryDelete(string path)

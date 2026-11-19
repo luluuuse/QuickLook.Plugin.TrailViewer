@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+Object.defineProperty(globalThis, 'navigator', { configurable: true, value: undefined });
+
 import { overlayFileName } from '../../viewer/overlay-export.js';
 
 test('overlay file names keep every visual option distinct', () => {

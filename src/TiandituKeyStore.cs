@@ -33,7 +33,6 @@ internal static class TiandituKeyStore
         if (!IsValid(key)) return false;
 
         var target = path ?? DefaultFilePath;
-        string temporary = null;
         try
         {
             var directory = Path.GetDirectoryName(target);
@@ -43,32 +42,12 @@ internal static class TiandituKeyStore
             var encrypted = ProtectedData.Protect(plain, null, DataProtectionScope.CurrentUser);
             Array.Clear(plain, 0, plain.Length);
 
-            temporary = target + "." + Guid.NewGuid().ToString("n") + ".tmp";
-            File.WriteAllBytes(temporary, encrypted);
-            if (File.Exists(target))
-            {
-                var backup = target + ".old";
-                File.Replace(temporary, target, backup, true);
-                File.Delete(backup);
-            }
-            else
-            {
-                File.Move(temporary, target);
-            }
-            temporary = null;
+            AtomicFile.WriteBytes(target, encrypted);
             return true;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or CryptographicException)
         {
             return false;
-        }
-        finally
-        {
-            if (temporary != null)
-            {
-                try { File.Delete(temporary); }
-                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
-            }
         }
     }
 

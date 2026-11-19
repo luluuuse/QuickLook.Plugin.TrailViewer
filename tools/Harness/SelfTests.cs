@@ -6,6 +6,7 @@ using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading;
 
 internal static class SelfTests
 {
@@ -27,6 +28,7 @@ internal static class SelfTests
             TestKmzLimit(root, temporary);
             TestSourceSafety(temporary);
             TestViewerShutdownFilter();
+            TestClipboardRetry();
             TestPreferences(temporary);
             TestCustomSources(temporary);
             TestProductIdentity(temporary);
@@ -34,6 +36,7 @@ internal static class SelfTests
             TestViewerBuildId(temporary);
             TestOverlayTransfer();
             TestAtomicFile(temporary);
+            TestViewerMessages();
             TestAttachmentExport(temporary);
         }
         finally
@@ -271,8 +274,35 @@ internal static class SelfTests
         Check("viewer COM shutdown is handled",
             TrailViewerPanel.IsViewerShutdown(
                 new System.Runtime.InteropServices.COMException("closed")));
+        Check("a dispatcher shutdown cancellation is handled",
+            TrailViewerPanel.IsViewerShutdown(new System.Threading.Tasks.TaskCanceledException()));
         Check("unrelated viewer errors are not swallowed",
             !TrailViewerPanel.IsViewerShutdown(new ArgumentException("bad input")));
+    }
+
+    private static void TestClipboardRetry()
+    {
+        var attempts = 0;
+        TrailViewerPanel.SetClipboardTextAsync("point", _ =>
+        {
+            attempts++;
+            if (attempts < 3)
+                throw new System.Runtime.InteropServices.ExternalException("clipboard busy");
+        }, 3, 0).GetAwaiter().GetResult();
+        Check("a briefly locked clipboard is retried", attempts == 3, attempts.ToString());
+
+        var finalFailure = false;
+        try
+        {
+            TrailViewerPanel.SetClipboardTextAsync("point", _ =>
+                throw new System.Runtime.InteropServices.ExternalException("clipboard busy"), 2, 0)
+                .GetAwaiter().GetResult();
+        }
+        catch (System.Runtime.InteropServices.ExternalException)
+        {
+            finalFailure = true;
+        }
+        Check("a permanently unavailable clipboard still reports failure", finalFailure);
     }
 
     private static void TestPreferences(string temporary)
@@ -496,6 +526,11 @@ internal static class SelfTests
         using var second = new MemoryStream(Encoding.UTF8.GetBytes("second"));
         AtomicFile.Write(target, second);
         Check("an existing atomic file is replaced", File.ReadAllText(target) == "second");
+        AtomicFile.WriteText(target, "text");
+        Check("the shared text writer publishes UTF-8", File.ReadAllText(target) == "text");
+        AtomicFile.WriteBytes(target, new byte[] { 1, 2, 3 });
+        Check("the shared byte writer publishes exact bytes",
+            File.ReadAllBytes(target).SequenceEqual(new byte[] { 1, 2, 3 }));
         Check("no temporary atomic files are left", Directory.GetFiles(folder, "*.tmp").Length == 0);
     }
 
@@ -507,6 +542,46 @@ internal static class SelfTests
         var folder = AttachmentExport.FolderTarget(source);
         Check("attachment folder sits beside the original track",
             folder == Path.Combine(temporary, "attachments", "track-photos"), folder);
+
+        var closing = new AttachmentExport(source);
+        var slotsField = typeof(AttachmentExport).GetField(
+            "_downloadSlots", BindingFlags.Instance | BindingFlags.NonPublic);
+        var slots = slotsField?.GetValue(closing) as SemaphoreSlim;
+        Check("attachment download slots are available to the close-race test", slots != null);
+        if (slots != null)
+        {
+            slots.Wait();
+            closing.Dispose();
+            try
+            {
+                slots.Release(); // the in-flight DownloadAsync finally block
+                Check("closing an attachment export does not dispose active download slots", true);
+            }
+            catch (ObjectDisposedException)
+            {
+                Check("closing an attachment export does not dispose active download slots", false);
+            }
+            closing.Dispose();
+        }
+
+        var canceled = new AttachmentExport(source);
+        var canceledSlots = slotsField?.GetValue(canceled) as SemaphoreSlim;
+        Check("attachment slots are available for the cancellation test", canceledSlots != null);
+        if (canceledSlots != null)
+        {
+            canceledSlots.Wait();
+            canceledSlots.Wait();
+            canceledSlots.Wait();
+            var pending = canceled.DownloadAsync(
+                "job-2\t9\tphoto.jpg\t" + Uri.EscapeDataString("https://images.example/photo.jpg"));
+            canceled.Dispose();
+            var result = pending.GetAwaiter().GetResult();
+            Check("a queued download returns a failure after the host closes",
+                !result.Ok && result.Detail == "download canceled", result.Detail);
+            canceledSlots.Release();
+            canceledSlots.Release();
+            canceledSlots.Release();
+        }
 
         using (var export = new AttachmentExport(source))
         {
@@ -521,13 +596,15 @@ internal static class SelfTests
 
             export.BeginUpload(batch + "\t1\timage-1\t1\tphoto.png");
             export.AppendUpload("image-1\t0\t1\t" + Base64("second"));
-            var second = export.CompleteUpload(batch + "\t1\timage-1\t1");
+            var second = export.CompleteUploadAsync(batch + "\t1\timage-1\t1")
+                .GetAwaiter().GetResult();
             Check("a duplicate attachment name receives a suffix",
                 second.Ok && Path.GetFileName(second.Path) == "photo-2.png", second.Path);
 
             var embedded = Path.Combine(Path.GetDirectoryName(source), "embedded.png");
             File.WriteAllText(embedded, "embedded");
-            var local = export.CopyLocal(batch + "\t2\tembedded.png\tembedded.png");
+            var local = export.CopyLocalAsync(batch + "\t2\tembedded.png\tembedded.png")
+                .GetAwaiter().GetResult();
             Check("an embedded image is copied directly by the host",
                 local.Ok && File.ReadAllText(local.Path) == "embedded", local.Detail);
             var escaped = export.CopyLocal(batch + "\t3\tescape.png\t..%2Fescape.png");
@@ -535,7 +612,7 @@ internal static class SelfTests
 
             using (var resumed = new AttachmentExport(source))
             {
-                var state = resumed.Resume(batch + "\t0,1,2");
+                var state = resumed.ResumeAsync(batch + "\t0,1,2").GetAwaiter().GetResult();
                 Check("resume reads the manifest without rewriting completed images",
                     state.Completed.SequenceEqual(new[] { 0, 1, 2 }), string.Join(",", state.Completed));
                 Check("resume returns the original export folder", state.Folder == folder, state.Folder);
@@ -573,6 +650,57 @@ internal static class SelfTests
         Check("private-network image links are rejected",
             !AttachmentExport.IsAllowedUri("https://192.168.1.4/photo.jpg")
             && !AttachmentExport.IsAllowedUri("https://[fd00::1]/photo.jpg"));
+        Check("multicast and reserved image links are rejected",
+            !AttachmentExport.IsAllowedUri("https://224.0.0.1/photo.jpg")
+            && !AttachmentExport.IsAllowedUri("https://240.0.0.1/photo.jpg")
+            && !AttachmentExport.IsAllowedUri("https://198.18.0.1/photo.jpg")
+            && !AttachmentExport.IsAllowedUri("https://192.0.2.1/photo.jpg")
+            && !AttachmentExport.IsAllowedUri("https://198.51.100.1/photo.jpg")
+            && !AttachmentExport.IsAllowedUri("https://203.0.113.1/photo.jpg")
+            && !AttachmentExport.IsAllowedUri("https://[::]/photo.jpg")
+            && !AttachmentExport.IsAllowedUri("https://[2001:db8::1]/photo.jpg"));
+        Check("a TUN proxy fake address is allowed only after hostname resolution",
+            !AttachmentExport.IsAllowedUri("https://198.18.1.1/photo.jpg")
+            && !AttachmentExport.IsBlockedResolved(
+                System.Net.IPAddress.Parse("198.18.1.1"))
+            && AttachmentExport.IsBlockedResolved(
+                System.Net.IPAddress.Parse("192.168.1.4")));
+        var signatures = new[]
+        {
+            AttachmentExport.ImageExtensionFor(new byte[] { 0xff, 0xd8, 0xff, 0xe0 }),
+            AttachmentExport.ImageExtensionFor(new byte[] { 0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a }),
+            AttachmentExport.ImageExtensionFor(new byte[] { 0x47, 0x49, 0x46, 0x38, 0x39, 0x61 }),
+            AttachmentExport.ImageExtensionFor(new byte[] {
+                0x52, 0x49, 0x46, 0x46, 0, 0, 0, 0, 0x57, 0x45, 0x42, 0x50 }),
+            AttachmentExport.ImageExtensionFor(new byte[] {
+                0, 0, 0, 0, 0x66, 0x74, 0x79, 0x70, 0x61, 0x76, 0x69, 0x66 }),
+        };
+        Check("supported image signatures are recognised",
+            signatures.SequenceEqual(new[] { ".jpg", ".png", ".gif", ".webp", ".avif" }),
+            string.Join(",", signatures));
+        Check("a disguised non-image payload is rejected",
+            AttachmentExport.ImageExtensionFor(Encoding.UTF8.GetBytes("<html>not an image</html>")) == null);
+    }
+
+    private static void TestViewerMessages()
+    {
+        Check("clipboard failure uses a string WebMessage with an explicit false flag",
+            ViewerMessages.ClipboardResult("clip-1", false, "denied")
+                == "clipboardResult\tclip-1\t0\tdenied");
+        var failed = new AttachmentResult("job-1", 7, false, "/tmp/photo one.jpg", "write failed");
+        Check("attachment failure uses the shared WebMessage contract",
+            ViewerMessages.AttachmentResult(failed)
+                == "attachmentResult\tjob-1\t7\t0\t%2Ftmp%2Fphoto%20one.jpg\twrite%20failed");
+        var resumed = new AttachmentResumeResult("job-1", new[] { 1, 3 }, "/tmp/photo one");
+        Check("attachment resume uses the shared WebMessage contract",
+            ViewerMessages.AttachmentResume(resumed)
+                == "attachmentResume\tjob-1\t1,3\t%2Ftmp%2Fphoto%20one");
+        Check("attachment resume failures preserve the batch",
+            ViewerMessages.AttachmentResumeFailure("job-1") == "attachmentResume\tjob-1\t\t");
+        Check("overlay result callbacks avoid script source",
+            ViewerMessages.OverlayExported("/tmp/a b.png") == "overlayExported\t%2Ftmp%2Fa%20b.png"
+            && ViewerMessages.OverlayFailed("bad 'file'")
+                == "overlayFailed\tbad%20%27file%27");
     }
 
     private static string Base64(string text) =>

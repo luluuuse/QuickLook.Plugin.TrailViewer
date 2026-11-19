@@ -34,6 +34,14 @@ $env:CHROMIUM = 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
 npm test
 ```
 
+开发时可以按改动范围选择套件，例如：
+
+```powershell
+node scripts/test.cjs tools floating-panels custom-source
+```
+
+PR CI 将浏览器套件分为五组并行运行；发布标签仍运行完整套件。
+
 ## 打包
 
 ```powershell

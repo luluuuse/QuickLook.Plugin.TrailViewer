@@ -2,7 +2,9 @@
 const path = require('path');
 const {
   launchBrowser,
+  settlePopup,
   waitForLayout,
+  waitForMapIdle,
 } = require('./support/browser.cjs');
 const { createChecker } = require('./support/assertions.cjs');
 const { createArtifacts } = require('./support/artifacts.cjs');
@@ -54,6 +56,39 @@ async function run(width, height) {
   await page.waitForFunction(() => document.body.classList.contains('loaded'));
   await waitForLayout(page);
 
+  await page.evaluate(() => window.trailViewer.nav.select(1));
+  await settlePopup(page, '.leaflet-popup', 1);
+  await waitForMapIdle(page);
+  await page.evaluate(() => window.trailViewer.map.panBy([240, 120], { animate: false }));
+  await waitForMapIdle(page);
+  const viewBeforeToolbox = await page.evaluate(() => {
+    const center = window.trailViewer.map.getCenter();
+    return { lat: center.lat, lng: center.lng, zoom: window.trailViewer.map.getZoom() };
+  });
+  await page.locator('.toolbox-switch > button').click();
+  await waitForLayout(page);
+  await waitForMapIdle(page);
+  const viewAfterToolbox = await page.evaluate(() => {
+    const center = window.trailViewer.map.getCenter();
+    return { lat: center.lat, lng: center.lng, zoom: window.trailViewer.map.getZoom() };
+  });
+  check(`${width}px: opening the toolbox does not recall an older focused point`,
+    viewAfterToolbox.lat === viewBeforeToolbox.lat
+      && viewAfterToolbox.lng === viewBeforeToolbox.lng
+      && viewAfterToolbox.zoom === viewBeforeToolbox.zoom,
+    JSON.stringify({ before: viewBeforeToolbox, after: viewAfterToolbox }));
+  await page.locator('.toolbox-switch > button').click();
+  await waitForLayout(page);
+  await waitForMapIdle(page);
+  const viewAfterToolboxClose = await page.evaluate(() => {
+    const center = window.trailViewer.map.getCenter();
+    return { lat: center.lat, lng: center.lng, zoom: window.trailViewer.map.getZoom() };
+  });
+  check(`${width}px: closing the toolbox does not recall an older focused point`,
+    viewAfterToolboxClose.lat === viewBeforeToolbox.lat
+      && viewAfterToolboxClose.lng === viewBeforeToolbox.lng
+      && viewAfterToolboxClose.zoom === viewBeforeToolbox.zoom,
+    JSON.stringify({ before: viewBeforeToolbox, after: viewAfterToolboxClose }));
   await page.locator('.toolbox-switch > button').click();
   await waitForLayout(page);
   check(`${width}px: toolbox opens alone`,

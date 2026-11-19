@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Text;
 
 namespace QuickLook.Plugin.TrailViewer;
 
@@ -164,6 +165,15 @@ internal sealed class OverlayTransferResult : IDisposable
 
 internal static class AtomicFile
 {
+    internal static void WriteText(string target, string text) =>
+        WriteBytes(target, new UTF8Encoding(false).GetBytes(text ?? string.Empty));
+
+    internal static void WriteBytes(string target, byte[] bytes)
+    {
+        using var source = new MemoryStream(bytes ?? Array.Empty<byte>(), false);
+        Write(target, source);
+    }
+
     /// <summary>Writes beside the target first, then publishes with a move or replace, leaving no partial PNG.</summary>
     internal static void Write(string target, Stream source)
     {

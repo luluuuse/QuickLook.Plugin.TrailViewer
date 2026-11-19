@@ -1,5 +1,4 @@
-// Leaflet controls and layer definitions. Dependencies are injected so this module does not reach into the map
-// application's globals.
+// Leaflet controls. Layer definitions and tile construction live in dedicated modules.
 
 import { readStored, writeStored } from './storage.js';
 import { iconElement, iconMarkup, setIcon } from './icons.js';
@@ -11,282 +10,20 @@ import {
   saveCustomLayers,
   validateTemplate,
 } from './custom-layers.js';
+import {
+  CATEGORY_ICONS,
+  LAYERS,
+  LAYER_KEY,
+  PROVIDERS,
+  defaultProvider,
+  normalizeLayer,
+  registerCustomProvider,
+  unregisterCustomProvider,
+} from './layer-registry.js';
+import { createProviderLayer } from './layer-providers.js';
+import { createCustomSourceForm } from './layer-custom-form.js';
 
-export const LAYERS = {
-  road: {
-    label: 'layer.road',
-    short: 'layer.shortRoad',
-    title: 'layer.roadTitle',
-    providers: {
-      osm: {
-        key: 'road.osm',
-        label: 'layer.osm',
-        url: 'https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png',
-        options: {
-          subdomains: 'abc',
-          maxZoom: 19,
-          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a> contributors, '
-            + 'style <a href="https://www.hotosm.org/" target="_blank">HOT</a>, '
-            + 'hosted by <a href="https://openstreetmap.fr/" target="_blank">OSM France</a>',
-        },
-      },
-      tianditu: {
-        key: 'road.tianditu',
-        label: 'layer.tiandituRoad',
-        requiresKey: 'tianditu',
-        layers: [
-          {
-            layer: 'vec',
-            options: {
-              maxZoom: 19,
-              maxNativeZoom: 18,
-              zIndex: 5,
-              attribution: '&copy; <a href="https://www.tianditu.gov.cn/" target="_blank">天地图</a>',
-            },
-          },
-          {
-            layer: 'cva',
-            options: { maxZoom: 19, maxNativeZoom: 18, zIndex: 10 },
-          },
-        ],
-      },
-    },
-  },
-  terrain: {
-    label: 'layer.terrain',
-    short: 'layer.shortTerrain',
-    title: 'layer.terrainTitle',
-    providers: {
-      cyclosm: {
-        key: 'terrain.cyclosm',
-        label: 'layer.cyclosm',
-        url: 'https://{s}.tile-cyclosm.openstreetmap.fr/cyclosm/{z}/{x}/{y}.png',
-        options: {
-          subdomains: 'abc',
-          maxZoom: 19,
-          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a> contributors, '
-            + 'style <a href="https://www.cyclosm.org/" target="_blank">CyclOSM</a>, '
-            + 'hosted by <a href="https://openstreetmap.fr/" target="_blank">OSM France</a>',
-        },
-      },
-      openHiking: {
-        key: 'terrain.openHiking',
-        label: 'layer.openHiking',
-        url: 'https://tile.openmaps.fr/openhikingmap/{z}/{x}/{y}.png',
-        options: {
-          maxZoom: 19,
-          maxNativeZoom: 18,
-          attribution: '<a href="https://wiki.openstreetmap.org/wiki/OpenHikingMap" target="_blank">'
-            + '&copy; OpenHikingMap</a> '
-            + '<a href="https://openmaps.fr/donate" target="_blank">Donation</a> '
-            + '<a href="https://www.openstreetmap.org/copyright" target="_blank">&copy; OpenStreetMap</a>',
-        },
-      },
-      openTopo: {
-        key: 'terrain.openTopo',
-        label: 'layer.openTopo',
-        url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
-        options: {
-          subdomains: 'abc',
-          maxZoom: 19,
-          maxNativeZoom: 17,
-          attribution: 'Map data &copy; '
-            + '<a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a> contributors, '
-            + '<a href="https://viewfinderpanoramas.org/" target="_blank">SRTM</a> | Map style &copy; '
-            + '<a href="https://opentopomap.org/" target="_blank">OpenTopoMap</a> '
-            + '(<a href="https://creativecommons.org/licenses/by-sa/3.0/" target="_blank">CC-BY-SA</a>)',
-        },
-      },
-    },
-  },
-  satellite: {
-    label: 'layer.satellite',
-    short: 'layer.shortSatellite',
-    title: 'layer.satelliteTitle',
-    providers: {
-      esri: {
-        key: 'satellite.esri',
-        label: 'layer.esri',
-        url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-        options: {
-          maxZoom: 19,
-          attribution: 'Imagery &copy; Esri, Maxar, Earthstar Geographics and the GIS User Community',
-        },
-      },
-      tianditu: {
-        key: 'satellite.tianditu',
-        label: 'layer.tiandituSatellite',
-        requiresKey: 'tianditu',
-        layers: [
-          {
-            layer: 'img',
-            options: {
-              maxZoom: 19,
-              maxNativeZoom: 18,
-              zIndex: 5,
-              attribution: '&copy; <a href="https://www.tianditu.gov.cn/" target="_blank">天地图</a>',
-            },
-          },
-          {
-            layer: 'cia',
-            options: { maxZoom: 19, maxNativeZoom: 18, zIndex: 10 },
-          },
-        ],
-      },
-    },
-  },
-  // Filled at runtime from the user's own list. The plugin ships no third-party endpoint, so this category is
-  // empty until someone adds one.
-  custom: {
-    label: 'layer.custom',
-    short: 'layer.shortCustom',
-    title: 'layer.customTitle',
-    providers: {},
-  },
-  none: {
-    label: 'layer.none',
-    short: 'layer.shortNone',
-    title: 'layer.noneTitle',
-    settingsOnly: true,
-    providers: {
-      none: { key: 'none', label: 'layer.none' },
-    },
-  },
-};
-
-const CATEGORY_ICONS = Object.freeze({
-  road: 'layer-road',
-  terrain: 'layer-terrain',
-  satellite: 'layer-satellite',
-  custom: 'layer-custom',
-});
-
-const LAYER_KEY = 'layer';
-const LEGACY_LAYERS = {
-  map: 'road.osm',
-  terrain: 'terrain.cyclosm',
-  satellite: 'satellite.esri',
-  none: 'none',
-};
-
-const PROVIDERS = Object.fromEntries(Object.entries(LAYERS).flatMap(([category, definition]) =>
-  Object.values(definition.providers).map((provider) => [provider.key, { category, provider }])));
-
-/** Registers one user entry so the rest of the switcher can treat it like any other provider. */
-function registerCustomProvider(entry) {
-  LAYERS.custom.providers[entry.id] = {
-    key: entry.id,
-    label: entry.name,
-    custom: entry,
-  };
-  PROVIDERS[entry.id] = { category: 'custom', provider: LAYERS.custom.providers[entry.id] };
-}
-
-function unregisterCustomProvider(id) {
-  delete LAYERS.custom.providers[id];
-  delete PROVIDERS[id];
-}
-
-function defaultProvider(category) {
-  return Object.values(LAYERS[category]?.providers || {})[0]?.key;
-}
-
-export function normalizeLayer(value) {
-  if (typeof value !== 'string') return null;
-  if (value in PROVIDERS) return value;
-  if (value in LEGACY_LAYERS) return LEGACY_LAYERS[value];
-  if (value in LAYERS) return defaultProvider(value);
-  return null;
-}
-
-/** Loads the user's own sources and makes them selectable before the switcher is built. */
-export function loadCustomProviders(read = readStored, hosted = null) {
-  const entries = loadCustomLayers(read, hosted);
-  for (const entry of entries) registerCustomProvider(entry);
-  return entries;
-}
-
-function graticule(L, map) {
-  const group = L.layerGroup();
-  const steps = [0.0001, 0.0002, 0.0005, 0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10, 15, 30];
-  const style = { color: '#ffffff', opacity: 0.12, weight: 1, interactive: false };
-
-  function redraw() {
-    group.clearLayers();
-    const bounds = map.getBounds();
-    const span = Math.max(bounds.getNorth() - bounds.getSouth(), 1e-6);
-    const step = steps.find((candidate) => span / candidate <= 10) ?? 30;
-    const south = Math.max(-90, bounds.getSouth());
-    const north = Math.min(90, bounds.getNorth());
-    for (let lat = Math.ceil(south / step) * step; lat <= north; lat += step) {
-      group.addLayer(L.polyline([[lat, bounds.getWest()], [lat, bounds.getEast()]], style));
-    }
-    for (let lon = Math.ceil(bounds.getWest() / step) * step; lon <= bounds.getEast(); lon += step) {
-      group.addLayer(L.polyline([[south, lon], [north, lon]], style));
-    }
-  }
-
-  group.on('add', () => {
-    map.on('moveend', redraw);
-    redraw();
-  });
-  group.on('remove', () => map.off('moveend', redraw));
-  return group;
-}
-
-function tiandituDirectUrl(layer, key) {
-  return `https://t{s}.tianditu.gov.cn/${layer}_w/wmts`
-    + '?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0'
-    + `&LAYER=${layer}&STYLE=default&TILEMATRIXSET=w&FORMAT=tiles`
-    + '&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}'
-    + `&tk=${encodeURIComponent(key)}`;
-}
-
-function createProviderLayer(L, map, provider, directKey, onDirectError) {
-  if (provider.custom) return createCustomLayer(L, provider.custom);
-  if (provider.requiresKey === 'tianditu') {
-    if (!directKey) return L.layerGroup();
-    const tileLayers = provider.layers.map(({ layer, options }) =>
-      L.tileLayer(tiandituDirectUrl(layer, directKey), {
-        ...(options || {}),
-        subdomains: '01234567',
-      }));
-    const retryDelays = [800, 2500];
-    let consecutiveErrors = 0;
-    let retryAttempt = 0;
-    let retryTimer = null;
-    const retry = () => {
-      if (retryTimer || retryAttempt >= retryDelays.length) return;
-      const delay = retryDelays[retryAttempt];
-      retryAttempt += 1;
-      retryTimer = setTimeout(() => {
-        retryTimer = null;
-        for (const layer of tileLayers) {
-          if (layer._map) layer.redraw();
-        }
-      }, delay);
-    };
-    const failed = () => {
-      consecutiveErrors += 1;
-      if (consecutiveErrors < 3) return;
-      onDirectError({ count: consecutiveErrors, retrying: retryAttempt < retryDelays.length });
-      retry();
-    };
-    const loaded = () => {
-      consecutiveErrors = 0;
-      retryAttempt = 0;
-      if (retryTimer) clearTimeout(retryTimer);
-      retryTimer = null;
-    };
-    for (const layer of tileLayers) {
-      layer.on('tileerror', failed);
-      layer.on('tileload', loaded);
-    }
-    return L.layerGroup(tileLayers);
-  }
-  if (!provider.url) return graticule(L, map);
-  return L.tileLayer(provider.url, { ...(provider.options || {}) });
-}
+export { LAYERS, loadCustomProviders, normalizeLayer } from './layer-registry.js';
 
 export function savedLayer(params) {
   const fromHost = normalizeLayer(params.get('layer'));
@@ -300,6 +37,7 @@ export function createLayerSwitcher({
   onTiandituDirectError = () => {}, onCustomError = () => {},
   onOpen = () => {}, onCustomSave, customSources = null,
 }) {
+  const lifecycle = new AbortController();
   let directKey = tiandituDirectKey;
   let keyReady = Boolean(directKey);
   const layers = {};
@@ -346,11 +84,10 @@ export function createLayerSwitcher({
   let customViewOpen = false;
   let customList;
   let customForm;
+  let customFormView;
   let customEmpty;
   let customEmptyAction;
   let customCount;
-  let customError;
-  let customUrlStatus;
   let customAddButton;
   let customManageButton;
   let customEntries = customSources || loadCustomLayers(readStored);
@@ -432,72 +169,32 @@ export function createLayerSwitcher({
   function clearCustomForm() {
     editingId = null;
     if (!customForm) return;
-    for (const field of customForm.querySelectorAll('input')) {
-      if (field.type === 'checkbox') field.checked = false;
-      else if (field.type === 'radio') field.checked = field.value === '256';
-      else if (field.name === 'minZoom') field.value = '1';
-      else if (field.name === 'maxZoom') field.value = '19';
-      else field.value = '';
-    }
-    customUrlStatus.hidden = true;
-    customForm.querySelector('[name="url"]')?.removeAttribute('data-invalid');
+    customFormView.reset();
     customForm.hidden = true;
-    if (customError) customError.hidden = true;
     if (menuHeading) menuHeading.textContent = t('layer.customHeading');
     renderCustomList();
   }
 
-  function readCustomForm() {
-    const value = (name) => customForm.querySelector(`[name="${name}"]`)?.value ?? '';
-    return {
-      id: editingId || undefined,
-      name: value('name').trim(),
-      url: value('url').trim(),
-      tileSize: Number(customForm.querySelector('[name="tileSize"]:checked')?.value || 256),
-      minZoom: Number(value('minZoom') || 1),
-      maxZoom: Number(value('maxZoom') || 19),
-      subdomains: value('subdomains').trim(),
-      attribution: value('attribution').trim(),
-      tms: Boolean(customForm.querySelector('[name="tms"]')?.checked),
-    };
-  }
-
-  function showCustomError(code) {
-    if (!customError) return;
-    const key = {
-      empty: 'layer.customInvalidEmpty',
-      scheme: 'layer.customInvalidScheme',
-      token: 'layer.customInvalidToken',
-      space: 'layer.customInvalidSpace',
-      syntax: 'layer.customInvalidSyntax',
-      subdomain: 'layer.customSubdomainRequired',
-      duplicate: 'layer.customDuplicate',
-      name: 'layer.customInvalidName',
-    }[code] || 'layer.customInvalidToken';
-    customError.textContent = t(key);
-    customError.hidden = false;
-  }
-
   function submitCustomForm() {
-    const draft = readCustomForm();
-    if (!draft.name) { showCustomError('name'); return; }
+    const draft = customFormView.read(editingId);
+    if (!draft.name) { customFormView.showError('name'); return; }
     const checked = validateTemplate(draft.url);
-    if (!checked.ok) { showCustomError(checked.code); return; }
+    if (!checked.ok) { customFormView.showError(checked.code); return; }
     if (checked.url.includes('{s}') && !draft.subdomains) {
-      showCustomError('subdomain');
+      customFormView.showError('subdomain');
       return;
     }
     const duplicate = customEntries.some((entry) => entry.id !== editingId
       && entry.name.toLocaleLowerCase() === draft.name.toLocaleLowerCase());
     if (duplicate) {
-      showCustomError('duplicate');
+      customFormView.showError('duplicate');
       return;
     }
 
     const previousId = editingId;
     const next = customEntries.filter((entry) => entry.id !== editingId);
     const saved = normalizeEntry(draft, next.length);
-    if (!saved) { showCustomError('token'); return; }
+    if (!saved) { customFormView.showError('token'); return; }
     next.push(saved);
     customEntries = next;
     persistCustom(previousId);
@@ -512,20 +209,7 @@ export function createLayerSwitcher({
     if (!entry || !customForm) return;
     pendingDelete = null;
     editingId = id;
-    const set = (name, value) => {
-      const field = customForm.querySelector(`[name="${name}"]`);
-      if (field) field.value = value;
-    };
-    set('name', entry.name);
-    set('url', entry.url);
-    set('minZoom', String(entry.minZoom));
-    set('maxZoom', String(entry.maxZoom));
-    set('subdomains', entry.subdomains);
-    set('attribution', entry.attribution);
-    const size = customForm.querySelector(`[name="tileSize"][value="${entry.tileSize}"]`);
-    if (size) size.checked = true;
-    const tms = customForm.querySelector('[name="tms"]');
-    if (tms) tms.checked = entry.tms;
+    customFormView.setEntry(entry);
     openCustomForm();
   }
 
@@ -1098,154 +782,13 @@ export function createLayerSwitcher({
       headerActions.insertBefore(customAddButton, closeButton);
       customAddButton.hidden = true;
 
-      customForm = el('form', 'layer-custom-form');
-      customForm.hidden = true;
-      // Builds a labelled field and returns both the wrapper and the input, so callers can place the whole
-      // field wherever it belongs. Returning only the input used to leave the label behind in the form.
-      const buildField = (name, labelKey, type = 'text', extra = {}) => {
-        const wrap = el('label', 'layer-custom-field');
-        const label = el('span', null, t(labelKey));
-        label.dataset.labelKey = labelKey;
-        wrap.append(label);
-        const input = el('input');
-        input.type = type;
-        input.name = name;
-        for (const [key, value] of Object.entries(extra)) input.setAttribute(key, value);
-        wrap.append(input);
-        return { wrap, input, label };
-      };
-      const nameField = buildField('name', 'layer.customName', 'text', {
-        maxlength: String(CUSTOM_LIMITS.maxNameLength), required: '',
+      customFormView = createCustomSourceForm({
+        el,
+        t,
+        onCancel: () => clearCustomForm(),
+        onSubmit: () => submitCustomForm(),
       });
-      const urlField = buildField('url', 'layer.customUrl', 'url', {
-        maxlength: String(CUSTOM_LIMITS.maxUrlLength),
-        placeholder: 'https://host/{z}/{x}/{y}.png',
-        required: '',
-      });
-      customForm.append(nameField.wrap, urlField.wrap);
-      const urlHint = el('p', 'layer-setting-note', t('layer.customUrlHint'));
-      urlHint.dataset.labelKey = 'layer.customUrlHint';
-      customForm.append(urlHint);
-
-      // Live format feedback: the same validator the save button uses, so the message cannot disagree with it.
-      customUrlStatus = el('p', 'layer-custom-url-status');
-      customUrlStatus.dataset.customUrlStatus = '';
-      customUrlStatus.hidden = true;
-      customForm.append(customUrlStatus);
-      const checkUrl = () => {
-        const raw = urlField.input.value.trim();
-        if (!raw) {
-          customUrlStatus.hidden = true;
-          urlField.input.removeAttribute('data-invalid');
-          return null;
-        }
-        const result = validateTemplate(raw);
-        if (result.ok) {
-          customUrlStatus.hidden = true;
-          urlField.input.removeAttribute('data-invalid');
-          if (result.url !== raw) urlField.input.value = result.url;
-          if (/(?:%40|@)2x/i.test(result.url)) {
-            customForm.querySelector('[name="tileSize"][value="512"]').checked = true;
-          }
-          return result;
-        }
-        customUrlStatus.hidden = false;
-        customUrlStatus.textContent = t({
-          empty: 'layer.customInvalidEmpty',
-          scheme: 'layer.customInvalidScheme',
-          token: 'layer.customInvalidToken',
-          space: 'layer.customInvalidSpace',
-          syntax: 'layer.customInvalidSyntax',
-        }[result.code] || 'layer.customInvalidToken');
-        urlField.input.setAttribute('data-invalid', 'true');
-        return result;
-      };
-      urlField.input.addEventListener('input', checkUrl);
-      urlField.input.addEventListener('blur', checkUrl);
-
-      const sizeWrap = el('div', 'layer-custom-field');
-      sizeWrap.append(el('span', null, t('layer.customTileSize')));
-      const sizeGroup = el('div', 'layer-custom-inline');
-      for (const size of CUSTOM_LIMITS.tileSizes) {
-        const option = el('label', 'layer-custom-radio');
-        const radio = el('input');
-        radio.type = 'radio';
-        radio.name = 'tileSize';
-        radio.value = String(size);
-        radio.checked = size === 256;
-        option.append(radio, el('span', null, String(size)));
-        sizeGroup.append(option);
-      }
-      sizeWrap.append(sizeGroup);
-
-      const zoomWrap = el('div', 'layer-custom-field');
-      zoomWrap.append(el('span', null, t('layer.customZoom')));
-      const zoomInline = el('div', 'layer-custom-inline');
-      const minZoom = el('input');
-      minZoom.type = 'number';
-      minZoom.name = 'minZoom';
-      minZoom.min = '0';
-      minZoom.max = '22';
-      minZoom.value = '1';
-      const maxZoom = el('input');
-      maxZoom.type = 'number';
-      maxZoom.name = 'maxZoom';
-      maxZoom.min = '0';
-      maxZoom.max = '22';
-      maxZoom.value = '19';
-      zoomInline.append(minZoom, el('span', 'layer-custom-dash', '–'), maxZoom);
-      zoomWrap.append(zoomInline);
-
-      // Advanced fields collapse by default: the form has to fit a short preview window, and most sources only
-      // need a name and an address.
-      const advanced = el('details', 'layer-custom-advanced');
-      const advancedSummary = el('summary', 'layer-custom-advanced-summary', t('layer.customAdvanced'));
-      advancedSummary.dataset.labelKey = 'layer.customAdvanced';
-      advanced.append(advancedSummary);
-      const advancedBody = el('div', 'layer-custom-advanced-body');
-      // Each advanced field keeps its own label: appending only the input left bare, unlabelled boxes behind.
-      advancedBody.append(
-        buildField('subdomains', 'layer.customSubdomains', 'text', {
-          maxlength: '16', placeholder: t('layer.customSubdomainsHint'),
-        }).wrap,
-      );
-      advancedBody.append(
-        buildField('attribution', 'layer.customAttribution', 'text', {
-          maxlength: String(CUSTOM_LIMITS.maxAttributionLength),
-          placeholder: t('layer.customAttributionHint'),
-        }).wrap,
-      );
-      const tmsWrap = el('label', 'layer-custom-field layer-custom-toggle');
-      const tmsBox = el('input');
-      tmsBox.type = 'checkbox';
-      tmsBox.name = 'tms';
-      tmsWrap.append(tmsBox, el('span', null, t('layer.customTms')));
-      advancedBody.append(tmsWrap);
-      advanced.append(advancedBody);
-      const basics = el('div', 'layer-custom-basics');
-      basics.append(sizeWrap, zoomWrap);
-      customForm.append(basics, advanced);
-
-      customError = el('p', 'layer-custom-error', '');
-      customError.hidden = true;
-      customError.dataset.customError = '';
-      customForm.append(customError);
-
-      const formActions = el('div', 'layer-custom-form-actions');
-      const saveButton = el('button', 'layer-custom-save', t('layer.customSave'));
-      saveButton.type = 'submit';
-      saveButton.dataset.customSave = '';
-      saveButton.dataset.labelKey = 'layer.customSave';
-      const cancelButton = el('button', 'layer-custom-cancel', t('layer.customCancel'));
-      cancelButton.type = 'button';
-      cancelButton.dataset.labelKey = 'layer.customCancel';
-      cancelButton.addEventListener('click', () => clearCustomForm());
-      formActions.append(cancelButton, saveButton);
-      customForm.append(formActions);
-      customForm.addEventListener('submit', (event) => {
-        event.preventDefault();
-        submitCustomForm();
-      });
+      customForm = customFormView.form;
 
       customSection.append(customEmpty, customList, customForm);
       customView.append(customCount, customSection);
@@ -1256,14 +799,14 @@ export function createLayerSwitcher({
         event.preventDefault();
         if (settingsViewOpen || customViewOpen) backFromCurrentView();
         else closeMenu({ restoreFocus: true });
-      });
+      }, { signal: lifecycle.signal });
       bar.append(menu);
       L.DomEvent.disableClickPropagation(bar);
       // Close on the initial map press. A text selection can begin inside the form and end over the map, which
       // produces a click on the map; that completion click must not dismiss the editor mid-drag.
       map.getContainer().addEventListener('pointerdown', (event) => {
         if (!event.target.closest('.leaflet-control')) closeMenu();
-      });
+      }, { signal: lifecycle.signal });
       return bar;
     },
   });
@@ -1291,6 +834,11 @@ export function createLayerSwitcher({
     },
     current: () => current,
     currentCategory: () => currentCategory,
+    destroy() {
+      lifecycle.abort();
+      closeMenu();
+      menu?.remove();
+    },
     relabel() {
       for (const [key, button] of Object.entries(categoryButtons)) {
         categoryLabels[key].textContent = t(LAYERS[key].label);

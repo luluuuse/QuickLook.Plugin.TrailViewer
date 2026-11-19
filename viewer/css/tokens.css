@@ -1,0 +1,109 @@
+/* Design tokens and shared primitives. */
+
+:root {
+  --bg: #181818;
+  --panel: rgba(24, 24, 24, 0.86);
+  --text: #e6e6e6;
+  --muted: #9a9a9a;
+  --accent: #2f9bff;
+  /* Shared surface for task panels: translucent enough to keep map context, with a readable blur. */
+  --tool-panel-background: rgba(24, 24, 24, 0.78);
+  --tool-panel-filter: blur(14px) saturate(0.9);
+  --icon-size: 16px;
+  --icon-size-compact: 12px;
+  --icon-stroke: 1.75;
+  --icon-color: #e6e6e6;
+  --icon-hover: #ffffff;
+  --icon-disabled: #666666;
+  --icon-active: #8fd9ff;
+  --icon-active-background: #234f79;
+  --icon-active-line: #2f9bff;
+  --toolbar-height: 32px;
+  --toolbar-radius: 5px;
+  --toolbar-gap: 8px;
+  --floating-panel-top: 54px;
+  --floating-panel-header-height: 40px;
+  --z-map-ui: 900;
+  --z-floating-panel: 1000;
+  --z-toast: 1100;
+  --z-overlay: 1200;
+  --z-tool-panel: 1400;
+  --z-photo-modal: 3000;
+  font: 13px/1.4 "Segoe UI", system-ui, sans-serif;
+  color-scheme: dark;
+}
+
+html, body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+}
+
+#map {
+  position: absolute;
+  inset: 0;
+  background: var(--bg);
+}
+
+button:focus-visible,
+a:focus-visible,
+[role="button"]:focus-visible {
+  outline: 2px solid #8fc7ff;
+  outline-offset: 2px;
+}
+
+/* Application icons share one open outlined geometry. Data symbols deliberately opt into their own fill
+   policy below so map meaning is never reduced to the button palette. */
+.ui-icon {
+  display: block;
+  width: var(--icon-size);
+  height: var(--icon-size);
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: var(--icon-stroke);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+
+.ui-icon.icon-compact {
+  width: var(--icon-size-compact);
+  height: var(--icon-size-compact);
+}
+
+.data-symbol {
+  display: block;
+  overflow: visible;
+  flex: none;
+  color: inherit;
+}
+
+.data-symbol .symbol-fill {
+  fill: currentColor;
+  stroke: #1b1b1b;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.data-symbol .symbol-hole {
+  fill: #1b1b1b;
+  stroke: none;
+}
+
+.data-symbol .symbol-detail {
+  fill: none;
+  stroke: #1b1b1b;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.toolbox-export-settings .pick .option:focus-visible {
+  outline-offset: -3px;
+}
+
+body.no-map #map {

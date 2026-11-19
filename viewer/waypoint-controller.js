@@ -601,6 +601,13 @@ export function createWaypointController({
     closeOverview: (restoreFocus = true) => overview.close({ restoreFocus }),
     refreshMapMarks: renderWaypointPins,
     relabel,
+    destroy() {
+      map.off('zoomend', scheduleWaypointPins);
+      map.off('moveend', scheduleWaypointPins);
+      map.off('resize', scheduleWaypointPins);
+      pinLayer.remove();
+      overview.destroy();
+    },
     openStop() {
       const node = selectedNode();
       const marker = node?.markers.find((candidate) => candidate.isPopupOpen());

@@ -169,7 +169,6 @@ internal static class ViewerPreferences
 
     private static void Save(string path, Dictionary<string, string> values)
     {
-        string temporary = null;
         try
         {
             var directory = Path.GetDirectoryName(path);
@@ -182,31 +181,11 @@ internal static class ViewerPreferences
             for (var i = 0; i < keys.Count; i++)
                 lines[i] = keys[i] + "=" + values[keys[i]];
 
-            temporary = path + "." + Guid.NewGuid().ToString("n") + ".tmp";
-            File.WriteAllLines(temporary, lines, new UTF8Encoding(false));
-            if (File.Exists(path))
-            {
-                var backup = path + ".old";
-                File.Replace(temporary, path, backup, true);
-                File.Delete(backup);
-            }
-            else
-            {
-                File.Move(temporary, path);
-            }
-            temporary = null;
+            AtomicFile.WriteText(path, string.Join(Environment.NewLine, lines) + Environment.NewLine);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             // Preference persistence must never break the preview.
-        }
-        finally
-        {
-            if (temporary != null)
-            {
-                try { File.Delete(temporary); }
-                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
-            }
         }
     }
 }

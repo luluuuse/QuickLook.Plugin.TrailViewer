@@ -82,8 +82,14 @@ export function parseCoordinates(raw) {
 /** gx:coord holds "lon lat alt", space separated. */
 function parseGxCoord(raw, { skipElevation = false } = {}) {
   const parts = (raw || '').trim().split(/\s+/);
-  const point = parseCoordinates(`${parts[0]},${parts[1]},${skipElevation ? '' : parts[2] ?? ''}`);
-  return point[0] || null;
+  const lon = Number(parts[0]);
+  const lat = Number(parts[1]);
+  if (!isLatLon(lat, lon)) return null;
+  const point = { lat, lon };
+  const alt = Number(parts[2]);
+  if (!skipElevation && parts[2] !== undefined && parts[2].trim() !== '' && Number.isFinite(alt))
+    point.ele = alt;
+  return point;
 }
 
 function readTime(placemark) {

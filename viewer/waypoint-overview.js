@@ -21,6 +21,7 @@ function loadOverrides() {
  * order, then click the camp, pass or photo stop they need.
  */
 export function createWaypointOverview({ el, onSelect, onLayoutChange, onOpen }) {
+  const lifecycle = new AbortController();
   let panel = null;
   let filterTrigger = null;
   let filterMenu = null;
@@ -183,14 +184,14 @@ export function createWaypointOverview({ el, onSelect, onLayoutChange, onOpen })
       if (!openPopover) return;
       if (openPopover.menu.contains(event.target) || openPopover.trigger.contains(event.target)) return;
       closePopover();
-    });
+    }, { signal: lifecycle.signal });
     document.addEventListener('keydown', (event) => {
       if (event.key !== 'Escape' || !openPopover) return;
       event.preventDefault();
       event.stopPropagation();
       closePopover(true);
-    });
-    window.addEventListener('resize', () => closePopover());
+    }, { signal: lifecycle.signal });
+    window.addEventListener('resize', () => closePopover(), { signal: lifecycle.signal });
     document.body.append(panel);
   }
 
@@ -411,5 +412,9 @@ export function createWaypointOverview({ el, onSelect, onLayoutChange, onOpen })
     close,
     open,
     isOpen: () => Boolean(panel) && !panel.hidden,
+    destroy() {
+      lifecycle.abort();
+      panel?.remove();
+    },
   };
 }

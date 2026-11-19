@@ -6,7 +6,6 @@ interface Window {
     customSources?: Array<Record<string, unknown>>;
   };
   trailViewer?: any;
-  gpxViewer?: any;
   chrome?: {
     webview?: {
       postMessage(message: string): void;

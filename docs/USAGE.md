@@ -132,7 +132,8 @@ FIT 读取活动和路线中的 GPS 记录、时间、海拔、心率、会话�
 - 外链只在选择全部导出后请求，最多 3 张并发；同一域名只做一次安全检查，单张超时或失败不会阻塞其他图片。
 - 导出目录内的隐藏清单记录已完成图片；关闭窗口后重新打开同一轨迹会跳过已完成项，只补导缺失或失败图片。
   原轨迹文件被修改后旧清单自动失效。结果会显示新增、跳过已完成和失败数量。
-- 只接受公开 HTTPS 图片，HTTP、带凭据、回环、私网和链路本地地址会被拒绝。
+- 只接受公开 HTTPS 图片，HTTP、带凭据、回环、私网、多播、保留网段和链路本地地址会被拒绝；返回内容
+  还必须匹配支持的图片文件头。
 - 单张图片限制 30 MB，整批最多 200 张、300 MB；界面显示进度、成功/失败数量和最终目录。
 
 ### 轨迹天气
@@ -356,8 +357,8 @@ directory.
 - A hidden manifest records completed images. Reopening the same unchanged track skips those files and retries
   only missing or failed images; editing the source track invalidates the old manifest. The result reports
   added, already-completed and failed counts.
-- Only public HTTPS images are accepted. HTTP, credentials, loopback, private-network and link-local
-  destinations are rejected.
+- Only public HTTPS images are accepted. HTTP, credentials, loopback, private, multicast, reserved and
+  link-local destinations are rejected, and the response must carry a supported image signature.
 - Each image is limited to 30 MB; a batch is limited to 200 images and 300 MB. The panel reports progress,
   success/failure counts and the destination folder.
 

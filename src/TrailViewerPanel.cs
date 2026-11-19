@@ -6,6 +6,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -31,10 +32,13 @@ internal sealed class TrailViewerPanel : UserControl, IDisposable
 
     private static readonly string FileHost = $"file.{PluginIdentity.VirtualHostSuffix}";
     private static readonly TimeSpan LoadTimeout = TimeSpan.FromSeconds(20);
+    private static readonly object EnvironmentGate = new();
+    private static System.Threading.Tasks.Task<CoreWebView2Environment> _environmentTask;
     internal const long MaxInputBytes = 64L * 1024 * 1024;
 
     private readonly Stopwatch _clock = Stopwatch.StartNew();
     private readonly DispatcherTimer _timeout;
+    private readonly CancellationTokenSource _lifecycle = new();
     private string _path;
     private string _sourcePath;
     private string _name;
@@ -63,6 +67,11 @@ internal sealed class TrailViewerPanel : UserControl, IDisposable
     internal static Action<string> Trace = _ => { };
 
     public void Load(string path)
+    {
+        _ = LoadAsync(path);
+    }
+
+    private async System.Threading.Tasks.Task LoadAsync(string path)
     {
         _measureActive = false;
         _sourcePath = Path.GetFullPath(path);
@@ -98,10 +107,18 @@ internal sealed class TrailViewerPanel : UserControl, IDisposable
         {
             try
             {
-                _unpackedFolder = KmzArchive.CreateFolder();
-                _path = KmzArchive.ExtractDocument(_sourcePath, _unpackedFolder);
+                _unpackedFolder = await System.Threading.Tasks.Task.Run(
+                    KmzArchive.CreateFolder, _lifecycle.Token);
+                var unpacked = _unpackedFolder;
+                _path = await System.Threading.Tasks.Task.Run(
+                    () => KmzArchive.ExtractDocument(_sourcePath, unpacked, _lifecycle.Token),
+                    _lifecycle.Token);
                 _fileRoot = _unpackedFolder;
                 Trace($"unpacked {_name} to {_path}");
+            }
+            catch (OperationCanceledException) when (_finished)
+            {
+                return;
             }
             catch (Exception ex) when (ex is InvalidDataException or IOException
                 or UnauthorizedAccessException or NotSupportedException)
@@ -111,6 +128,7 @@ internal sealed class TrailViewerPanel : UserControl, IDisposable
                 return;
             }
         }
+        if (_finished) return;
         _attachments = new AttachmentExport(_sourcePath, _fileRoot);
 
         _webView = new WebView2
@@ -141,7 +159,49 @@ internal sealed class TrailViewerPanel : UserControl, IDisposable
         Content = _webView;
         _timeout.Start();
         Trace("WebView2 runtime " + CoreWebView2Environment.GetAvailableBrowserVersionString());
-        _ = _webView.EnsureCoreWebView2Async();
+        _ = EnsureWebViewAsync();
+    }
+
+    internal static void PrepareEnvironment()
+    {
+        var task = SharedEnvironmentAsync();
+        _ = task.ContinueWith(
+            completed => Trace("WebView2 environment prewarm failed: "
+                + completed.Exception?.GetBaseException().Message),
+            CancellationToken.None,
+            System.Threading.Tasks.TaskContinuationOptions.OnlyOnFaulted,
+            System.Threading.Tasks.TaskScheduler.Default);
+    }
+
+    private static System.Threading.Tasks.Task<CoreWebView2Environment> SharedEnvironmentAsync()
+    {
+        lock (EnvironmentGate)
+        {
+            return _environmentTask ??= CoreWebView2Environment.CreateAsync(null, UserDataFolder);
+        }
+    }
+
+    private async System.Threading.Tasks.Task EnsureWebViewAsync()
+    {
+        try
+        {
+            var environment = await SharedEnvironmentAsync();
+            if (_webView == null || _finished) return;
+            await _webView.EnsureCoreWebView2Async(environment);
+        }
+        catch (Exception ex) when (!_finished)
+        {
+            Trace("prewarmed WebView2 environment failed; using the default profile: " + ex.Message);
+            try
+            {
+                if (_webView != null && !_finished)
+                    await _webView.EnsureCoreWebView2Async();
+            }
+            catch (Exception fallback) when (!_finished)
+            {
+                Fail("Could not start WebView2: " + fallback.Message);
+            }
+        }
     }
 
     /// <summary>
@@ -235,6 +295,8 @@ internal sealed class TrailViewerPanel : UserControl, IDisposable
                     "window.__TRAILVIEWER_RUNTIME_CONFIG__ = Object.freeze({"
                     + string.Join(", ", runtimeConfig) + "});");
             }
+            if (_webView == null || _finished)
+                return;
             _webView.Source = new Uri(BuildViewerUrl(_path, _name, _fileRoot));
             Trace("navigating to " + _webView.Source);
         }
@@ -430,19 +492,19 @@ internal sealed class TrailViewerPanel : UserControl, IDisposable
         else if (message.StartsWith("exportchunk\t", StringComparison.Ordinal))
             AppendExport(message.Substring("exportchunk\t".Length));
         else if (message.StartsWith("exportdone\t", StringComparison.Ordinal))
-            FinishExport(message.Substring("exportdone\t".Length));
+            _ = FinishExportAsync(message.Substring("exportdone\t".Length));
         else if (message.StartsWith("clipboard\t", StringComparison.Ordinal))
-            CopyToClipboard(message.Substring("clipboard\t".Length));
+            _ = CopyToClipboardAsync(message.Substring("clipboard\t".Length));
         else if (message.StartsWith("attachmentbegin\t", StringComparison.Ordinal))
             BeginAttachment(message.Substring("attachmentbegin\t".Length));
         else if (message.StartsWith("attachmentlocal\t", StringComparison.Ordinal))
-            CopyLocalAttachment(message.Substring("attachmentlocal\t".Length));
+            _ = CopyLocalAttachmentAsync(message.Substring("attachmentlocal\t".Length));
         else if (message.StartsWith("attachmentresume\t", StringComparison.Ordinal))
-            ResumeAttachments(message.Substring("attachmentresume\t".Length));
+            _ = ResumeAttachmentsAsync(message.Substring("attachmentresume\t".Length));
         else if (message.StartsWith("attachmentchunk\t", StringComparison.Ordinal))
             AppendAttachment(message.Substring("attachmentchunk\t".Length));
         else if (message.StartsWith("attachmentdone\t", StringComparison.Ordinal))
-            FinishAttachment(message.Substring("attachmentdone\t".Length));
+            _ = FinishAttachmentAsync(message.Substring("attachmentdone\t".Length));
         else if (message.StartsWith("attachmentlink\t", StringComparison.Ordinal))
             _ = DownloadAttachmentAsync(message.Substring("attachmentlink\t".Length));
         else if (message == "ready" || message.StartsWith("ready\t", StringComparison.Ordinal))
@@ -450,9 +512,15 @@ internal sealed class TrailViewerPanel : UserControl, IDisposable
         else if (message.StartsWith("error:", StringComparison.Ordinal))
             Finish(message.Substring("error:".Length), "");
         else if (message.StartsWith("settings\t", StringComparison.Ordinal))
-            ViewerPreferences.SaveFromQuery(message.Substring("settings\t".Length));
+        {
+            var query = message.Substring("settings\t".Length);
+            _ = System.Threading.Tasks.Task.Run(() => ViewerPreferences.SaveFromQuery(query));
+        }
         else if (message.StartsWith("custom-sources\t", StringComparison.Ordinal))
-            CustomSourceStore.SaveJson(message.Substring("custom-sources\t".Length));
+        {
+            var json = message.Substring("custom-sources\t".Length);
+            _ = System.Threading.Tasks.Task.Run(() => CustomSourceStore.SaveJson(json));
+        }
         else if (message == "measure-state\t1" || message == "measure-state\t0")
             _measureActive = message.EndsWith("\t1", StringComparison.Ordinal);
         else if (message == "text-input\t1" || message == "text-input\t0")
@@ -468,7 +536,7 @@ internal sealed class TrailViewerPanel : UserControl, IDisposable
         }
     }
 
-    private void CopyToClipboard(string body)
+    private async System.Threading.Tasks.Task CopyToClipboardAsync(string body)
     {
         var split = body.IndexOf('\t');
         var id = split > 0 ? body.Substring(0, split) : "";
@@ -493,7 +561,7 @@ internal sealed class TrailViewerPanel : UserControl, IDisposable
 
         try
         {
-            Clipboard.SetText(text);
+            await SetClipboardTextAsync(text);
             SendClipboardResult(id, true, "");
         }
         catch (Exception ex) when (ex is InvalidOperationException or ExternalException)
@@ -502,10 +570,29 @@ internal sealed class TrailViewerPanel : UserControl, IDisposable
         }
     }
 
+    internal static async System.Threading.Tasks.Task SetClipboardTextAsync(
+        string text, Action<string> writer = null, int attempts = 20, int delayMilliseconds = 50)
+    {
+        writer = writer ?? Clipboard.SetText;
+        attempts = Math.Max(1, attempts);
+        for (var attempt = 0; ; attempt++)
+        {
+            try
+            {
+                writer(text);
+                return;
+            }
+            catch (ExternalException) when (attempt + 1 < attempts)
+            {
+                // Another process can briefly own the Windows clipboard (CLIPBRD_E_CANT_OPEN).
+                await System.Threading.Tasks.Task.Delay(delayMilliseconds);
+            }
+        }
+    }
+
     private void SendClipboardResult(string id, bool ok, string detail)
     {
-        _ = SendToViewer($"clipboardResult('{Escape(id)}','{(ok ? 1 : 0)}',"
-            + $"'{Uri.EscapeDataString(detail ?? "")}')");
+        _ = PostToViewerMessageAsync(ViewerMessages.ClipboardResult(id, ok, detail));
     }
 
     private void BeginAttachment(string body)
@@ -532,12 +619,18 @@ internal sealed class TrailViewerPanel : UserControl, IDisposable
         }
     }
 
-    private void CopyLocalAttachment(string body)
+    private async System.Threading.Tasks.Task CopyLocalAttachmentAsync(string body)
     {
+        var attachments = _attachments;
+        if (attachments == null) return;
         AttachmentResult result;
         try
         {
-            result = _attachments.CopyLocal(body);
+            result = await attachments.CopyLocalAsync(body);
+        }
+        catch (OperationCanceledException) when (_finished)
+        {
+            return;
         }
         catch (Exception ex) when (ex is InvalidDataException or FormatException)
         {
@@ -549,34 +642,44 @@ internal sealed class TrailViewerPanel : UserControl, IDisposable
         _ = SendAttachmentResultAsync(result);
     }
 
-    private void ResumeAttachments(string body)
+    private async System.Threading.Tasks.Task ResumeAttachmentsAsync(string body)
     {
+        var attachments = _attachments;
+        if (attachments == null) return;
         try
         {
-            var result = _attachments.Resume(body);
-            var indices = string.Join(",", result.Completed);
-            _ = SendToViewer($"attachmentResume('{Escape(result.Batch)}','{indices}',"
-                + $"'{Uri.EscapeDataString(result.Folder ?? "")}')");
+            var result = await attachments.ResumeAsync(body);
+            _ = PostToViewerMessageAsync(ViewerMessages.AttachmentResume(result));
+        }
+        catch (OperationCanceledException) when (_finished)
+        {
+            return;
         }
         catch (Exception ex) when (ex is InvalidDataException or FormatException)
         {
             var batch = body.Split('\t')[0];
-            _ = SendToViewer($"attachmentResume('{Escape(batch)}','','')");
+            _ = PostToViewerMessageAsync(ViewerMessages.AttachmentResumeFailure(batch));
             Trace("attachment resume failed: " + ex.Message);
         }
     }
 
-    private void FinishAttachment(string body)
+    private async System.Threading.Tasks.Task FinishAttachmentAsync(string body)
     {
+        var attachments = _attachments;
+        if (attachments == null) return;
         AttachmentResult result;
         try
         {
-            result = _attachments.CompleteUpload(body);
+            result = await attachments.CompleteUploadAsync(body);
+        }
+        catch (OperationCanceledException) when (_finished)
+        {
+            return;
         }
         catch (Exception ex) when (ex is InvalidDataException or FormatException or IOException
             or UnauthorizedAccessException or NotSupportedException)
         {
-            SendAttachmentFailure(_attachments.CurrentBatch, _attachments.CurrentIndex, ex.Message);
+            SendAttachmentFailure(attachments.CurrentBatch, attachments.CurrentIndex, ex.Message);
             return;
         }
         _ = SendAttachmentResultAsync(result);
@@ -584,10 +687,12 @@ internal sealed class TrailViewerPanel : UserControl, IDisposable
 
     private async System.Threading.Tasks.Task DownloadAttachmentAsync(string body)
     {
+        var attachments = _attachments;
+        if (attachments == null) return;
         AttachmentResult result;
         try
         {
-            result = await _attachments.DownloadAsync(body);
+            result = await attachments.DownloadAsync(body);
         }
         catch (Exception ex) when (ex is InvalidDataException or FormatException or UriFormatException)
         {
@@ -606,10 +711,7 @@ internal sealed class TrailViewerPanel : UserControl, IDisposable
 
     private async System.Threading.Tasks.Task SendAttachmentResultAsync(AttachmentResult result)
     {
-        var call = $"attachmentResult('{Escape(result.Batch)}',{result.Index},'{(result.Ok ? 1 : 0)}',"
-            + $"'{Uri.EscapeDataString(result.Path ?? "")}',"
-            + $"'{Uri.EscapeDataString(result.Detail ?? "")}')";
-        await SendToViewer(call).ConfigureAwait(false);
+        await PostToViewerMessageAsync(ViewerMessages.AttachmentResult(result)).ConfigureAwait(false);
     }
 
     private static bool IsEnglishMessage(string message) =>
@@ -650,124 +752,14 @@ internal sealed class TrailViewerPanel : UserControl, IDisposable
 
     private void ConfigureTiandituKey(bool english)
     {
-        var owner = Window.GetWindow(this);
-        var dialog = new Window
-        {
-            Owner = owner,
-            Title = english ? "TrailViewer · Tianditu key" : "TrailViewer · 天地图密钥",
-            Width = 430,
-            SizeToContent = SizeToContent.Height,
-            ResizeMode = ResizeMode.NoResize,
-            WindowStartupLocation = owner == null
-                ? WindowStartupLocation.CenterScreen
-                : WindowStartupLocation.CenterOwner,
-            ShowInTaskbar = false,
-        };
-
-        var panel = new StackPanel { Margin = new Thickness(18) };
-        panel.Children.Add(new TextBlock
-        {
-            Text = english
-                ? "Enter your Tianditu developer key (32 hexadecimal characters)."
-                : "输入天地图开发者密钥（32 位十六进制）。",
-            FontWeight = FontWeights.SemiBold,
-            Margin = new Thickness(0, 0, 0, 8),
-        });
-        panel.Children.Add(new TextBlock
-        {
-            Text = english
-                ? "The key is encrypted for the current Windows user. TrailViewer decrypts it only for this "
-                    + "preview and the WebView requests Tianditu directly. It is not written to page URLs, "
-                    + "browser storage, logs or release packages."
-                : "密钥会使用当前 Windows 用户凭据加密。TrailViewer 只在本次预览中解密，由 WebView 直接请求"
-                    + "天地图；它不会写入页面地址、浏览器存储、日志或安装包。",
-            TextWrapping = TextWrapping.Wrap,
-            Margin = new Thickness(0, 0, 0, 12),
-        });
-
-        var status = new TextBlock
-        {
-            Text = TiandituKeyStore.HasKey()
-                ? (english ? "A key is already configured. Enter a new value to replace it." : "当前已配置密钥。输入新值可替换。")
-                : "",
-            Foreground = Brushes.DimGray,
-            TextWrapping = TextWrapping.Wrap,
-            Margin = new Thickness(0, 0, 0, 8),
-        };
-        var input = new PasswordBox { MaxLength = 64, Padding = new Thickness(6) };
-        input.PasswordChanged += (_, _) =>
-        {
-            status.Text = TiandituKeyStore.IsValid(input.Password)
-                ? (english ? "The key format is valid." : "密钥格式有效，保存后即可使用天地图。")
-                : (english
-                    ? "Invalid key format: enter 32 hexadecimal characters."
-                    : "密钥格式无效：需要 32 位十六进制字符。");
-            status.Foreground = TiandituKeyStore.IsValid(input.Password) ? Brushes.DarkGreen : Brushes.DarkRed;
-        };
-        panel.Children.Add(input);
-        panel.Children.Add(status);
-
-        var buttons = new StackPanel
-        {
-            Orientation = Orientation.Horizontal,
-            HorizontalAlignment = HorizontalAlignment.Right,
-            Margin = new Thickness(0, 14, 0, 0),
-        };
-        var cancel = new Button { Content = english ? "Cancel" : "取消", Padding = new Thickness(14, 5, 14, 5) };
-        cancel.Click += (_, _) => dialog.DialogResult = false;
-        var save = new Button
-        {
-            Content = english ? "Save" : "保存",
-            Padding = new Thickness(14, 5, 14, 5),
-            Margin = new Thickness(8, 0, 0, 0),
-            IsDefault = true,
-        };
-        var saved = false;
-        save.Click += (_, _) =>
-        {
-            if (!TiandituKeyStore.IsValid(input.Password))
-            {
-                status.Text = english
-                    ? "Enter a valid 32-character hexadecimal key."
-                    : "请输入有效的 32 位十六进制密钥。";
-                status.Foreground = Brushes.DarkRed;
-                return;
-            }
-            if (!TiandituKeyStore.Save(input.Password))
-            {
-                status.Text = english
-                    ? "Could not save the key. Check the current user's data-directory permissions."
-                    : "无法保存密钥，请检查当前用户的数据目录权限。";
-                status.Foreground = Brushes.DarkRed;
-                return;
-            }
-            input.Clear();
-            saved = true;
-            dialog.DialogResult = true;
-        };
-        buttons.Children.Add(cancel);
-        buttons.Children.Add(save);
-        panel.Children.Add(buttons);
-
-        dialog.Content = panel;
-        dialog.Loaded += (_, _) => input.Focus();
-        dialog.ShowDialog();
-        if (saved) _ = NotifyTiandituKeyStateAsync();
+        if (TiandituKeyDialog.Show(Window.GetWindow(this), english))
+            _ = NotifyTiandituKeyStateAsync();
     }
 
     private void RemoveTiandituKey(bool english)
     {
-        var owner = Window.GetWindow(this);
-        var answer = MessageBox.Show(owner,
-            english
-                ? "Remove the Tianditu key saved for the current Windows user?"
-                : "移除当前 Windows 用户保存的天地图密钥？",
-            "TrailViewer",
-            MessageBoxButton.YesNo,
-            MessageBoxImage.Question);
-        if (answer != MessageBoxResult.Yes) return;
-        TiandituKeyStore.Delete();
-        _ = NotifyTiandituKeyStateAsync();
+        if (TiandituKeyDialog.Remove(Window.GetWindow(this), english))
+            _ = NotifyTiandituKeyStateAsync();
     }
 
     private async System.Threading.Tasks.Task NotifyTiandituKeyStateAsync()
@@ -827,7 +819,7 @@ internal sealed class TrailViewerPanel : UserControl, IDisposable
     }
 
     /// <summary>Writes the picture beside the track, or into the plugin's own folder when that one is read-only.</summary>
-    private void FinishExport(string body)
+    private async System.Threading.Tasks.Task FinishExportAsync(string body)
     {
         OverlayTransferResult picture;
         try
@@ -846,7 +838,12 @@ internal sealed class TrailViewerPanel : UserControl, IDisposable
         try
         {
             target = OverlayTarget(_sourcePath, picture.Name);
-            AtomicFile.Write(target, picture.Picture);
+            await System.Threading.Tasks.Task.Run(
+                () => AtomicFile.Write(target, picture.Picture), _lifecycle.Token);
+        }
+        catch (OperationCanceledException) when (_finished)
+        {
+            return;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException)
         {
@@ -856,12 +853,17 @@ internal sealed class TrailViewerPanel : UserControl, IDisposable
                 var fallback = Path.Combine(SettingHelper.LocalDataPath, "exports");
                 Directory.CreateDirectory(fallback);
                 target = Path.Combine(fallback, picture.Name);
-                AtomicFile.Write(target, picture.Picture);
+                await System.Threading.Tasks.Task.Run(
+                    () => AtomicFile.Write(target, picture.Picture), _lifecycle.Token);
+            }
+            catch (OperationCanceledException) when (_finished)
+            {
+                return;
             }
             catch (Exception inner)
             {
                 Trace($"export failed: {ex.Message} / {inner.Message}");
-                _ = SendToViewer($"exportFailed('{Escape(inner.Message)}')");
+                _ = PostToViewerMessageAsync(ViewerMessages.OverlayFailed(inner.Message));
                 return;
             }
         }
@@ -871,43 +873,28 @@ internal sealed class TrailViewerPanel : UserControl, IDisposable
         }
 
         Trace($"exported overlay to {target}");
-        _ = SendToViewer($"exported('{Escape(target)}')");
+        _ = PostToViewerMessageAsync(ViewerMessages.OverlayExported(target));
     }
 
     private void FailExport(string detail)
     {
         _overlay.Reset();
         Trace("export failed: " + detail);
-        _ = SendToViewer($"exportFailed('{Escape(detail)}')");
+        _ = PostToViewerMessageAsync(ViewerMessages.OverlayFailed(detail));
     }
-
-    private static string Escape(string text) =>
-        (text ?? "").Replace("\\", "\\\\").Replace("'", "\\'")
-            .Replace("\r", "\\r").Replace("\n", "\\n")
-            .Replace("\u2028", "\\u2028").Replace("\u2029", "\\u2029");
 
     internal static bool IsOversized(long bytes) => bytes > MaxInputBytes;
 
     internal static bool IsViewerShutdown(Exception exception) =>
         exception is InvalidOperationException or ObjectDisposedException
-            or System.Runtime.InteropServices.COMException;
+            or System.Runtime.InteropServices.COMException
+            or System.Threading.Tasks.TaskCanceledException;
 
     internal static string OverlayTarget(string sourcePath, string name) =>
         Path.Combine(Path.GetDirectoryName(Path.GetFullPath(sourcePath)) ?? "", name);
 
-    private async System.Threading.Tasks.Task SendToViewer(string call)
-    {
-        try
-        {
-            var core = _webView?.CoreWebView2;
-            if (core != null)
-                await core.ExecuteScriptAsync($"window.trailViewer && window.trailViewer.{call}");
-        }
-        catch (Exception ex) when (IsViewerShutdown(ex))
-        {
-            // The preview closed between the write and the toast; nothing left to tell.
-        }
-    }
+    private System.Threading.Tasks.Task PostToViewerMessageAsync(string message) =>
+        ViewerBridge.PostAsync(Dispatcher, () => _webView, message);
 
     /// <summary>Shows the error in place of the viewer and ends loading.</summary>
     private void Fail(string error)
@@ -999,6 +986,7 @@ internal sealed class TrailViewerPanel : UserControl, IDisposable
     public void Dispose()
     {
         _finished = true; // no callbacks after the preview is closed
+        _lifecycle.Cancel();
         _onScreen = false;
         _textInput = false;
         _timeout.Stop();

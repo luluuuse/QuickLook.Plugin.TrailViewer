@@ -42,8 +42,11 @@ async function main() {
         const send = (value) => setTimeout(() => listeners.forEach((listener) => listener({ data: value })), 0);
         if (message.startsWith('clipboard\t')) {
           const parts = message.split('\t');
-          window.__clipboardText = decodeURIComponent(parts[2] || '');
-          send(`clipboardResult\t${parts[1]}\t1\t`);
+          const ok = window.__clipboardFailure ? '0' : '1';
+          if (!window.__clipboardFailure) window.__clipboardText = decodeURIComponent(parts[2] || '');
+          setTimeout(() =>
+            send(`clipboardResult\t${parts[1]}\t${ok}\t${ok === '1' ? '' : 'denied%20by%20test'}`),
+          window.__clipboardDelay || 0);
         } else if (message.startsWith('attachmentresume\t')) {
           const parts = message.split('\t');
           const completed = String(parts[2] || '').split(',')
@@ -122,6 +125,37 @@ async function main() {
   check('the host clipboard and attachment acknowledgements are callable',
     callbacks.clipboard === 'function' && callbacks.attachment === 'function',
     JSON.stringify(callbacks));
+  const failedClipboard = await page.evaluate(async () => {
+    window.__clipboardFailure = true;
+    try {
+      await window.trailViewer.coordinates.copy('30.000000, 114.000000');
+      return 'resolved';
+    } catch (error) {
+      return error.message;
+    } finally {
+      window.__clipboardFailure = false;
+    }
+  });
+  check('the explicit false flag rejects a failed clipboard write',
+    failedClipboard === 'denied by test', failedClipboard);
+  const burstClipboard = await page.evaluate(async () => {
+    window.__clipboardDelay = 80;
+    const before = window.__hostMessages.filter((message) => message.startsWith('clipboard\t')).length;
+    const first = window.trailViewer.coordinates.copy('first');
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    const second = window.trailViewer.coordinates.copy('second');
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    const third = window.trailViewer.coordinates.copy('third');
+    await Promise.all([first, second, third]);
+    window.__clipboardDelay = 0;
+    return {
+      messages: window.__hostMessages.filter((message) => message.startsWith('clipboard\t')).length - before,
+      text: window.__clipboardText,
+    };
+  });
+  check('concurrent clipboard copies keep one write in flight and prefer the latest value',
+    burstClipboard.messages === 2 && burstClipboard.text === 'third',
+    JSON.stringify(burstClipboard));
   const attachmentTitle = await page.locator('.toolbox-action[data-tool="attachments"]').getAttribute('title');
   check('attachment inventory counts embedded and external photos',
     attachmentTitle === '4 photos \u00b7 3 embedded \u00b7 1 external', attachmentTitle);
@@ -193,6 +227,24 @@ async function main() {
   check('a free map point explains that elevation is unavailable',
     await page.locator('.coordinate-focus-elevation').textContent() === 'Elevation: unavailable'
       && await page.locator('.toolbox-coordinate-elevation').textContent() === 'Elevation: unavailable');
+  await page.waitForTimeout(200);
+  const clipboardMessagesBeforeRapidPicks = await page.evaluate(() =>
+    window.__hostMessages.filter((message) => message.startsWith('clipboard\t')).length);
+  await page.mouse.click(690, 500);
+  await page.mouse.click(700, 510);
+  await page.mouse.click(710, 520);
+  await page.waitForFunction((previous) =>
+    window.__hostMessages.filter((message) => message.startsWith('clipboard\t')).length > previous,
+  clipboardMessagesBeforeRapidPicks);
+  const rapidPickCopy = await page.evaluate(() => ({
+    clipboard: window.__clipboardText,
+    displayed: document.querySelector('.toolbox-coordinate-result code').textContent,
+    messages: window.__hostMessages.filter((message) => message.startsWith('clipboard\t')).length,
+  }));
+  check('rapid point picks write only the final coordinate',
+    rapidPickCopy.messages === clipboardMessagesBeforeRapidPicks + 1
+      && rapidPickCopy.clipboard === rapidPickCopy.displayed,
+    JSON.stringify(rapidPickCopy));
   await page.waitForTimeout(1900);
   check('transient pick feedback disappears while picking remains active',
     await page.locator('.coordinate-pick-hint').isHidden()
@@ -205,6 +257,7 @@ async function main() {
     const map = window.trailViewer.map;
     return map.getZoom() >= 14 && map.getBounds().contains([30.58, 114.3]);
   });
+  await page.waitForFunction(() => window.__clipboardText === '30.580000, 114.300000');
   check('a fixed coordinate focuses the map and shows a strong point marker',
     await page.locator('.coordinate-focus-halo').count() === 1
       && await page.locator('.coordinate-focus-label strong').textContent() === 'Start'

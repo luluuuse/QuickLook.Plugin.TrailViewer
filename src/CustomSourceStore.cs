@@ -78,39 +78,18 @@ internal static class CustomSourceStore
 
         lock (Gate)
         {
-            string temporary = null;
             try
             {
                 var directory = Path.GetDirectoryName(path);
                 if (string.IsNullOrEmpty(directory))
                     return false;
                 Directory.CreateDirectory(directory);
-                temporary = path + "." + Guid.NewGuid().ToString("n") + ".tmp";
-                File.WriteAllText(temporary, normalized, new UTF8Encoding(false));
-                if (File.Exists(path))
-                {
-                    var backup = path + ".old";
-                    File.Replace(temporary, path, backup, true);
-                    File.Delete(backup);
-                }
-                else
-                {
-                    File.Move(temporary, path);
-                }
-                temporary = null;
+                AtomicFile.WriteText(path, normalized);
                 return true;
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
                 return false;
-            }
-            finally
-            {
-                if (temporary != null)
-                {
-                    try { File.Delete(temporary); }
-                    catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
-                }
             }
         }
     }

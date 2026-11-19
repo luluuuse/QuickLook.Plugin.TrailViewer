@@ -8,6 +8,7 @@
 | 浏览器测试 | `tests/*-test.cjs` | 地图、图标系统、测距、分段表、交互、布局、照片、导出、语言和可访问性 |
 | 夹具检测 | `tests/viewer-test.cjs`, `tests/fixtures/` | GPX/KML/KMZ/FIT 解析和格式边界 |
 | 宿主自测 | `tools/Harness/SelfTests.cs` | KMZ、偏好、DPAPI 密钥、导出状态机和缓存身份 |
+| PR 浏览器分片 | `.github/workflows/build.yml` | core、map、tools、media、network 五组并行 |
 | live smoke | `tests/smoke/` | CyclOSM、OpenHikingMap、OpenTopoMap 真实瓦片端点，独立于主 CI |
 
 ## 命令
@@ -63,6 +64,7 @@ node scripts/pack.cjs
 
 修改 C# 宿主时增加 `npm run test:host`。正式发布前执行 `npm run check`、`npm test`、宿主测试和版本检查。
 先完成版本号与构建，再运行版本测试，避免构建元数据仍指向旧版本。
+Build workflow 使用声明的最低 Node 20，Release workflow 使用 Node 22，两侧共同覆盖最低版本与当前环境。
 
 当前专项入口：
 
@@ -75,6 +77,8 @@ node scripts/pack.cjs
 - `tests/unit/copy-coordinates.test.mjs`：摘要字段降级、路网摘要和坐标目标计算。
 - `tests/unit/attachments.test.mjs`：内置/Data URI/外链分类、URL 去重、外链 3 路并发、清单续传和纯内置
   导出跳过外链。
+- `tools/Harness/SelfTests.cs`：宿主消息格式、失败布尔值、剪贴板占用重试、关闭取消、DNS/SSRF 范围、
+  TUN 假地址例外、图片文件头、异步附件路径、共享原子文本/字节写入、清单续传和本地回退路径。
 - `tests/profile-test.cjs`：坡度剖面、可选心率开关/双轴/缺口、悬停读数和窄窗布局。
 - `tests/route-info-test.cjs`：距离标记、缺口/异常聚类和重复平移时的语言节点稳定性。
 - `tests/export-test.cjs`：导出版式、透明 PNG、路线名称与日期、徒步指标顺序、路网语义、工具箱内设置页、
@@ -85,7 +89,8 @@ node scripts/pack.cjs
 - `tests/custom-source-test.cjs`：Windy 512 px 图源添加、两步路占位符转换、HTTPS 校验、列表/编辑子页、
   单行四分类、非空分类的常规选择器、重新打开分流、管理入口、图标操作、二次删除确认、持久化、删除回退和
   主次按钮样式、跨面板文字拖动选择、320 px 面板宽度与右对齐，以及宿主配置注入和保存消息。
-- `tests/floating-panels-test.cjs`：工具箱、图层和标记点列表的共享顶部/标题几何与三者互斥。
+- `tests/floating-panels-test.cjs`：工具箱、图层和标记点列表的共享顶部/标题几何、三者互斥，以及工具箱
+  开合不会把手动平移后的地图拉回旧焦点。
 - `tests/runner-test.cjs`：专项筛选、套件列表、未知名称和未知参数处理。
 - `tests/network-test.cjs`：生成式多路线路网、时间对象跳过、拖动中视口刷新、LOD Canvas、标注点虚拟化及性能预算。
 - `tests/measure-test.cjs`：测距索引懒加载、航点吸附、轨迹吸附、地图手势、面板布局和共享导出页。
@@ -102,4 +107,5 @@ node scripts/pack.cjs
 ## CI
 
 `.github/workflows/build.yml` 在 push 和 PR 上执行静态检查、夹具复现、Release 构建、宿主测试、检测测试和
-全部浏览器测试。live smoke 独立运行，不阻塞主 CI。
+五组并行浏览器测试。GitHub Release 工作流仍执行完整 `npm test`，避免分片遗漏发布门禁。live smoke
+独立运行，不阻塞主 CI。

@@ -13,6 +13,7 @@ public class Plugin : IViewer
 
     public void Init()
     {
+        TrailViewerPanel.PrepareEnvironment();
     }
 
     public bool CanHandle(string path) => !Directory.Exists(path) && DocumentDetector.CanPreview(path);

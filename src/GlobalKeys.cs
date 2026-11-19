@@ -47,6 +47,7 @@ internal sealed class GlobalKeys : IDisposable
     private readonly HookProc _callback; // held in a field: the GC must not collect the thunk the OS calls
     private readonly ManualResetEventSlim _ready = new(false);
     private readonly Dictionary<uint, bool> _hostPids = new();
+    private readonly Dictionary<uint, string> _foregroundNames = new();
     private readonly HashSet<int> _held = new();
     private readonly uint _ownPid = (uint)Process.GetCurrentProcess().Id;
 
@@ -208,20 +209,27 @@ internal sealed class GlobalKeys : IDisposable
         return IsHostProcess(pid);
     }
 
-    private static string ForegroundName()
+    private string ForegroundName()
     {
         var hwnd = GetForegroundWindow();
         if (hwnd == IntPtr.Zero)
             return "none";
         GetWindowThreadProcessId(hwnd, out var pid);
+        if (_foregroundNames.TryGetValue(pid, out var cached))
+            return cached;
         try
         {
             using var process = Process.GetProcessById((int)pid);
+            if (_foregroundNames.Count > 32)
+                _foregroundNames.Clear();
+            _foregroundNames[pid] = process.ProcessName;
             return process.ProcessName;
         }
         catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
         {
-            return "pid" + pid;
+            var fallback = "pid" + pid;
+            _foregroundNames[pid] = fallback;
+            return fallback;
         }
     }
 

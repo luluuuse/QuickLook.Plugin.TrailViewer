@@ -49,6 +49,7 @@ import { installLeafletIcons } from './icons.js';
 import { gradeAwareHikeSeconds } from './track-analysis.js';
 import { attachmentItems, createAttachmentExporter } from './attachments.js';
 import { coordinateTargets } from './coordinates.js';
+import { createHostBridge } from './host-bridge.js';
 
 const L = window.L;
 const params = new URLSearchParams(location.search);
@@ -61,9 +62,15 @@ const timing = {
   firstPaintMs: null,
   splitFirstOpenMs: null,
 };
-const hasQuickLookHost = Boolean(
-  window.chrome?.webview?.postMessage && window.chrome.webview.addEventListener,
-);
+const hostBridge = createHostBridge();
+const {
+  hasHost: hasQuickLookHost,
+  post,
+  decodeMessage,
+  copyText,
+  clipboardResult,
+  persistCustomSources,
+} = hostBridge;
 const runtimeConfig = window.__TRAILVIEWER_RUNTIME_CONFIG__ || {};
 let runtimeTiandituKey = runtimeConfig.direct === true
   && /^[0-9a-fA-F]{32}$/.test(runtimeConfig.tiandituKey || '')
@@ -72,8 +79,6 @@ let runtimeTiandituKey = runtimeConfig.direct === true
 const initialDirectTiandituKey = runtimeTiandituKey;
 let tiandituTransientShown = false;
 let tiandituRejectedShown = false;
-let clipboardSequence = 0;
-const pendingClipboard = new Map();
 let photoAttachments = [];
 let attachmentExporter = null;
 
@@ -85,51 +90,6 @@ function fileNameFromSource(source) {
   } catch {
     return leaf || t('file.untitled');
   }
-}
-
-
-function post(message) {
-  window.chrome?.webview?.postMessage(message);
-}
-
-function decodeMessage(value) {
-  try {
-    return decodeURIComponent(value || '');
-  } catch {
-    return value || '';
-  }
-}
-
-function clipboardResult(id, ok, detail = '') {
-  const pending = pendingClipboard.get(id);
-  if (!pending) return;
-  pendingClipboard.delete(id);
-  clearTimeout(pending.timer);
-  if (ok) pending.resolve();
-  else pending.reject(new Error(decodeMessage(detail) || 'clipboard write failed'));
-}
-
-async function copyText(text) {
-  if (!hasQuickLookHost) {
-    if (!navigator.clipboard?.writeText) throw new Error('clipboard access is unavailable');
-    await navigator.clipboard.writeText(text);
-    return;
-  }
-  if (text.length > 32000) throw new Error('the copied text is too large');
-  const id = `${Date.now().toString(36)}-${(clipboardSequence += 1).toString(36)}`;
-  const result = new Promise((resolve, reject) => {
-    const timer = setTimeout(() => {
-      pendingClipboard.delete(id);
-      reject(new Error('the clipboard did not respond'));
-    }, 4000);
-    pendingClipboard.set(id, { resolve, reject, timer });
-  });
-  post(`clipboard\t${id}\t${encodeURIComponent(text)}`);
-  return result;
-}
-
-function persistCustomSources(entries) {
-  if (hasQuickLookHost) post(`custom-sources\t${JSON.stringify(entries)}`);
 }
 
 function el(tag, className, text) {
@@ -446,7 +406,7 @@ async function main() {
     gpx,
     segments: tracks.segments,
     waypointIndex: () => waypointController.waypointIndex(),
-    onLayoutChange: () => mapViewController?.refreshControls({ refitHome: false }),
+    onLayoutChange: () => mapViewController?.refreshControls({ refitHome: false, revealFocus: false }),
   });
   measurementController = measurement;
   let reportedMeasurementActive = null;
@@ -739,7 +699,11 @@ async function main() {
     },
   };
   window.trailViewer = api;
-  window.gpxViewer = api; // Remove after one compatibility release.
+  window.addEventListener('pagehide', () => {
+    toolboxController?.destroy();
+    layerSwitch?.destroy();
+    waypointController.destroy();
+  }, { once: true });
   window.chrome?.webview?.addEventListener('message', (event) => {
     if (typeof event.data !== 'string') return;
     const parts = event.data.split('\t');
@@ -755,6 +719,10 @@ async function main() {
       );
     } else if (parts[0] === 'attachmentResume') {
       api.attachmentResume(parts[1], parts[2], decodeMessage(parts[3]));
+    } else if (parts[0] === 'overlayExported') {
+      api.exported(decodeMessage(parts[1]));
+    } else if (parts[0] === 'overlayFailed') {
+      api.exportFailed(decodeMessage(parts[1]));
     } else if (parts[0] === 'tianditu-response') {
       api.tiandituResponse(Number(parts[1]));
     }

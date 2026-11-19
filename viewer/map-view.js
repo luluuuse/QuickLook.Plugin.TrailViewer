@@ -72,6 +72,7 @@ export function createMapView({ map, isChromeHidden }) {
   let safeRect = makeRect(0, 0, container.clientWidth, container.clientHeight);
   let layoutFrame = 0;
   let pendingRefitHome = true;
+  let pendingRevealFocus = true;
   let fitFrame = 0;
   let revealFrame = 0;
   let revealAgain = false;
@@ -287,27 +288,38 @@ export function createMapView({ map, isChromeHidden }) {
     });
   }
 
-  function refreshLayout({ refitHome = true } = {}) {
+  function cancelScheduledReveal() {
+    if (!revealFrame) return;
+    cancelAnimationFrame(revealFrame);
+    revealFrame = 0;
+    revealAgain = false;
+  }
+
+  function refreshLayout({ refitHome = true, revealFocus = true } = {}) {
     observeLayoutNodes();
     placeControls();
     safeRect = measureSafeRect();
     const signature = currentSignature();
     if (signature === layoutSignature) return;
     layoutSignature = signature;
-    if (!atHome && lastFocus) scheduleReveal();
+    if (!atHome && lastFocus && revealFocus) scheduleReveal();
     else if (refitHome && atHome && signature !== lastFittedSignature) {
       scheduleFit();
     }
   }
 
-  function scheduleRefresh({ refitHome = true } = {}) {
+  function scheduleRefresh({ refitHome = true, revealFocus = true } = {}) {
+    if (!revealFocus) cancelScheduledReveal();
     pendingRefitHome = layoutFrame ? pendingRefitHome && refitHome : refitHome;
+    pendingRevealFocus = layoutFrame ? pendingRevealFocus && revealFocus : revealFocus;
     if (layoutFrame) return;
     layoutFrame = requestAnimationFrame(() => {
       const shouldRefitHome = pendingRefitHome;
+      const shouldRevealFocus = pendingRevealFocus;
       pendingRefitHome = true;
+      pendingRevealFocus = true;
       layoutFrame = 0;
-      refreshLayout({ refitHome: shouldRefitHome });
+      refreshLayout({ refitHome: shouldRefitHome, revealFocus: shouldRevealFocus });
     });
   }
 
@@ -420,14 +432,18 @@ export function createMapView({ map, isChromeHidden }) {
     focusSelection,
     revealPoint,
     observeControls() {
-      observer = new ResizeObserver(() => scheduleRefresh({ refitHome: false }));
+      observer = new ResizeObserver((entries) => {
+        const toolboxOnly = entries.length > 0
+          && entries.every((entry) => entry.target.id === 'toolbox-panel');
+        scheduleRefresh({ refitHome: false, revealFocus: !toolboxOnly });
+      });
       observeLayoutNodes();
       placeControls();
       addEventListener('resize', () => scheduleRefresh({ refitHome: true }));
       refreshLayout({ refitHome: false });
     },
-    refreshControls({ refitHome = true } = {}) {
-      scheduleRefresh({ refitHome });
+    refreshControls({ refitHome = true, revealFocus = true } = {}) {
+      scheduleRefresh({ refitHome, revealFocus });
     },
     safeRect: () => ({ ...safeRect }),
     layoutState: () => layoutState,

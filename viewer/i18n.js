@@ -778,7 +778,10 @@ function detect() {
   }
   const saved = readStored(STORAGE_KEY);
   if (LANGS.includes(saved)) return saved;
-  for (const tag of navigator.languages || [navigator.language || '']) {
+  const languages = typeof navigator === 'undefined'
+    ? []
+    : navigator.languages || [navigator.language || ''];
+  for (const tag of languages) {
     if (typeof tag === 'string' && tag.toLowerCase().startsWith('zh')) return 'zh';
   }
   return 'en';

@@ -29,14 +29,23 @@ QuickLook
 | `viewer/profile-*.js` | 剖面数据、坡度着色、可选心率双轴、SVG 和地图光标 |
 | `viewer/map-view.js`, `viewer/map-focus.js` | 安全区域、取景、选中点避让和三态布局 |
 | `viewer/map-controls.js` | 底图类别、具体图源、图源菜单、地图设置页与署名 |
+| `viewer/layer-registry.js` | 内置图源注册表、旧分类归一化和定制图源注册 |
+| `viewer/layer-providers.js` | 普通、天地图和网格底图的 Leaflet 图层构造 |
+| `viewer/layer-custom-form.js` | 定制图源表单、字段归一化与实时模板校验 |
 | `viewer/custom-layers.js` | 用户定制图源的模板校验、本地存储和 Leaflet 图层构造 |
 | `viewer/measure.js` | 多段手动测距、屏幕像素吸附、测距图层和实时距离 |
 | `viewer/coordinates.js` | 起点、终点和顶点坐标目标计算；任意点由地图拾取并复用标记点吸附 |
 | `viewer/attachments.js` | 内置图片本地直拷、Data URI 分块、HTTPS 外链三路并发调度 |
 | `viewer/toolbox.js` | 地图分析、分享导出和环境信息的统一工具箱入口 |
+| `viewer/toolbox-coordinates.js` | 坐标目标、任意点拾取、吸附和高亮提示 |
+| `viewer/toolbox-attachments.js` | 附件导出入口、进度和结果状态 |
+| `viewer/host-bridge.js` | WebView2 消息、剪贴板和定制图源持久化桥接 |
 | `viewer/weather.js` | 起点、终点、顶点的目标点计算、海拔可用性判断、Windy 外链生成和外链打开 |
 | `viewer/icons.js` | 统一 UI 图标与地图数据符号注册表、Leaflet 原生控件图标适配 |
 | `viewer/export*.js` | 离屏画布、版式和 PNG 分块传输 |
+
+`viewer/style.css` 只负责按顺序加载 `viewer/css/` 下的 tokens、panels、toolbox、layers、map-data 与
+photos 样式文件。主要浮层间距、面板和模态层级通过 `--z-*` 变量统一约束。
 
 模块通过显式参数注入依赖，不共享可变全局状态。`window.trailViewer` 仅用于浏览器测试和宿主诊断。
 
@@ -72,7 +81,8 @@ QuickLook
 和关闭逻辑。工具箱主菜单把四个高频工具排成 2×2 图标格，轨迹天气保留为下方完整功能条；图源列表只渲染
 当前地图类型的来源。
 工具箱、图层面板和标记点列表的顶部位置由地图布局统一写出的 `--floating-panel-top` 决定；任一窗口打开
-时会先关闭另外两个，标记点列表因互斥被关闭时不恢复自己的按钮焦点。
+时会先关闭另外两个，标记点列表因互斥被关闭时不恢复自己的按钮焦点。工具箱自身的开合不重放历史焦点，
+因为用户可能已经手动平移；摘要展开和窗口缩放等布局变化仍会让当前点位保持在安全地图区域内。
 顶部图层入口由 `updateMenuButton` 更新类别文字和类别图标，具体图源名称只进入 tooltip 和无障碍名称；
 图源切换和语言切换共用这一入口。
 
@@ -83,6 +93,9 @@ Leaflet 事件，但拾取态优先消费单击并保持工具箱打开。吸附
 相对图片只向宿主发送经过验证的相对路径并直接复制，Data URI 仍由页面分块发送；HTTPS 外链交给宿主
 下载，页面最多同时调度 3 张，宿主也以 3 个下载槽限流，并缓存同一域名的公共地址检查。所有结果都经过
 原子写入、重名后缀和大小/数量限制。
+DNS 校验只缓存成功结果，瞬时失败会从缓存移除。下载完成后再按文件头识别 JPEG、PNG、GIF、WebP、BMP
+或 AVIF，不把响应的 `Content-Type` 作为唯一可信依据。Clash/Mihomo TUN 常见的公开域名假地址
+`198.18.0.0/15` 仅在域名解析阶段放行，URL 直接写该地址仍按 SSRF 风险拒绝。
 
 附件目录中的隐藏清单 `.trailviewer-photo-export.json` 绑定原轨迹路径、长度和修改时间。每次图片成功
 发布后，宿主原子更新已完成项和文件大小。重新打开同一源文件时，页面先查询清单，已完成且大小匹配的项目
@@ -95,10 +108,16 @@ Leaflet 事件，但拾取态优先消费单击并保持工具箱打开。吸附
 `ViewerPreferences.cs` 负责跨版本偏好文件；`CustomSourceStore.cs` 负责校验并原子保存定制图源；
 `KmzArchive.cs` 负责受限解包：保留 KML 的内部相对目录，
 并把 KML 引用的本地图片按同一目录结构写入临时文件夹，让虚拟文件主机可以直接响应照片 URL。
+`ViewerBridge.cs` 统一 Dispatcher 封送和字符串 WebMessage，`TiandituKeyDialog.cs` 独立管理天地图密钥窗口。
 宿主保留原始输入路径用于导出定位，KMZ 解包路径只供页面预览；所有输入类型在创建 WebView 前统一检查
 64 MB 上限。
+WebView2 共享环境在插件初始化时预热；每个面板仍拥有自己的文档、生命周期取消源和消息订阅。KMZ 解包、
+附件复制、续传和落盘在后台执行，关闭只结束当前预览。
 `TiandituKeyStore.cs` 使用当前 Windows 用户的 DPAPI 保存天地图密钥。宿主在页面创建前注入当前预览的
 运行时配置，页面直接请求天地图官方 WMTS；宿主不代理瓦片，也没有逐瓦片 WebMessage 往返。
+Windows 剪贴板被其他进程短暂占用时，宿主对 `CLIPBRD_E_CANT_OPEN` 做短间隔有界重试，再向页面报告结果。
+重试异步等待，不占用 WPF 界面线程。页面保证同一时刻只有一个写入在途；坐标工具还会把 150 ms 内的
+连续拾取合并为最后一次剪贴板写入，避免快速点选挤占宿主消息队列。
 
 前端到宿主的主要消息：
 
@@ -122,6 +141,9 @@ attachmentlink  <batch> <index> <name> <encoded-url>
 ```
 
 页面协议版本位于 `Directory.Build.props`，与产品版本独立。
+
+宿主向页面返回剪贴板、附件、续传和叠加图结果时统一使用 `PostWebMessageAsString` 的制表符消息，
+不再把结果值拼入 `ExecuteScriptAsync` 源码；布尔值由页面按显式 `'1'` 解析。
 
 `text-input` 上报页面内文本字段的焦点状态。宿主的全局键盘钩子在操作系统层拦截 `W/Q/E/S/C/M`，
 比 WebView 更早拿到按键，因此输入框里打字会被当成快捷键；钩子读到该状态为 1 时直接放行，
@@ -182,5 +204,6 @@ Leaflet Canvas 命中。拖动过程中按动画帧增量更新当前视口，�
 
 - 产品版本来自 `Directory.Build.props`，遵循 Semantic Versioning。
 - WebView2 虚拟主机名来自 `viewer/` 内容哈希和页面协议版本。
+- 共享 WebView2 环境降低连续预览的冷启动成本，页面与文件映射仍按每个预览重新建立。
 - C# 或文档变化不会无意义地刷新前端缓存；前端内容变化会自动获得新缓存身份。
 - 偏好文件使用独立 schema 版本，避免被 WebView origin 生命周期绑定。
