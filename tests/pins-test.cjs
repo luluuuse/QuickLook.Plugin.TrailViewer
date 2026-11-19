@@ -9,6 +9,7 @@ const path = require('path');
 const {
   launchBrowser,
   settlePopup,
+  switchLanguage,
   waitForLayout,
   waitForZoom,
 } = require('./support/browser.cjs');
@@ -61,9 +62,10 @@ async function main() {
       active: button ? button.classList.contains('active') : false,
       pressed: button ? button.getAttribute('aria-pressed') : '',
       accessibleName: button ? button.getAttribute('aria-label') : '',
-      label: button ? button.textContent.trim() : '',
+      label: button?.querySelector('span')?.textContent.trim() || '',
       title: button ? button.title : '',
       icon: button?.querySelector('svg')?.dataset.icon || '',
+      key: button?.querySelector('kbd')?.textContent || '',
       iconColor: button?.querySelector('svg') ? getComputedStyle(button.querySelector('svg')).color : '',
       background: button ? getComputedStyle(button).backgroundColor : '',
       shadow: button ? getComputedStyle(button).boxShadow : '',
@@ -93,6 +95,7 @@ async function main() {
   check('it is named after what it controls', s.label === 'Markers', s.label);
   // The key is part of the tooltip now that there is no bar to spell it out on.
   check('the tooltip offers to hide them', s.title === 'Hide markers and anomaly labels (W)', s.title);
+  check('the marker control keeps the key in its tooltip without a duplicate badge', s.key === '', s.key);
   check('and screen readers get the same action name', s.accessibleName === s.title, s.accessibleName);
   check('the marker control uses the shared pin icon', s.icon === 'pin' && s.iconColor === 'rgb(143, 217, 255)',
     `${s.icon}/${s.iconColor}`);
@@ -113,7 +116,7 @@ async function main() {
   check('the switch is off', s.visible === false && s.active === false);
   check('the switch exposes its off state', s.pressed === 'false', s.pressed);
   check('the tooltip now offers to show them', s.title === 'Show markers and anomaly labels (W)', s.title);
-  check('the pin icon is muted while markers are hidden', s.iconColor === 'rgb(154, 154, 154)', s.iconColor);
+  check('the pin icon is muted while markers are hidden', s.iconColor === 'rgb(174, 184, 196)', s.iconColor);
 
   // 3. A key press outranks the hidden state: the pins come back and the first one is selected.
   await press('ArrowRight');
@@ -151,8 +154,7 @@ async function main() {
   check('the selection is the same one', s.index === 0, `${s.index}`);
 
   // 7. The label follows the interface language, the state does not change.
-  await page.locator('.lang-switch button').click();
-  await waitForLayout(page);
+  await switchLanguage(page, 'zh');
   s = await state();
   check('the switch speaks Chinese', s.label === '标记点', s.label);
   check('the tooltip is Chinese too', s.title === '隐藏标记点与异常标记（W）', s.title);
@@ -163,8 +165,7 @@ async function main() {
   s = await state();
   check('the Chinese button hides them',
     s.pins === 0 && s.title === '显示标记点与异常标记（W）', `${s.pins} ${s.title}`);
-  await page.locator('.lang-switch button').click();
-  await waitForLayout(page);
+  await switchLanguage(page, 'en');
 
   // 8. A pure track has no waypoints, but its dots are marks too: the switch must still be there.
   await page.evaluate(() => localStorage.removeItem('trailviewer.pins'));

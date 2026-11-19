@@ -1,5 +1,6 @@
 import { formatCoord, formatElevation } from './format.js';
 import { iconElement, iconMarkup, weatherMarkMarkup } from './icons.js';
+import { createSnapIndicator, createSnapReticleMarker } from './snap-indicator.js';
 
 /** Coordinate subview: point targets, free-map picking, snapping and clipboard feedback. */
 export function createCoordinateTool({
@@ -8,12 +9,19 @@ export function createCoordinateTool({
 }) {
   const lifecycle = new AbortController();
   const { signal } = lifecycle;
+  const snapIndicator = createSnapIndicator({
+    L,
+    map,
+    t,
+    labelClassName: 'snap-label coordinate-snap-label',
+  });
   let active = false;
   let copiedPoint = null;
   let highlight = null;
   let highlightTimer = 0;
   let copyTimer = 0;
   let pickHintTimer = 0;
+  let moveFrame = 0;
 
   const view = el('section', 'toolbox-subview toolbox-coordinate');
   view.hidden = true;
@@ -88,9 +96,18 @@ export function createCoordinateTool({
     if (target) result.dataset.target = target;
   }
 
+  function hideSnap() {
+    if (moveFrame) {
+      cancelAnimationFrame(moveFrame);
+      moveFrame = 0;
+    }
+    snapIndicator.hide();
+  }
+
   function stop() {
     if (!active) return;
     active = false;
+    hideSnap();
     clearTimeout(pickHintTimer);
     clearTimeout(highlightTimer);
     panel()?.classList.remove('is-picking');
@@ -142,7 +159,7 @@ export function createCoordinateTool({
       className: 'coordinate-focus-dot',
       pane: 'markerPane',
     });
-    const label = el('div', 'coordinate-focus-label');
+    const label = el('div', snapped ? 'coordinate-focus-label is-snapped' : 'coordinate-focus-label');
     label.append(
       el('strong', null, t(`coordinates.${targetKey}`)),
       el('small', 'coordinate-focus-details',
@@ -159,7 +176,16 @@ export function createCoordinateTool({
         iconAnchor: [-14, 25],
       }),
     });
-    highlight = L.layerGroup([halo, dot, tag]).addTo(map);
+    const layers = [halo, dot, tag];
+    if (snapped) {
+      const reticle = createSnapReticleMarker(L, point, {
+        kind: 'marker',
+        animate: false,
+        zIndexOffset: 2300,
+      });
+      if (reticle) layers.push(reticle);
+    }
+    highlight = L.layerGroup(layers).addTo(map);
     if (ephemeral) {
       highlightTimer = setTimeout(() => {
         if (highlight) map.removeLayer(highlight);
@@ -217,13 +243,34 @@ export function createCoordinateTool({
     weather.title = t('coordinates.weatherHint');
     weather.setAttribute('aria-label', weather.title);
     hint.querySelector('span').textContent = t('coordinates.pick');
+    snapIndicator.relabel();
     render();
   }
+
+  function onMouseMove(event) {
+    if (!active) return;
+    if (event.originalEvent?.target?.closest?.('.leaflet-control')) {
+      hideSnap();
+      return;
+    }
+    if (moveFrame) return;
+    const latlng = event.latlng;
+    moveFrame = requestAnimationFrame(() => {
+      moveFrame = 0;
+      if (!active) return;
+      snapIndicator.show(snapMarker(latlng));
+    });
+  }
+
+  map.on('mousemove', onMouseMove);
+  map.on('mouseout', hideSnap);
+  map.on('movestart zoomstart', hideSnap);
 
   map.getContainer().addEventListener('click', (event) => {
     if (!active || event.target.closest('.leaflet-control')) return;
     event.preventDefault();
     event.stopPropagation();
+    hideSnap();
     showHint();
     const target = snapMarker(map.mouseEventToLatLng(event));
     if (target) copy(target, 'picked', { snapped: target.kind === 'marker', ephemeral: true });
@@ -231,6 +278,11 @@ export function createCoordinateTool({
 
   function destroy() {
     lifecycle.abort();
+    hideSnap();
+    map.off('mousemove', onMouseMove);
+    map.off('mouseout', hideSnap);
+    map.off('movestart zoomstart', hideSnap);
+    snapIndicator.destroy();
     clearTimeout(highlightTimer);
     clearTimeout(copyTimer);
     clearTimeout(pickHintTimer);

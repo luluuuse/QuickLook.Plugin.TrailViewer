@@ -9,6 +9,7 @@ const path = require('path');
 const {
   launchBrowser,
   settlePopup,
+  switchLanguage,
   waitForLayout,
 } = require('./support/browser.cjs');
 const { createChecker } = require('./support/assertions.cjs');
@@ -48,17 +49,30 @@ async function main() {
   // rather than eyeballed.
   const stats = () => page.evaluate(() => [...document.querySelectorAll('#info .stats .pair')].map((pair) => {
     const box = pair.getBoundingClientRect();
+    const value = pair.querySelector('dd');
+    const style = getComputedStyle(pair);
+    const valueStyle = getComputedStyle(value);
     return {
       label: pair.querySelector('dt').textContent,
-      value: pair.querySelector('dd').textContent,
+      value: value.textContent,
       top: Math.round(box.top),
       left: Math.round(box.left),
       right: Math.round(box.right),
+      borderLeft: style.borderLeftWidth,
+      paddingLeft: style.paddingLeft,
+      valueColor: valueStyle.color,
+      valueSize: valueStyle.fontSize,
+      valueWeight: valueStyle.fontWeight,
     };
   }));
 
-  const shape = () => page.evaluate(() => ({
-    profile: window.trailViewer.profile && {
+  const shape = () => page.evaluate(() => {
+    const svg = document.querySelector('#profile .chart > svg');
+    const area = document.querySelector('#profile .area');
+    const gradient = document.querySelector('#profile #slope-fill');
+    const stops = gradient ? [...gradient.querySelectorAll('stop')] : [];
+    return {
+      profile: window.trailViewer.profile && {
       min: window.trailViewer.profile.min,
       max: window.trailViewer.profile.max,
       ascent: window.trailViewer.profile.ascent,
@@ -89,11 +103,23 @@ async function main() {
     facts: [...document.querySelectorAll('#info .facts dd')].map((n) => n.textContent),
     chart: document.querySelector('#profile .chart')?.getBoundingClientRect().toJSON() || null,
     legendBox: document.querySelector('#profile .legend')?.getBoundingClientRect().toJSON() || null,
-    colours: [...new Set([...document.querySelectorAll('#profile .area')].map((a) => a.getAttribute('fill')))],
+    colours: [...new Set(stops.map((node) => node.getAttribute('stop-color')))],
+    gradient: gradient ? {
+      units: gradient.getAttribute('gradientUnits'),
+      x1: gradient.getAttribute('x1'),
+      x2: gradient.getAttribute('x2'),
+      stops: stops.length,
+    } : null,
+    masked: Boolean(svg && area) && (svg.querySelectorAll('[mask]').length > 0
+      || getComputedStyle(svg).maskImage !== 'none'
+      || getComputedStyle(area).maskImage !== 'none'),
+    contain: svg ? getComputedStyle(svg).contain : '',
+    layerTransform: svg ? getComputedStyle(svg).transform : '',
     pins: [...document.querySelectorAll('#profile .pin')].map((n) => ({
       photo: n.classList.contains('photo'), title: n.title, left: n.style.left, top: n.style.top,
     })),
-  }));
+    };
+  });
 
   const heart = () => page.evaluate(() => {
     const button = document.querySelector('#profile .profile-heart-toggle');
@@ -122,8 +148,7 @@ async function main() {
     };
   });
 
-  // 1. A synthetic hike with heights and times: the summary gains speed, ascent and descent, in a row of
-  //    their own with the extent of the route in a second row under them.
+  // 1. A synthetic hike with heights and times: distance and ascent lead the summary.
   await open('track-time-ele.gpx');
   let s = await shape();
   let r = await rows();
@@ -132,14 +157,32 @@ async function main() {
   // 283 m of the walk used to disappear because the recording stopped while still climbing.
   check('the summary gains the climb', r.Ascent === '567 m', r.Ascent);
   check('the summary gains the drop', r.Descent === '598 m', r.Descent);
-  check('speed, climb and drop share one row',
-    cells.slice(0, 3).map((c) => c.label).join(',') === 'Moving avg,Ascent,Descent'
+  check('distance, ascent and descent lead the first row',
+    cells.slice(0, 3).map((c) => c.label).join(',') === 'Distance,Ascent,Descent'
       && cells[0].top === cells[1].top && cells[1].top === cells[2].top,
     cells.slice(0, 3).map((c) => `${c.label}@${c.top}`).join(' '));
-  check('distance, time and points share the next row',
-    cells.slice(3).map((c) => c.label).join(',') === 'Distance,Total time,Points'
+  check('the second row is time, speed and points',
+    cells.slice(3).map((c) => c.label).join(',') === 'Total time,Moving avg,Points'
       && cells[3].top === cells[4].top && cells[4].top === cells[5].top && cells[3].top > cells[2].top,
     cells.slice(3).map((c) => `${c.label}@${c.top}`).join(' '));
+  // Distance and total time carry the blue rule; every other cell stays on the quiet surface.
+  check('distance and total time carry the only blue rules',
+    cells[0].borderLeft === '2px' && cells[0].paddingLeft === '7px'
+      && cells[3].borderLeft === '2px' && cells[3].paddingLeft === '7px'
+      && cells.filter((c) => c.borderLeft !== '0px').length === 2,
+    JSON.stringify(cells.map((c) => `${c.label}:border=${c.borderLeft}`)));
+  check('the accented values keep their typographic tier',
+    cells[0].valueColor === 'rgb(255, 255, 255)' && cells[0].valueSize === '15px'
+      && cells[0].valueWeight === '600'
+      && cells[3].valueColor === 'rgb(207, 214, 223)' && cells[3].valueSize === '13px'
+      && cells[3].valueWeight === '500'
+      && cells[4].valueColor === 'rgb(207, 214, 223)' && cells[4].valueSize === '13px',
+    JSON.stringify(cells.slice(0, 1).concat(cells.slice(3, 5)).map((c) => ({
+      label: c.label,
+      color: c.valueColor,
+      size: c.valueSize,
+      weight: c.valueWeight,
+    }))));
   // The duration moved up into that row, so the list below must not say it twice.
   const facts = await page.evaluate(() => [...document.querySelectorAll('#info .facts dt')].map((n) => n.textContent));
   check('the duration is not repeated below', !facts.includes('Time'), facts.join('/'));
@@ -179,19 +222,21 @@ async function main() {
     s.legendBox.left >= s.chart.left - 1,
     `legend ${Math.round(s.legendBox.left)} vs chart ${Math.round(s.chart.left)}`);
 
-  // 3. The fill is cut finer than the five kinds of ground: the colour follows the gradient itself.
-  check('the fill is cut finer than the stretches', s.areas.length > s.profile.runs.length,
-    `${s.areas.length} pieces for ${s.profile.runs.length} stretches`);
-  check('every piece is painted from the scale',
-    s.areas.every((c) => /^rgb\(/ .test(c) || c.startsWith('url(#slope-')), s.areas.slice(0, 3).join(','));
-  check('the fill uses a range of colours, not five', s.colours.length >= 5, `${s.colours.length} distinct`);
-  // Each piece overlaps its neighbour by half a unit, so the anti-aliased seam between them cannot show.
-  check('the pieces follow each other without a gap',
-    s.spans.every((span, i) => i === 0 || (span[0] <= s.spans[i - 1][1] + 0.01 && span[0] >= s.spans[i - 1][1] - 1.1)),
-    s.spans.slice(0, 5).map((p) => p.map(Math.round).join('-')).join(' '));
+  // 3. One static fill path and one horizontal gradient keep long-route hover independent of route length.
+  check('the profile fill uses one path',
+    s.areas.length === 1 && s.areas[0] === 'url(#slope-fill)',
+    `${s.areas.length} path(s): ${s.areas.join(',')}`);
+  check('the fill uses one user-space horizontal gradient',
+    s.gradient?.units === 'userSpaceOnUse' && s.gradient.x1 === '0' && s.gradient.x2 === '600'
+      && s.gradient.stops > s.profile.runs.length,
+    JSON.stringify(s.gradient));
+  check('the single gradient retains a colour range', s.colours.length >= 5, `${s.colours.length} distinct`);
   check('the fill is anchored at both ends of the route',
-    Math.abs(s.spans[0][0]) <= 1 && Math.abs(s.spans[s.spans.length - 1][1] - 601) <= 1.1,
-    `${s.spans[0][0]} .. ${s.spans[s.spans.length - 1][1]}`);
+    s.spans.length === 1 && Math.abs(s.spans[0][0]) <= 1 && Math.abs(s.spans[0][1] - 600) <= 1,
+    `${s.spans[0][0]} .. ${s.spans[0][1]}`);
+  check('the profile static layer is isolated and unmasked',
+    !s.masked && s.contain === 'strict' && s.layerTransform !== 'none',
+    `${s.masked}/${s.contain}/${s.layerTransform}`);
 
   // 4. The two ends of the axis are written in a column of their own, clear of the drawing.
   check('the top of the axis is labelled', s.axis[0].text === '1800 m', s.axis[0].text);
@@ -271,7 +316,7 @@ async function main() {
   check('short alternating runs collapse in one linear pass',
     tidied.length === 1 && tidied[0][0] === 0 && tidied[0][1] === 2000, JSON.stringify(tidied));
   check('the legend carries the scale it refers to',
-    /^linear-gradient/.test(s.scaleBar || '') && /#3aa06e|rgb\(58, 160, 110\)/.test(s.scaleBar || ''), s.scaleBar);
+    /^linear-gradient/.test(s.scaleBar || '') && /rgb\(64, 128, 102\)/.test(s.scaleBar || ''), s.scaleBar);
 
   // 4b. The top and bottom of the route are written where they happen, not only as the ends of the axis.
   const high = s.extremes.find((e) => e.kind === 'high');
@@ -299,6 +344,9 @@ async function main() {
       right: box.right,
       bottom: box.bottom,
       dotTop: dot.top,
+      guideTransform: document.querySelector('#profile .guide').style.transform,
+      guideWillChange: getComputedStyle(document.querySelector('#profile .guide')).willChange,
+      readoutTransform: node.style.transform,
     };
   });
   check('hovering the plot names a height', /^\d+ m$/.test(tip.ele), tip.ele);
@@ -310,18 +358,20 @@ async function main() {
   const cursor = s.chart.top + 40;
   check('the readout stays above the cursor', tip.bottom <= cursor,
     `tip bottom ${Math.round(tip.bottom)} vs cursor ${Math.round(cursor)}`);
+  check('the cursor layers move with transforms',
+    /translate3d/.test(tip.guideTransform) && /translate3d/.test(tip.readoutTransform)
+      && tip.guideWillChange === 'transform',
+    `${tip.guideTransform}/${tip.readoutTransform}/${tip.guideWillChange}`);
 
   // 6. The language switch carries the axis and the legend with it.
-  await page.locator('.lang-switch button').click();
-  await waitForLayout(page);
+  await switchLanguage(page, 'zh');
   s = await shape();
   check('the axis speaks Chinese and keeps the unit', s.axis[0].text === '1800 m', s.axis[0].text);
   check('the legend speaks Chinese', /^陡坡\s*.*\s*·\s*最陡\s*\d+%$/.test(s.legend.text), String(s.legend.text));
   // The date is Intl's business, and Intl follows the system unless it is told otherwise: the interface said
   // English and the date still said 2026年1月1日.
   check('the date is written in Chinese', s.facts.some((v) => /年.*月.*日/.test(v)), s.facts.join(' | '));
-  await page.locator('.lang-switch button').click();
-  await waitForLayout(page);
+  await switchLanguage(page, 'en');
   s = await shape();
   check('and the date goes back to English', !s.facts.some((v) => /[年月日]/.test(v)),
     s.facts.join(' | '));
@@ -365,14 +415,12 @@ async function main() {
   check('hovering reports the heart rate at the route position',
     /^\d+ bpm$/.test(heartReadout.value) && heartReadout.hidden === false && heartReadout.dot === false,
     JSON.stringify(heartReadout));
-  await page.locator('.lang-switch button').click();
-  await waitForLayout(page);
+  await switchLanguage(page, 'zh');
   h = await heart();
   check('the heart-rate control follows the language',
     h.button === '心率' && h.title === '隐藏心率叠加', `${h.button}/${h.title}`);
   check('the average label follows the language', h.averageText === '平均 130 bpm', h.averageText);
-  await page.locator('.lang-switch button').click();
-  await waitForLayout(page);
+  await switchLanguage(page, 'en');
 
   const heartPlacements = [];
   for (const width of [1200, 900, 700, 520, 360]) {

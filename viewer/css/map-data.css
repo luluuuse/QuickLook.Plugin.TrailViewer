@@ -1,17 +1,5 @@
 /* Map controls, attachments, pins and measurement graphics. */
 
-/* One button, one job: it shows the language the page is in and flips to the other one. */
-.lang-switch {
-  border-radius: var(--toolbar-radius);
-}
-
-.lang-switch button {
-  border: 0;
-  min-width: 34px;
-  font: inherit;
-  cursor: pointer;
-}
-
 .leaflet-container .leaflet-control-attribution {
   background: rgba(24, 24, 24, 0.7);
   color: var(--muted);
@@ -28,19 +16,17 @@
 }
 
 .leaflet-popup-content-wrapper, .leaflet-popup-tip, .leaflet-tooltip {
-  background: #2a2a2a;
+  background: var(--surface-raised);
   color: var(--text);
-  border-color: #444;
+  border-color: var(--border-control);
 }
 
-/* Attachment cards use the same translucent surface as the waypoint list, without adding a blur. */
+/* Both pin cards sit on the same translucent surface as the waypoint list, without adding a blur. */
 .photo-popup .leaflet-popup-content-wrapper,
-.photo-popup .leaflet-popup-tip {
+.photo-popup .leaflet-popup-tip,
+.place-popup .leaflet-popup-content-wrapper,
+.place-popup .leaflet-popup-tip {
   background: var(--panel);
-}
-
-.point-popup .coord {
-  font-family: Consolas, monospace;
 }
 
 .gpx-pin {
@@ -64,7 +50,6 @@
   top: -2px;
   right: -2px;
   color: #ffffff;
-  filter: drop-shadow(0 0 1px #1b1b1b);
 }
 
 .pin-camera .symbol-detail {
@@ -78,7 +63,7 @@ body.measuring #map.leaflet-container {
 }
 
 .measure-section-label,
-.measure-snap-label {
+.snap-label {
   background: none;
   border: 0;
   white-space: nowrap;
@@ -86,11 +71,11 @@ body.measuring #map.leaflet-container {
 }
 
 .measure-section-label span,
-.measure-snap-label span {
+.snap-label span {
   display: inline-block;
   padding: 2px 5px;
   border-radius: 3px;
-  font-size: 10px;
+  font-size: 11px;
   line-height: 1.25;
 }
 
@@ -102,14 +87,80 @@ body.measuring #map.leaflet-container {
 }
 
 .measure-section-label.current span {
-  border-color: #fff2a8;
+  border-color: var(--snap-accent);
 }
 
-.measure-snap-label span {
-  border: 1px solid #fff2a8;
-  background: rgba(7, 20, 26, 0.88);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
-  color: #fff2a8;
+/* Standardized snap target reticle and lightweight label shared across snapping tools (measure, coordinates). */
+.snap-indicator {
+  background: none;
+  border: 0;
+  pointer-events: none;
+}
+
+.snap-reticle {
+  display: block;
+  width: 18px;
+  height: 18px;
+  pointer-events: none;
+}
+
+.snap-symbol {
+  display: block;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.snap-indicator.is-animated .snap-symbol {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: snap-reticle-in var(--snap-motion) forwards;
+}
+
+.snap-symbol .snap-casing {
+  fill: none;
+  stroke: var(--snap-casing);
+  stroke-width: 3.4;
+  stroke-linecap: round;
+  stroke-linejoin: miter;
+}
+
+.snap-symbol .snap-stroke {
+  fill: none;
+  stroke: var(--snap-accent);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: miter;
+}
+
+.snap-symbol .snap-dot {
+  fill: var(--snap-accent);
+  stroke: var(--snap-casing);
+  stroke-width: 0.9;
+}
+
+.snap-label span {
+  border: 1px solid var(--snap-border);
+  background: var(--snap-label-background);
+  box-shadow: var(--snap-label-shadow);
+  color: var(--snap-text);
+}
+
+@keyframes snap-reticle-in {
+  0% {
+    opacity: 0.55;
+    transform: scale(1.28);
+  }
+
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .snap-indicator.is-animated .snap-symbol {
+    animation: none;
+  }
 }
 
 /* Distance samples are passive map furniture: an arrow gives the direction at each kilometre, and the label
@@ -125,7 +176,6 @@ body.measuring #map.leaflet-container {
   margin: 8px auto 0;
   place-items: center;
   color: #ffffff;
-  filter: drop-shadow(0 0 2px #111) drop-shadow(0 0 1px #111);
   transform: rotate(var(--bearing));
   transform-origin: 50% 50%;
 }
@@ -144,9 +194,10 @@ body.measuring #map.leaflet-container {
   border-radius: 3px;
   background: rgba(24, 24, 24, 0.78);
   color: #fff;
-  font-size: 10px;
+  font-size: 11px;
   line-height: 1.2;
   white-space: nowrap;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
   transform: translateX(-50%);
 }
 
@@ -174,7 +225,7 @@ body.measuring #map.leaflet-container {
   border-radius: 50%;
   background: #e54638;
   color: #fff;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   box-shadow: 0 0 5px rgba(0, 0, 0, 0.8);
 }
@@ -188,8 +239,8 @@ body.measuring #map.leaflet-container {
   width: auto;
   min-width: 27px;
   padding: 0 4px;
-  border-radius: 10px;
-  font-size: 10px;
+  border-radius: var(--radius-lg);
+  font-size: 11px;
 }
 
 .gpx-anomaly-segment {
@@ -212,10 +263,10 @@ body.measuring #map.leaflet-container {
   height: 18px;
   padding: 0 4px;
   border: 2px solid #fff;
-  border-radius: 9px;
+  border-radius: var(--radius-md);
   background: #1bc4d3;
   color: #07191c;
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 700;
   line-height: 14px;
   white-space: nowrap;

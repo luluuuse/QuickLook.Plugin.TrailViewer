@@ -73,7 +73,6 @@ export function createMapView({ map, isChromeHidden }) {
   let layoutFrame = 0;
   let pendingRefitHome = true;
   let pendingRevealFocus = true;
-  let fitFrame = 0;
   let revealFrame = 0;
   let revealAgain = false;
   let layoutSignature = '';
@@ -81,19 +80,57 @@ export function createMapView({ map, isChromeHidden }) {
   let homeView = null;
   let atHome = true;
   let lastFocus = null;
+  let initialRoutePending = false;
   const observed = new WeakSet();
   let observer = null;
 
   function mapRect(node) {
     if (!shown(node)) return null;
     const base = container.getBoundingClientRect();
+    return rectWithin(node, base);
+  }
+
+  function rectWithin(node, base) {
+    if (!node || node.hidden) return null;
+    const style = getComputedStyle(node);
+    if (style.display === 'none' || style.visibility === 'hidden') return null;
     const rect = node.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return null;
     return makeRect(
       rect.left - base.left,
       rect.top - base.top,
       rect.right - base.left,
       rect.bottom - base.top,
     );
+  }
+
+  function readLayoutSnapshot() {
+    const base = container.getBoundingClientRect();
+    const infoNode = document.getElementById('info');
+    const splitNode = document.getElementById('splits');
+    const zoomNode = map.zoomControl?.getContainer().closest('.leaflet-top.leaflet-left');
+    const toolsNode = document.querySelector('#map .leaflet-top.leaflet-right');
+    const hidden = isChromeHidden();
+    const toolChildren = toolsNode
+      ? [...toolsNode.children].map((node) => rectWithin(node, base)).filter(Boolean)
+      : [];
+    return {
+      width: container.clientWidth,
+      height: container.clientHeight,
+      hidden,
+      info: hidden ? null : rectWithin(infoNode, base),
+      splitElement: splitNode,
+      splits: hidden ? null : rectWithin(splitNode, base),
+      zoom: rectWithin(zoomNode, base),
+      tools: rectWithin(toolsNode, base),
+      toolChildren,
+      profile: rectWithin(document.getElementById('profile'), base),
+      exportPanel: rectWithin(document.getElementById('export'), base),
+      toolbox: rectWithin(document.getElementById('toolbox-panel'), base),
+      overview: rectWithin(document.querySelector('.waypoint-overview'), base),
+      scale: rectWithin(document.querySelector('.leaflet-control-scale'), base),
+      attribution: rectWithin(document.querySelector('.leaflet-control-attribution'), base),
+    };
   }
 
   function addObserved(node) {
@@ -117,9 +154,8 @@ export function createMapView({ map, isChromeHidden }) {
     }
   }
 
-  function controlWidths(row) {
-    if (!shown(row)) return { total: 0, widest: 0 };
-    const widths = [...row.children].filter(shown).map((node) => node.getBoundingClientRect().width);
+  function controlWidths(children) {
+    const widths = children.map((rect) => rect.width);
     return {
       total: widths.reduce((sum, width) => sum + width + 10, 10),
       widest: widths.length > 0 ? Math.max(...widths) : 0,
@@ -136,23 +172,18 @@ export function createMapView({ map, isChromeHidden }) {
    * right-hand switches use two rows while zoom stays beside the card; docked gives zoom and tools
    * their own band below the card.
    */
-  function placeControls() {
-    const zoomWrap = map.zoomControl?.getContainer().closest('.leaflet-top.leaflet-left');
-    const tools = document.querySelector('#map .leaflet-top.leaflet-right');
-    if (!zoomWrap) return;
-
-    const hidden = isChromeHidden();
-    const card = hidden ? null : mapRect(document.getElementById('info'));
-    const splitPanel = hidden ? null : document.getElementById('splits');
-    const splits = splitPanel && shown(splitPanel) ? mapRect(splitPanel) : null;
-    const zoom = mapRect(zoomWrap);
+  function placeControls(snapshot) {
+    const card = snapshot.info;
+    const splits = snapshot.splits;
+    const zoom = snapshot.zoom;
+    if (!zoom) return;
     const zoomWidth = zoom?.width || 30;
-    const row = controlWidths(tools);
+    const row = controlWidths(snapshot.toolChildren);
     // The red zoom/locate/export column belongs to the summary card. Expanding the split panel must not move it.
     const zoomLeft = card ? card.right + 8 : 10;
     const zoomRight = zoomLeft + zoomWidth;
     const inlineRoom = innerWidth - zoomRight - 22;
-    const inline = !tools || row.total <= inlineRoom;
+    const inline = !snapshot.tools || row.total <= inlineRoom;
     // A wrapped tool bar needs enough room for at least the compact waypoint group and language chip.
     // Below that the controls belong in the measured docked band rather than stacking one per row.
     const minWrapped = Math.max(132, row.widest + 12);
@@ -163,7 +194,7 @@ export function createMapView({ map, isChromeHidden }) {
       && splits.right > zoomLeft - 6;
     const splitTop = Math.max(
       (card?.bottom || 0) + 8,
-      splitPanel?.classList.contains('expanded') && splitWouldMeetZoom
+      snapshot.splitElement?.classList.contains('expanded') && splitWouldMeetZoom
         ? (zoom?.bottom || 0) + 8
         : 0,
       10,
@@ -198,42 +229,33 @@ export function createMapView({ map, isChromeHidden }) {
         ? Math.max(120, innerWidth - 20)
         : Math.max(minWrapped, wrappedRoom)));
     }
-    const toolsBottom = tools
-      ? Math.max(0, ...[...tools.children].map((node) => node.getBoundingClientRect().bottom))
-      : 0;
-    const floatingTop = Math.max(54, toolsBottom + 4);
-    setVariable('--floating-panel-top', cssPixels(floatingTop));
-
-    const profileHeight = shown(document.getElementById('profile'))
-      ? document.getElementById('profile').getBoundingClientRect().height
-      : 0;
+    const profileHeight = snapshot.profile?.height || 0;
     const infoCeiling = Math.max(120, Math.min(innerHeight * 0.48, innerHeight - profileHeight - 120));
     setVariable('--info-max-height', cssPixels(infoCeiling));
   }
 
-  function measureSafeRect() {
-    const width = container.clientWidth;
-    const height = container.clientHeight;
-    const hidden = isChromeHidden();
+  function measureSafeRect(snapshot) {
+    const width = snapshot.width;
+    const height = snapshot.height;
     const topBoxes = [
-      hidden ? null : mapRect(document.getElementById('info')),
-      hidden ? null : mapRect(document.getElementById('splits')),
-      mapRect(document.querySelector('#map .leaflet-top.leaflet-left')),
-      mapRect(document.querySelector('#map .leaflet-top.leaflet-right')),
-      mapRect(document.getElementById('export')),
-      mapRect(document.getElementById('toolbox-panel')),
+      snapshot.info,
+      snapshot.splits,
+      snapshot.zoom,
+      snapshot.tools,
+      snapshot.exportPanel,
+      snapshot.toolbox,
     ].filter(Boolean);
     let top = topBoxes.reduce((largest, rect) => Math.max(largest, rect.bottom), 0);
 
     const bottomBoxes = [
-      mapRect(document.getElementById('profile')),
-      mapRect(document.querySelector('.leaflet-control-scale')),
-      mapRect(document.querySelector('.leaflet-control-attribution')),
+      snapshot.profile,
+      snapshot.scale,
+      snapshot.attribution,
     ].filter(Boolean);
     let bottom = bottomBoxes.reduce((smallest, rect) => Math.min(smallest, rect.top), height);
     let right = 0;
 
-    const overview = mapRect(document.querySelector('.waypoint-overview'));
+    const overview = snapshot.overview;
     if (overview) {
       if (overview.left > width * 0.45 && overview.width <= 360) {
         right = Math.max(right, width - overview.left);
@@ -262,14 +284,12 @@ export function createMapView({ map, isChromeHidden }) {
       .map((value) => Math.round(value)).join(':');
   }
 
-  function scheduleFit() {
-    if (fitFrame || !bounds?.isValid()) return;
-    fitFrame = requestAnimationFrame(() => {
-      fitFrame = 0;
-      fit();
-    });
-  }
-
+  /**
+   * Re-applies the current selection after the layout moved (summary expanded, window resized). This uses
+   * focusSelection rather than revealPoint: revealPoint only nudges a card that is partly off screen, which
+   * leaves a card taller than the safe band straddling the summary. focusSelection knows to align such a card
+   * to the safe top, so the card reads from its heading down.
+   */
   function scheduleReveal() {
     if (!lastFocus) return;
     if (revealFrame) {
@@ -279,7 +299,7 @@ export function createMapView({ map, isChromeHidden }) {
     revealFrame = requestAnimationFrame(() => {
       revealFrame = requestAnimationFrame(() => {
         revealFrame = 0;
-        revealPoint(lastFocus.latlng, lastFocus.options);
+        focusSelection(lastFocus.latlng, lastFocus.options);
         if (revealAgain) {
           revealAgain = false;
           scheduleReveal();
@@ -295,16 +315,50 @@ export function createMapView({ map, isChromeHidden }) {
     revealAgain = false;
   }
 
-  function refreshLayout({ refitHome = true, revealFocus = true } = {}) {
-    observeLayoutNodes();
-    placeControls();
-    safeRect = measureSafeRect();
+  function refineDependentVariables(snapshot) {
+    const card = snapshot.info;
+    const splits = snapshot.splits;
+    const zoom = snapshot.zoom;
+    const zoomLeft = card ? card.right + 8 : 10;
+    const splitWouldMeetZoom = splits && zoom && splits.right > zoomLeft - 6;
+    const splitTop = Math.max(
+      (card?.bottom || 0) + 8,
+      snapshot.splitElement?.classList.contains('expanded') && splitWouldMeetZoom
+        ? (zoom?.bottom || 0) + 8
+        : 0,
+      10,
+    );
+    setVariable('--splits-top', cssPixels(splitTop));
+    const toolsBottom = snapshot.tools?.bottom || 0;
+    setVariable('--floating-panel-top', cssPixels(Math.max(54, toolsBottom + 4)));
+    if (!splits || sameNumber(splits.top, splitTop)) return snapshot;
+    return {
+      ...snapshot,
+      splits: {
+        ...splits,
+        top: splitTop,
+        bottom: splitTop + splits.height,
+      },
+    };
+  }
+
+  function finishLayout(snapshot) {
+    const refined = refineDependentVariables(snapshot);
+    safeRect = measureSafeRect(refined);
     const signature = currentSignature();
+    const fitInitialRoute = initialRoutePending;
+    initialRoutePending = false;
+    const shouldRefitHome = pendingRefitHome;
+    const shouldRevealFocus = pendingRevealFocus;
+    pendingRefitHome = true;
+    pendingRevealFocus = true;
+    layoutFrame = 0;
     if (signature === layoutSignature) return;
     layoutSignature = signature;
-    if (!atHome && lastFocus && revealFocus) scheduleReveal();
-    else if (refitHome && atHome && signature !== lastFittedSignature) {
-      scheduleFit();
+    if (fitInitialRoute && bounds?.isValid()) fit();
+    else if (!atHome && lastFocus && shouldRevealFocus) scheduleReveal();
+    else if (shouldRefitHome && atHome && signature !== lastFittedSignature) {
+      fit();
     }
   }
 
@@ -314,19 +368,14 @@ export function createMapView({ map, isChromeHidden }) {
     pendingRevealFocus = layoutFrame ? pendingRevealFocus && revealFocus : revealFocus;
     if (layoutFrame) return;
     layoutFrame = requestAnimationFrame(() => {
-      const shouldRefitHome = pendingRefitHome;
-      const shouldRevealFocus = pendingRevealFocus;
-      pendingRefitHome = true;
-      pendingRevealFocus = true;
-      layoutFrame = 0;
-      refreshLayout({ refitHome: shouldRefitHome, revealFocus: shouldRevealFocus });
+      observeLayoutNodes();
+      placeControls(readLayoutSnapshot());
+      layoutFrame = requestAnimationFrame(() => finishLayout(readLayoutSnapshot()));
     });
   }
 
   function fitRoute({ animate = false, maxZoom = 16 } = {}) {
     if (!bounds?.isValid()) return;
-    placeControls();
-    safeRect = measureSafeRect();
     const width = container.clientWidth;
     const height = container.clientHeight;
     map.fitBounds(bounds, {
@@ -347,8 +396,6 @@ export function createMapView({ map, isChromeHidden }) {
 
   function focusBounds(nextBounds, options = {}) {
     if (!nextBounds?.isValid()) return;
-    placeControls();
-    safeRect = measureSafeRect();
     const width = container.clientWidth;
     const height = container.clientHeight;
     const before = map.getZoom();
@@ -373,7 +420,11 @@ export function createMapView({ map, isChromeHidden }) {
     const popup = document.querySelector('.leaflet-popup');
     if (!popup) return null;
     const content = popup.querySelector('.leaflet-popup-content');
-    if (content instanceof HTMLElement) {
+    // Both pin cards size themselves: the photo one from its 4:3 frame, the plain one from its own text box,
+    // which scrolls internally. Clamping the popup content here cut the facts and the next arrow off the
+    // bottom of a portrait card, so the limit stays for text popups that have no card of their own.
+    const isPinCard = popup.classList.contains('photo-popup') || popup.classList.contains('place-popup');
+    if (content instanceof HTMLElement && !isPinCard) {
       const limit = Math.max(48, safeRect.height - 96);
       content.style.maxHeight = `${Math.round(limit)}px`;
       content.style.overflowY = 'auto';
@@ -392,8 +443,6 @@ export function createMapView({ map, isChromeHidden }) {
 
   function focusSelection(latlng, options = {}) {
     if (!latlng) return;
-    placeControls();
-    safeRect = measureSafeRect();
     const at = map.latLngToContainerPoint(latlng);
     const focus = unionRects([pointRect(at.x, at.y, 38), options.popup ? popupRect(true) : null]);
     const offset = focusOffset(focus, safeRect);
@@ -405,7 +454,9 @@ export function createMapView({ map, isChromeHidden }) {
     lastFocus = { latlng: storedLatLng(latlng), options: { popup: Boolean(options.popup), animate: false } };
   }
 
+  map.on('movestart', () => document.body.classList.add('is-map-dragging'));
   map.on('moveend', () => {
+    document.body.classList.remove('is-map-dragging');
     if (homeView && sameView({
       lat: map.getCenter().lat,
       lng: map.getCenter().lng,
@@ -425,6 +476,7 @@ export function createMapView({ map, isChromeHidden }) {
     map,
     setRoute(nextBounds) {
       bounds = nextBounds;
+      initialRoutePending = Boolean(nextBounds?.isValid());
     },
     fit,
     fitRoute,
@@ -438,9 +490,8 @@ export function createMapView({ map, isChromeHidden }) {
         scheduleRefresh({ refitHome: false, revealFocus: !toolboxOnly });
       });
       observeLayoutNodes();
-      placeControls();
       addEventListener('resize', () => scheduleRefresh({ refitHome: true }));
-      refreshLayout({ refitHome: false });
+      scheduleRefresh({ refitHome: true });
     },
     refreshControls({ refitHome = true, revealFocus = true } = {}) {
       scheduleRefresh({ refitHome, revealFocus });

@@ -4,6 +4,7 @@ const path = require('path');
 const {
   launchBrowser,
   openViewer,
+  switchLanguage,
   waitForMapIdle,
   waitForLayout,
 } = require('./support/browser.cjs');
@@ -281,9 +282,7 @@ async function main() {
   await page.locator('.splits-table tbody tr').nth(1).click();
   await waitForMapIdle(page);
 
-  await page.locator('.lang-switch button').click();
-  await page.waitForFunction(() => document.documentElement.lang === 'zh-CN');
-  await waitForLayout(page);
+  await switchLanguage(page, 'zh');
   state = await splitState();
   check('an open split panel keeps its state while the labels change language',
     state.expanded === 'true'

@@ -4,6 +4,7 @@ const path = require('path');
 const {
   launchBrowser,
   openViewer,
+  switchLanguage,
   waitForLayout,
   waitForMapIdle,
 } = require('./support/browser.cjs');
@@ -159,8 +160,24 @@ async function main() {
   await page.click('.toolbox-action[data-tool="measure"]');
   check('the measure action enters the measuring state',
     await page.evaluate(() => window.trailViewer.measure.active()) === true);
+  await page.click('.toolbox-help');
+  check('the shortcut reference is available without leaving measurement',
+    await page.locator('.toolbox-shortcut-page').isVisible()
+      && await page.evaluate(() => window.trailViewer.measure.active()) === true);
+  await page.click('.toolbox-shortcut-page .toolbox-back');
+  check('returning from the shortcut reference restores the measurement page',
+    await page.locator('.toolbox-measure').isVisible());
   check('the map exposes the measuring cursor class',
     await page.evaluate(() => document.body.classList.contains('measuring')) === true);
+  // The measure page opens as a mode, so it needs the same explicit way back as the other tool pages.
+  await page.click('.toolbox-measure .toolbox-back');
+  check('the measurement page returns to the tools',
+    await page.locator('.toolbox-main').isVisible()
+      && await page.evaluate(() => window.trailViewer.measure.toolboxOpen()) === true);
+  check('going back keeps the measuring state', await page.evaluate(() => window.trailViewer.measure.active()) === true);
+  await page.click('.toolbox-action[data-tool="measure"]');
+  check('the measure action returns to the running measurement',
+    await page.locator('.toolbox-measure').isVisible());
 
   // Left click and a left drag are map gestures, never point insertions.
   await page.click('#map', { button: 'left', position: { x: 560, y: 360 } });
@@ -219,6 +236,21 @@ async function main() {
   });
   check('hovering near a track point paints the snap target',
     (await page.locator('.measure-snap-label').textContent()).includes('track point'));
+  const trackSnapStyle = await page.evaluate(() => {
+    const svg = document.querySelector('.snap-indicator[class*="snap-indicator-track"] svg');
+    const label = document.querySelector('.snap-label.measure-snap-label span');
+    const style = label ? getComputedStyle(label) : null;
+    return {
+      symbol: svg?.dataset.symbol,
+      background: style?.backgroundColor,
+      border: style?.borderColor,
+    };
+  });
+  check('track snapping uses the standardized cross reticle and lightweight label surface',
+    trackSnapStyle.symbol === 'snap-track'
+      && trackSnapStyle.background === 'rgba(7, 20, 26, 0.74)'
+      && trackSnapStyle.border === 'rgba(255, 242, 168, 0.55)',
+    JSON.stringify(trackSnapStyle));
 
   await page.mouse.click(visibleTrackPoint.x + 9, visibleTrackPoint.y, { button: 'right' });
   await page.waitForFunction(() => window.trailViewer.measure.summary().pointCount === 1);
@@ -234,9 +266,78 @@ async function main() {
       && snappedPoint.lon === visibleTrackPoint.lon,
     JSON.stringify(snappedPoint));
 
+  // Manual measured points: exclude the active tip, snap earlier points to close loops, and snap across sections.
+  await page.evaluate(() => window.trailViewer.measure.clear());
+  await page.mouse.click(540, 320, { button: 'right' });
+  await page.waitForFunction(() => window.trailViewer.measure.summary().pointCount === 1);
+  const tipSnap = await page.evaluate(() => {
+    const api = window.trailViewer;
+    const p0 = api.measure.sections()[0][0];
+    const at = api.map.containerPointToLatLng(
+      api.map.latLngToContainerPoint([p0.lat, p0.lon]).add([6, 0]),
+    );
+    return api.measure.snapAt(at);
+  });
+  check('the active section tip is excluded from snapping to prevent self-snapping',
+    tipSnap.kind !== 'measure', JSON.stringify(tipSnap));
+
+  await page.mouse.click(660, 360, { button: 'right' });
+  await page.waitForFunction(() => window.trailViewer.measure.summary().pointCount === 2);
+  const manualFirst = await page.evaluate(() => {
+    const p0 = window.trailViewer.measure.sections()[0][0];
+    const screen = window.trailViewer.map.latLngToContainerPoint([p0.lat, p0.lon]);
+    return { ...p0, x: screen.x, y: screen.y };
+  });
+  await page.mouse.move(manualFirst.x + 7, manualFirst.y);
+  await page.waitForFunction(() => {
+    const svg = document.querySelector('.snap-indicator-measure svg');
+    const label = document.querySelector('.measure-snap-label span');
+    return svg?.dataset.symbol === 'snap-measure' && Boolean(label?.textContent?.includes('measured point'));
+  });
+  check('hovering an earlier measured point shows the square snap reticle and label',
+    await page.locator('.snap-indicator-measure svg').getAttribute('data-symbol') === 'snap-measure'
+      && (await page.locator('.measure-snap-label').textContent()).includes('measured point'));
+  await page.mouse.click(manualFirst.x + 7, manualFirst.y, { button: 'right' });
+  await page.waitForFunction(() => window.trailViewer.measure.summary().pointCount === 3);
+  const loopClosing = await page.evaluate(() => window.trailViewer.measure.sections()[0][2]);
+  check('right-clicking near an earlier manual point closes the loop with exact coordinates',
+    loopClosing.kind === 'measure'
+      && loopClosing.lat === manualFirst.lat
+      && loopClosing.lon === manualFirst.lon,
+    JSON.stringify(loopClosing));
+
+  await page.evaluate(() => window.trailViewer.measure.endSection());
+  const crossSectionSnap = await page.evaluate(() => {
+    const api = window.trailViewer;
+    const p1 = api.measure.sections()[0][1];
+    const at = api.map.containerPointToLatLng(
+      api.map.latLngToContainerPoint([p1.lat, p1.lon]).add([6, 0]),
+    );
+    return { snap: api.measure.snapAt(at), expected: p1 };
+  });
+  check('after ending a section, any finished manual point becomes a snap target',
+    crossSectionSnap.snap.kind === 'measure'
+      && crossSectionSnap.snap.lat === crossSectionSnap.expected.lat
+      && crossSectionSnap.snap.lon === crossSectionSnap.expected.lon,
+    JSON.stringify(crossSectionSnap));
+
+  // Restore two-point baseline for the undo/redo and multi-section assertions below.
+  await page.evaluate(() => window.trailViewer.measure.clear());
+  await page.mouse.click(visibleTrackPoint.x + 9, visibleTrackPoint.y, { button: 'right' });
+  await page.waitForFunction(() => window.trailViewer.measure.summary().pointCount === 1);
+  await page.mouse.click(680, 440, { button: 'right' });
+  await page.waitForFunction(() => window.trailViewer.measure.summary().pointCount === 2);
+
   await page.keyboard.press('Control+z');
   check('Ctrl+Z undoes the last point',
     await page.evaluate(() => window.trailViewer.measure.summary().pointCount) === 1);
+  const undoneSnap = await page.evaluate(() => {
+    const api = window.trailViewer;
+    const at = api.map.containerPointToLatLng([680, 440]);
+    return api.measure.snapAt(at);
+  });
+  check('an undone manual point is no longer a snap target',
+    undoneSnap.kind !== 'measure', JSON.stringify(undoneSnap));
   check('the undone point becomes available for redo',
     await page.evaluate(() => window.trailViewer.measure.canRedo()) === true);
   await page.keyboard.press('Control+Shift+z');
@@ -294,17 +395,31 @@ async function main() {
       && await page.evaluate(() => window.trailViewer.measure.toolboxOpen()) === true);
 
   // 6. Language updates the labels without resetting points.
-  await page.locator('.lang-switch button').click();
-  await waitForLayout(page);
+  await switchLanguage(page, 'zh');
   check('the toolbox translates to Chinese',
     await page.locator('#toolbox-panel .toolbox-heading').textContent() === '工具箱');
   check('the measurement result survives the language switch',
     await page.evaluate(() => window.trailViewer.measure.summary().pointCount) === 4);
+  check('the header switch follows the new language',
+    await page.locator('.toolbox-lang-text').textContent() === '中'
+      && await page.locator('.toolbox-lang').getAttribute('title') === 'English');
 
   await page.evaluate(() => {
     window.trailViewer.measure.start();
     window.trailViewer.measure.openToolbox();
   });
+  const zhManualTarget = await page.evaluate(() => {
+    const p1 = window.trailViewer.measure.sections()[0][1];
+    const screen = window.trailViewer.map.latLngToContainerPoint([p1.lat, p1.lon]);
+    return { x: screen.x, y: screen.y };
+  });
+  await page.mouse.move(zhManualTarget.x + 6, zhManualTarget.y);
+  await page.waitForFunction(() => {
+    const label = document.querySelector('.measure-snap-label span');
+    return label?.textContent === '吸附：测距点';
+  });
+  check('Chinese mode translates manual-point snap labels',
+    await page.locator('.measure-snap-label span').textContent() === '吸附：测距点');
   await page.setViewportSize({ width: 360, height: 740 });
   await waitForLayout(page);
   const narrow = await page.evaluate(() => {

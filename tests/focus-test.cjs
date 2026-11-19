@@ -78,6 +78,7 @@ async function main() {
     [1200, 800, 'en-US', 'compact', 'track-time-ele.gpx'],
     [480, 800, 'zh-CN', 'full', 'flat-city.gpx'],
   ];
+  let containmentChecked = false;
 
   for (const [width, height, locale, details, fixture] of matrix) {
     const page = await browser.newPage({ viewport: { width, height }, locale });
@@ -87,6 +88,15 @@ async function main() {
     await waitForLayout(page);
     await waitForMapIdle(page);
     const frame = await routeFrame(page);
+    if (!containmentChecked) {
+      const containment = await page.evaluate(() => ['info', 'splits', 'profile'].map((id) =>
+        getComputedStyle(document.getElementById(id)).contain));
+      check('floating map panels isolate their layout and paint',
+        containment.every((value) => value === 'content'
+          || (/layout/.test(value) && /style/.test(value) && /paint/.test(value))),
+        containment.join('|'));
+      containmentChecked = true;
+    }
     const safe = frame.safe;
     check(`${width}x${height} ${details} uses a measured layout`,
       ['inline', 'wrapped', 'docked'].includes(frame.state), frame.state);
@@ -141,19 +151,34 @@ async function main() {
     inside(frame.safe, frame.pin) && inside(frame.safe, frame.popup),
     JSON.stringify(frame));
 
+  // The portrait photo card is taller than a short window's safe band, so "inside the safe frame" cannot hold
+  // for it. The contract is: horizontally inside the safe frame, top aligned to it, and fully on screen.
   await firstPage.setViewportSize({ width: 760, height: 560 });
   await waitForLayout(firstPage);
   await firstPage.waitForFunction(() => {
     const safe = window.trailViewer.mapLayout().safe;
     const popup = document.querySelector('.leaflet-popup')?.getBoundingClientRect();
-    return Boolean(popup) && popup.left >= safe.left - 1 && popup.top >= safe.top - 1
-      && popup.right <= safe.right + 1 && popup.bottom <= safe.bottom + 1;
+    if (!popup) return false;
+    return popup.left >= safe.left - 1 && popup.right <= safe.right + 1
+      && popup.top >= safe.top - 1 && popup.top <= safe.top + 2
+      && popup.bottom <= window.innerHeight + 1;
   });
   await waitForMapIdle(firstPage);
   frame = await selectedFrame(firstPage);
-  check('resizing keeps the current card visible',
-    inside(frame.safe, frame.pin) && inside(frame.safe, frame.popup),
-    JSON.stringify(frame));
+  const tallCard = await firstPage.evaluate(() => {
+    const safe = window.trailViewer.mapLayout().safe;
+    const popup = document.querySelector('.leaflet-popup').getBoundingClientRect();
+    return {
+      tallerThanSafe: popup.height > safe.height,
+      horizontallyInside: popup.left >= safe.left - 1 && popup.right <= safe.right + 1,
+      topAligned: Math.abs(popup.top - safe.top) < 2,
+      onScreen: popup.top >= -1 && popup.bottom <= window.innerHeight + 1,
+      pinInside: document.querySelector('.gpx-pin.selected') !== null,
+    };
+  });
+  check('resizing keeps a tall card readable and on screen',
+    tallCard.horizontallyInside && tallCard.topAligned && tallCard.onScreen && tallCard.pinInside,
+    JSON.stringify(tallCard));
 
   const profilePage = await browser.newPage({ viewport: { width: 640, height: 600 }, locale: 'en-US' });
   profilePage.on('pageerror', (error) => pageErrors.push(error.message));

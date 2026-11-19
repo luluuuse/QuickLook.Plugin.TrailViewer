@@ -9,6 +9,7 @@ const fs = require('fs');
 const path = require('path');
 const {
   launchBrowser,
+  switchLanguage,
   waitForLayout,
   waitForPhoto,
 } = require('./support/browser.cjs');
@@ -130,18 +131,42 @@ async function main() {
   s = await state();
   check('Q / E leaves no-map mode and restores a map source', s.layer !== 'none', s.layer);
 
+  // 3b. T is the toolbox itself: the same open/close the corner button does, through both key routes.
+  const toolboxOpen = () => page.evaluate(() => window.trailViewer.measure.toolboxOpen());
+  await press('t');
+  check('T opens the toolbox', (await toolboxOpen()) === true);
+  await press('t');
+  check('T closes it again', (await toolboxOpen()) === false);
+  await page.evaluate(() => window.trailViewer.pressKey('t'));
+  await waitForLayout(page);
+  check('pressKey("t") opens it like the key does', (await toolboxOpen()) === true);
+  await page.evaluate(() => window.trailViewer.pressKey('t'));
+  await waitForLayout(page);
+  check('and closes it', (await toolboxOpen()) === false);
+  // A repeat is one press here too: holding T must not make the panel flicker.
+  await page.evaluate(() => {
+    for (let i = 0; i < 5; i++) {
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 't', repeat: true, bubbles: true, cancelable: true }));
+    }
+  });
+  await waitForLayout(page);
+  check('a held T is ignored', (await toolboxOpen()) === false);
+
   // 4. A photo covers the map: the three keys stand down until it is closed.
   await page.locator('.gpx-pin[title="Album"]').click();
-  await page.locator('.photo-popup .photo-thumb').first().click();
+  await page.locator('.photo-popup .photo-frame').first().click();
   await waitForPhoto(page);
   s = await state();
   const before = { layer: s.layer, pins: s.pins };
   await press('w');
   await press('q');
   await press('e');
+  await press('t');
   s = await state();
   check('W does nothing while a photo is open', s.pins === before.pins, `${s.pins}`);
   check('Q and E do not change the background behind a photo', s.layer === before.layer, s.layer);
+  check('T does not open the toolbox behind a photo',
+    (await page.evaluate(() => window.trailViewer.measure.toolboxOpen())) === false);
   // The host route (pressKey) has to obey the same rule: it is what QuickLook-side keys go through.
   await page.evaluate(() => {
     window.trailViewer.pressKey('w');
@@ -219,13 +244,11 @@ async function main() {
   check('the background keys still work on an area-only file', s.layer === next, `${s.layer}, wanted ${next}`);
 
   // 9. The tooltips follow the interface language.
-  await page.locator('.lang-switch button').click();
-  await waitForLayout(page);
+  await switchLanguage(page, 'zh');
   s = await state();
   check('the tooltips speak Chinese', /切换/.test(s.layerTitle) && /（C）/.test(s.fitTitle),
     `${s.layerTitle} | ${s.fitTitle}`);
-  await page.locator('.lang-switch button').click();
-  await waitForLayout(page);
+  await switchLanguage(page, 'en');
 
   // 10. S clears the map: the summary, the key bar, both top corners and the profile go, the route stays. The
   //     scale and the map credit are not interface -- one says how big the picture is, the other is a term of use.
@@ -241,7 +264,7 @@ async function main() {
       hidden: document.body.classList.contains('chrome-hidden'),
       info: shown('#info'), profile: shown('#profile'),
       zoom: shown('.leaflet-control-zoom'), layers: shown('.layer-switch'),
-      pins: shown('.pins-switch'), lang: shown('.lang-switch'),
+      pins: shown('.pins-switch'), toolbox: shown('.toolbox-switch'),
       scale: shown('.leaflet-control-scale'), credit: shown('.leaflet-control-attribution'),
       map: shown('#map'),
       markers: document.querySelectorAll('.gpx-pin').length,
@@ -252,14 +275,15 @@ async function main() {
   await open('kml-photos.kml');
   let c = await chrome();
   check('everything is on the map to begin with',
-    c.info && c.profile && c.zoom && c.layers && c.pins && c.lang, JSON.stringify(c));
+    c.info && c.profile && c.zoom && c.layers && c.pins && c.toolbox, JSON.stringify(c));
 
   await press('s');
   c = await chrome();
   check('S takes the summary away', c.info === false);
   check('and the profile', c.profile === false);
-  check('and the buttons in both top corners', c.zoom === false && c.layers === false && c.pins === false && c.lang === false,
-    `${c.zoom}/${c.layers}/${c.pins}/${c.lang}`);
+  check('and the buttons in both top corners',
+    c.zoom === false && c.layers === false && c.pins === false && c.toolbox === false,
+    `${c.zoom}/${c.layers}/${c.pins}/${c.toolbox}`);
   check('the map and the route stay', c.map === true);
   // The markers are content, not interface: hiding the buttons must not hide them.
   check('the markers stay on the map', c.markers === 5, `${c.markers}`);
@@ -269,7 +293,7 @@ async function main() {
   await press('s');
   c = await chrome();
   check('S brings everything back',
-    c.info && c.profile && c.zoom && c.layers && c.pins && c.lang, JSON.stringify(c));
+    c.info && c.profile && c.zoom && c.layers && c.pins && c.toolbox, JSON.stringify(c));
   check('and the class is gone', c.hidden === false);
 
   // The host sends the same key through pressKey when QuickLook is holding the keyboard.
@@ -282,10 +306,10 @@ async function main() {
   // A photo card over the map does not take the key away -- W, Q and E keep working through it. The full-screen
   // viewer does: the map is behind it, and a change nobody can see is a change nobody asked for.
   await page.locator('.gpx-pin[title="Album"]').click();
-  await page.waitForSelector('.photo-popup .photo-thumb');
+  await page.waitForSelector('.photo-popup .photo-frame');
   await press('s');
   check('the key works through a photo card', (await chrome()).hidden === true);
-  await page.locator('.photo-popup .photo-thumb').nth(0).click();
+  await page.locator('.photo-popup .photo-frame').nth(0).click();
   await waitForPhoto(page);
   await press('s');
   check('but not while the viewer is full screen', (await chrome()).hidden === true);

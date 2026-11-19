@@ -10,7 +10,7 @@
 // so the height is what sets it. A fixed height made it the window's business; these assertions pin it to
 // the route instead.
 const path = require('path');
-const { launchBrowser, waitForLayout } = require('./support/browser.cjs');
+const { launchBrowser, switchLanguage, waitForLayout } = require('./support/browser.cjs');
 const { createChecker } = require('./support/assertions.cjs');
 const { createArtifacts } = require('./support/artifacts.cjs');
 const { startStaticServer } = require('./support/server.cjs');
@@ -102,9 +102,7 @@ async function main() {
   check('the caption admits it', /×0\./.test(steep.note || ''), steep.note);
 
   // ---- the caption is part of the page language ----
-  await page.click('.lang-switch button');
-  await page.waitForFunction(() => document.documentElement.lang === 'en');
-  await waitForLayout(page);
+  await switchLanguage(page, 'en');
   const english = await measure();
   check('the caption follows the language', /Vertical/.test(english.note || ''), english.note);
 

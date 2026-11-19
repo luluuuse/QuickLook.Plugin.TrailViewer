@@ -36,7 +36,8 @@ decorative and always `aria-hidden="true"`.
 - **Data symbols** describe map information. They keep their semantic red, yellow, green or cyan fill, but use a
   dark `1.5` outline through the shared `data-symbol` and `symbol-*` classes. Use `symbolMarkup()` or
   `symbolElement()` for SVG data symbols; simple circles and paths rendered by Leaflet continue to use the
-  shared numeric values.
+  shared numeric values. The waypoint pin uses a symmetric `24×32` data grid; its camera badge is positioned
+  independently so the pin itself stays optically centred.
 - **Weather marks** (`WEATHER_MARKS`) label the three route-weather points and sit in their own registry because
   they are neither a control nor map geometry: a filled green start pin, a filled red end pin and a filled amber
   peak pin. They share one map-pin silhouette and a dark `1.5` outline. Use `weatherMarkMarkup()` or
@@ -57,6 +58,10 @@ Never use a filled UI icon for status colour. Never remove semantic data fill me
 Unknown names fall back to `circle-help` for UI icons, `warning` for data symbols and `start` for weather
 marks, so a missing registration fails visibly without injecting unchecked markup.
 
+`iconElement()`, `symbolElement()` and `weatherMarkElement()` cache one `<template>` per resolved visual
+configuration and clone its first SVG child. Repeated tool, layer and map updates therefore do not reparse the
+same trusted SVG markup.
+
 ## Leaflet controls
 
 `installLeafletIcons(map, { closeLabel })` replaces the native text content of zoom controls and popup close
@@ -65,12 +70,15 @@ should receive the same adapter rather than overriding the vendored file.
 
 ## Initial registry families
 
-- Map controls: zoom, locate, grid/no-map, eight-tooth settings gear, marker pin, list, close, check and chevrons.
+- Map controls: plus/minus zoom, four-corner fit-bounds, grid/no-map, six-tooth settings gear, marker pin, list,
+  close, check and chevrons. Fit-bounds deliberately differs from the coordinate and centre-point crosshairs.
 - Map source categories: route nodes, contour lines, globe and configuration sliders.
-- Toolbox and measurement: toolbox, ruler, coordinates, folded map for overlay export, stacked photo for
-  attachment export, cloud all-photo export, folder embedded-photo export, copy, finish section, centre point,
-  undo, redo, clear and stop.
+- Toolbox and measurement: toolbox, circle-help for the shortcut reference, ruler, coordinates, folded map for
+  overlay export, stacked photo for attachment export, cloud all-photo export, folder embedded-photo export,
+  copy, finish section, centre point, undo, redo, clear and stop.
 - Route weather: the cloud action icon plus the coloured start, end and peak map-pin marks.
 - Splits: the route toggle and chevron; metric table headers intentionally remain text-only.
 - Overview and photos: filter, edit, close, previous and next.
-- Status and data: waypoint, camera, direction, warning, activity, start/end, profile pins and scrubber.
+- Status and data: waypoint, camera, direction, warning, activity, start/end, profile pins, scrubber, and the
+  standardized `18×18` map-snapping reticles (`snap-marker` diamond, `snap-measure` square and `snap-track`
+  cross, rendered with shared `--snap-*` tokens and lightweight `.snap-label` tags).

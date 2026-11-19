@@ -1,6 +1,9 @@
-import { iconElement, iconMarkup, setIcon, weatherMarkMarkup } from './icons.js';
+import { iconElement, iconMarkup, setIcon } from './icons.js';
+import { LANG_NAMES } from './i18n.js';
 import { createCoordinateTool } from './toolbox-coordinates.js';
 import { createAttachmentTool } from './toolbox-attachments.js';
+import { createMeasureTool } from './toolbox-measure.js';
+import { createToolboxMain } from './toolbox-main.js';
 
 /**
  * One map-corner entry for task tools. Every tool page shares this panel, header and back navigation.
@@ -25,45 +28,52 @@ export function createToolbox({
   weatherAvailable,
   weatherModes = [],
   weatherHasElevation = () => true,
+  lang = () => 'zh',
+  setLang = () => false,
   onOpen,
   onLayoutChange,
 }) {
   const lifecycle = new AbortController();
+  // Declared with their real signatures: the defaults below are zero-argument stubs, and TypeScript would
+  // otherwise infer those stubs as the only shape the callers may use.
+  /** @type {() => string} */
+  const readLang = lang;
+  /** @type {(next: string) => boolean} */
+  const writeLang = setLang;
   let open = false;
   let button = null;
   let panel = null;
-  let mainView = null;
-  let measureView = null;
-  let measureTotal = null;
-  let measureMeta = null;
-  let sectionList = null;
-  let measureButton = null;
-  let coordinateButton = null;
-  let attachmentButton = null;
-  let exportButton = null;
-  let weatherButton = null;
-  let weatherPicker = null;
-  let weatherMode = weatherModes[0] || 'start';
-  let measureTitle = null;
-  let listHeading = null;
-  let instruction = null;
-  let finishButton = null;
-  let undoButton = null;
-  let redoButton = null;
-  let centerButton = null;
-  let clearButton = null;
-  let stopButton = null;
   let closeButton = null;
-  let headNote = null;
+  let helpButton = null;
+  let langButton = null;
+  let langText = null;
+  let shortcutsView = null;
+  let shortcutsBack = null;
+  const shortcutRows = [];
   let exportView = null;
   let exportBack = null;
   let exportSettingsPanel = null;
   let view = 'main';
+  // Where the shortcut page goes back to. It is opened from any page, so the back action returns to that
+  // page rather than always to the menu.
+  let shortcutReturn = 'main';
+  // The measure page is a mode, not just a page: entering measurement opens it, and only leaving measurement
+  // closes it. Remembering the previous state keeps a back press from being undone by the next render.
+  let measureWasActive = false;
 
   function showView(next) {
     if (next !== 'coordinate') coordinates.stop();
     view = next;
     render();
+  }
+
+  function toggleShortcuts() {
+    if (view === 'shortcuts') {
+      showView(shortcutReturn);
+      return;
+    }
+    shortcutReturn = view;
+    showView('shortcuts');
   }
 
   const coordinates = createCoordinateTool({
@@ -93,6 +103,41 @@ export function createToolbox({
     renderToolbox: () => render(),
     showToast,
   });
+  const measureTool = createMeasureTool({
+    el,
+    t,
+    formatDistance,
+    measurement,
+    map,
+    // Back is navigation, not a mode change: the measured points and the measuring state stay as they are, so
+    // the user can look at another tool and return to the same measurement.
+    onBack: () => showView('main'),
+  });
+  const main = createToolboxMain({
+    el,
+    t,
+    exportAvailable,
+    weatherAvailable,
+    weatherHasElevation,
+    weatherModes,
+    onMeasure: () => startMeasure(),
+    onCoordinates: () => {
+      if (measurement.active()) measurement.stop();
+      showView('coordinate');
+      coordinates.begin();
+    },
+    onExport: () => {
+      if (measurement.active()) measurement.stop();
+      showView('export');
+      requestAnimationFrame(() => exportSettingsPanel?.focus());
+    },
+    onAttachments: () => {
+      if (measurement.active()) measurement.stop();
+      showView('attachments');
+    },
+    onWeather: (mode) => onWeather?.(mode),
+    onClose: () => closePanel(),
+  });
 
   function render() {
     if (!panel) return;
@@ -100,77 +145,49 @@ export function createToolbox({
     const active = measurement.active();
     button?.classList.toggle('active', active);
     button?.setAttribute('aria-pressed', String(active));
-    const description = active ? `${t('toolbox.open')} · ${t('measure.active')}` : t('toolbox.open');
+    const description = active
+      ? `${t('toolbox.toggle')} · ${t('measure.active')}`
+      : t('toolbox.toggle');
     button?.setAttribute('title', description);
     button?.setAttribute('aria-label', description);
 
-    measureButton.querySelector('strong').textContent = t(active
-      ? 'measure.active' : summary.pointCount > 0 ? 'measure.resume' : 'measure.start');
     coordinates.render();
     const attachmentCounts = attachments.render();
-    attachmentButton.disabled = attachmentCounts.total === 0;
-    attachmentButton.title = attachmentCounts.total > 0
-      ? t('attachments.summary', attachmentCounts)
-      : t('attachments.none');
-    attachmentButton.setAttribute('aria-label', attachmentButton.title);
-    coordinateButton.title = t('toolbox.coordinatesHint');
-    coordinateButton.setAttribute('aria-label', coordinateButton.title);
-    exportButton.disabled = !exportAvailable();
-    exportButton.title = exportAvailable() ? t('toolbox.exportHint') : t('export.empty');
-    exportButton.setAttribute('aria-label', exportButton.title);
-    weatherButton.disabled = !weatherAvailable();
-    weatherButton.title = weatherAvailable() ? t('toolbox.weatherHint') : t('weather.unavailable');
-    weatherButton.setAttribute('aria-label', weatherButton.title);
-    for (const option of weatherPicker.querySelectorAll('[data-weather-mode]')) {
-      option.setAttribute('aria-pressed', String(option.dataset.weatherMode === weatherMode));
-    }
-    weatherPicker.hidden = !weatherAvailable() || weatherModes.length === 0;
-    // The summit segment disappears when a file carries no elevation instead of opening a point it cannot find.
-    for (const option of weatherPicker.querySelectorAll('[data-weather-mode]')) {
-      option.disabled = Boolean(option.dataset.weatherMode === 'highest' && !weatherHasElevation());
-    }
+    main.render({ active, summary, attachmentCounts });
+    measureTool.render();
 
-    measureTotal.textContent = formatDistance(summary.totalMeters);
-    measureMeta.textContent = t('measure.summary', {
-      sections: summary.sectionCount,
-      points: summary.pointCount,
-    });
-    instruction.textContent = t('measure.instruction');
-    finishButton.disabled = !measurement.canEndSection();
-    undoButton.disabled = !measurement.canUndo();
-    redoButton.disabled = !measurement.canRedo();
-    clearButton.disabled = summary.pointCount === 0;
-    stopButton.querySelector('.toolbox-action-label').textContent = t(active ? 'measure.stop' : 'measure.resume');
-    measureButton.title = t(active ? 'measure.stopTitle' : 'measure.startTitle');
-    undoButton.title = t('measure.undoTitle');
-    redoButton.title = t('measure.redoTitle');
-    stopButton.title = t(active ? 'measure.stopTitle' : 'measure.resumeTitle');
-    undoButton.setAttribute('aria-label', undoButton.title);
-    redoButton.setAttribute('aria-label', redoButton.title);
-    stopButton.setAttribute('aria-label', stopButton.title);
-    measureButton.setAttribute('aria-label', measureButton.title);
-
-    sectionList.replaceChildren();
-    const rows = [];
-    measurement.sections().forEach((points, index) => {
-      if (points.length === 0) return;
-      const meters = index < summary.segmentMeters.length ? summary.segmentMeters[index] : 0;
-      rows.push(el('li', 'toolbox-section-row', t('measure.sectionRow', {
-        index: index + 1,
-        distance: formatDistance(meters),
-        points: points.length,
-      })));
-    });
-    if (rows.length === 0) rows.push(el('li', 'toolbox-empty', t('measure.empty')));
-    sectionList.append(...rows);
-
-    if (active) view = 'measure';
-    else if (view === 'measure') view = 'main';
-    mainView.hidden = view !== 'main';
-    measureView.hidden = view !== 'measure';
+    // Entering measurement switches to its page; leaving it closes that page. Both are the measuring mode's
+    // own transitions, so a language switch or a layout refresh does not pull the page out from under the user.
+    if (active && !measureWasActive) view = 'measure';
+    else if (!active && measureWasActive && view === 'measure') view = 'main';
+    measureWasActive = active;
+    main.view.hidden = view !== 'main';
+    measureTool.view.hidden = view !== 'measure';
     coordinates.view.hidden = view !== 'coordinate';
     attachments.view.hidden = view !== 'attachments';
     exportView.hidden = view !== 'export';
+    shortcutsView.hidden = view !== 'shortcuts';
+    helpButton.classList.toggle('active', view === 'shortcuts');
+    helpButton.setAttribute('aria-pressed', String(view === 'shortcuts'));
+    renderLanguage();
+  }
+
+  /**
+   * One button, not a pair of options: a globe marks the control as a language switch and the glyph beside it
+   * names the language in use, so a click flips to the other one. The tooltip names the target in that
+   * language's own words -- "English" on a Chinese page, "中文" on an English one -- because naming it in the
+   * current interface language only repeated what the button already said.
+   */
+  function renderLanguage() {
+    if (!langButton) return;
+    const current = readLang();
+    const target = current === 'zh' ? 'en' : 'zh';
+    langButton.title = LANG_NAMES[target];
+    langButton.setAttribute('aria-label', t('toolbox.languageSwitch', {
+      current: LANG_NAMES[current],
+      target: LANG_NAMES[target],
+    }));
+    langText.textContent = current === 'zh' ? '中' : 'EN';
   }
 
   function openPanel({ focus = true } = {}) {
@@ -184,7 +201,7 @@ export function createToolbox({
     if (focus) {
       requestAnimationFrame(() => {
         const target = view === 'measure'
-          ? stopButton
+          ? measureTool.stopButton
           : view === 'coordinate'
             ? coordinates.view.querySelector('[data-coordinate="start"]:not(:disabled)')
               || coordinates.view.querySelector('[data-coordinate="center"]')
@@ -192,7 +209,9 @@ export function createToolbox({
               ? attachments.view.querySelector('.toolbox-back')
             : view === 'export'
               ? exportBack
-              : measureButton;
+              : view === 'shortcuts'
+                ? shortcutsBack
+                : main.measureButton;
         target?.focus({ preventScroll: true });
       });
     }
@@ -201,7 +220,7 @@ export function createToolbox({
   function closePanel({ restoreFocus = false } = {}) {
     if (!open) return;
     coordinates.stop();
-    if (view === 'coordinate' || view === 'attachments' || view === 'export') view = 'main';
+    if (['coordinate', 'attachments', 'export', 'shortcuts'].includes(view)) view = 'main';
     open = false;
     panel.hidden = true;
     button.setAttribute('aria-expanded', 'false');
@@ -211,9 +230,9 @@ export function createToolbox({
 
   function startMeasure() {
     view = 'measure';
-    measurement.start();
+    measureTool.start();
     render();
-    requestAnimationFrame(() => finishButton.focus({ preventScroll: true }));
+    requestAnimationFrame(() => measureTool.focusFinish());
   }
 
   const Control = L.Control.extend({
@@ -243,95 +262,61 @@ export function createToolbox({
       const header = el('div', 'toolbox-header');
       const heading = el('strong', 'toolbox-heading', t('toolbox.title'));
       heading.id = 'toolbox-heading';
-      headNote = el('span', 'toolbox-head-note', t('toolbox.quickStart'));
+      // One control, one click: the button names the language in use and the arrow says it flips.
+      langButton = el('button', 'toolbox-lang');
+      langButton.type = 'button';
+      langButton.dataset.lang = 'switch';
+      langText = el('span', 'toolbox-lang-text', '');
+      // Globe first, then the language in use: the icon says "this is about language", the glyph says which
+      // one is on. One element each, so neither has to do two jobs.
+      langButton.append(
+        iconElement('globe', { size: 13, className: 'ui-icon toolbox-lang-icon' }),
+        langText,
+      );
+      langButton.addEventListener('click', () => {
+        writeLang(readLang() === 'zh' ? 'en' : 'zh');
+      });
+      helpButton = el('button', 'toolbox-help');
+      helpButton.type = 'button';
+      helpButton.dataset.toolbox = 'shortcuts';
+      setIcon(helpButton, 'circle-help');
+      helpButton.addEventListener('click', () => toggleShortcuts());
       closeButton = el('button', 'toolbox-close');
       closeButton.type = 'button';
       setIcon(closeButton, 'close');
       closeButton.addEventListener('click', () => closePanel({ restoreFocus: true }));
-      header.append(heading, headNote, closeButton);
+      header.append(heading, langButton, helpButton, closeButton);
 
-      mainView = el('div', 'toolbox-main');
-      const quickGrid = el('div', 'toolbox-quick-grid');
-      quickGrid.setAttribute('role', 'group');
-      quickGrid.setAttribute('aria-label', t('toolbox.quickTools'));
-
-      measureButton = el('button', 'toolbox-action toolbox-quick-action');
-      measureButton.type = 'button';
-      measureButton.dataset.tool = 'measure';
-      measureButton.innerHTML = `<span class="toolbox-action-icon">${iconMarkup('ruler')}</span>`
-        + '<strong></strong><span class="toolbox-key-chip">M</span>';
-      measureButton.addEventListener('click', startMeasure);
-
-      coordinateButton = el('button', 'toolbox-action toolbox-quick-action');
-      coordinateButton.type = 'button';
-      coordinateButton.dataset.tool = 'coordinates';
-      coordinateButton.innerHTML = `<span class="toolbox-action-icon">${iconMarkup('coordinates')}</span>`
-        + '<strong></strong>';
-      coordinateButton.querySelector('strong').textContent = t('toolbox.coordinates');
-      coordinateButton.addEventListener('click', () => {
-        if (measurement.active()) measurement.stop();
-        showView('coordinate');
-        coordinates.begin();
-      });
-
-      exportButton = el('button', 'toolbox-action toolbox-quick-action');
-      exportButton.type = 'button';
-      exportButton.dataset.tool = 'export';
-      exportButton.innerHTML = `<span class="toolbox-action-icon">${iconMarkup('overlay-export')}</span>`
-        + '<strong></strong>';
-      exportButton.querySelector('strong').textContent = t('toolbox.export');
-      exportButton.addEventListener('click', () => {
-        if (measurement.active()) measurement.stop();
-        showView('export');
-        requestAnimationFrame(() => exportSettingsPanel?.focus());
-      });
-
-      attachmentButton = el('button', 'toolbox-action toolbox-quick-action');
-      attachmentButton.type = 'button';
-      attachmentButton.dataset.tool = 'attachments';
-      attachmentButton.innerHTML = `<span class="toolbox-action-icon">${iconMarkup('photo-export')}</span>`
-        + '<strong></strong>';
-      attachmentButton.querySelector('strong').textContent = t('toolbox.attachments');
-      attachmentButton.addEventListener('click', () => {
-        if (measurement.active()) measurement.stop();
-        showView('attachments');
-      });
-
-      weatherButton = el('button', 'toolbox-action');
-      weatherButton.type = 'button';
-      weatherButton.dataset.tool = 'weather';
-      weatherButton.innerHTML = `<span class="toolbox-action-icon">${iconMarkup('weather')}</span>`
-        + '<span><strong></strong><small></small></span>';
-      weatherButton.querySelector('strong').textContent = t('toolbox.weather');
-      weatherButton.querySelector('small').textContent = t('toolbox.weatherHint');
-      weatherButton.addEventListener('click', () => {
-        closePanel();
-        onWeather?.(weatherMode);
-      });
-
-      // The three points share the action card: the card is the control, and the segments choose which point
-      // it opens. Keeping them inside one border is what stops the picker reading as a second, unrelated tool.
-      weatherPicker = el('div', 'toolbox-weather-picker');
-      weatherPicker.setAttribute('role', 'group');
-      weatherPicker.setAttribute('aria-label', t('toolbox.weatherTarget'));
-      for (const mode of weatherModes) {
-        const option = el('button', 'toolbox-weather-mode');
-        option.type = 'button';
-        option.dataset.weatherMode = mode;
-        option.innerHTML = `${weatherMarkMarkup(mode, { size: 16 })}`
-          + `<span class="toolbox-weather-mode-label">${t(`weather.mode.${mode}`)}</span>`;
-        option.setAttribute('aria-pressed', String(mode === weatherMode));
-        option.addEventListener('click', () => {
-          weatherMode = mode;
-          render();
-        });
-        weatherPicker.append(option);
+      shortcutsView = el('section', 'toolbox-subview toolbox-shortcut-page');
+      shortcutsView.hidden = true;
+      shortcutsBack = el('button', 'toolbox-back');
+      shortcutsBack.type = 'button';
+      shortcutsBack.append(iconElement('arrow-left'), el('span', null, t('toolbox.back')));
+      shortcutsBack.addEventListener('click', () => showView(shortcutReturn));
+      const shortcutsTitle = el('h2', 'toolbox-subtitle', t('toolbox.help'));
+      const shortcutsHint = el('p', 'toolbox-subhint', t('toolbox.helpHint'));
+      // One two-column table: seven shortcuts in four rows, so the reference fits the panel without scrolling.
+      const shortcutList = el('div', 'toolbox-shortcut-list');
+      shortcutList.setAttribute('role', 'list');
+      for (const [keys, labelKey] of [
+        ['W', 'toolbox.shortcutMarkers'],
+        ['S', 'toolbox.shortcutChrome'],
+        ['A / D', 'toolbox.shortcutNav'],
+        ['Q / E', 'toolbox.shortcutMap'],
+        ['C', 'toolbox.shortcutLocate'],
+        ['M', 'toolbox.shortcutMeasure'],
+        ['T', 'toolbox.shortcutToolbox'],
+      ]) {
+        const row = el('div', 'toolbox-shortcut-row');
+        row.setAttribute('role', 'listitem');
+        const key = el('kbd', 'control-key toolbox-shortcut-keys', keys);
+        const label = el('span', 'toolbox-shortcut-label', t(labelKey));
+        label.dataset.labelKey = labelKey;
+        row.append(key, label);
+        shortcutList.append(row);
+        shortcutRows.push(label);
       }
-      weatherPicker.hidden = weatherModes.length === 0;
-      const weatherRow = el('div', 'toolbox-weather-card');
-      weatherRow.append(weatherButton, weatherPicker);
-      quickGrid.append(measureButton, coordinateButton, exportButton, attachmentButton);
-      mainView.append(quickGrid, weatherRow);
+      shortcutsView.append(shortcutsBack, shortcutsTitle, shortcutsHint, shortcutList);
 
       exportView = el('section', 'toolbox-subview toolbox-export');
       exportView.hidden = true;
@@ -348,44 +333,18 @@ export function createToolbox({
       exportSettingsPanel = mountExportView?.(exportSettings) || null;
       exportView.append(exportSettings);
 
-      measureView = el('section', 'toolbox-measure');
-      measureView.hidden = true;
-      measureTitle = el('span', 'toolbox-measure-kicker', t('measure.active'));
-      measureTotal = el('strong', 'toolbox-measure-total', formatDistance(0));
-      measureTotal.tabIndex = -1;
-      measureTotal.setAttribute('aria-live', 'polite');
-      measureMeta = el('span', 'toolbox-measure-meta');
-      instruction = el('p', 'toolbox-measure-help');
-
-      listHeading = el('strong', 'toolbox-list-heading', t('measure.sections'));
-      sectionList = el('ol', 'toolbox-section-list');
-
-      const actions = el('div', 'toolbox-measure-actions');
-      const actionButton = (icon, labelKey, name, className = '') => {
-        const action = el('button', className);
-        action.type = 'button';
-        action.dataset.measure = name;
-        action.append(iconElement(icon), el('span', 'toolbox-action-label', t(labelKey)));
-        return action;
-      };
-      finishButton = actionButton('finish-section', 'measure.finishSection', 'finish');
-      finishButton.addEventListener('click', () => measurement.endSection());
-      centerButton = actionButton('center-point', 'measure.centerPoint', 'center');
-      centerButton.addEventListener('click', () => measurement.addAt(map.getCenter()));
-      undoButton = actionButton('undo', 'measure.undo', 'undo');
-      undoButton.addEventListener('click', () => measurement.undo());
-      redoButton = actionButton('redo', 'measure.redo', 'redo');
-      redoButton.addEventListener('click', () => measurement.redo());
-      clearButton = actionButton('clear', 'measure.clear', 'clear', 'danger');
-      clearButton.addEventListener('click', () => measurement.clear());
-      stopButton = actionButton('stop', 'measure.stop', 'stop', 'primary');
-      stopButton.addEventListener('click', () => {
-        if (measurement.active()) measurement.stop();
-        else startMeasure();
-      });
-      actions.append(finishButton, centerButton, undoButton, redoButton, clearButton, stopButton);
-      measureView.append(measureTitle, measureTotal, measureMeta, instruction, listHeading, sectionList, actions);
-      panel.append(header, mainView, coordinates.view, attachments.view, exportView, measureView);
+      panel.append(
+        header,
+        main.view,
+        coordinates.view,
+        attachments.view,
+        exportView,
+        shortcutsView,
+        measureTool.view,
+      );
+      helpButton.title = t('toolbox.help');
+      helpButton.setAttribute('aria-label', t('toolbox.help'));
+      helpButton.setAttribute('aria-pressed', 'false');
       closeButton.title = t('toolbox.close');
       closeButton.setAttribute('aria-label', t('toolbox.close'));
 
@@ -420,14 +379,11 @@ export function createToolbox({
     toggle: () => (open ? closePanel() : openPanel()),
     isOpen: () => open,
     isView: (name) => open && view === name,
-    weatherMode: () => weatherMode,
-    isWeatherModeEnabled: (mode) => !(mode === 'highest' && !weatherHasElevation()),
-    setWeatherMode(mode) {
-      if (!weatherModes.includes(mode)) return false;
-      weatherMode = mode;
-      render();
-      return true;
-    },
+    // The shortcut page is opened from any page, so its back action has to return where it came from.
+    toggleShortcuts,
+    weatherMode: main.weatherMode,
+    isWeatherModeEnabled: main.isWeatherModeEnabled,
+    setWeatherMode: main.setWeatherMode,
     destroy() {
       lifecycle.abort();
       coordinates.destroy();
@@ -435,38 +391,22 @@ export function createToolbox({
     },
     relabel() {
       document.getElementById('toolbox-heading').textContent = t('toolbox.title');
-      headNote.textContent = t('toolbox.quickStart');
+      helpButton.title = t('toolbox.help');
+      helpButton.setAttribute('aria-label', t('toolbox.help'));
       closeButton.title = t('toolbox.close');
       closeButton.setAttribute('aria-label', t('toolbox.close'));
-      mainView.querySelector('.toolbox-quick-grid').setAttribute('aria-label', t('toolbox.quickTools'));
-      coordinateButton.querySelector('strong').textContent = t('toolbox.coordinates');
-      exportButton.querySelector('strong').textContent = t('toolbox.export');
-      attachmentButton.querySelector('strong').textContent = t('toolbox.attachments');
-      weatherButton.querySelector('strong').textContent = t('toolbox.weather');
-      weatherButton.querySelector('small').textContent = t('toolbox.weatherHint');
-      weatherButton.title = weatherAvailable() ? t('toolbox.weatherHint') : t('weather.unavailable');
-      weatherButton.setAttribute('aria-label', weatherButton.title);
-      weatherPicker.setAttribute('aria-label', t('toolbox.weatherTarget'));
-      for (const option of weatherPicker.querySelectorAll('[data-weather-mode]')) {
-        const label = option.querySelector('.toolbox-weather-mode-label');
-        if (label) label.textContent = t(`weather.mode.${option.dataset.weatherMode}`);
-      }
+      main.relabel();
       coordinates.relabel();
       attachments.relabel();
       exportBack.querySelector('span').textContent = t('toolbox.back');
       exportView.querySelector('.toolbox-subtitle').textContent = t('export.panel');
       exportView.querySelector('.toolbox-subhint').textContent = t('export.panelHint');
+      shortcutsBack.querySelector('span').textContent = t('toolbox.back');
+      shortcutsView.querySelector('.toolbox-subtitle').textContent = t('toolbox.help');
+      shortcutsView.querySelector('.toolbox-subhint').textContent = t('toolbox.helpHint');
+      for (const label of shortcutRows) label.textContent = t(label.dataset.labelKey);
       exportSettingsPanel?.relabel();
-      measureTitle.textContent = t('measure.active');
-      instruction.textContent = t('measure.instruction');
-      listHeading.textContent = t('measure.sections');
-      finishButton.querySelector('.toolbox-action-label').textContent = t('measure.finishSection');
-      centerButton.querySelector('.toolbox-action-label').textContent = t('measure.centerPoint');
-      undoButton.querySelector('.toolbox-action-label').textContent = t('measure.undo');
-      redoButton.querySelector('.toolbox-action-label').textContent = t('measure.redo');
-      clearButton.querySelector('.toolbox-action-label').textContent = t('measure.clear');
-      stopButton.querySelector('.toolbox-action-label').textContent = t(measurement.active()
-        ? 'measure.stop' : 'measure.resume');
+      measureTool.relabel();
       render();
       onLayoutChange?.();
     },

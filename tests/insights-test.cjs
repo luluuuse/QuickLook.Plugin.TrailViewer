@@ -1,6 +1,6 @@
 // Waypoint insight phase 1: local semantic labels, negation, multi-label rows, category filters and map selection.
 const path = require('path');
-const { launchBrowser, openViewer, settlePopup, waitForLayout } = require('./support/browser.cjs');
+const { launchBrowser, openViewer, settlePopup, switchLanguage, waitForLayout } = require('./support/browser.cjs');
 const { createChecker } = require('./support/assertions.cjs');
 const { createArtifacts } = require('./support/artifacts.cjs');
 const { startStaticServer } = require('./support/server.cjs');
@@ -121,9 +121,7 @@ async function main() {
     selected.index === 5 && selected.title === '危险水源' && selected.highlighted === '5',
     `${selected.index}/${selected.title}/${selected.highlighted}`);
 
-  await page.locator('.lang-switch button').click();
-  await page.waitForFunction(() => document.documentElement.lang === 'zh-CN');
-  await waitForLayout(page);
+  await switchLanguage(page, 'zh');
   await page.locator('.waypoint-filter-trigger').click();
   const translated = await page.evaluate(() => ({
     title: document.querySelector('.waypoint-overview-header strong')?.textContent,

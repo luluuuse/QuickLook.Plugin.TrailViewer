@@ -4,6 +4,7 @@ const {
   launchBrowser,
   openViewer,
   settlePopup,
+  switchLanguage,
   waitForLayout,
   waitForZoom,
 } = require('./support/browser.cjs');
@@ -114,6 +115,25 @@ async function main() {
       && zoomedIn.labels.every((label, index) => index === 0
         || Number.parseInt(label, 10) > Number.parseInt(zoomedIn.labels[index - 1], 10)),
     zoomedIn.labels.join(','));
+
+  let capsuleTrack = '<?xml version="1.0"?><gpx version="1.1" xmlns="http://www.topografix.com/GPX/1/1"><trk><trkseg>';
+  for (let i = 0; i < 92; i += 1) {
+    capsuleTrack += `<trkpt lat="0" lon="${(i * 0.0001).toFixed(4)}"><ele>10</ele></trkpt>`;
+  }
+  capsuleTrack += '</trkseg></trk></gpx>';
+  await page.route((url) => url.pathname.endsWith('/capsule-ends.gpx'),
+    (route) => route.fulfill({ body: capsuleTrack, contentType: 'application/gpx+xml' }));
+  await openViewer(page, base, 'capsule-ends.gpx');
+  const capsuleEnds = await page.evaluate(() => ({
+    distance: window.trailViewer.summary.distanceMeters,
+    arrows: document.querySelectorAll('.gpx-distance').length,
+    labels: document.querySelectorAll('.gpx-km').length,
+  }));
+  check('a kilometre capsule near the route end is skipped without removing its direction arrow',
+    capsuleEnds.distance > 1000 && capsuleEnds.distance < 1030
+      && capsuleEnds.arrows > 0 && capsuleEnds.labels === 0,
+    JSON.stringify(capsuleEnds));
+  await page.unroute((url) => url.pathname.endsWith('/capsule-ends.gpx'));
 
   await openViewer(page, base, 'multi-segment.gpx');
   const gaps = await page.evaluate(() => ({
@@ -348,8 +368,7 @@ async function main() {
   check('the active row stays highlighted', found.highlighted === '1', found.highlighted);
   check('the overview stays open for browsing', found.stillOpen === true);
 
-  await page.locator('.lang-switch button').click();
-  await page.waitForFunction(() => document.documentElement.lang === 'zh-CN');
+  await switchLanguage(page, 'zh');
   const translated = await page.evaluate(() => ({
     title: document.querySelector('.waypoint-overview-header strong')?.textContent,
     close: document.querySelector('.waypoint-overview-header .close')?.title,
@@ -363,7 +382,7 @@ async function main() {
   await page.setViewportSize({ width: 360, height: 740 });
   await waitForLayout(page);
   const narrow = await page.evaluate(() => {
-    const boxes = ['.waypoint-overview-switch', '.layer-switch', '.pins-switch', '.lang-switch']
+    const boxes = ['.waypoint-overview-switch', '.layer-switch', '.pins-switch', '.toolbox-switch']
       .map((selector) => document.querySelector(selector)?.getBoundingClientRect().toJSON());
     const info = document.getElementById('info').getBoundingClientRect().toJSON();
     const panel = document.querySelector('.waypoint-overview').getBoundingClientRect().toJSON();

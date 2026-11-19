@@ -105,11 +105,15 @@ export function createSummaryView({
     box.append(headingRow);
 
     const stats = el('div', 'stats');
+    // primary is the typographic tier; accent is the blue rule that marks the two numbers the card answers
+    // first. They are separate because a row can be important without being the first thing read.
     const statRow = (pairs) => {
       if (pairs.length === 0) return;
       const line = el('dl', 'row');
-      for (const [label, value, title] of pairs) {
+      for (const [label, value, title, primary = false, accent = false] of pairs) {
         const pair = el('div', 'pair');
+        pair.classList.toggle('primary', primary);
+        pair.classList.toggle('accent', accent);
         pair.append(el('dt', null, label), el('dd', null, value));
         if (title) pair.title = title;
         line.append(pair);
@@ -117,14 +121,16 @@ export function createSummaryView({
       stats.append(line);
     };
 
-    const climb = [];
+    let speedPair = null;
+    let ascentPair = null;
+    let descentPair = null;
     const speedSeconds = summary.movingDurationSeconds || summary.durationSeconds;
     if (speedSeconds > 0 && summary.distanceMeters > 0) {
-      climb.push([
+      speedPair = [
         t(summary.movingDurationSeconds ? 'info.movingSpeed' : 'info.speed'),
         formatSpeed(summary.distanceMeters / speedSeconds),
         t(summary.movingTimeSource === 'metadata' ? 'info.movingTimeMetadata' : 'info.movingTimeEstimated'),
-      ]);
+      ];
     }
     if (summary.points > 0) {
       const ascentTitle = elevations && elevations.rawAscent !== elevations.ascent
@@ -133,18 +139,25 @@ export function createSummaryView({
           raw: formatElevation(elevations.rawAscent),
         })
         : null;
-      climb.push([t('info.ascent'), formatElevation(elevations?.ascent), ascentTitle]);
-      climb.push([t('info.descent'), formatElevation(elevations?.descent)]);
+      ascentPair = [t('info.ascent'), formatElevation(elevations?.ascent), ascentTitle, true];
+      descentPair = [t('info.descent'), formatElevation(elevations?.descent)];
     }
-    statRow(climb);
 
-    const extent = [];
+    let distancePair = null;
     if (summary.segments > 0 || summary.routes > 0) {
-      extent.push([
+      distancePair = [
         summary.segments > 0 ? t('info.distance') : t('info.routeLength'),
         formatDistance(summary.distanceMeters),
-      ]);
+        null,
+        true,
+        // The two numbers the card answers first: how far, and how long it took.
+        true,
+      ];
     }
+    // Row one is the shape of the route: how far, how much up, how much down.
+    statRow([distancePair, ascentPair, descentPair].filter(Boolean));
+
+    let timePair = null;
     if (summary.durationSeconds !== null) {
       const moving = summary.movingDurationSeconds !== null
         ? formatDuration(summary.movingDurationSeconds)
@@ -152,10 +165,13 @@ export function createSummaryView({
       const title = estimateSeconds !== null && estimateSeconds !== undefined
         ? t('info.totalTimeHint', { moving, estimate: formatDuration(estimateSeconds) })
         : t('info.totalTimeHint', { moving, estimate: '\u2014' });
-      extent.push([t('info.totalTime'), formatDuration(summary.durationSeconds), title]);
+      timePair = [t('info.totalTime'), formatDuration(summary.durationSeconds), title, false, true];
     }
-    if (summary.points > 0) extent.push([t('info.points'), summary.points.toLocaleString()]);
-    statRow(extent);
+    // Row two is how it went: how long, how fast, over how many points.
+    const pointsPair = summary.points > 0
+      ? [t('info.points'), summary.points.toLocaleString()]
+      : null;
+    statRow([timePair, speedPair, pointsPair].filter(Boolean));
     if (stats.childElementCount > 0) box.append(stats);
 
     if (detailsMode !== 'full') {

@@ -24,6 +24,7 @@ Common controls:
 | Hide interface chrome | <kbd>S</kbd> |
 | Start/finish measuring | <kbd>M</kbd> |
 | Measuring undo / redo | <kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> |
+| Open/close toolbox | <kbd>T</kbd> |
 | Export overlay image | Toolbox → Export overlay |
 | Open route weather | Toolbox → Route weather |
 
@@ -39,47 +40,27 @@ Common controls:
   heart rate, moving speed and vertical speed.
 - **Route networks:** merged networks are detected and rendered as independent routes instead of one trip;
   global speed, split and combined-profile calculations are skipped for faster loading and lower memory use.
-- **Waypoints and photos:** route-ordered navigation, yellow pins, photo albums with true source-pixel
-  percentages, wheel zoom up to 800% and drag-to-pan, plus a searchable overview with local
-  danger/water/camp/exit insight labels. Attachment preview cards use the waypoint list's unblurred translucent
-  background, and the full-size photo viewer keeps the map visible around the image.
-- **Elevation profile:** gradient-coloured terrain, waypoint dots, scrub readout and a layout that preserves
-  the vertical scale across window sizes. Per-point heart rate can be overlaid on its own scale and is off
-  by default; a dashed line marks the whole-route average.
-- **Manual measurement:** the toolbox supports multi-section point-to-point distance measurement. Right-click
-  adds a point while left-drag pans and the wheel zooms; nearby waypoints and recorded track samples snap
-  automatically. Section subtotals and the overall distance update on the map.
+- **Waypoints and photos:** route-ordered navigation, photo albums with portrait 4:3 cards, true source-pixel
+  percentages, wheel zoom up to 800% and drag-to-pan, scrollable plain waypoint cards, and a searchable
+  overview with local danger/water/camp/exit insight labels.
+- **Elevation profile:** gradient-coloured terrain, waypoint dots, scrub readout and optional per-point heart
+  rate overlaid on its own scale with a whole-route average line.
+- **Manual measurement:** multi-section point-to-point distance measurement on the map. Right-click adds a
+  point while left-drag pans and the wheel zooms; nearby waypoints, previously placed measurement points, and
+  recorded track samples snap automatically. Section subtotals and overall distance update live.
 - **Copy and attachment export:** copy a shareable summary from the track card, copy WGS-84 coordinates for
   the start, end, peak, map centre or any picked point (with nearby marker snapping and elevation notes), and
-  export embedded,
-  Data URI and HTTPS-linked photos beside the source track.
-- **Map focus:** opening the file and selecting a waypoint keep the relevant content inside the region not
-  covered by the summary, toolbars, waypoint list or profile.
-- **Unified icons:** map controls, task panels, the split entry, the waypoint overview, the photo viewer and
-  map data symbols follow one reusable icon specification; per-kilometre data headers remain text-only.
-- **Responsive UI:** measured `inline`, `wrapped` and `docked` layouts for narrow windows, bilingual UI and
-  persistent map/marker/export preferences.
-- **Map sources:** Road keeps the OpenStreetMap HOT base, while Terrain offers CyclOSM, OpenHikingMap and
-  OpenTopoMap in a compact source menu. Tianditu road and satellite imagery are available with a user-owned key;
-  the Custom category has a dedicated source list and editor for HTTPS tiles, including two-step placeholders and
-  512 px addresses. The host persists custom sources across overwrite upgrades. The source panel shows only
-  providers from the active map type. The top layer entry shows the active category icon and label, while the
-  low-frequency no-map mode uses the Grid icon in the layer title bar.
-- **Unified toolbox:** distance measurement, point coordinates, overlay export, attachment photo export and
-  route weather share one entry: four tools form a 2×2 quick-launch grid, with route weather in a full-width
-  strip below.
-  Every tool page uses the same translucent right-hand window, header, back and close behavior, including
-  overlay export. Overlay export offers square, portrait and landscape PNG layouts with selectable ink and
-  backing with a live preview. The toolbox stays open after export so several styles can be exported in a row;
-  each image includes the route name and date. Route networks show total route length and segment count without
-  inventing trip endpoints or statistics. Attachment photos can copy embedded files quickly or
-  process the complete set with three concurrent external workers. Reopening the same track resumes by skipping
-  completed images and retrying only missing or failed items.
-- **Unified floating panels:** the toolbox, layer panel and waypoint list share one top position and header
-  height, and only one can remain open.
-- **Route weather:** opens Windy in your browser with that point's hourly forecast already expanded. Choose
-  start, end or peak; each opens at street level, and the peak segment is disabled when the file carries no
-  reliable elevation. Windy opens on the cloud layer, and no third-party map is embedded in the preview.
+  export embedded, Data URI and HTTPS-linked photos beside the source track—either embedded-only or all images
+  concurrently with automatic resume.
+- **Map sources:** OpenStreetMap HOT (Road), CyclOSM / OpenHikingMap / OpenTopoMap (Terrain), Tianditu road
+  and satellite imagery with a user-owned key, an offline Grid (no-map) mode, and persistent HTTPS Custom
+  sources (including two-step placeholders and 512 px tiles).
+- **Overlay export:** export transparent square, portrait and landscape PNG route overlays with a live preview,
+  selectable ink and backing, route name, date and trip statistics (or route-network length and segment counts).
+- **Route weather:** opens Windy in your browser on the cloud layer with hourly forecasts expanded for the
+  route's start, end or peak (when reliable elevation is available), without embedding third-party maps.
+- **Bilingual interface:** switch in place between English and Chinese without reloading the preview, with
+  persistent map, marker and export preferences.
 
 Detailed behaviour, advanced controls and export examples are in [docs/USAGE.md](docs/USAGE.md).
 

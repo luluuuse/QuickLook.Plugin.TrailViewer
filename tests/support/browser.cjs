@@ -84,10 +84,36 @@ async function waitForTiles(page, fragment = '', minimum = 1) {
   }, { fragment, minimum }, { timeout: 15000 });
 }
 
+/**
+ * Switch the interface language through the control the user has: the 中 / EN pill in the toolbox header.
+ * Opening the toolbox is what closes the waypoint list, so a list that was open is opened again afterwards.
+ */
+async function switchLanguage(page, code) {
+  const before = await page.evaluate(() => ({
+    toolbox: Boolean(window.trailViewer?.measure.toolboxOpen()),
+    overview: Boolean(window.trailViewer?.nav.overviewOpen()),
+  }));
+  if (!before.toolbox) await page.locator('.toolbox-switch > button').click();
+  // One button that flips: click it only when the page is not already in the wanted language.
+  const shown = (await page.locator('.toolbox-lang-text').textContent() || '').trim();
+  if (shown !== (code === 'zh' ? '中' : 'EN')) await page.locator('.toolbox-lang').click();
+  await page.waitForFunction(
+    (want) => document.documentElement.lang === (want === 'zh' ? 'zh-CN' : 'en'),
+    code,
+  );
+  await waitForLayout(page);
+  if (!before.toolbox) await page.locator('.toolbox-switch > button').click();
+  if (before.overview) {
+    await page.evaluate(() => window.trailViewer.nav.openOverview());
+    await waitForLayout(page);
+  }
+}
+
 module.exports = {
   launchBrowser,
   openViewer,
   settlePopup,
+  switchLanguage,
   waitForFocus,
   waitForLayout,
   waitForMapIdle,

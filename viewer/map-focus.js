@@ -60,17 +60,24 @@ export function containsRect(outer, inner) {
 /**
  * A selected point is left alone while it sits in the comfort rectangle. Once it falls outside,
  * the camera is moved so the visible marker/popup union is centred in the safe map area.
+ *
+ * A card can be taller than the safe area -- the portrait 4:3 photo card is 299 px and the safe band is
+ * often less than that. Centring it would still leave it hanging over the summary or the profile, so in that
+ * case the union is aligned to the safe top instead: the card reads from its heading down, which is the part
+ * the reader is looking at, and its tip stays attached to the pin.
  */
 export function focusOffset(focus, safe) {
   if (!focus || safe.width <= 0 || safe.height <= 0 || containsRect(comfortRect(safe), focus)) {
     return { x: 0, y: 0, needed: false };
   }
-  const from = rectCenter(focus);
-  const to = rectCenter(safe);
+  let x = rectCenter(safe).x - rectCenter(focus).x;
+  let y = rectCenter(safe).y - rectCenter(focus).y;
+  if (focus.height > safe.height) y = safe.top - focus.top;
+  if (focus.width > safe.width) x = safe.left - focus.left;
   return {
-    x: Math.round(to.x - from.x),
-    y: Math.round(to.y - from.y),
-    needed: Math.abs(to.x - from.x) >= 0.5 || Math.abs(to.y - from.y) >= 0.5,
+    x: Math.round(x),
+    y: Math.round(y),
+    needed: Math.abs(x) >= 0.5 || Math.abs(y) >= 0.5,
   };
 }
 

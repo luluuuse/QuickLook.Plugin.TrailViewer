@@ -10,6 +10,7 @@ const path = require('path');
 const {
   launchBrowser,
   settlePopup,
+  switchLanguage,
   waitForLayout,
   waitForPhoto,
 } = require('./support/browser.cjs');
@@ -44,8 +45,10 @@ async function main() {
         '.toolbox-action[data-tool="export"]']
         .map((q) => document.querySelector(q)?.title || '').join(' | '),
       layers: Array.from(document.querySelectorAll('.layer-category-button')).map((n) => n.textContent),
-      langButton: text('.lang-switch button'),
-      langTitle: document.querySelector('.lang-switch button')?.title || '',
+      langButton: document.querySelector('.toolbox-lang-text')?.textContent || '',
+      langTitle: document.querySelector('.toolbox-lang')?.title || '',
+      langGlobe: Boolean(document.querySelector('.toolbox-lang [data-icon="globe"]')),
+      langLabel: document.querySelector('.toolbox-lang')?.getAttribute('aria-label') || '',
       profile: text('#profile .range'),
       axis: Array.from(document.querySelectorAll('#profile .axis')).map((n) => n.textContent),
       legend: text('#profile .legend .item'),
@@ -54,7 +57,8 @@ async function main() {
         return node ? `${node.querySelector('.ele').textContent}|${node.querySelector('.meta').textContent}` : '';
       })(),
       card: text('.leaflet-popup-content'),
-      thumbs: titles('.photo-thumb'),
+      nextTitle: document.querySelector('.photo-next')?.title || '',
+      position: text('.photo-position'),
       photoClose: document.querySelector('.photo-close')?.title || '',
       photoArrows: titles('.photo-arrow'),
       photoMeta: text('.photo-meta'),
@@ -93,15 +97,19 @@ async function main() {
   check('the profile title is translated', s.profile === '海拔', s.profile);
   check('the profile axis is translated but keeps its unit', s.axis.length === 2 && s.axis.every((a) => /^-?\d+ m$/.test(a)), s.axis.join(' / '));
   check('the profile legend is translated', /^(陡坡|无陡坡)\s*.*·\s*最陡\s*\d+%$/.test(s.legend.replace(/\s+/g, ' ')), s.legend);
-  check('the switch button shows the current language', s.langButton === '中', s.langButton);
+  // The tooltip names what the click gives you, in that language's own words: "English" on a Chinese page.
+  check('the switch shows the language in use and names the one a click gives',
+    s.langButton === '中' && s.langGlobe && s.langTitle === 'English'
+      && s.langLabel === '界面语言：中文，点击切换到 English',
+    `${s.langButton} / ${s.langGlobe} / ${s.langTitle} / ${s.langLabel}`);
 
   // 2. An open card and the profile are repainted, not closed.
   await page.locator('.gpx-pin[title="Album"]').click();
-  await page.waitForSelector('.photo-popup .photo-thumb');
+  await page.waitForSelector('.photo-popup .photo-frame');
   s = await snapshot(page);
-  check('the card hint is translated', s.card.includes('点击图片查看原图'), s.card.slice(-40));
-  check('an album counts its photos in Chinese', s.card.includes('共 2 张'), s.card.slice(-40));
-  check('a thumbnail names its place in Chinese', s.thumbs[1] === '打开第 2/2 张', s.thumbs.join(' | '));
+  check('the position counter is language-neutral', s.position === '2/3', s.position);
+  check('the next arrow tooltip names where it goes in Chinese',
+    /下一处带照片的标记点/.test(s.nextTitle), s.nextTitle);
   check('the elevation line is Chinese but the unit is not', s.card.includes('海拔 26 m'), s.card.slice(0, 40));
 
   await page.evaluate(() => window.trailViewer.scrub.at(200));
@@ -110,9 +118,7 @@ async function main() {
     /^(?:\d+ m)?\|\d+(?:\.\d+)? (?:m|km)(?: · \d{1,2}:\d{2}(?::\d{2})?)?$/.test(zhReadout), zhReadout);
 
   // 3. The switch repaints what is open and keeps the selection.
-  await page.locator('.lang-switch button').click();
-  await page.waitForFunction(() => document.documentElement.lang === 'en');
-  await waitForLayout(page);
+  await switchLanguage(page, 'en');
   s = await snapshot(page);
   check('the switch turns the page English', s.lang === 'en' && s.title === 'Track viewer', `${s.lang} ${s.title}`);
   check('the labels follow', s.labels.includes('Points') && s.labels.includes('Contents'), s.labels.join('/'));
@@ -135,12 +141,12 @@ async function main() {
   check('the zoom buttons stay right of the card after a language switch', pins.left >= pins.right,
     `zoom ${pins.left} vs card ${pins.right}`);
   check('the scrubber readout follows while it is on screen', /^(?:\d+ m)?\|(?:\d+ m(?: · \d+ m)?)$/.test(s.readout), s.readout);
-  check('the button now offers Chinese', s.langButton === 'EN' && s.langTitle === 'Switch to Chinese',
-    `${s.langButton} / ${s.langTitle}`);
-  check('the open card is rebuilt in English', s.card.includes('Click a photo to open it full size'),
-    s.card.slice(-40));
-  check('the album hint is rebuilt in English', s.card.includes('2 photos'), s.card.slice(-40));
-  check('the thumbnails are rebuilt in English', s.thumbs[1] === 'Open photo 2 of 2', s.thumbs.join(' | '));
+  check('the switch now reads English and points back to Chinese',
+    s.langButton === 'EN' && s.langTitle === '中文'
+      && s.langLabel === 'Interface language: English. Click for 中文.',
+    `${s.langButton} / ${s.langTitle} / ${s.langLabel}`);
+  check('the next arrow tooltip is rebuilt in English',
+    /next of 3 pins with photos/i.test(s.nextTitle), s.nextTitle);
   check('the selection survives the switch', s.selected === 'Album', s.selected);
   check('the card is still open after the switch', (await page.locator('.leaflet-popup').count()) === 1);
 
@@ -152,11 +158,10 @@ async function main() {
   check('nothing is selected after a reload', s.selected === '', s.selected);
 
   // 5. Photos carry the language into the full-size viewer.
-  await page.locator('.lang-switch button').click();
-  await page.waitForFunction(() => document.documentElement.lang === 'zh-CN');
+  await switchLanguage(page, 'zh');
   await page.locator('.gpx-pin[title="Album"]').click();
-  await page.waitForSelector('.photo-popup .photo-thumb');
-  await page.locator('.photo-popup .photo-thumb').nth(0).click();
+  await page.waitForSelector('.photo-popup .photo-frame');
+  await page.locator('.photo-popup .photo-frame').nth(0).click();
   await waitForPhoto(page);
   await settlePopup(page, '.leaflet-popup', 0);
   s = await snapshot(page);
@@ -189,12 +194,13 @@ async function main() {
   await open(enPage, `${base}/viewer/index.html?src=../tests/fixtures/${fixture}`);
   s = await snapshot(enPage);
   check('an English system starts in English', s.lang === 'en' && s.langButton === 'EN', `${s.lang} ${s.langButton}`);
-  check('the switch offers Chinese there', s.langTitle === 'Switch to Chinese', s.langTitle);
-  await enPage.locator('.lang-switch button').click();
-  await enPage.waitForFunction(() => document.documentElement.lang === 'zh-CN');
+  check('the switch points at Chinese there', s.langTitle === '中文', s.langTitle);
+  await switchLanguage(enPage, 'zh');
   s = await snapshot(enPage);
-  check('the switch turns an English page Chinese', s.lang === 'zh-CN' && s.langTitle === 'Switch to English',
-    `${s.lang} / ${s.langTitle}`);
+  check('the switch turns an English page Chinese',
+    s.lang === 'zh-CN' && s.langButton === '中' && s.langTitle === 'English'
+      && s.langLabel === '界面语言：中文，点击切换到 English',
+    `${s.lang} / ${s.langButton} / ${s.langTitle} / ${s.langLabel}`);
 
   // 8. Error pages are translated as well. The page above was switched to Chinese, so the same choice applies.
   await enPage.goto(`${base}/viewer/index.html?src=../tests/fixtures/truncated.gpx`);

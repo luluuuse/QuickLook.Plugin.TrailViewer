@@ -67,9 +67,16 @@ FIT 读取活动和路线中的 GPS 记录、时间、海拔、心率、会话�
   和下拉箭头，完整名称仍可通过悬停提示和无障碍标签读取。
 - `列表` 打开标记点速览；支持语义筛选、合并近点和人工纠正。
 - 点击或键盘 `Enter` 可放大 GPS 异常和数据缺口标签。
-- 点击照片缩略图进入全览后，右上角显示当前显示尺寸相对原图像素的真实百分比，例如原图为
-  2560 px 宽、窗口中显示 640 px 时显示 `25%`。滚轮按绝对比例缩放，最高 800%；点击百分比恢复
-  适应窗口，放大后可拖拽平移，切换照片时会重新适应窗口。
+- 带照片的标记点点击后显示一张卡片，**整张卡片就是照片**（竖幅 4:3，即高:宽 = 4:3，与手机竖拍一致）：名称和“时间 · 海拔”压在底部的
+  渐隐层上，右上角是关闭，右下角是圆形箭头和 `2/9` 位置进度。**点照片任意处**即进入全览；圆形箭头
+  跳到下一处带照片的标记点并就地打开它的卡片，只有一处带照片时不显示箭头。
+- 没有照片的标记点卡片与它同属一套：同样的 224 px 宽度、圆角和右上角关闭，名称与“时间 · 海拔”两行
+  字级一致；描述较长时在卡片内滚动，卡片本身不会长长地压住地图。卡片不再显示经纬度，图钉已经标出位置。
+- 进入全览后，右上角显示当前显示尺寸相对原图像素的真实百分比，例如原图为 2560 px 宽、窗口中显示
+  640 px 时显示 `25%`。滚轮按绝对比例缩放，最高 800%；点击百分比恢复适应窗口，放大后可拖拽平移，
+  切换照片时会重新适应窗口。
+- 被选中的标记点与起终点共用标准化双描边准星（标记点为菱形、起终点为十字），精确锚定在图钉尖端坐标上，
+  并与图钉本体的暖金色轮廓微光配合。
 
 ### 海拔剖面
 
@@ -84,16 +91,32 @@ FIT 读取活动和路线中的 GPS 记录、时间、海拔、心率、会话�
 生成，可包含名称、里程、日期、总用时、运动时间、运动均速、累计上升/下降、顶点海拔和点数；缺失字段会
 省略。路网文件只复制里程、路线/分段数量和标记点数量，不伪造全网用时、均速或海拔。
 
+摘要卡分两行六项：第一行里程、上升、下降，第二行总用时、运动均速、点数。里程和总用时左侧带蓝色竖线，
+作为最常被先读的两个数值；其余四项用字号、字重和颜色保持次级层级。工具箱标题栏右侧的
+`?` 打开快捷键速查页，以两列表格列出 `W` 标记点、`S` 隐藏界面、`A` / `D` 切换点位或照片、`Q` / `E` 切换
+地图图源、`C` 全轨迹、`M` 测距、`T` 开关工具箱；常用按钮的悬停提示仍保留对应键位。
+
+### 界面语言
+
+工具箱标题栏里只有一个语言按钮：左边是地球图标，右边是当前语言（`中` 或 `EN`），点击即在中文与英文之间
+切换；悬停提示直接给出可切换到的语言——中文界面显示 `English`，英文界面显示 `中文`。整页就地重绘，
+地图视野、已展开的面板和测距结果都保持原样，不会重新加载预览。选择会被记住，下次打开同一种语言；
+没有手动选择时跟随系统语言。
+
 ### 距离测量
 
 打开右上角 **工具箱**，选择 **距离测量**：
 
 - <kbd>M</kbd> 可直接开始测距；测距中再次按 <kbd>M</kbd> 结束测距。
 - 测距页面固定贴近窗口右侧；叠加图导出等其他工具页复用同一工具箱窗口。
+- 页面顶部的 **返回** 回到工具箱主菜单，测距状态和已打的点都保留：去看别的工具再回来，
+  可以接着量同一段，不会因为翻页被打断。
 - 右键在地图上添加测距点；左键仍用于拖动地图，滚轮按当前位置缩放。
 - <kbd>Ctrl</kbd>+<kbd>Z</kbd> 撤回最后一个操作，
   <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> 重做。
-- 靠近已有标记点或轨迹采样点时自动吸附，并显示目标类型；吸附使用屏幕上的 14 px 范围。
+- 在 14 px 屏幕半径内，靠近标记点、先前手动打下的测距点（自动排除当前活动段末点以防自吸死锁）或轨迹
+  采样点时会自动吸附到精确坐标。同像素平手时遵循 `标记点 > 测距点 > 轨迹点` 优先级；悬停时以标准化
+  双描边准星区分目标类型（标记点菱形、测距点方块、轨迹点十字），并搭配轻量化悬浮标签。
 - **结束本段** 后，下一次右键从新一段开始。工具箱分别显示每段距离、点数与全部路线总距离。
 - **撤销打点** 删除最后一个点，**清空** 删除全部测距线；**结束测距** 退出打点状态但保留当前结果。
 - **在地图中心打点** 提供不依赖右键的键盘操作路径。
@@ -107,8 +130,9 @@ FIT 读取活动和路线中的 GPS 记录、时间、海拔、心率、会话�
 
 - 起点、终点使用轨迹或路线的首末记录点；顶点沿用可靠海拔判断。
 - 点击起点、终点或顶点会复制坐标、自动聚焦该点，并在地图上显示脉冲标记和坐标标签。
-- 打开工具即关闭当前图钉弹窗并进入十字准星状态。任意位置都可单击取点；靠近标记点时自动吸附到标记点，
-  离开吸附范围后保持用户实际点击的位置。拾取可连续进行，左键拖动和滚轮缩放不变；关闭坐标窗口即可结束。
+- 打开工具即关闭当前图钉弹窗并进入十字准星状态。任意位置都可单击取点；靠近标记点 14 px 内会显示
+  标准化菱形吸附准星与轻量标签，单击后精确吸附到标记点，离开吸附范围后保持用户实际点击的位置。拾取可
+  连续进行，左键拖动和滚轮缩放不变；关闭坐标窗口即可结束。
 - **中心** 复制当前地图中心坐标，并提供悬停说明。
 
 所有结果按 `纬度, 经度` 六位小数复制，面板说明当前使用 WGS-84，不静默转换为 GCJ-02。
@@ -274,9 +298,18 @@ is used.
 - The map recentres when the selected pin approaches an edge, the summary, toolbars or the profile.
 - **List** opens the waypoint overview with filters, nearby-point merging and local manual corrections.
 - Click or press Enter on a GPS anomaly or data-gap label to zoom to it.
-- In the full-size photo viewer, the top-right percentage is the displayed width divided by the source width:
-  a 2560 px photo shown at 640 px reads 25%, and 100% means 1:1 pixels. Use the wheel to zoom up to 800%,
-  drag a zoomed photo to pan, click the percentage to fit the window again, or change photos to start over.
+- A pin with photos opens a card that **is** the photo (portrait 4:3, height : width): the name and "time · elevation" sit on a bottom
+  scrim, with close at the top right and a round next arrow plus a `2/9` position counter at the bottom right.
+  Click anywhere on the photo for the full-size viewer; the arrow jumps to the next pin that has photos and opens
+  its card in place, and is not shown when this is the only one.
+- A pin without photos opens the same card family: the same 224 px width, corner radius and top-right close, the
+  name and "time · elevation" at the same two type sizes. A longer description scrolls inside the card instead of
+  stretching it down the map. Coordinates are no longer shown -- the pin already marks the spot.
+- In the full-size viewer, the top-right percentage is the displayed width divided by the source width: a
+  2560 px photo shown at 640 px reads 25%, and 100% means 1:1 pixels. Use the wheel to zoom up to 800%, drag a
+  zoomed photo to pan, click the percentage to fit the window again, or change photos to start over.
+- The selected pin is marked by the standardized double-stroked selection reticle (diamond for waypoints, cross for
+  start/end track anchors) centred on the pin tip together with a subtle warm accent glow on the pin itself.
 - The first-click attachment card reuses the waypoint list's unblurred translucent background. The full-size
   viewer also keeps its dark semi-transparent surround, with duplicate panels and controls hidden.
 
@@ -296,6 +329,23 @@ descriptions. It includes only values the file actually provides: name, distance
 time, moving average, ascent/descent, peak elevation and point count. Route networks copy distance, route/
 segment counts and waypoint count without inventing whole-network duration, speed or elevation.
 
+The summary card is two rows of three: distance, ascent and descent, then total time, moving average speed
+and points. Distance and total time carry a blue rule on their left edge as the two values read first; the
+other four stay on the secondary tier by size, weight and colour.
+
+The `?` control in the toolbox header opens one two-column keyboard reference: `W` markers, `S` hide
+interface, `A` / `D` previous or next point or photo, `Q` / `E` switch map source, `C` whole route, `M` measure,
+`T` open or close the toolbox. Native control tooltips keep the relevant key without repeating shortcut
+badges throughout the toolbox.
+
+### Interface language
+
+The toolbox header carries a single language button: a globe icon beside the language in use (`中` or `EN`),
+and one click flips between Chinese and English. The tooltip names the language the click gives you, in that
+language's own words — `English` on a Chinese page, `中文` on an English one. The page repaints in place, so
+the map view, open panels and any measurement survive the switch and the preview is never reloaded. The choice
+is remembered for the next file; without a manual choice the interface follows the system language.
+
 ### Distance measurement
 
 Open **Toolbox** in the upper-right corner and choose **Measure distance**:
@@ -303,11 +353,16 @@ Open **Toolbox** in the upper-right corner and choose **Measure distance**:
 - <kbd>M</kbd> starts measuring directly; press it again while measuring to finish.
 - The measurement page stays against the right edge. Overlay export and the other tool pages reuse the same
   toolbox window.
+- **Back** at the top of the page returns to the toolbox menu and keeps both the measuring state and the points
+  already placed, so looking at another tool does not interrupt a measurement.
 - Right-click adds a point. Left-drag still pans the map, and the wheel zooms at the pointer.
 - <kbd>Ctrl</kbd>+<kbd>Z</kbd> undoes the last change;
   <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> redoes it.
-- Nearby waypoints and recorded track samples snap to their exact coordinates within a 14 px screen radius;
-  the target type is shown while hovering.
+- Nearby waypoints, previously placed manual measurement points (excluding the active section's last vertex so
+  it cannot self-snap), and recorded track samples snap to their exact coordinates within a 14 px screen radius.
+  Exact ties favour `marker > measured point > track point`. While hovering, a standardized double-stroked
+  reticle distinguishes the target type (diamond for waypoints, square for measured points, cross for track
+  samples) alongside a lightweight snap label.
 - **End section** finishes the current line, and the next right-click starts a separate section. The toolbox
   shows every section subtotal, its point count and the overall distance.
 - **Undo point** removes the last point, **Clear** removes all measurements, and **Finish measuring** leaves
@@ -328,8 +383,9 @@ single-row controls offer start, end, peak and map centre:
   route weather.
 - Start, end and peak copy the coordinate, focus the map and show a pulsing point with a coordinate label.
 - Opening the tool closes the current pin popup and changes the cursor to a crosshair. Any position can be
-  picked repeatedly; nearby markers snap to their exact coordinate while points outside the snap radius stay
-  where clicked. Left-drag and wheel zoom remain unchanged; closing the coordinate window ends picking.
+  picked repeatedly; hovering within 14 px of a marker shows the standardized diamond snap reticle and label,
+  and clicking snaps to its exact coordinate while points outside the snap radius stay where clicked. Left-drag
+  and wheel zoom remain unchanged; closing the coordinate window ends picking.
 - **Centre** copies the current map-centre coordinate and has its own hover explanation.
 
 Coordinates copy as six-decimal `latitude, longitude`; the panel identifies WGS-84 and never silently converts

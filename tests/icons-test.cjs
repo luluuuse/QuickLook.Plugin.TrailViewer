@@ -182,11 +182,19 @@ async function main() {
   await page.click('.waypoint-overview-header .close');
 
   await page.locator('.gpx-pin[title="Album"]').click();
-  await page.waitForSelector('.photo-popup .photo-thumb');
-  const popupClose = await page.evaluate(() => window.__readIcon('.photo-popup .leaflet-popup-close-button svg'));
-  check('Leaflet popup close uses the shared close icon',
-    expectedDefault(popupClose, 'close'), JSON.stringify(popupClose));
-  await page.locator('.photo-popup .photo-thumb').first().click();
+  await page.waitForSelector('.photo-popup .photo-frame');
+  // The card draws its own close control inside the photo frame and hides Leaflet's, so the icon assertions
+  // follow the visible control.
+  const popupClose = await page.evaluate(() => ({
+    leafletHidden: getComputedStyle(
+      document.querySelector('.photo-popup .leaflet-popup-close-button'),
+    ).display === 'none',
+    cardClose: Boolean(document.querySelector('.photo-popup .photo-card-close')),
+  }));
+  check('the card owns its close control and hides Leaflet’s',
+    popupClose.leafletHidden === true && popupClose.cardClose === true,
+    JSON.stringify(popupClose));
+  await page.locator('.photo-popup .photo-frame').first().click();
   await page.waitForFunction(() => window.trailViewer.photos.isOpen());
   const photo = await page.evaluate(() => ({
     close: window.__readIcon('.photo-close svg'),

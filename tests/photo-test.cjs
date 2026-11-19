@@ -66,11 +66,11 @@ async function main() {
   const badges = await page.locator('.gpx-pin.has-photo').count();
   check('three pins carry the photo badge', badges === 3, `${badges} badges`);
 
-  // Helpers: a pin click opens the card; a thumbnail click opens the viewer.
+  // Helpers: a pin click opens the card; the hero photo opens the viewer.
   const openCard = async (name) => {
     await page.locator(`.gpx-pin[title="${name}"]`).click();
     await page.waitForFunction(() => {
-      const img = document.querySelector('.photo-popup .photo-thumb img');
+      const img = document.querySelector('.photo-popup .photo-frame img');
       return img && img.complete && img.naturalWidth > 0;
     });
     // The click must leave the card open. Waiting for the popup transition distinguishes an open card from
@@ -80,8 +80,8 @@ async function main() {
     const open = await page.locator('.photo-popup').count();
     check(`the card for "${name}" stays open after the click`, open === 1, `${open} cards`);
   };
-  const openFromCard = async (index) => {
-    await page.locator('.photo-popup .photo-thumb').nth(index).click();
+  const openFromCard = async () => {
+    await page.locator('.photo-popup .photo-frame').click();
     await waitForPhoto(page);
     await waitForFocus(page, '.photo-close');
   };
@@ -121,30 +121,70 @@ async function main() {
 
   // 3. The pin opens a card: details, one thumbnail, no full-size image yet.
   await openCard('Remote');
-  let card = await page.evaluate(() => ({
-    text: document.querySelector('.photo-popup .leaflet-popup-content').textContent,
-    thumbs: document.querySelectorAll('.photo-popup .photo-thumb').length,
-    single: document.querySelector('.photo-popup .photo-thumbs')?.classList.contains('single'),
-    hint: document.querySelector('.photo-popup .photo-hint')?.textContent || '',
-    thumbSrc: document.querySelector('.photo-popup .photo-thumb img')?.getAttribute('src') || '',
-    thumbLoaded: (document.querySelector('.photo-popup .photo-thumb img')?.naturalWidth || 0) > 0,
-    background: getComputedStyle(document.querySelector('.photo-popup .leaflet-popup-content-wrapper'))
-      .backgroundColor,
-    tipBackground: getComputedStyle(document.querySelector('.photo-popup .leaflet-popup-tip'))
-      .backgroundColor,
-    viewerOpen: window.trailViewer.photos.isOpen(),
-    bigLoaded: Boolean(document.querySelector('.photo-image')?.getAttribute('src')),
-  }));
+  let card = await page.evaluate(() => {
+    const hero = document.querySelector('.photo-popup .photo-frame');
+    const cardBox = document.querySelector('.photo-popup .leaflet-popup-content-wrapper')
+      .getBoundingClientRect();
+    return {
+      text: document.querySelector('.photo-popup .leaflet-popup-content').textContent,
+      title: document.querySelector('.photo-popup .photo-card-title')?.textContent || '',
+      metas: [...document.querySelectorAll('.photo-popup .photo-card-meta')].map((n) => n.textContent),
+      heroSrc: document.querySelector('.photo-popup .photo-frame img')?.getAttribute('src') || '',
+      heroLoaded: (document.querySelector('.photo-popup .photo-frame img')?.naturalWidth || 0) > 0,
+      heroBox: hero ? (() => { const r = hero.getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height)]; })() : null,
+      cardWidth: Math.round(cardBox.width),
+      actions: [...document.querySelectorAll('.photo-popup .photo-action')].map((button) => ({
+        text: button.textContent,
+        disabled: button.disabled,
+        title: button.title,
+      })),
+      next: document.querySelector('.photo-popup .photo-next')
+        ? {
+          width: Math.round(document.querySelector('.photo-popup .photo-next').getBoundingClientRect().width),
+          title: document.querySelector('.photo-popup .photo-next').title,
+        }
+        : null,
+      position: document.querySelector('.photo-popup .photo-position')?.textContent || '',
+      contentScroll: (() => {
+        const node = document.querySelector('.photo-popup .leaflet-popup-content');
+        return node ? node.scrollHeight > node.clientHeight + 1 : null;
+      })(),
+      inlineMaxHeight: document.querySelector('.photo-popup .leaflet-popup-content')?.style.maxHeight || '',
+      background: getComputedStyle(document.querySelector('.photo-popup .leaflet-popup-content-wrapper'))
+        .backgroundColor,
+      tipBackground: getComputedStyle(document.querySelector('.photo-popup .leaflet-popup-tip'))
+        .backgroundColor,
+      viewerOpen: window.trailViewer.photos.isOpen(),
+      bigLoaded: Boolean(document.querySelector('.photo-image')?.getAttribute('src')),
+    };
+  });
   check('card opens instead of the full viewer', card.viewerOpen === false);
-  check('card shows the placemark name', card.text.includes('Remote'), card.text);
-  check('card shows the description text', card.text.includes('Standing on the bridge'), card.text);
-  check('card shows coordinates', /\d+\.\d{6}, \d+\.\d{6}/.test(card.text), card.text);
-  check('card holds one thumbnail', card.thumbs === 1, `${card.thumbs}`);
-  check('single thumbnail grows to fill the card', card.single === true);
-  check('thumbnail points at the resolved photo', card.thumbSrc === 'https://example.test/remote.jpg?w=800&h=600', card.thumbSrc);
-  check('thumbnail actually loads', card.thumbLoaded === true);
-  check('card says the photo can be enlarged', /full size/.test(card.hint), card.hint);
+  check('card shows the placemark name', card.title === 'Remote', card.title);
+  // The whole card is the photo. Portrait 4:3 means height : width = 4 : 3, which is how a phone shoots upright.
+  check('the photo fills the entire card in portrait 4:3',
+    card.heroBox !== null && card.heroBox[0] === card.cardWidth
+      && Math.abs(card.heroBox[1] / card.heroBox[0] - 4 / 3) < 0.02,
+    JSON.stringify({ frame: card.heroBox, card: card.cardWidth }));
+  check('the photo points at the resolved image',
+    card.heroSrc === 'https://example.test/remote.jpg?w=800&h=600', card.heroSrc);
+  check('the photo actually loads', card.heroLoaded === true);
+  // Coordinates and the "open photo" button are deliberately gone: the photo is the button, and the coordinate
+  // pair was the least useful line on a card anchored to a pin the reader just clicked.
+  check('the card no longer prints coordinates',
+    !card.metas.some((meta) => /\d+\.\d{6}, \d+\.\d{6}/.test(meta)), JSON.stringify(card.metas));
+  check('the card no longer offers an open-photo button', card.actions.length === 0,
+    JSON.stringify(card.actions));
+  // This fixture's pin carries no timestamp, so the line holds only the elevation. The card must not invent one.
+  check('the meta line carries what the pin actually has',
+    card.metas.length === 1 && /25 m/.test(card.metas[0]), JSON.stringify(card.metas));
+  check('next is a round arrow with a position counter',
+    card.next !== null && card.next.width === 28 && /^1\/3$/.test(card.position || ''),
+    JSON.stringify({ next: card.next, position: card.position }));
   check('no full-size image before the second click', card.bigLoaded === false);
+  // A viewport-relative max-height used to clamp this card and cut its facts and next arrow off the bottom.
+  check('the card is not clamped by a viewport height limit',
+    card.contentScroll === false && card.inlineMaxHeight === '',
+    JSON.stringify({ scroll: card.contentScroll, inline: card.inlineMaxHeight }));
   check('the attachment card matches the waypoint-list transparency',
     card.background === 'rgba(24, 24, 24, 0.86)'
       && card.tipBackground === 'rgba(24, 24, 24, 0.86)',
@@ -152,13 +192,17 @@ async function main() {
 
   // 4. The thumbnail opens the original, and the card gets out of the way.
   const layoutBeforePhoto = await page.evaluate(() => window.trailViewer.mapLayout());
-  await openFromCard(0);
+  await openFromCard();
   let state = await viewer();
   check('thumbnail opens the viewer', state.open === true);
   check('absolute URL kept as is', state.src === 'https://example.test/remote.jpg?w=800&h=600', state.src);
   check('caption is the placemark name', state.caption === 'Remote', state.caption);
-  check('meta shows coordinates', /\d+\.\d{6}, \d+\.\d{6}/.test(state.meta), state.meta);
-  check('meta shows the description text', state.meta.includes('Standing on the bridge'), state.meta);
+  // The viewer keeps the full metadata line: time, coordinates, elevation and the description.
+  check('the full-size viewer still shows the metadata line',
+    /\d+\.\d{6}, \d+\.\d{6}/.test(state.meta) && /Standing on the bridge/.test(state.meta), state.meta);
+  // The card is the photo now, so a long placemark description is left to the full-size viewer's meta line.
+  check('the description stays out of the photo-only card',
+    !card.text.includes('Standing on the bridge'), card.text);
   check('single photo hides the counter', state.counterHidden === true);
   const initialPercent = Number.parseInt(state.zoom, 10);
   const initialDisplayedPercent = Math.round(state.displayWidth / state.naturalWidth * 100);
@@ -276,22 +320,26 @@ async function main() {
   await page.locator('.photo-close').click();
   check('close button hides the viewer', (await page.evaluate(() => window.trailViewer.photos.isOpen())) === false);
 
-  // 6. A relative path resolves against the document it came from; a card of two shows two thumbnails.
+  // 6. A relative path resolves against the document it came from; the frame keeps its shape for an album.
   await openCard('Album');
   card = await page.evaluate(() => ({
-    thumbs: document.querySelectorAll('.photo-popup .photo-thumb').length,
-    first: document.querySelector('.photo-popup .photo-thumb img')?.getAttribute('src') || '',
-    hint: document.querySelector('.photo-popup .photo-hint')?.textContent || '',
+    first: document.querySelector('.photo-popup .photo-frame img')?.getAttribute('src') || '',
+    position: document.querySelector('.photo-popup .photo-position')?.textContent || '',
+    heroBox: (() => {
+      const r = document.querySelector('.photo-popup .photo-frame').getBoundingClientRect();
+      return [Math.round(r.width), Math.round(r.height)];
+    })(),
   }));
-  check('two thumbnails in the card', card.thumbs === 2, `${card.thumbs}`);
   check('relative path resolves next to the document', /\/tests\/fixtures\/photo\.png$/.test(card.first), card.first);
-  check('card counts the album', /2 photos/.test(card.hint), card.hint);
+  check('the frame keeps its portrait 4:3 shape for an album',
+    Math.abs(card.heroBox[1] / card.heroBox[0] - 4 / 3) < 0.02, JSON.stringify(card.heroBox));
+  check('the position counter follows the pin', /^2\/3$/.test(card.position), card.position);
 
-  // 7. A thumbnail in the middle of an album opens that photo, not the first one.
-  await openFromCard(1);
+  // 7. The album opens at its first photo; the arrows walk the rest.
+  await openFromCard();
   state = await viewer();
-  check('second thumbnail opens the second photo', /photo2\.png$/.test(state.src), state.src);
-  check('counter starts at the clicked photo', state.counter === '2 / 2', state.counter);
+  check('the hero opens the first photo', /photo\.png$/.test(state.src), state.src);
+  check('counter starts at the first photo', state.counter === '1 / 2', state.counter);
   check('two arrows appear', state.arrows === 2, `${state.arrows}`);
   await wheelPhoto(-100, '125%');
   state = await viewer();
@@ -328,8 +376,8 @@ async function main() {
     return image?.naturalWidth > 0 && zoom && !zoom.hidden && zoom.textContent === '100%';
   });
   state = await viewer();
-  check('next wraps to the first photo', /photo\.png$/.test(state.src), state.src);
-  check('counter follows', state.counter === '1 / 2', state.counter);
+  check('next advances to the second photo', /photo2\.png$/.test(state.src), state.src);
+  check('counter follows', state.counter === '2 / 2', state.counter);
   check('changing photos resets zoom to 100%', state.zoom === '100%' && state.transform === '',
     `${state.zoom} ${state.transform}`);
 
@@ -337,7 +385,7 @@ async function main() {
   await page.locator('.photo-image').click();
   state = await viewer();
   check('clicking the original keeps the viewer open', state.open === true);
-  check('clicking the original does not step', state.counter === '1 / 2', state.counter);
+  check('clicking the original does not step', state.counter === '2 / 2', state.counter);
 
   // 10. Clicking the backdrop closes.
   const mapBeforeBackdropClose = await page.evaluate(() => {
@@ -362,7 +410,7 @@ async function main() {
 
   // 11. An inline data URI loads without any network.
   await openCard('Inline');
-  await openFromCard(0);
+  await openFromCard();
   check('data URI renders',
     (await page.evaluate(() => document.querySelector('.photo-image').getAttribute('src'))).startsWith('data:image/png;base64,'));
   await page.locator('.photo-close').click();
@@ -374,14 +422,118 @@ async function main() {
   await page.waitForSelector('.leaflet-popup-content');
   const popup = await page.evaluate(() => ({
     text: document.querySelector('.leaflet-popup-content').textContent,
-    thumbs: document.querySelectorAll('.photo-thumb').length,
+    heroes: document.querySelectorAll('.photo-frame').length,
     open: window.trailViewer.photos.isOpen(),
   }));
   check('plain pin opens the usual popup', popup.text.includes('Plain'), popup.text);
-  check('plain pin has no thumbnails', popup.thumbs === 0, `${popup.thumbs}`);
+  check('plain pin has no photo card', popup.heroes === 0, `${popup.heroes}`);
   check('plain pin does not open the photo viewer', popup.open === false);
 
-  // 13. The info panel counts what can be clicked.
+  // 13. "Next" walks to the next pin with photos, not the next frame of the same place.
+  await openCard('Remote');
+  const beforeNext = await page.evaluate(() => document.querySelector('.gpx-pin.selected')?.getAttribute('title'));
+  await page.locator('.photo-popup .photo-next').click();
+  await settlePopup(page, '.photo-popup', 1);
+  await waitForMapIdle(page);
+  const afterNext = await page.evaluate(() => ({
+    selected: document.querySelector('.gpx-pin.selected')?.getAttribute('title'),
+    title: document.querySelector('.photo-popup .photo-card-title')?.textContent,
+    heroes: document.querySelectorAll('.photo-popup .photo-frame').length,
+    position: document.querySelector('.photo-popup .photo-position')?.textContent || '',
+    viewer: window.trailViewer.photos.isOpen(),
+  }));
+  check('next moves to a different pin', afterNext.selected !== beforeNext,
+    `${beforeNext} -> ${afterNext.selected}`);
+  check('next opens that pin card rather than the full viewer',
+    afterNext.heroes === 1 && afterNext.viewer === false, JSON.stringify(afterNext));
+  check('the card now names the other placemark', afterNext.title === afterNext.selected,
+    `${afterNext.title} vs ${afterNext.selected}`);
+  check('the position counter advanced with it', /^2\/3$/.test(afterNext.position), afterNext.position);
+
+  // 14. The selected pin uses the standardized diamond snap reticle centred on its tip.
+  const selection = await page.evaluate(() => {
+    const reticle = document.querySelector('.pin-selection-reticle');
+    const reticleSvg = reticle?.querySelector('svg');
+    const pin = document.querySelector('.gpx-pin.selected .pin-symbol-wrap');
+    const pinPath = pin?.querySelector('.pin-symbol path');
+    const reticleBox = reticle?.getBoundingClientRect();
+    const pinBox = pinPath?.getBoundingClientRect();
+    const reticleCenterX = reticleBox ? (reticleBox.left + reticleBox.right) / 2 : NaN;
+    const reticleCenterY = reticleBox ? (reticleBox.top + reticleBox.bottom) / 2 : NaN;
+    const pinCenterX = pinBox ? (pinBox.left + pinBox.right) / 2 : NaN;
+    const pinTipY = pinBox ? pinBox.bottom : NaN;
+    return {
+      reticleCount: document.querySelectorAll('.pin-selection-reticle').length,
+      symbol: reticleSvg?.dataset.symbol || '',
+      dx: Math.abs(reticleCenterX - pinCenterX),
+      dy: Math.abs(reticleCenterY - pinTipY),
+      outline: pin ? getComputedStyle(pin, '::after').content : '',
+      pinFilter: pin ? getComputedStyle(pin.querySelector('svg')).filter : '',
+    };
+  });
+  check('exactly one standardized reticle marks the selected pin',
+    selection.reticleCount === 1 && selection.symbol === 'snap-marker', JSON.stringify(selection));
+  check('the selection reticle centres accurately on the pin tip',
+    selection.dx <= 1 && selection.dy <= 1.5, JSON.stringify(selection));
+  check('the pin no longer carries a second outline', selection.outline === 'none', selection.outline);
+  check('the pin itself picks up the warm accent glow', /drop-shadow/.test(selection.pinFilter), selection.pinFilter);
+
+  // 15. A pin without photos opens the same card family: the same fixed width, the same corner close, the same
+  // two type sizes -- and no coordinate pair, because the pin already marks the spot.
+  await page.locator('.gpx-pin[title="Plain"]').click();
+  await settlePopup(page, '.place-popup', 1);
+  await waitForMapIdle(page);
+  const plain = await page.evaluate(() => {
+    const popup = document.querySelector('.place-popup');
+    const card = popup?.querySelector('.place-card');
+    const title = popup?.querySelector('.place-card-title');
+    const meta = popup?.querySelector('.place-card-meta');
+    const close = popup?.querySelector('.place-card-close');
+    const box = card?.getBoundingClientRect();
+    const closeBox = close?.getBoundingClientRect();
+    const wrapper = popup?.querySelector('.leaflet-popup-content-wrapper');
+    return {
+      width: box ? Math.round(box.width) : 0,
+      text: card?.textContent || '',
+      title: title?.textContent || '',
+      meta: meta?.textContent || '',
+      titleSize: title ? getComputedStyle(title).fontSize : '',
+      metaSize: meta ? getComputedStyle(meta).fontSize : '',
+      closeSize: closeBox ? [Math.round(closeBox.width), Math.round(closeBox.height)] : null,
+      closeOffset: closeBox && box
+        ? [Math.round(box.right - closeBox.right), Math.round(closeBox.top - box.top)]
+        : null,
+      radius: wrapper ? getComputedStyle(wrapper).borderTopLeftRadius : '',
+      cardBg: card ? getComputedStyle(card).backgroundColor : '',
+      wrapperBg: wrapper ? getComputedStyle(wrapper).backgroundColor : '',
+      inlineMaxHeight: popup?.querySelector('.leaflet-popup-content')?.style.maxHeight || '',
+    };
+  });
+  check('a pin without photos opens the same card width', plain.width === 224, `${plain.width}`);
+  check('the plain card keeps the photo card radius', plain.radius === '8px', plain.radius);
+  check('the plain card carries the name and one facts line',
+    plain.title === 'Plain' && /29 m/.test(plain.meta), `${plain.title} / ${plain.meta}`);
+  check('the plain card keeps the photo card type sizes',
+    plain.titleSize === '12.5px' && plain.metaSize === '10.5px',
+    `${plain.titleSize} / ${plain.metaSize}`);
+  check('both cards draw the same close button in the same corner',
+    JSON.stringify(plain.closeSize) === '[24,24]' && JSON.stringify(plain.closeOffset) === '[6,6]',
+    JSON.stringify({ size: plain.closeSize, offset: plain.closeOffset }));
+  check('the plain card no longer prints coordinates',
+    !/\d+\.\d{6}, \d+\.\d{6}/.test(plain.text), plain.text.slice(0, 120));
+  check('the plain card is not clamped by a viewport height limit', plain.inlineMaxHeight === '',
+    plain.inlineMaxHeight);
+  // The wrapper paints --panel once, the same translucent surface the waypoint list uses. Painting the card
+  // too stacked two 0.86 layers into an almost solid block.
+  check('the plain card is as transparent as the waypoint list',
+    plain.cardBg === 'rgba(0, 0, 0, 0)' && plain.wrapperBg === 'rgba(24, 24, 24, 0.86)',
+    `${plain.cardBg} / ${plain.wrapperBg}`);
+  await page.locator('.place-popup .place-card-close').click();
+  await settlePopup(page, '.place-popup', 0);
+  const stillOpen = await page.locator('.place-popup').count();
+  check('the plain card closes from its own button', stillOpen === 0, `${stillOpen}`);
+
+  // 16. The info panel counts what can be clicked.
   const info = await page.evaluate(() => document.getElementById('info').textContent);
   check('info box lists the photos', /Photos\s*4 photos on 3 pins/.test(info), info.replace(/\s+/g, ' ').slice(0, 160));
 

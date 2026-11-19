@@ -10,6 +10,13 @@ import { readStored, writeStored } from './storage.js';
 const STORAGE_KEY = 'lang';
 export const LANGS = ['en', 'zh'];
 
+/**
+ * A language named in itself, not in the interface language: "English" stays English on a Chinese page and
+ * "中文" stays Chinese on an English one. That is how the switch button's tooltip names what the click gives
+ * you -- "切换为英文" told a Chinese reader nothing they could not already see.
+ */
+export const LANG_NAMES = { zh: '中文', en: 'English' };
+
 /** A value is either a string with {placeholders} or a function taking the same values. */
 const DICT = {
   en: {
@@ -103,10 +110,21 @@ const DICT = {
     'toolbox.title': 'Toolbox',
     'tool.close': 'Close',
     'toolbox.open': 'Open the toolbox',
+    'toolbox.toggle': 'Open or close the toolbox (T)',
     'toolbox.close': 'Close the toolbox',
     'toolbox.back': 'Back to tools',
-    'toolbox.quickStart': 'Quick launch',
     'toolbox.quickTools': 'Quick tools',
+    'toolbox.shortcuts': 'Keyboard shortcuts',
+    'toolbox.shortcutMeasure': 'Measure',
+    'toolbox.shortcutMarkers': 'Markers',
+    'toolbox.shortcutLocate': 'Whole route',
+    'toolbox.shortcutChrome': 'Hide interface',
+    'toolbox.shortcutMap': 'Switch map source',
+    'toolbox.shortcutNav': 'Previous / next point or photo',
+    'toolbox.shortcutToolbox': 'Open or close the toolbox',
+    'toolbox.languageSwitch': (v) => `Interface language: ${v.current}. Click for ${v.target}.`,
+    'toolbox.help': 'Keyboard shortcuts',
+    'toolbox.helpHint': 'Keys work while the map is focused.',
     'toolbox.measureHint': 'Right-click to add points; M starts or finishes measuring',
     'toolbox.export': 'Export overlay',
     'toolbox.exportHint': 'Save the recorded track as a transparent PNG',
@@ -161,6 +179,7 @@ const DICT = {
     'measure.redoTitle': 'Redo point (Ctrl+Shift+Z)',
     'measure.clear': 'Clear',
     'measure.snapMarker': 'Snap: marker',
+    'measure.snapPoint': 'Snap: measured point',
     'measure.snapTrack': 'Snap: track point',
 
     // The exported picture: the two words inside the start and end badges are one character each.
@@ -204,6 +223,11 @@ const DICT = {
 
     'photo.openIndexed': (v) => `Open photo ${v.index} of ${v.count}`,
     'photo.openSingle': 'Open at full size',
+    'photo.openOriginal': 'Open photo',
+    'photo.closeCard': 'Close',
+    'photo.nextPin': 'Next',
+    'photo.nextPinTitle': (v) => `Go to the next of ${v.count} pins with photos`,
+    'photo.noNextPin': 'No other pin has photos',
     'photo.hintMany': (v) => `Click a photo to open it full size \u00b7 ${v.count} photos`,
     'photo.hintOne': 'Click the photo to open it full size',
     'photo.close': 'Close (click anywhere)',
@@ -287,6 +311,7 @@ const DICT = {
     'layer.keyConfigured': 'Configured',
     'layer.keyMissing': 'Not configured',
     'layer.typeHeading': 'Map type',
+    'layer.switchHint': 'Switch map category',
     'layer.sourceHeading': 'Map source',
     'layer.noMapHint': 'Only the coordinate grid is shown; no map tiles are downloaded.',
     'layer.chooseSource': 'Choose map source',
@@ -364,8 +389,6 @@ const DICT = {
     'insight.summit': 'Summit / pass',
     'insight.access': 'Access',
     'insight.viewpoint': 'Viewpoint',
-
-    'switch.title': 'Switch to Chinese',
 
     'unit.m': 'm',
     'unit.km': 'km',
@@ -475,10 +498,21 @@ const DICT = {
     'toolbox.title': '工具箱',
     'tool.close': '关闭',
     'toolbox.open': '打开工具箱',
+    'toolbox.toggle': '打开或关闭工具箱（T）',
     'toolbox.close': '关闭工具箱',
     'toolbox.back': '返回工具箱',
-    'toolbox.quickStart': '快速启动',
     'toolbox.quickTools': '快捷工具',
+    'toolbox.shortcuts': '键盘快捷键',
+    'toolbox.shortcutMeasure': '测距',
+    'toolbox.shortcutMarkers': '标记点',
+    'toolbox.shortcutLocate': '全轨迹',
+    'toolbox.shortcutChrome': '隐藏界面',
+    'toolbox.shortcutMap': '切换地图图源',
+    'toolbox.shortcutNav': '切换点位或照片',
+    'toolbox.shortcutToolbox': '打开或关闭工具箱',
+    'toolbox.languageSwitch': (v) => `界面语言：${v.current}，点击切换到 ${v.target}`,
+    'toolbox.help': '快捷键速查',
+    'toolbox.helpHint': '地图获得焦点时可用。',
     'toolbox.measureHint': '右键添加测距点；M 开始或结束测距',
     'toolbox.export': '叠加图导出',
     'toolbox.exportHint': '将记录轨迹保存为透明 PNG',
@@ -533,6 +567,7 @@ const DICT = {
     'measure.redoTitle': '重做打点（Ctrl+Shift+Z）',
     'measure.clear': '清空',
     'measure.snapMarker': '吸附：标记点',
+    'measure.snapPoint': '吸附：测距点',
     'measure.snapTrack': '吸附：轨迹点',
 
     'export.title': '把轨迹导出为透明图片。',
@@ -575,6 +610,11 @@ const DICT = {
 
     'photo.openIndexed': (v) => `打开第 ${v.index}/${v.count} 张`,
     'photo.openSingle': '查看原图',
+    'photo.openOriginal': '查看原图',
+    'photo.closeCard': '关闭',
+    'photo.nextPin': '下一张',
+    'photo.nextPinTitle': (v) => `跳到下一处带照片的标记点，共 ${v.count} 处`,
+    'photo.noNextPin': '没有其他标记点带照片',
     'photo.hintMany': (v) => `点击图片查看原图 \u00b7 共 ${v.count} 张`,
     'photo.hintOne': '点击图片查看原图',
     'photo.close': '关闭（点击空白处亦可）',
@@ -653,6 +693,7 @@ const DICT = {
     'layer.keyConfigured': '已配置',
     'layer.keyMissing': '尚未配置',
     'layer.typeHeading': '地图类型',
+    'layer.switchHint': '切换地图类别',
     'layer.sourceHeading': '地图图源',
     'layer.noMapHint': '仅显示坐标网格，不下载地图瓦片。',
     'layer.chooseSource': '选择地图图源',
@@ -731,8 +772,6 @@ const DICT = {
     'insight.access': '入口',
     'insight.viewpoint': '观景',
 
-    'switch.title': 'Switch to English',
-
     // Units stay in their international form in both languages: "16.81 km" is read at a glance, "16.81 公里"
     // is a sentence. Everything else on the page is translated; a measurement is not a word.
     'unit.m': 'm',
@@ -793,12 +832,6 @@ const listeners = new Set();
 export const getLang = () => lang;
 export const isChinese = () => lang === 'zh';
 
-/** The label for the switch button: it shows where you are, the tooltip says where the click goes. */
-export const langLabel = () => (lang === 'zh' ? '中' : 'EN');
-
-/** True when the click would change the language, i.e. the pair this build actually ships. */
-export const otherLang = () => (lang === 'zh' ? 'en' : 'zh');
-
 export function onLangChange(fn) {
   listeners.add(fn);
   return () => listeners.delete(fn);
@@ -811,8 +844,6 @@ export function setLang(next) {
   for (const fn of listeners) fn(lang);
   return true;
 }
-
-export const toggleLang = () => setLang(otherLang());
 
 /** Looks the text up; a function value gets the values, a string has {placeholders} filled in. */
 export function t(key, values) {

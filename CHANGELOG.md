@@ -17,6 +17,414 @@ Added / Changed / Deprecated / Removed / Fixed / Security 分类；没有内容�
 
 - None.
 
+## 1.25.7 — 2026-11-20
+
+### 中文
+
+#### 新增
+
+- 工具箱标题栏新增 **?** 快捷键速查页，以两列表格列出 `W / S / A D / Q E / C / M / T`，可从主菜单或任意
+  工具子页进入并原路返回。
+- 新增 <kbd>T</kbd> 快捷键打开或关闭工具箱；页面内文本输入框获得焦点时，所有全局快捷键与工具箱键自动放行。
+- 测距页顶部新增 **返回** 按钮：回到工具箱主菜单或浏览其它工具时保留测距状态与已打点位，仅在真正开始或
+  结束测距时切换工具页。
+- 测距工具支持自动吸附手动创建的测距点（排除当前活动段末点以防自吸死锁），方便闭合环线或跨段续接；
+  同像素平手时遵循 `标记点 > 测距点 > 轨迹点` 优先级，撤回或清空后即时更新。
+- 浮动面板与标记点卡片新增轻量进入动效，并在系统开启“减少动态效果”时自动降级。
+
+#### 变更
+
+- **标记点卡片统一与整卡照片预览**：
+  - 带照片的标记点卡片改为“整卡即照片”（竖幅 `4:3` 铺满），名称与“时间 · 海拔”压在底部渐隐层上，点击
+    照片任意位置进入全览；“下一张”按路线顺序跳到下一处带照片的标记点并显示 `2/9` 进度。
+  - 无照片标记点卡片改为与照片卡片同一套外壳（固定 `224 px` 宽度、圆角、右上角关闭按钮、一致的名称
+    与元信息字级），长描述在卡内滚动，不再拉长遮住地图；短窗口下高于安全区的卡片自动对齐安全区顶部。
+- **标准化地图吸附与点位选中视觉系统**：
+  - 全项目统一使用双描边 `18×18` 准星与 `--snap-*` 设计令牌，按目标类型区分形状——标记点菱形、测距点
+    方块、轨迹点十字——在浅色地形图和深色卫星图上都清晰可辨，搭配轻量化半透明吸附标签与 `120 ms`
+    入场动效。
+  - 测距悬停、点位坐标拾取悬停以及点击/导航选中标记点全部复用这套标准化准星；选中图钉同时配以暖金色
+    轮廓微光，不再使用模糊蓝光晕或随缩放失调的描边圈。
+- **界面语言切换收口到工具箱顶栏**：地图右上角不再单独放置语言开关，工具箱标题栏改为单个 **地球图标 +
+  当前语言（`中` / `EN`）** 按钮，悬停提示直接显示目标语言本名（`English` / `中文`）；点击就地重绘整页，
+  地图视野、已展开面板与测距进度保持不变。
+- **轨迹摘要卡与路线标签优化**：摘要卡改为两行六项（首行里程、上升、下降；次行总用时、运动均速、点数），
+  里程与总用时左侧保留蓝色重点竖线；移除主界面内重复的快捷键徽标；视口内公里胶囊自动避让路线起终点、
+  上一胶囊和附近航点，同时保留方向箭头。
+- **海拔剖面渲染优化**：改用低饱和户外色阶与密集航点像素抽稀，剖面填充合并为单条 SVG 路径和单个横向
+  渐变；悬停光标使用缓存边界与独立合成层位移，减少长轨迹悬停合成开销。
+- **图标与布局响应性能**：收敛设计令牌与字体对比度，航点图钉采用对称 `24×32` 网格、居中按钮使用四角
+  取景框、设置采用六齿齿轮并缓存 SVG 模板；地图布局改为“读取快照 → 写入样式 → 下一帧复核”，消除同帧
+  强制重排，拖动地图时临时关闭高开销面板模糊并隔离浮层重绘。
+- **工程结构与模块边界**：宿主拆分消息路由、WebView 生命周期与消息处理模块（`TrailViewerPanel.cs` 精简
+  并完成可空引用检查清理）；前端拆出图层、定制图源、测距、吸附指示器与工具箱主菜单模块，样式表从
+  `index.html` 并行加载。
+
+#### 移除
+
+- 标记点卡片不再显示经纬度坐标；需要复制坐标时可使用工具箱 **点位坐标**。
+
+#### 修复
+
+- 修复标记点图钉锚点偏置（`iconAnchor` 由 `[10, 26]` 校正为 `[12, 28]`、`popupAnchor` 对齐 `[0, -26]`），
+  使图钉针尖、吸附/选中准星中心、轨迹坐标与弹窗箭头精确同轴对齐。
+- 修复无照片标记点卡片背景过暗：原弹窗外壳与卡片各绘制一遍 `--panel` 叠成近乎不透明，现只由外壳绘制
+  一次，透明度与标记点列表保持一致。
+- 修复切换界面语言或窗口布局刷新把工具箱退回主菜单，以及快捷键速查返回丢失来源页面的问题。
+- 修复点击标记点时地图跳动两次（统一由 `popupopen` 作为唯一聚焦平移入口），以及照片卡片“下一张”误用排序前
+  下标导致跳到无关点位的问题。
+- 修复竖幅照片卡片被通用弹窗 `max-height` 裁切底部信息与翻页箭头的问题。
+- 修复图层面板“添加图源”按钮因把状态取值函数当成布尔值而点击无效，以及定制管理入口在列表中异常常驻的问题。
+- 修复坐标拾取模式下因 `panels.css` 顶部残留无效声明块而丢弃十字准星光标规则的问题。
+- 修复宿主附件回退写入前未重置流位置、导航焦点定时器未在关闭时停止的问题，并明确拦截 IPv6 未指定地址 `::`。
+
+### English
+
+#### Added
+
+- Added a **?** keyboard reference page in the toolbox header (`W / S / A D / Q E / C / M / T`) as a compact
+  two-column table; it opens from the main menu or any subpage and returns to the page it was opened from.
+- Added <kbd>T</kbd> to toggle the toolbox; all global and toolbox shortcuts yield automatically while a text
+  input has focus.
+- Added a **Back** button at the top of the distance-measurement page so returning to the toolbox menu or checking
+  another tool preserves the measuring state and all placed points.
+- Distance measurement now snaps automatically to manually placed measurement points (excluding the active section's
+  last vertex to prevent self-snapping), making loop closures and cross-section branches exact. Exact-pixel ties
+  follow `marker > measured point > track point`, and undo/clear update snap targets immediately.
+- Added a subtle entrance transition for floating panels and waypoint cards with automatic `prefers-reduced-motion`
+  fallback.
+
+#### Changed
+
+- **Unified waypoint cards and full-bleed photo preview**:
+  - Waypoints with photos now open as portrait `4:3` cards filled by the photo, with name and "time · elevation"
+    over a bottom scrim; clicking anywhere on the photo opens the full-size viewer, and "Next" advances along the
+    route to the next photo stop with a `2/9` counter.
+  - Plain waypoint cards without photos now share the same shell (`224 px` width, corner radius, top-right close
+    button, matching title/meta typography) and scroll long descriptions internally instead of stretching down the
+    map; cards taller than the safe band align cleanly to the safe top on short windows.
+- **Standardized map-snapping and waypoint-selection visual system**:
+  - Consolidated snapping reticles into double-stroked `18×18` symbols and `--snap-*` design tokens differentiated
+    by target kind — diamond for waypoints, square for measured points, cross for track samples — paired with a
+    lighter translucent snap label and a `120 ms` lock-in transition.
+  - Distance-measurement hover, coordinate-picker hover, and clicked/navigated waypoint selection now share the
+    same reticle with a subtle warm accent glow on the selected pin, replacing the old blurred blue ground halo.
+- **Single language toggle in the toolbox header**: removed the standalone map-corner language control in favour
+  of one **globe icon + current language (`中` / `EN`)** button whose tooltip names the target language in its own
+  script (`English` / `中文`); toggling repaints in place while preserving map view, open panels, and active
+  measurements.
+- **Track summary hierarchy and kilometre labels**: arranged the summary into two rows of three (`distance / ascent /
+  descent`, `total time / moving average speed / points`) with blue accent rules marking distance and total time,
+  removed duplicate inline shortcut badges, and had kilometre capsules avoid route ends, previous capsules, and
+  nearby waypoints while keeping direction arrows.
+- **Elevation profile rendering**: switched to a muted outdoor palette with dense-pin pixel thinning and a single
+  SVG path plus single horizontal gradient fill; the scrubber reuses cached bounds and transform-only compositing.
+- **Icons and layout responsiveness**: consolidated surface/radius/contrast tokens with a `11 px` minimum for core
+  labels, adopted a symmetric `24×32` waypoint template, four-corner fit-bounds icon, six-tooth settings gear, and
+  SVG `<template>` caching; moved map layout to a read-snapshot, write-styles, next-frame verification flow,
+  paused backdrop blur during map drags, and isolated floating panels with `contain`.
+- **Architecture and module boundaries**: split host message routing, WebView lifecycle, and message handlers into
+  focused files (`TrailViewerPanel.cs` reduced with nullable cleanup across core host units), separated frontend
+  layers, custom-source manager, measurement, snap indicator, and toolbox subviews, and loaded stylesheets in
+  parallel from `index.html`.
+
+#### Removed
+
+- Waypoint cards no longer print coordinates; **Point coordinates** in the toolbox remains the dedicated tool for
+  copying them.
+
+#### Fixed
+
+- Corrected the waypoint pin anchor from `[10, 26]` to `[12, 28]` (and `popupAnchor` to `[0, -26]`) so the pin tip,
+  diamond snap/selection reticle, recorded coordinate, and popup arrow align on the exact same centreline.
+- Fixed plain-pin cards appearing too dark: `--panel` was painted twice (once on the popup shell and once on the
+  card); it is now painted once so translucency matches the waypoint overview.
+- Fixed switching interface language or refreshing layout knocking the toolbox back to its main menu, and fixed the
+  shortcut reference losing its return subpage.
+- Fixed the map jumping twice when clicking a pin (consolidated panning into `popupopen` alone) and fixed the photo
+  card "Next" button using pre-sort `sourceIndex` instead of route-ordered `navigationIndex`.
+- Fixed portrait photo cards having their bottom metadata and next arrow clipped by generic popup `max-height` caps.
+- Fixed the custom-source "Add source" button failing because an injected state getter was evaluated as a boolean,
+  and stopped management actions from staying visible inappropriately.
+- Fixed coordinate-picking mode keeping a grab cursor because an orphaned declaration block at the top of
+  `panels.css` caused browsers to discard the crosshair rule.
+- Fixed the host attachment fallback failing to rewind its stream before retrying, made the post-navigation focus
+  timer stop cleanly on close, and explicitly blocked the IPv6 unspecified address `::`.
+
+## 1.25.6 — 2026-11-19
+
+### 中文
+
+#### 变更
+
+- 没有照片的标记点卡片改为与带照片卡片同一套样式：同样 224 px 宽度、8 px 圆角和右上角关闭按钮，
+  名称与“时间 · 海拔”沿用卡片的两行字级；描述较长时在卡片内滚动，不再把卡片拉长压住地图。
+
+#### 移除
+
+- 标记点卡片不再显示经纬度。图钉已经标出位置，六位小数的坐标是这张窄卡片里最宽也最少被读的一行；
+  需要坐标时可用工具箱的 **点位坐标**。
+
+### English
+
+#### Changed
+
+- A pin without photos now opens the same card as one with photos: the same 224 px width, 8 px radius and
+  top-right close button, with the name and "time · elevation" kept at the card's two type sizes. A longer
+  description scrolls inside the card instead of stretching it down the map.
+
+#### Removed
+
+- Waypoint cards no longer print coordinates. The pin already marks the spot, and the six-decimal pair was the
+  widest and least-read line a card this narrow could hold; **Point coordinates** in the toolbox still copies it.
+
+## 1.25.5 — 2026-11-19
+
+### 中文
+
+#### 变更
+
+- 界面语言改成工具箱标题栏里的**一个按钮**：按钮显示当前语言（`中` 或 `EN`）并带一个双向箭头，点击即在
+  中文与英文之间切换；提示与无障碍名称写明「界面语言：中文，点击切换到 英文」。不再用并排两个选项的
+  胶囊，避免读成“二选一”而不是“翻一下”。
+- 工具箱标题栏去掉“快速启动”说明文字，标题独占剩余宽度；新增 `swap` 双向箭头图标。
+
+### English
+
+#### Changed
+
+- The interface language is now **one button** in the toolbox header: it prints the language in use (`中` or
+  `EN`) beside a two-way arrow, and a click flips between Chinese and English. Tooltip and accessible name read
+  "Interface language: Chinese. Click for English." The side-by-side two-option pill is gone — it read as a
+  choice rather than a flip.
+- The toolbox header no longer prints the "Quick launch" note, so the heading takes the remaining width, and
+  the icon set gains a `swap` two-way arrow.
+
+## 1.25.4 — 2026-11-19
+
+### 中文
+
+#### 新增
+
+- 测距页顶部增加 **返回** 按钮：回到工具箱主菜单时测距状态与已打的点全部保留，去看别的工具再回来
+  可以接着量同一段，不会因为翻页被打断。
+- 界面语言切换移入工具箱标题栏，做成 **中 / EN** 胶囊按钮：两种语言同时可见，当前语言填充高亮，点击
+  另一侧立即切换；地图右上角不再有单独的语言按钮。切换后整页就地重绘，地图视野与已展开的面板保持原样。
+- 新增 `T` 键打开或关闭工具箱。快捷键速查表增至七项（`W / S / A D / Q E / C / M / T`），仍为两列。
+
+#### 修复
+
+- 修复切换界面语言或布局刷新把工具箱从当前工具页挤回主菜单：现在只有测距模式真正开始或结束才切换
+  页面，测距页、坐标页和导出页在重绘后保持原位。
+- 修复快捷键速查页从坐标、导出等子页打开后只能回到主菜单：现在会退回进入前的那一页。
+
+### English
+
+#### Added
+
+- The measure page now opens with **Back** at the top: returning to the toolbox menu keeps the measuring state
+  and every point already placed, so looking at another tool no longer interrupts a measurement.
+- The interface-language switch moved into the toolbox header as a **中 / EN** pill: both languages stay
+  visible, the active one is filled, and clicking the other side switches immediately. The map corner no longer
+  carries a separate language button. The page repaints in place, keeping the map view and any open panel.
+- `T` now opens or closes the toolbox. The keyboard reference grows to seven entries
+  (`W / S / A D / Q E / C / M / T`) and stays a two-column table.
+
+#### Fixed
+
+- Fixed the toolbox falling back to the menu whenever the interface language changed or the layout refreshed:
+  only the measuring mode's own start and end switch pages now, so the measure, coordinate and export pages
+  stay where they were after a repaint.
+- Fixed the keyboard reference always returning to the menu when opened from a subpage such as coordinates or
+  export; it now returns to the page it was opened from.
+
+## 1.25.3 — 2026-11-19
+
+### 中文
+
+#### 变更
+
+- 工具箱快捷键速查改为两列表格，顺序为 `W / S / A D / Q E / C / M`，六项排成三行，短窗口内不再需要滚动。
+- 轨迹信息卡改为两行六项：第一行里程、上升、下降，第二行总用时、运动均速、点数；里程和总用时左侧加
+  蓝色竖线作为重点标识，其余四项保持次级层级。
+- 选中标记点改为柔和地面光晕：取消图钉自身的描边圈，光晕改为无描边的贴地圆斑并加 `blur(5px)`，
+  图钉本体改用蓝色 `drop-shadow` 发光。
+- 标记点照片卡片改为“整卡即照片”：照片铺满整个**竖幅 4:3**（高:宽）卡片，名称与“时间 · 海拔”压在
+  底部渐隐层上，看图面积达到卡片高度的 100%。取消“查看原图”按钮（点照片任意处即打开全览），移除坐标值；
+  “下一张”简化为右下角圆形箭头，上方显示 `2/9` 位置进度。卡片加入与其它浮层一致的微动效
+  （淡入 + 轻微上浮），并跟随系统“减少动态效果”设置。
+
+#### 修复
+
+- 修复地图图层的“添加图源”按钮点击后没有任何反应：图源管理器把传入的取值函数当成布尔值使用，导致新增
+  表单在隐藏的页面里打开，界面毫无变化；同时“管理图源”和数量标记在图层列表中被错误地强制显示。
+- 修复点击标记点时地图乱跳：Leaflet 在触发 click 之前就已打开 popup，两条路径各自触发一次聚焦平移，
+  第二次量到的还是正在展开的 popup，于是又纠正了第一次刚稳定下来的位置。现改为 popupopen 是唯一的平移
+  入口，点击、方向键、列表三个入口都只平移一次。
+- 修复“下一张”按钮乱跳：它用 `sourceIndex` 定位，而该值在 `sortStops()` 排序之前就已固定，
+  排序后数组顺序变了、下标却没变，于是跳到无关的点位。改用 `navigationIndex`，它按路线里程稳定排序。
+- 修复坐标点位工具启动后地图仍是手状光标：`panels.css` 开头残留一段无选择器的声明块，
+  浏览器连带丢弃了紧随其后的 `is-coordinate-picking` 光标规则。修复后拾取态正确显示十字准星。
+- 修复竖幅照片卡片底部信息和箭头被裁掉：`map-view.js` 的 `popupRect()` 会给弹窗内容写内联
+  `max-height`，对高 299 px 的竖幅卡片会截断；现跳过 `.photo-popup`，CSS 也不再限制该弹窗高度。
+- 修复短窗口下竖幅卡片压住摘要卡：`focusOffset` 增加“内容高于安全区时顶部对齐”的分支，布局刷新改用
+  `focusSelection` 而非只做最小移动的 `revealPoint`。
+
+### English
+
+#### Changed
+
+- The toolbox keyboard reference is now a two-column table ordered `W / S / A D / Q E / C / M`; six entries
+  in three rows fit a short panel without scrolling.
+- The track summary card is now two rows of three: distance, ascent and descent, then total time, moving average
+  speed and points. Distance and total time carry a blue rule on their left edge as the primary markers.
+- The waypoint photo card is now the photo: it fills the whole portrait 4:3 frame (height : width) and the name plus time/elevation sit on
+  a bottom scrim, taking the visible image to 100% of the card. The "Open photo" button is gone (the
+  photo itself opens the viewer), coordinates are no longer printed, and "Next" is a round arrow in the corner
+  with a `2/9` position counter above it. The card also enters with the same short fade and rise as the
+  other floating panels, and honours the system reduce-motion setting.
+- Selecting a waypoint now reads as a soft patch of light on the ground: the outline around the pin is gone, the
+  halo is a strokeless ground disc softened with `blur(5px)`, and the pin itself glows with a blue
+  `drop-shadow`.
+
+#### Fixed
+
+- Fixed the map keeping its grab hand after the coordinate picking tool started: a selector-less declaration block
+  left at the top of `panels.css` made the browser discard the `is-coordinate-picking` cursor rule that
+  followed it. The picking mode now shows the crosshair it always meant to.
+- Fixed the map jumping when a waypoint pin is clicked: Leaflet opens the popup before it fires click, so both
+  paths panned once each, and the second pan measured a popup that was still expanding and corrected the position
+  the first pan had just settled. popupopen is now the only place that pans, so a click, an arrow key and the
+  overview list each move the map exactly once.
+- Fixed the photo card "Next" button jumping to an unrelated pin: it located its neighbour with `sourceIndex`,
+  which is fixed before `sortStops()` reorders the array. It now uses `navigationIndex`, which follows the
+  route distance.
+- Fixed the map layer "Add source" button appearing to do nothing: the custom-source manager read the injected
+  state getter as a boolean, so the form opened inside a hidden page and the UI never changed. The same bug forced
+  the "Manage sources" link and the entry counter to stay visible in the layer list.
+- Fixed the portrait photo card losing its facts and next arrow: `popupRect()` in `map-view.js` wrote an
+  inline `max-height` onto every popup, which clipped a 299 px tall card. It now skips `.photo-popup`, and
+  the stylesheet no longer caps that popup either.
+- Fixed a tall card covering the summary in short windows: `focusOffset` now aligns content taller than the safe
+  band to the safe top, and layout refreshes re-apply `focusSelection` instead of the minimal-movement
+  `revealPoint`.
+
+## 1.25.2 — 2026-11-19
+
+### 中文
+
+#### 新增
+
+- 工具箱标题栏新增 `?` 快捷键速查入口，集中列出 `M / W / C / S / Q / E / ← →`。
+
+#### 变更
+
+- 移除测距卡片、标记点按钮和主工具箱内的重复快捷键徽标；按钮悬停提示继续保留快捷键。
+- 摘要卡移除蓝色竖线，里程与上升改用字重、字号和颜色形成主次层级。
+- 剖面填充改为单条路径与单个横向渐变，悬停光标使用缓存尺寸和独立合成层位移。
+- 公里胶囊避让起终点及上一已绘胶囊，方向箭头不受影响。
+
+### English
+
+#### Added
+
+- The toolbox header now includes a `?` shortcut reference for `M / W / C / S / Q / E / ← →`.
+
+#### Changed
+
+- Duplicate shortcut badges were removed from the measurement card, marker control and main toolbox;
+  native tooltips still expose the keys.
+- The summary card replaces the blue rule with typography-led distance and ascent hierarchy.
+- The profile fill now uses one path and one horizontal gradient; the scrubber uses cached bounds and
+  transform-only cursor layers.
+- Kilometre capsules avoid route ends and the previous capsule without removing direction arrows.
+
+## 1.25.1 — 2026-11-19
+
+### 中文
+
+#### 变更
+
+- 移除剖面填充的底端渐隐遮罩，避免长轨迹悬停时重复合成大量遮罩层。
+
+### English
+
+#### Changed
+
+- Removed the profile fill's bottom fade to avoid compositing many mask layers while scrubbing long tracks.
+
+## 1.25.0 — 2026-11-19
+
+### 中文
+
+#### 新增
+
+- 图层菜单显示 `Q / E` 提示，工具箱主菜单显示 `M / W / C / S` 快捷键提示，标记点控制显示 `W` 徽标。
+- 浮动面板增加轻量进入动效，并提供系统“减少动态效果”降级。
+- PR 工作流把浏览器测试拆为 core、map、tools、media、network 五组并行。
+
+#### 变更
+
+- 地图布局改为“读取快照 → 写入样式 → 下一帧复核”，消除同帧强制重排。
+- 航点图钉改用对称 `24×32` 模板，取景按钮改为四角取景框，设置图标改为六齿版本。
+- SVG 图标模板按名称、尺寸和样式缓存，重复图标只克隆缓存节点。
+- 视觉 Token 收敛圆角、表面、边框和层级；核心标签最小字号提高到 11 px，并增强弱文字对比度。
+- 摘要卡突出里程与累计爬升，其余指标保持次级层级。
+- 剖面改为低饱和松绿、暖琥珀、焦糖橙、暗绯红阶，并增加底部渐隐和密集航点像素抽稀。
+- 里程标签避让 24 px 内可见航点，昂贵的 SVG `drop-shadow` 改为描边或轻量阴影。
+- 地图拖动期间临时关闭浮动面板模糊，浮层增加 `contain: layout style paint`。
+- 宿主消息路由、WebView 生命周期、图层视图、定制图源管理、测距页、工具箱主菜单和测试 API 拆为独立模块。
+- `TrailViewerPanel.cs` 从约 1000 行降至约 400 行；新增宿主文件启用可空引用检查。
+- 样式表直接由 `index.html` 并行加载，移除串行 `@import` 入口。
+
+#### 修复
+
+- 附件主目录写入失败回退前复位流位置，避免回退文件截断。
+- 明确拦截 IPv6 未指定地址 `::`。
+- 导航完成后的焦点重试定时器提升为实例字段，并在关闭时停止。
+
+#### 安全
+
+- 完成 `TrailViewerPanel`、`AttachmentExport`、`KmzArchive` 的渐进可空引用检查清理。
+
+### English
+
+#### Added
+
+- Layer menus now show `Q / E`, the toolbox shows `M / W / C / S` shortcut hints, and the marker control
+  carries a `W` badge.
+- Floating panels have a lightweight entrance transition with reduced-motion fallback.
+- Pull-request browser tests now run in five parallel groups: core, map, tools, media and network.
+
+#### Changed
+
+- Map layout now uses a read-snapshot, write-styles, next-frame verification flow, removing same-frame forced
+  reflow.
+- Waypoint pins use a symmetric `24×32` template, fit-to-route uses a four-corner frame, and settings uses a
+  clearer six-tooth gear.
+- SVG templates are cached by name, size and style; repeated icons clone cached nodes.
+- Radius, surface, border and layer tokens are consolidated; core labels start at 11 px and muted text has
+  stronger contrast.
+- The summary card promotes distance and ascent ahead of secondary metrics.
+- The profile uses a muted pine, amber, caramel and oxblood scale with a bottom fade and dense-pin thinning.
+- Kilometre capsules avoid visible waypoints within 24 px, and expensive SVG `drop-shadow` filters are replaced
+  by outlines or lightweight shadows.
+- Panel blur is disabled while the map is dragging, and floating panels isolate layout, style and paint.
+- Host message routing, WebView lifecycle, layer views, custom-source management, measurement, toolbox main menu
+  and the test API are split into focused modules.
+- `TrailViewerPanel.cs` drops from roughly 1000 lines to about 400; new host files enable nullable analysis.
+- Stylesheets load in parallel from `index.html`, removing the serial `@import` entry point.
+
+#### Fixed
+
+- Attachment fallback rewinds its stream before retrying another folder.
+- The IPv6 unspecified address is explicitly blocked.
+- The post-navigation focus retry is now an instance timer and stops on close.
+
+#### Security
+
+- Nullable-reference cleanup is complete for `TrailViewerPanel`, `AttachmentExport` and `KmzArchive`.
+
 ## 1.24.0 — 2026-11-19
 
 ### 中文

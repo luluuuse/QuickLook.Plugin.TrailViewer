@@ -53,6 +53,16 @@ test('a target larger than the safe area is centred', () => {
   assert.deepEqual(result, { x: -150, y: 0, needed: true });
 });
 
+// The portrait photo card is 299 px tall and a short window's safe band is often under 240. Centring it would
+// still leave it over the summary or the profile, so an oversize card aligns to the safe top and reads downward.
+test('a card taller than the safe area aligns to the safe top', () => {
+  const safe = makeRect(100, 160, 900, 400);
+  const card = unionRects([makeRect(480, 380, 510, 400), makeRect(430, 100, 660, 399)]);
+  const result = focusOffset(card, safe);
+  assert.equal(result.needed, true);
+  assert.equal(result.y, 60);
+});
+
 test('comfort rectangle never collapses in a small safe area', () => {
   const safe = makeRect(10, 20, 90, 100);
   const comfort = comfortRect(safe);

@@ -92,6 +92,45 @@ export function createHostBridge() {
     if (hasHost) post(`custom-sources\t${JSON.stringify(entries)}`);
   }
 
+  function installViewerMessages(api, clipboardResultHandler) {
+    window.chrome?.webview?.addEventListener('message', (event) => {
+      if (typeof event.data !== 'string') return;
+      const parts = event.data.split('\t');
+      if (parts[0] === 'clipboardResult') {
+        clipboardResultHandler(parts[1], parts[2] === '1', parts[3]);
+      } else if (parts[0] === 'attachmentResult') {
+        api.attachments.result(
+          parts[1],
+          Number(parts[2]),
+          parts[3] === '1',
+          decodeMessage(parts[4]),
+          decodeMessage(parts[5]),
+        );
+      } else if (parts[0] === 'attachmentResume') {
+        api.attachmentResume(parts[1], parts[2], decodeMessage(parts[3]));
+      } else if (parts[0] === 'overlayExported') {
+        api.exported(decodeMessage(parts[1]));
+      } else if (parts[0] === 'overlayFailed') {
+        api.exportFailed(decodeMessage(parts[1]));
+      } else if (parts[0] === 'tianditu-response') {
+        api.tiandituResponse(Number(parts[1]));
+      }
+    });
+  }
+
+  function installTextInputReporting(isTextField) {
+    let reported = null;
+    const report = (active) => {
+      if (active === reported) return;
+      reported = active;
+      post(`text-input\t${active ? '1' : '0'}`);
+    };
+    document.addEventListener('focusin', (event) => report(isTextField(event.target)));
+    document.addEventListener('focusout', (event) => {
+      if (!isTextField(event.relatedTarget)) report(false);
+    });
+  }
+
   return {
     hasHost,
     post,
@@ -99,5 +138,7 @@ export function createHostBridge() {
     copyText,
     clipboardResult,
     persistCustomSources,
+    installViewerMessages,
+    installTextInputReporting,
   };
 }

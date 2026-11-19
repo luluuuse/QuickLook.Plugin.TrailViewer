@@ -1,7 +1,14 @@
 import { distanceMeters } from './geo.js';
+import { createSnapIndicator } from './snap-indicator.js';
 import { createPointIndex } from './spatial.js';
 
 export const SNAP_PIXELS = 14;
+
+const SNAP_PRIORITY = Object.freeze({
+  marker: 3,
+  measure: 2,
+  track: 1,
+});
 
 /**
  * @param {{lat:number, lon:number}[][]} sections
@@ -23,8 +30,8 @@ export function measurementSummary(sections) {
 }
 
 /**
- * Pick the closest target within the snap radius. A marker wins an exact tie so the more meaningful
- * object is recorded when a waypoint and a track sample occupy the same pixel.
+ * Pick the closest target within the snap radius. Exact ties follow marker > measure > track so
+ * explicit waypoints win over measured vertices, which win over dense track samples.
  *
  * @param {{kind:string, distancePixels:number}[]} candidates
  */
@@ -32,10 +39,11 @@ export function chooseSnap(candidates) {
   let best = null;
   for (const candidate of candidates) {
     if (!(candidate.distancePixels <= SNAP_PIXELS)) continue;
+    const rank = SNAP_PRIORITY[candidate.kind] || 0;
+    const bestRank = best ? (SNAP_PRIORITY[best.kind] || 0) : -1;
     if (!best
       || candidate.distancePixels < best.distancePixels
-      || (candidate.distancePixels === best.distancePixels
-        && candidate.kind === 'marker' && best.kind !== 'marker')) {
+      || (candidate.distancePixels === best.distancePixels && rank > bestRank)) {
       best = candidate;
     }
   }
@@ -60,7 +68,12 @@ export function createMeasurement({
   let trackIndex = null;
   const layer = L.layerGroup().addTo(map);
   const previewLayer = L.layerGroup().addTo(map);
-  const snapLayer = L.layerGroup().addTo(map);
+  const snapIndicator = createSnapIndicator({
+    L,
+    map,
+    t,
+    labelClassName: 'snap-label measure-snap-label',
+  });
   const listeners = new Set();
   let sections = [];
   let current = null;
@@ -192,10 +205,37 @@ export function createMeasurement({
     };
   }
 
+  function nearestMeasured(latlng) {
+    if (sections.length === 0) return null;
+    const lat = Number(latlng.lat);
+    const lon = Number(latlng.lng ?? latlng.lon);
+    const targetScreen = map.latLngToContainerPoint([lat, lon]);
+    const last = current?.points.length ? current.points[current.points.length - 1] : null;
+    let best = null;
+    for (const section of sections) {
+      for (const point of section.points) {
+        if (last && distanceMeters(last, point) < 0.01) continue;
+        const pointScreen = map.latLngToContainerPoint([point.lat, point.lon]);
+        const distancePixels = targetScreen.distanceTo(pointScreen);
+        if (!best || distancePixels < best.distancePixels) {
+          best = {
+            lat: point.lat,
+            lon: point.lon,
+            ele: point.ele,
+            kind: 'measure',
+            distancePixels,
+          };
+        }
+      }
+    }
+    return best;
+  }
+
   function snapAt(latlng) {
     const marker = nearest(getWaypointIndex(), latlng, 'marker');
+    const measured = nearestMeasured(latlng);
     const track = nearest(getTrackIndex(), latlng, 'track');
-    return chooseSnap([marker, track].filter(Boolean)) || {
+    return chooseSnap([marker, measured, track].filter(Boolean)) || {
       lat: Number(latlng.lat),
       lon: Number(latlng.lng ?? latlng.lon),
       kind: 'free',
@@ -214,16 +254,19 @@ export function createMeasurement({
   }
 
   function hideHover() {
+    if (moveFrame) {
+      cancelAnimationFrame(moveFrame);
+      moveFrame = 0;
+    }
     hover = null;
     previewLayer.clearLayers();
-    snapLayer.clearLayers();
+    snapIndicator.hide();
   }
 
   function paintHover(target) {
     if (!active) return;
     hover = target;
     previewLayer.clearLayers();
-    snapLayer.clearLayers();
     if (current?.points.length) {
       const last = current.points[current.points.length - 1];
       L.polyline([[last.lat, last.lon], [target.lat, target.lon]], {
@@ -235,26 +278,7 @@ export function createMeasurement({
         className: 'measure-preview',
       }).addTo(previewLayer);
     }
-    if (target.kind === 'free') return;
-    L.circleMarker([target.lat, target.lon], {
-      radius: 10,
-      color: '#fff2a8',
-      weight: 2,
-      fillColor: '#ffffff',
-      fillOpacity: 0.08,
-      interactive: false,
-      pane: 'markerPane',
-    }).addTo(snapLayer);
-    const text = target.kind === 'marker' ? t('measure.snapMarker') : t('measure.snapTrack');
-    L.marker([target.lat, target.lon], {
-      interactive: false,
-      keyboard: false,
-      icon: L.divIcon({
-        className: 'measure-snap-label',
-        html: `<span>${text}</span>`,
-        iconAnchor: [-12, 22],
-      }),
-    }).addTo(snapLayer);
+    snapIndicator.show(target);
   }
 
   function addAt(latlng) {
@@ -281,7 +305,12 @@ export function createMeasurement({
   }
 
   function onMouseMove(event) {
-    if (!active || moveFrame) return;
+    if (!active) return;
+    if (event.originalEvent?.target?.closest?.('.leaflet-control')) {
+      hideHover();
+      return;
+    }
+    if (moveFrame) return;
     const latlng = event.latlng;
     moveFrame = requestAnimationFrame(() => {
       moveFrame = 0;
@@ -350,7 +379,7 @@ export function createMeasurement({
 
   function relabel() {
     draw();
-    if (hover) paintHover(hover);
+    snapIndicator.relabel();
     notify();
   }
 

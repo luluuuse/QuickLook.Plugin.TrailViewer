@@ -1,3 +1,5 @@
+#nullable enable
+
 using QuickLook.Common.Helpers;
 using System;
 using System.Collections.Concurrent;
@@ -43,7 +45,7 @@ internal sealed class AttachmentExport : IDisposable
     private int _savedCount;
     private bool _disposed;
 
-    internal AttachmentExport(string sourcePath, string fileRoot = null)
+    internal AttachmentExport(string sourcePath, string? fileRoot = null)
     {
         _sourcePath = Path.GetFullPath(sourcePath);
         _fileRoot = Path.GetFullPath(fileRoot ?? Path.GetDirectoryName(_sourcePath) ?? "");
@@ -51,7 +53,7 @@ internal sealed class AttachmentExport : IDisposable
         _sourceSignature = $"{_sourcePath}|{source.Length}|{source.LastWriteTimeUtc.Ticks}";
     }
 
-    internal string CurrentBatch { get; private set; }
+    internal string CurrentBatch { get; private set; } = string.Empty;
 
     internal int CurrentIndex { get; private set; }
 
@@ -265,6 +267,7 @@ internal sealed class AttachmentExport : IDisposable
         {
             try
             {
+                PrepareFallbackSource(source);
                 var fallback = Path.Combine(SettingHelper.LocalDataPath, "exports", "photos");
                 var target = WriteUnique(index, name, source, fallback);
                 return new AttachmentResult(batch, index, true, target, "");
@@ -274,6 +277,11 @@ internal sealed class AttachmentExport : IDisposable
                 return new AttachmentResult(batch, index, false, "", second.Message);
             }
         }
+    }
+
+    internal static void PrepareFallbackSource(Stream source)
+    {
+        if (source.CanSeek) source.Position = 0;
     }
 
     private string ResolveLocalPath(string relativePath)
@@ -327,7 +335,7 @@ internal sealed class AttachmentExport : IDisposable
         if (Directory.Exists(fallback)) yield return fallback;
     }
 
-    private AttachmentManifest LoadManifest(string folder)
+    private AttachmentManifest? LoadManifest(string folder)
     {
         if (_manifests.TryGetValue(folder, out var cached)) return cached;
         var path = Path.Combine(folder, ManifestName);
@@ -454,7 +462,7 @@ internal sealed class AttachmentExport : IDisposable
             if (!response.IsSuccessStatusCode)
                 throw new InvalidDataException($"the image server returned HTTP {(int)response.StatusCode}");
 
-            var mediaType = response.Content.Headers.ContentType?.MediaType?.ToLowerInvariant();
+            var mediaType = response.Content.Headers.ContentType?.MediaType?.ToLowerInvariant() ?? string.Empty;
             if (string.IsNullOrWhiteSpace(mediaType) || !mediaType.StartsWith("image/", StringComparison.Ordinal))
                 throw new InvalidDataException("the external link did not return an image");
             if (response.Content.Headers.ContentLength > MaxImageBytes)
@@ -530,6 +538,7 @@ internal sealed class AttachmentExport : IDisposable
     private static bool IsBlocked(IPAddress address)
     {
         if (address.IsIPv4MappedToIPv6) address = address.MapToIPv4();
+        if (address.Equals(IPAddress.IPv6None)) return true;
         if (IPAddress.IsLoopback(address)) return true;
         var bytes = address.GetAddressBytes();
         if (address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
@@ -567,25 +576,26 @@ internal sealed class AttachmentExport : IDisposable
         return IsBlocked(address);
     }
 
-    internal static string ImageExtensionFor(byte[] bytes, int length = -1)
+    internal static string? ImageExtensionFor(byte[]? bytes, int length = -1)
     {
-        var available = Math.Min(bytes?.Length ?? 0, length < 0 ? bytes?.Length ?? 0 : length);
+        var data = bytes ?? Array.Empty<byte>();
+        var available = Math.Min(data.Length, length < 0 ? data.Length : length);
         bool Starts(params byte[] prefix) =>
             available >= prefix.Length
-            && prefix.Select((value, index) => bytes[index] == value).All(match => match);
+            && prefix.Select((value, index) => data[index] == value).All(match => match);
 
         if (Starts(0xff, 0xd8, 0xff)) return ".jpg";
         if (Starts(0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a)) return ".png";
         if (Starts(0x47, 0x49, 0x46, 0x38) && available >= 6
-            && (bytes[4] == 0x37 || bytes[4] == 0x39) && bytes[5] == 0x61) return ".gif";
+            && (data[4] == 0x37 || data[4] == 0x39) && data[5] == 0x61) return ".gif";
         if (Starts(0x42, 0x4d)) return ".bmp";
         if (Starts(0x52, 0x49, 0x46, 0x46) && available >= 12
-            && bytes[8] == 0x57 && bytes[9] == 0x45 && bytes[10] == 0x42 && bytes[11] == 0x50)
+            && data[8] == 0x57 && data[9] == 0x45 && data[10] == 0x42 && data[11] == 0x50)
             return ".webp";
         if (available >= 12
-            && bytes[4] == 0x66 && bytes[5] == 0x74 && bytes[6] == 0x79 && bytes[7] == 0x70
-            && bytes[8] == 0x61 && bytes[9] == 0x76 && bytes[10] == 0x69
-            && (bytes[11] == 0x66 || bytes[11] == 0x73))
+            && data[4] == 0x66 && data[5] == 0x74 && data[6] == 0x79 && data[7] == 0x70
+            && data[8] == 0x61 && data[9] == 0x76 && data[10] == 0x69
+            && (data[11] == 0x66 || data[11] == 0x73))
             return ".avif";
         return null;
     }
@@ -686,7 +696,7 @@ internal sealed class AttachmentManifest
 {
     public int Version { get; set; }
 
-    public string Source { get; set; }
+    public string Source { get; set; } = string.Empty;
 
     public Dictionary<string, AttachmentManifestEntry> Completed { get; set; }
         = new Dictionary<string, AttachmentManifestEntry>();
@@ -694,7 +704,7 @@ internal sealed class AttachmentManifest
 
 internal sealed class AttachmentManifestEntry
 {
-    public string Name { get; set; }
+    public string Name { get; set; } = string.Empty;
 
     public long Size { get; set; }
 }

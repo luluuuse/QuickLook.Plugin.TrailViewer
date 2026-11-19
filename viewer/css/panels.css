@@ -1,8 +1,8 @@
 /* Summary, profile, overlays and dark Leaflet controls. */
 
-  background: #20242a;
-}
-
+/* Picking a point is a different mode from panning the map: the whole surface stops saying "drag me" and says
+   "click here". Both selectors are needed -- Leaflet puts .leaflet-grab on the container and .leaflet-interactive
+   on every layer inside it, and either one alone leaves part of the map showing the grab hand. */
 .leaflet-container.is-coordinate-picking,
 .leaflet-container.is-coordinate-picking .leaflet-interactive {
   cursor: crosshair;
@@ -20,7 +20,7 @@
   padding: 8px 12px;
   transform: translateX(-50%);
   border: 1px solid var(--icon-active-line);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: rgba(35, 79, 121, 0.92);
   color: #fff;
   box-shadow: 0 4px 18px rgba(0, 0, 0, 0.5), 0 0 0 3px rgba(47, 155, 255, 0.15);
@@ -70,7 +70,7 @@
 }
 
 .coordinate-focus-label small {
-  font-size: 10px;
+  font-size: 11px;
   font-variant-numeric: tabular-nums;
   overflow-wrap: anywhere;
   white-space: normal;
@@ -79,6 +79,14 @@
 .coordinate-focus-label .coordinate-focus-elevation {
   color: var(--icon-active);
   font-weight: 600;
+}
+
+.coordinate-focus-label.is-snapped {
+  border-color: var(--snap-border);
+}
+
+.coordinate-focus-label.is-snapped .coordinate-focus-details {
+  color: var(--snap-text);
 }
 
 @keyframes coordinate-focus-pulse {
@@ -160,12 +168,12 @@
   min-width: 34px;
   padding: 1px 5px;
   border: 1px solid #4a4a4a;
-  border-radius: 9px;
-  background: #252525;
+  border-radius: var(--radius-md);
+  background: var(--surface-control);
   color: var(--muted);
   cursor: pointer;
   font: inherit;
-  font-size: 9.5px;
+  font-size: 11px;
   line-height: 15px;
 }
 
@@ -184,7 +192,7 @@
   place-items: center;
   border: 1px solid #4a4a4a;
   border-radius: 5px;
-  background: #252525;
+  background: var(--surface-control);
   color: var(--muted);
   cursor: pointer;
 }
@@ -226,17 +234,37 @@
 
 #info .stats dt {
   color: var(--muted);
-  font-size: 10px;
+  font-size: 11px;
   line-height: 1.3;
   white-space: nowrap;
 }
 
 #info .stats dd {
   margin: 0;
+  color: #cfd6df;
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 500;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+
+#info .stats .pair.primary dt {
+  color: #d4dde7;
+  font-size: 11.5px;
+}
+
+#info .stats .pair.primary dd {
+  color: #ffffff;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+/* The two numbers the card answers first -- how far and how long -- carry a blue rule down their left edge.
+   Typography alone separated the headline from the rest but not distance and time from their own row, and a
+   rule marks exactly those two without spending a second accent colour on the others. */
+#info .stats .pair.accent {
+  padding-left: 7px;
+  border-left: 2px solid var(--accent);
 }
 
 /* Facts read once: date, time, what the file holds, photos. Two columns, as before. */
@@ -348,7 +376,7 @@
 .split-toggle-count {
   margin-left: auto;
   color: var(--muted);
-  font-size: 9.5px;
+  font-size: 11px;
   white-space: nowrap;
 }
 
@@ -370,12 +398,12 @@
   margin-right: 9px;
   padding: 3px 7px;
   border: 1px solid #4b5963;
-  border-radius: 9px;
+  border-radius: var(--radius-md);
   background: #23313a;
   color: #b9e9f5;
   cursor: pointer;
   font: inherit;
-  font-size: 9.5px;
+  font-size: 11px;
   line-height: 15px;
 }
 
@@ -399,7 +427,7 @@
   overflow-y: auto;
   overscroll-behavior: contain;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   background: rgba(0, 0, 0, 0.14);
   scrollbar-color: #555 transparent;
   scrollbar-gutter: stable;
@@ -458,7 +486,7 @@
 }
 
 #splits[data-mode="detailed"] .splits-table tbody tr.fastest td:first-child {
-  background: #303030;
+  background: var(--surface-card);
 }
 
 #splits[data-mode="detailed"] .splits-table tbody tr.selected td:first-child {
@@ -563,7 +591,7 @@ html[lang="zh-CN"] .splits-table th {
   gap: 10px;
   margin-top: 8px;
   padding: 8px 9px 7px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   background: #242424;
 }
 
@@ -590,7 +618,7 @@ html[lang="zh-CN"] .splits-table th {
 .split-total span {
   margin-top: 2px;
   color: var(--muted);
-  font-size: 9.5px;
+  font-size: 11px;
   white-space: nowrap;
 }
 
@@ -672,11 +700,6 @@ body.layout-docked #info[data-details="full"] {
     justify-content: center;
   }
 
-  .lang-switch button {
-    width: 34px;
-    padding: 0;
-  }
-
   .pins-switch button > span:not(.dot),
   .waypoint-overview-switch button > span {
     position: absolute;
@@ -704,7 +727,7 @@ body.layout-docked #info[data-details="full"] {
   }
 
   .splits-table th {
-    font-size: 9px;
+    font-size: 11px;
   }
 
   .splits-table td {
@@ -738,9 +761,10 @@ body.with-profile .leaflet-bottom {
   margin-bottom: calc(var(--profile-height, 130px) + 10px);
 }
 
-/* S takes every piece of interface off the map: the summary, both top corners (zoom, fit, export, layers,
-   markers, language) and the profile. The scale and the OSM credit stay -- one says how big the picture is, the
-   other is the terms the tiles come under -- and with no panel in the way they drop back to the floor. */
+/* S takes every piece of interface off the map: the summary, both top corners (zoom, fit, layers, markers) and
+   the profile. The scale and the OSM credit stay -- one says how big the picture is, the other is the terms the
+   tiles come under -- and with no panel in the way they drop back to the floor. The language switch lives in the
+   toolbox header, so it goes with the toolbox. */
 body.chrome-hidden #info,
 body.chrome-hidden #splits,
 body.chrome-hidden #profile,
@@ -783,12 +807,12 @@ body.chrome-hidden.with-profile .leaflet-bottom {
   gap: 4px;
   padding: 0 6px;
   border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: transparent;
   color: var(--muted);
   cursor: pointer;
   font: inherit;
-  font-size: 10px;
+  font-size: 11px;
   line-height: 1;
   pointer-events: auto;
   white-space: nowrap;
@@ -823,21 +847,24 @@ body.chrome-hidden.with-profile .leaflet-bottom {
 #profile .readout {
   position: absolute;
   z-index: 5;
+  top: 0;
+  left: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 2px 6px 3px;
-  transform: translateX(-50%);
+  padding: 1px 6px 2px;
+  transform: translate3d(0, 0, 0) translateX(-50%);
   border: 1px solid rgba(255, 255, 255, 0.3);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   background: rgba(16, 16, 16, 0.5);
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
   color: var(--text);
-  font-size: 9.5px;
-  line-height: 1.35;
+  font-size: 11px;
+  line-height: 1.22;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9), 0 0 3px rgba(0, 0, 0, 0.7);
+  will-change: transform;
   pointer-events: none;
 }
 
@@ -879,7 +906,7 @@ body.chrome-hidden.with-profile .leaflet-bottom {
   border-radius: 3px;
   background: rgba(16, 16, 16, 0.55);
   color: var(--text);
-  font-size: 9.5px;
+  font-size: 11px;
   line-height: 15px;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -951,7 +978,7 @@ body.chrome-hidden.with-profile .leaflet-bottom {
   gap: 4px;
   margin-left: auto;
   color: var(--muted);
-  font-size: 9px;
+  font-size: 11px;
   font-variant-numeric: tabular-nums;
 }
 
@@ -981,7 +1008,7 @@ body.chrome-hidden.with-profile .leaflet-bottom {
   justify-content: space-between;
   width: var(--gutter);
   color: var(--muted);
-  font-size: 10px;
+  font-size: 11px;
   line-height: 1;
   font-variant-numeric: tabular-nums;
   pointer-events: none;
@@ -1013,12 +1040,12 @@ body.chrome-hidden.with-profile .leaflet-bottom {
   display: block;
   width: 100%;
   height: 100%;
+  contain: strict;
+  transform: translateZ(0);
 }
 
-/* Filled by the gradient of each stretch, so the shape of the climb is readable before the axis is. The
-   colours are opaque on purpose: two half-transparent shapes that meet leave a dark seam where neither
-   quite covers. The colour itself is computed per cell in profile.js -- nothing here may set `fill`, or it
-   would win over the attribute and every stretch would be the same shade again. */
+/* One static fill path with one horizontal gradient: long routes keep a single paint layer while the
+   cursor transforms independently above it. The colour is still computed from the shared slope scale. */
 #profile .area {
   stroke: none;
 }
@@ -1037,7 +1064,6 @@ body.chrome-hidden.with-profile .leaflet-bottom {
   stroke-linecap: round;
   stroke-linejoin: round;
   vector-effect: non-scaling-stroke;
-  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.8));
   pointer-events: none;
 }
 
@@ -1046,7 +1072,6 @@ body.chrome-hidden.with-profile .leaflet-bottom {
   stroke-width: 1;
   stroke-dasharray: 6 5;
   vector-effect: non-scaling-stroke;
-  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.8));
   pointer-events: none;
 }
 
@@ -1058,7 +1083,7 @@ body.chrome-hidden.with-profile .leaflet-bottom {
   border-radius: 3px;
   background: rgba(16, 16, 16, 0.62);
   color: #ffc0c7;
-  font-size: 9px;
+  font-size: 11px;
   font-variant-numeric: tabular-nums;
   line-height: 1.2;
   white-space: nowrap;
@@ -1080,7 +1105,7 @@ body.chrome-hidden.with-profile .leaflet-bottom {
   justify-content: space-between;
   align-items: flex-end;
   color: #ffb3bb;
-  font-size: 9px;
+  font-size: 11px;
   line-height: 1;
   font-variant-numeric: tabular-nums;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.95);
@@ -1101,8 +1126,11 @@ body.chrome-hidden.with-profile .leaflet-bottom {
   position: absolute;
   top: 0;
   bottom: 0;
+  left: 0;
   width: 0;
   border-left: 1px dashed rgba(255, 255, 255, 0.65);
+  transform: translate3d(0, 0, 0);
+  will-change: transform;
   pointer-events: none;
   z-index: 3;
 }
@@ -1112,13 +1140,13 @@ body.chrome-hidden.with-profile .leaflet-bottom {
   font-variant-numeric: tabular-nums;
 }
 
-/* A waypoint, where the track passes closest to it. The ring says there is a photo at this one. */
+/* A waypoint tick, where the track passes closest to it. The ring says there is a photo at this one. */
 #profile .pin {
   position: absolute;
-  width: 7px;
+  width: 3px;
   height: 7px;
-  margin: -3.5px 0 0 -3.5px;
-  border-radius: 50%;
+  margin: -7px 0 0 -1.5px;
+  border-radius: 1px;
   background: #f5c400;
   box-shadow: 0 0 0 1.5px rgba(24, 24, 24, 0.65);
   cursor: pointer;
@@ -1126,7 +1154,7 @@ body.chrome-hidden.with-profile .leaflet-bottom {
 }
 
 #profile .pin.photo {
-  box-shadow: 0 0 0 1.5px rgba(24, 24, 24, 0.65), 0 0 0 3px rgba(255, 255, 255, 0.9);
+  box-shadow: 0 0 0 1.5px rgba(24, 24, 24, 0.65), 0 0 0 3px rgba(255, 255, 255, 0.78);
 }
 
 /* Above rules set a position, which is enough to beat the browser's [hidden] rule on its own; stated here so
@@ -1141,12 +1169,16 @@ body.chrome-hidden.with-profile .leaflet-bottom {
 
 #profile .dot {
   position: absolute;
+  top: 0;
+  left: 0;
   width: 7px;
   height: 7px;
   margin: -3.5px 0 0 -3.5px;
   border-radius: 50%;
   background: #ffffff;
   box-shadow: 0 0 0 2px rgba(24, 24, 24, 0.55), 0 0 0 3.5px #ffffff;
+  transform: translate3d(0, 0, 0);
+  will-change: transform;
   pointer-events: none;
   z-index: 4;
 }
@@ -1154,12 +1186,16 @@ body.chrome-hidden.with-profile .leaflet-bottom {
 #profile .heart-dot {
   position: absolute;
   z-index: 4;
+  top: 0;
+  left: 0;
   width: 7px;
   height: 7px;
   margin: -3.5px 0 0 -3.5px;
   border-radius: 50%;
   background: #ff6675;
   box-shadow: 0 0 0 2px rgba(16, 16, 16, 0.8), 0 0 0 3px rgba(255, 102, 117, 0.55);
+  transform: translate3d(0, 0, 0);
+  will-change: transform;
   pointer-events: none;
 }
 
@@ -1198,7 +1234,7 @@ body.chrome-hidden.with-profile .leaflet-bottom {
   left: 50%;
   transform: translate(-50%, -50%);
   padding: 8px 16px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: rgba(16, 16, 16, 0.9);
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.45);
   color: var(--text);
@@ -1241,14 +1277,14 @@ body.failed #map {
 
 /* Leaflet controls in the dark theme */
 .leaflet-bar a, .layer-switch button, .locate-switch button, .toolbox-switch button, .pins-switch button,
-.lang-switch button, .waypoint-overview-switch button {
-  background: #2a2a2a;
+.waypoint-overview-switch button {
+  background: var(--surface-raised);
   color: var(--text);
-  border-color: #444;
+  border-color: var(--border-control);
 }
 
 .leaflet-bar a:hover, .layer-switch button:hover, .locate-switch button:hover, .toolbox-switch button:hover,
-.pins-switch button:hover, .lang-switch button:hover, .waypoint-overview-switch button:hover {
+.pins-switch button:hover, .waypoint-overview-switch button:hover {
   background: #383838;
   color: #fff;
 }
@@ -1268,8 +1304,7 @@ body.failed #map {
 
 .layer-switch,
 .pins-switch,
-.waypoint-overview-switch,
-.lang-switch {
+.waypoint-overview-switch {
   display: flex;
   box-sizing: border-box;
   height: var(--toolbar-height);

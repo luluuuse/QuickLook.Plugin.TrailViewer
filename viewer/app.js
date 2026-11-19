@@ -6,13 +6,12 @@ import { GpxError, parseGpxDocument, parseXml, summarize } from './gpx.js';
 import { KmlError, parseKmlDocument } from './kml.js';
 import { FitError, isFit, parseFit } from './fit.js';
 import { createRouteModel } from './route-model.js';
-import { getLang, isChinese, langLabel, onLangChange, t, toggleLang, units } from './i18n.js';
+import { getLang, isChinese, onLangChange, setLang, t, units } from './i18n.js';
 import { installSpaceGuard } from './focus.js';
 import { createPhotoViewer } from './photo-viewer.js';
 import { createProfileController } from './profile-controller.js';
 import {
   LAYERS,
-  createLanguageControl,
   createLayerSwitcher,
   loadCustomProviders,
   createLocateControl,
@@ -26,7 +25,7 @@ import {
   formatters,
 } from './format.js';
 import { createWaypointContent, renderPointPopup } from './waypoint-content.js';
-import { createSummaryView, trackSummaryText } from './summary-view.js';
+import { createSummaryView } from './summary-view.js';
 import { analyseSplits, splitCount } from './split-analysis.js';
 import { createSplitsView } from './split-view.js';
 import { createTrackLayer } from './track-layer.js';
@@ -50,6 +49,7 @@ import { gradeAwareHikeSeconds } from './track-analysis.js';
 import { attachmentItems, createAttachmentExporter } from './attachments.js';
 import { coordinateTargets } from './coordinates.js';
 import { createHostBridge } from './host-bridge.js';
+import { createTestApi } from './test-api.js';
 
 const L = window.L;
 const params = new URLSearchParams(location.search);
@@ -70,6 +70,8 @@ const {
   copyText,
   clipboardResult,
   persistCustomSources,
+  installViewerMessages,
+  installTextInputReporting,
 } = hostBridge;
 const runtimeConfig = window.__TRAILVIEWER_RUNTIME_CONFIG__ || {};
 let runtimeTiandituKey = runtimeConfig.direct === true
@@ -107,11 +109,11 @@ function showError(text) {
   post(`error:${text}`);
 }
 
-const pointPopup = (point, title) => renderPointPopup(point, title, el);
+const pointPopup = (point, title, close) => renderPointPopup(point, title, el, close);
 
 // Built on first use: a file whose waypoints carry no photos never pays for the modal DOM.
 const photoViewer = createPhotoViewer({ el, formatters, formatCoord, t });
-const waypointContent = createWaypointContent({ el, src, photoViewer, pointPopup });
+const waypointContent = createWaypointContent({ el, src, photoViewer });
 const { photosOf, photoPreview } = waypointContent;
 
 // ---------- info box and elevation profile ----------
@@ -246,6 +248,7 @@ const keyboardController = createKeyboardController({
   waypointController,
   measurement: () => measurementController,
   layerSwitch: () => layerSwitch,
+  toolbox: () => toolboxController,
   fit: () => mapViewController?.fit(),
   toggleChrome,
 });
@@ -280,12 +283,10 @@ function distanceLog(meters) {
 async function main() {
   const started = performance.now();
   applyPageLanguage();
-
   if (!src) {
     showError(t('error.noFile'));
     return;
   }
-
   let bytes;
   try {
     const response = await fetch(src);
@@ -297,7 +298,6 @@ async function main() {
     showError(t('error.read', { detail: e.message }));
     return;
   }
-
   let gpx;
   let routeModel;
   let summary;
@@ -337,7 +337,6 @@ async function main() {
     showError(known ? e.message : t('error.unexpected', { detail: e.message }));
     return;
   }
-
   // Worked out once: the summary box and the profile read the same numbers, and neither recomputes on a
   // language switch.
   const elevations = summary.elevation ? profileController.read(gpx, routeModel) : null;
@@ -366,7 +365,6 @@ async function main() {
   // is fixed in CSS, so the map never has to be told its size changed.
   const profile = elevations ? profileController.render(gpx, elevations) : null;
   timing.prepareMs = performance.now() - started;
-
   const map = L.map('map', { keyboard: false, worldCopyJump: false });
   map.getContainer().tabIndex = -1;
   installLeafletIcons(map, { closeLabel: () => t('tool.close') });
@@ -384,7 +382,6 @@ async function main() {
   tracks.refreshDistanceMarks();
   waypointController.refreshMapMarks();
   tracks.setAnnotationMarkersVisible(waypointController.visible());
-
   overlayExport = createOverlayExport({
     el,
     t,
@@ -451,6 +448,8 @@ async function main() {
     weatherAvailable: () => availableTargets(gpx).length > 0,
     weatherModes: availableTargets(gpx).length > 0 ? [...WEATHER_TARGETS] : [],
     weatherHasElevation: () => availableTargets(gpx).includes('highest'),
+    lang: getLang,
+    setLang,
     onWeather: (mode) => {
       const target = weatherTarget(gpx, mode);
       const url = windyUrl(target, zoomFor(mode));
@@ -467,7 +466,6 @@ async function main() {
     },
     onLayoutChange: () => mapViewController?.refreshControls({ refitHome: false }),
   });
-
   // First of the corner controls, so it stands leftmost: "where the map looks" before "what the map shows".
   const locateCtrl = createLocateControl({ L, map, el, t, onLocate: () => mapViewController.fit() });
   const warnTiandituTemporarily = () => {
@@ -515,31 +513,15 @@ async function main() {
   layerSwitch = switcher;
   // A file that draws no dots and has no waypoints gets no switch: there is nothing for it to show or hide.
   waypointController.createControl(map);
-  const langControl = createLanguageControl({
-    L, map, el, t, label: langLabel, toggle: toggleLang,
-  });
   mapViewController.observeControls();
   mapViewController.fit();
+  document.fonts?.ready.then(() => mapViewController.refreshControls());
   const scrub = profile ? profileController.attach(map, profile) : null;
   installSpaceGuard();
   document.addEventListener('keydown', onKeyDown);
-
-  // The host installs a low-level keyboard hook that swallows W/Q/E/S/C/M before the page ever sees them, so
-  // typing into a text field would otherwise be eaten. Report focus changes and let the hook stand down.
   const textFieldOf = (node) => node instanceof Element
     && Boolean(node.closest('input, textarea, select, [contenteditable="true"]'));
-  let textInputReported = null;
-  const reportTextInput = (active) => {
-    if (active === textInputReported) return;
-    textInputReported = active;
-    post(`text-input\t${active ? '1' : '0'}`);
-  };
-  document.addEventListener('focusin', (event) => reportTextInput(textFieldOf(event.target)));
-  document.addEventListener('focusout', (event) => {
-    // focusout fires before the next focusin, so only clear when nothing inside a field keeps the focus.
-    if (!textFieldOf(event.relatedTarget)) reportTextInput(false);
-  });
-
+  installTextInputReporting(textFieldOf);
   // A language switch repaints the page where it stands: same map, same view, same selection. Everything
   // that is generated from that state is rebuilt from the same values, so nothing has to be reparsed.
   onLangChange(() => {
@@ -552,7 +534,6 @@ async function main() {
     measurement.relabel();
     toolboxController.relabel();
     waypointController.relabel();
-    langControl.relabel();
     repaintLocalized();
     activeTrackLayer?.refreshDistanceMarks();
     if (scrub?.point()) scrub.refresh();
@@ -569,164 +550,26 @@ async function main() {
     // question -- and the card may not have changed width at all, leaving the observer silent.
     requestAnimationFrame(() => mapViewController.refreshControls());
   });
-
-  const api = {
-    gpx, summary, map, scrub, photos: photoViewer, hikeEstimate,
-    trackStats: tracks.networkStats,
-    performance: () => ({ ...timing }),
-    get splits() { return loadSplitsData(); },
-    localizedNodeCount: () => localizedNodes.length,
-    splitPanel: {
-      open: splitController.open,
-      close: splitController.close,
-      toggle: splitController.toggle,
-      isOpen: splitController.isOpen,
-      loaded: splitController.loaded,
-      select: splitController.select,
-      selected: splitController.selected,
-      mode: splitController.mode,
-      setMode: splitController.setMode,
-      toggleMode: splitController.toggleMode,
-    },
-    // The worked-out route shape, without the point arrays a test does not need.
-    profile: elevations && {
-      min: elevations.min, max: elevations.max, total: elevations.total,
-      ascent: elevations.ascent, descent: elevations.descent, runs: elevations.runs,
-      rawAscent: elevations.rawAscent, rawDescent: elevations.rawDescent, steep: elevations.steep,
-      slopeBins: elevations.slopeBins, heartRate: elevations.heartRate,
-    },
-    nav: {
-      select: waypointController.select,
-      index: waypointController.index,
-      stops: waypointController.stops,
-      photoStops: waypointController.photoStops,
-      nodes: () => waypointController.navigation().map((node) => ({
-        kind: [...node.kinds, ...(node.stop ? ['waypoint'] : [])].join('+'),
-        name: node.point.name || '',
-        along: node.along,
-        stop: node.stop?.sourceIndex ?? null,
-      })),
-      nodeIndex: waypointController.nodeIndex,
-      hasOverview: waypointController.hasOverview,
-      overviewOpen: waypointController.overviewOpen,
-      openOverview: waypointController.openOverview,
-      closeOverview: waypointController.closeOverview,
-    },
-    pins: {
-      show: () => waypointController.show(),
-      hide: () => waypointController.hide(),
-      visible: waypointController.visible,
-      hasControl: waypointController.hasControl,
-      count: waypointController.count,
-    },
-    selectLayer: (key) => switcher.select(key, true),
-    setTiandituKey: (key) => {
-      runtimeTiandituKey = /^[0-9a-fA-F]{32}$/.test(key || '') ? key : '';
+  const api = createTestApi({
+    gpx, summary, map, scrub, photoViewer, hikeEstimate, tracks, timing, loadSplitsData,
+    localizedNodes, splitController, elevations, waypointController, switcher,
+    getRuntimeTiandituKey: () => runtimeTiandituKey,
+    setRuntimeTiandituKey: (key) => { runtimeTiandituKey = key; },
+    clearTiandituFlags: () => {
       tiandituTransientShown = false;
       tiandituRejectedShown = false;
-      switcher.setDirectKey(runtimeTiandituKey);
-      return Boolean(runtimeTiandituKey);
     },
-    tiandituResponse: (status) => {
-      const code = Number(status);
-      if (code === 401 || code === 403) {
-        rejectTiandituKey();
-        return 'rejected';
-      }
-      if (code >= 400) {
-        warnTiandituTemporarily();
-        return 'temporary';
-      }
-      return 'ok';
-    },
-    tiandituKeyRejected: rejectTiandituKey,
-    tiandituTransport: () => runtimeTiandituKey ? 'direct' : 'none',
-    layer: switcher.current,
-    layerCategory: switcher.currentCategory,
-    // The frame the file opened with, for a test that wants it without walking the layers.
-    locate: () => mapViewController.fit(),
-    mapLayout: () => ({
-      state: mapViewController.layoutState(),
-      safe: mapViewController.safeRect(),
-      home: mapViewController.isHome(),
-      focus: mapViewController.focusState(),
-    }),
-    focusBounds: (bounds, options) => mapViewController.focusBounds(bounds, options),
-    revealPoint: (latlng, options) => mapViewController.revealPoint(latlng, options),
-    // For the host: it owns the keys until the page gets the keyboard (see TrailViewerPanel).
-    pressKey,
-    // The overlay export: the canvas is exposed for the tests, the toast callbacks for the host.
-    overlayCanvas: (options) => overlayExport.build(options),
-    exportOverlay: () => overlayExport.save(),
-    exportSettings: () => overlayExport.settings(),
-    panelOpen: () => toolboxController?.isView('export') ?? false,
-    exported: (path) => showToast(t('export.done', { name: String(path).split(/[\\/]/).pop() }), 4000),
-    exportFailed: (detail) => showToast(t('export.failed', { detail }), 4000),
-    summaryText: () => trackSummaryText(gpx, summary, elevations, fileName),
-    clipboardResult,
-    coordinates: {
-      targets: () => coordinateTargets(gpx),
-      copy: copyText,
-    },
-    attachments: {
-      items: () => photoAttachments,
-      exportAll: (includeExternal, onProgress) =>
-        attachmentExporter.exportAll(photoAttachments, includeExternal, onProgress),
-      result: (batch, index, ok, path, detail) =>
-        attachmentExporter.result(batch, index, ok, path, detail),
-    },
-    attachmentResult: (batch, index, ok, path, detail) =>
-      attachmentExporter.result(batch, index, ok, decodeMessage(path), decodeMessage(detail)),
-    attachmentResume: (batch, indices, folder) =>
-      attachmentExporter.resumeResult(batch, indices, decodeMessage(folder)),
-    measure: {
-      active: measurement.active,
-      start: measurement.start,
-      stop: measurement.stop,
-      add: measurement.addAt,
-      endSection: measurement.endSection,
-      undo: measurement.undo,
-      redo: measurement.redo,
-      clear: measurement.clear,
-      canUndo: measurement.canUndo,
-      canRedo: measurement.canRedo,
-      indexed: measurement.indexed,
-      summary: measurement.summary,
-      sections: measurement.sections,
-      snapAt: measurement.snapAt,
-      toolboxOpen: toolboxController.isOpen,
-      openToolbox: toolboxController.open,
-    },
-  };
+    warnTiandituTemporarily, rejectTiandituKey, mapViewController, pressKey, overlayExport,
+    toolboxController, showToast, t, fileName, clipboardResult, copyText, photoAttachments,
+    attachmentExporter, decodeMessage, measurement,
+  });
   window.trailViewer = api;
   window.addEventListener('pagehide', () => {
     toolboxController?.destroy();
     layerSwitch?.destroy();
     waypointController.destroy();
   }, { once: true });
-  window.chrome?.webview?.addEventListener('message', (event) => {
-    if (typeof event.data !== 'string') return;
-    const parts = event.data.split('\t');
-    if (parts[0] === 'clipboardResult') {
-      clipboardResult(parts[1], parts[2] === '1', parts[3]);
-    } else if (parts[0] === 'attachmentResult') {
-      api.attachments.result(
-        parts[1],
-        Number(parts[2]),
-        parts[3] === '1',
-        decodeMessage(parts[4]),
-        decodeMessage(parts[5]),
-      );
-    } else if (parts[0] === 'attachmentResume') {
-      api.attachmentResume(parts[1], parts[2], decodeMessage(parts[3]));
-    } else if (parts[0] === 'overlayExported') {
-      api.exported(decodeMessage(parts[1]));
-    } else if (parts[0] === 'overlayFailed') {
-      api.exportFailed(decodeMessage(parts[1]));
-    } else if (parts[0] === 'tianditu-response') {
-      api.tiandituResponse(Number(parts[1]));
-    }
-  });
+  installViewerMessages(api, clipboardResult);
   document.body.classList.add('loaded');
   timing.readyMs = performance.now() - started;
   requestAnimationFrame(() => requestAnimationFrame(() => {

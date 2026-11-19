@@ -290,8 +290,23 @@ export function createTrackLayer({ L, el, localized, t, pointPopup, onFocusBound
           distanceCache = { zoom, samples: samplesForRoute(distancePaths, intervals) };
         }
         const size = map.getSize();
+        const mapBox = map.getContainer().getBoundingClientRect();
+        const pinCentres = [...document.querySelectorAll('.gpx-pin')].map((pin) => {
+          const rect = pin.getBoundingClientRect();
+          return {
+            x: rect.left - mapBox.left + rect.width / 2,
+            y: rect.top - mapBox.top + rect.height / 2,
+          };
+        });
         const arrowBoxes = [];
         const labelBoxes = [];
+        const firstPath = distancePaths[0]?.points;
+        const lastPath = distancePaths[distancePaths.length - 1]?.points;
+        const routeEnds = [
+          firstPath?.[0],
+          lastPath?.[lastPath.length - 1],
+        ].filter(Boolean).map((point) => map.latLngToContainerPoint([point.lat, point.lon]));
+        let lastCapsule = null;
         for (const sample of distanceCache.samples) {
           const projected = map.latLngToContainerPoint([sample.point.lat, sample.point.lon]);
           if (projected.x < -40 || projected.y < -40
@@ -301,9 +316,20 @@ export function createTrackLayer({ L, el, localized, t, pointPopup, onFocusBound
           arrowBoxes.push(arrowBox);
           let kilometre = sample.kilometre;
           if (kilometre) {
+            if (pinCentres.some((pin) => Math.hypot(pin.x - projected.x, pin.y - projected.y) < 24)) {
+              kilometre = false;
+            }
+            const capsule = { x: projected.x, y: projected.y + 14 };
+            if (routeEnds.some((end) => Math.hypot(end.x - capsule.x, end.y - capsule.y) < 28)
+              || (lastCapsule && Math.hypot(lastCapsule.x - capsule.x, lastCapsule.y - capsule.y) < 36)) {
+              kilometre = false;
+            }
             const labelBox = { x: projected.x, y: projected.y + 14, width: 48, height: 17 };
-            if (overlaps(labelBox, labelBoxes)) kilometre = false;
-            else labelBoxes.push(labelBox);
+            if (kilometre && overlaps(labelBox, labelBoxes)) kilometre = false;
+            if (kilometre) {
+              labelBoxes.push(labelBox);
+              lastCapsule = capsule;
+            }
           }
           L.marker([sample.point.lat, sample.point.lon], {
             icon: distanceIcon(L, { ...sample, kilometre }),

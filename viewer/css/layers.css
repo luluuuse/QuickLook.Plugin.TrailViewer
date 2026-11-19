@@ -2,8 +2,7 @@
 
 .layer-menu-toggle,
 .pins-switch button,
-.waypoint-overview-switch button,
-.lang-switch button {
+.waypoint-overview-switch button {
   display: flex;
   align-items: center;
   box-sizing: border-box;
@@ -109,7 +108,7 @@
   padding: 0;
   place-items: center;
   border: 0;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--muted);
   cursor: pointer;
@@ -154,8 +153,12 @@
   display: block;
   padding: 0 3px 6px;
   color: #aaa;
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: 0.04em;
+}
+
+.layer-section-heading-row .control-key {
+  margin-left: auto;
 }
 
 .layer-section-heading-row {
@@ -175,7 +178,7 @@
   flex: none;
   padding: 2px 5px;
   color: #8fd9ff;
-  font-size: 10px;
+  font-size: 11px;
   line-height: 1.4;
 }
 
@@ -263,7 +266,7 @@
   width: 27px;
   height: 27px;
   padding: 0;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--muted);
   text-align: center;
@@ -425,7 +428,7 @@
   padding: 0;
   place-items: center;
   border: 0;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--muted);
 }
@@ -474,7 +477,7 @@
   display: block;
   padding: 2px 3px 6px;
   color: var(--muted);
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: 0.03em;
 }
 
@@ -512,7 +515,7 @@
   gap: 7px;
   padding: 7px 5px 7px 6px;
   border: 0;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--text);
   text-align: left;
@@ -566,7 +569,7 @@
   align-items: center;
   gap: 7px;
   color: var(--muted);
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .layer-custom-host {
@@ -628,7 +631,7 @@
   padding: 0;
   place-items: center;
   border: 0;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--muted);
   cursor: pointer;
@@ -684,7 +687,7 @@
 .layer-custom-empty-action {
   padding: 6px 12px;
   border: 1px solid #356d9d;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   background: #234f79;
   color: #fff;
   cursor: pointer;
@@ -752,7 +755,7 @@
 
 .layer-switch .layer-source-menu .layer-custom-cancel:hover {
   border-color: #777;
-  background: #303030;
+  background: var(--surface-card);
   color: #fff;
 }
 
@@ -788,7 +791,7 @@
 .layer-custom-advanced-summary::before {
   content: '▸ ';
   display: inline-block;
-  font-size: 9px;
+  font-size: 11px;
 }
 
 .layer-custom-advanced[open] > .layer-custom-advanced-summary::before {
@@ -1072,12 +1075,12 @@
   max-width: 172px;
   padding: 3px 6px;
   border: 1px solid #4a4a4a;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   background: #222;
   color: var(--muted);
   cursor: pointer;
   font: inherit;
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .waypoint-filter-trigger:hover,
@@ -1133,7 +1136,7 @@
   grid-column: 1 / -1;
   margin: 1px 3px 6px;
   color: var(--muted);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1156,7 +1159,7 @@
   color: var(--muted);
   cursor: pointer;
   font: inherit;
-  font-size: 10px;
+  font-size: 11px;
   overflow: hidden;
   text-align: left;
   text-overflow: ellipsis;
@@ -1184,7 +1187,7 @@
   color: var(--text);
   cursor: pointer;
   font: inherit;
-  font-size: 10px;
+  font-size: 11px;
   overflow: hidden;
   text-align: left;
   text-overflow: ellipsis;
@@ -1295,7 +1298,7 @@
   display: block;
   margin-top: 2px;
   color: #8fc7ff;
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -1361,10 +1364,10 @@
   flex: none;
   min-width: 18px;
   padding: 1px 4px;
-  border-radius: 9px;
+  border-radius: var(--radius-md);
   background: #3a3a3a;
   color: var(--muted);
-  font-size: 9.5px;
+  font-size: 11px;
   text-align: center;
 }
 
@@ -1420,9 +1423,9 @@
 .waypoint-insight-badge {
   padding: 1px 6px;
   border: 1px solid currentColor;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   color: #ddd;
-  font-size: 9.5px;
+  font-size: 11px;
   line-height: 1.4;
 }
 

@@ -1,6 +1,6 @@
 // Waypoint insight phase 2: full-text classification, icon hints, nearby merging and compact manual fixes.
 const path = require('path');
-const { launchBrowser, openViewer, waitForLayout } = require('./support/browser.cjs');
+const { launchBrowser, openViewer, switchLanguage, waitForLayout } = require('./support/browser.cjs');
 const { createChecker } = require('./support/assertions.cjs');
 const { createArtifacts } = require('./support/artifacts.cjs');
 const { startStaticServer } = require('./support/server.cjs');
@@ -129,9 +129,7 @@ async function main() {
   check('clear labels removes automatic highlights', corrected.primary === '' && corrected.badges === 0,
     JSON.stringify(corrected));
 
-  await page.locator('.lang-switch button').click();
-  await page.waitForFunction(() => document.documentElement.lang === 'zh-CN');
-  await waitForLayout(page);
+  await switchLanguage(page, 'zh');
   await page.locator('.waypoint-filter-trigger').click();
   const translated = await page.evaluate(() => ({
     chips: [...document.querySelectorAll('.insight-filter')].map((node) => node.textContent),

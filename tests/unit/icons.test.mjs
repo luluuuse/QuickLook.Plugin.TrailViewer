@@ -27,7 +27,10 @@ test('the icon registry is unique and covers every shared control', () => {
   ]) {
     assert.ok(UI_ICON_NAMES.includes(name), name);
   }
-  for (const name of ['waypoint', 'camera', 'direction', 'warning', 'anomaly']) {
+  for (const name of [
+    'waypoint', 'camera', 'direction', 'warning', 'anomaly',
+    'snap-marker', 'snap-measure', 'snap-track',
+  ]) {
     assert.ok(DATA_SYMBOL_NAMES.includes(name), name);
   }
 });
@@ -74,8 +77,15 @@ test('weather markers use the selected coloured map pins and fall back to start'
 
 test('the map settings registry uses the outlined gear', () => {
   const svg = iconMarkup('settings');
-  assert.match(svg, /M12\.22 2/);
-  assert.match(svg, /<circle cx="12" cy="12" r="3"\/>/);
+  assert.match(svg, /M9\.4 3h5\.2/);
+  assert.match(svg, /<circle cx="12" cy="12" r="3\.2"\/>/);
+  assert.doesNotMatch(svg, /M12\.22 2/);
+});
+
+test('fit-bounds uses a framing outline rather than a coordinate crosshair', () => {
+  const svg = iconMarkup('locate');
+  assert.match(svg, /M9 4H6/);
+  assert.doesNotMatch(svg, /M12 2v3/);
 });
 
 test('unknown names fail visibly through the local fallback icon', () => {
@@ -85,9 +95,20 @@ test('unknown names fail visibly through the local fallback icon', () => {
 
 test('semantic data symbols opt into fills without changing UI icon rules', () => {
   const pin = symbolMarkup('waypoint', { width: 24, height: 27 });
-  assert.match(pin, /viewBox="0 0 30 34"/);
+  assert.match(pin, /viewBox="0 0 24 32"/);
   assert.match(pin, /class="data-symbol"/);
   assert.match(pin, /class="symbol-fill"/);
   assert.match(pin, /class="symbol-hole"/);
   assert.doesNotMatch(pin, /fill="none"/);
+});
+
+test('standardized snap symbols share the 18 px double-stroked reticle structure', () => {
+  for (const name of ['snap-marker', 'snap-measure', 'snap-track']) {
+    const svg = symbolMarkup(name, { width: 18, height: 18, className: 'data-symbol snap-symbol' });
+    assert.match(svg, new RegExp(`data-symbol="${name}"`), name);
+    assert.match(svg, /viewBox="0 0 18 18"/, name);
+    assert.match(svg, /class="snap-casing"/, name);
+    assert.match(svg, /class="snap-stroke"/, name);
+    assert.match(svg, /class="snap-dot"/, name);
+  }
 });

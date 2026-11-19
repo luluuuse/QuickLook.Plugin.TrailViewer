@@ -45,6 +45,10 @@ async function geometry(page, name) {
   }, { panel: panels[name], header: headers[name] });
 }
 
+async function waitForAnimations(page) {
+  await page.waitForTimeout(180);
+}
+
 async function run(width, height) {
   const { server, base } = await startStaticServer(root);
   const browser = await launchBrowser();
@@ -67,6 +71,7 @@ async function run(width, height) {
   });
   await page.locator('.toolbox-switch > button').click();
   await waitForLayout(page);
+  await waitForAnimations(page);
   await waitForMapIdle(page);
   const viewAfterToolbox = await page.evaluate(() => {
     const center = window.trailViewer.map.getCenter();
@@ -91,14 +96,29 @@ async function run(width, height) {
     JSON.stringify({ before: viewBeforeToolbox, after: viewAfterToolboxClose }));
   await page.locator('.toolbox-switch > button').click();
   await waitForLayout(page);
+  await waitForAnimations(page);
   check(`${width}px: toolbox opens alone`,
     JSON.stringify(await states(page)) === JSON.stringify({
       toolbox: true, layer: false, overview: false,
     }));
+  const draggingStyle = await page.evaluate(() => {
+    window.trailViewer.map.fire('movestart');
+    const style = getComputedStyle(document.querySelector('#toolbox-panel'));
+    const result = {
+      dragging: document.body.classList.contains('is-map-dragging'),
+      filter: style.backdropFilter,
+    };
+    window.trailViewer.map.fire('moveend');
+    return result;
+  });
+  check(`${width}px: dragging temporarily removes the expensive panel blur`,
+    draggingStyle.dragging && draggingStyle.filter === 'none',
+    JSON.stringify(draggingStyle));
   const boxes = { toolbox: await geometry(page, 'toolbox') };
 
   await page.locator('.layer-menu-toggle').click();
   await waitForLayout(page);
+  await waitForAnimations(page);
   check(`${width}px: layer panel closes the toolbox`,
     JSON.stringify(await states(page)) === JSON.stringify({
       toolbox: false, layer: true, overview: false,
@@ -108,6 +128,7 @@ async function run(width, height) {
 
   await page.locator('[data-waypoints="overview"]').click();
   await waitForLayout(page);
+  await waitForAnimations(page);
   check(`${width}px: waypoint list closes the layer panel`,
     JSON.stringify(await states(page)) === JSON.stringify({
       toolbox: false, layer: false, overview: true,

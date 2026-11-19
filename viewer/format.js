@@ -12,6 +12,12 @@ export const formatters = (() => {
         date: new Intl.DateTimeFormat(locale, { year: 'numeric', month: 'short', day: 'numeric' }),
         time: new Intl.DateTimeFormat(locale, { hour: 'numeric', minute: '2-digit' }),
         full: new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'medium' }),
+        // The photo card has one line for time and elevation, so seconds are dropped: they were never useful on
+        // a pin, and the shorter form leaves room for the elevation that answers "how high was this".
+        short: new Intl.DateTimeFormat(locale, {
+          year: 'numeric', month: '2-digit', day: '2-digit',
+          hour: '2-digit', minute: '2-digit', hour12: false,
+        }),
       };
       cache.set(locale, set);
     }

@@ -1,5 +1,4 @@
 import {
-  elevationAt,
   profileSamples,
   seriesSamples,
   SLOPE_FULL,
@@ -79,59 +78,46 @@ export function createProfileChart({
     );
     const defs = document.createElementNS(ns, 'defs');
     svg.append(defs);
-    let cursor = 0;
-    let shape = null;
-    let previousFill = null;
-    let gradientId = 0;
+    const fillRuns = [];
     for (const cell of cells) {
       const bucket = bucketOf(cell.slope);
-      if (!shape || shape.bucket !== bucket) {
-        if (shape) emit(shape);
-        shape = { bucket, from: cell.from, to: cell.to, points: [] };
-      } else {
-        shape.to = cell.to;
-      }
-      while (cursor < curve.length && curve[cursor].along <= cell.to) {
-        if (curve[cursor].along > cell.from) shape.points.push([curve[cursor].along, curve[cursor].ele]);
-        cursor += 1;
-      }
-      shape.to = cell.to;
+      const previous = fillRuns[fillRuns.length - 1];
+      if (previous && previous.bucket === bucket) previous.to = cell.to;
+      else fillRuns.push({ bucket, from: cell.from, to: cell.to });
     }
-    if (shape) emit(shape);
+    const fillGradient = document.createElementNS(ns, 'linearGradient');
+    fillGradient.setAttribute('id', 'slope-fill');
+    fillGradient.setAttribute('gradientUnits', 'userSpaceOnUse');
+    fillGradient.setAttribute('x1', '0');
+    fillGradient.setAttribute('x2', String(width));
+    fillGradient.setAttribute('y1', '0');
+    fillGradient.setAttribute('y2', '0');
+    let previousColour = null;
+    const addStop = (x, colour) => {
+      const stop = document.createElementNS(ns, 'stop');
+      stop.setAttribute('offset', String(Math.min(1, Math.max(0, x / width))));
+      stop.setAttribute('stop-color', colour);
+      fillGradient.append(stop);
+    };
+    for (const run of fillRuns) {
+      const left = at(run.from);
+      const right = at(run.to);
+      const colour = slopeColor((run.bucket * SLOPE_FULL) / BUCKETS);
+      if (previousColour) addStop(left, previousColour);
+      else addStop(0, colour);
+      addStop(right, colour);
+      previousColour = colour;
+    }
+    if (fillRuns.length === 0) addStop(0, slopeColor(0));
+    defs.append(fillGradient);
 
-    function emit(part) {
-      const left = Math.max(0, at(part.from) - 0.5);
-      const right = Math.min(width, at(part.to) + 0.5);
-      const colour = slopeColor((part.bucket * SLOPE_FULL) / BUCKETS);
-      let fill = colour;
-      if (previousFill && previousFill !== colour && right - left > 0.8) {
-        const ramp = document.createElementNS(ns, 'linearGradient');
-        const id = `slope-${gradientId += 1}`;
-        ramp.setAttribute('id', id);
-        ramp.setAttribute('gradientUnits', 'userSpaceOnUse');
-        ramp.setAttribute('x1', left.toFixed(2));
-        ramp.setAttribute('x2', right.toFixed(2));
-        ramp.setAttribute('y1', '0');
-        ramp.setAttribute('y2', '0');
-        for (const [offset, stop] of [[0, previousFill], [1, colour]]) {
-          const node = document.createElementNS(ns, 'stop');
-          node.setAttribute('offset', String(offset));
-          node.setAttribute('stop-color', stop);
-          ramp.append(node);
-        }
-        defs.append(ramp);
-        fill = `url(#${id})`;
-      }
-      const area = document.createElementNS(ns, 'path');
-      area.setAttribute('class', 'area');
-      area.setAttribute('fill', fill);
-      area.setAttribute('d', `M${left.toFixed(1)},${height} L`
-        + `${at(part.from).toFixed(1)},${yOf(elevationAt(samples, part.from)).toFixed(1)} L`
-        + part.points.map(([along, elevation]) => `${at(along).toFixed(1)},${yOf(elevation).toFixed(1)}`).join(' L')
-        + ` L${right.toFixed(1)},${yOf(elevationAt(samples, part.to)).toFixed(1)} L${right.toFixed(1)},${height} Z`);
-      svg.append(area);
-      previousFill = colour;
-    }
+    const area = document.createElementNS(ns, 'path');
+    area.setAttribute('class', 'area');
+    area.setAttribute('fill', 'url(#slope-fill)');
+    area.setAttribute('d', `M0,${height} L`
+      + curve.map((point) => `${at(point.along).toFixed(1)},${yOf(point.ele).toFixed(1)}`).join(' L')
+      + ` L${width},${height} Z`);
+    svg.append(area);
 
     const line = document.createElementNS(ns, 'path');
     line.setAttribute('class', 'line');
@@ -197,10 +183,19 @@ export function createProfileChart({
     plot.append(gutter, chart);
 
     const pins = [];
+    const placedPins = [];
+    const denseWaypoints = (gpx.waypoints?.length || 0) > 100;
     for (const waypoint of gpx.waypoints || []) {
       const near = sampleIndex.nearest(waypoint);
-      const pin = el('span', photosOf(waypoint).length > 0 ? 'pin photo' : 'pin');
-      pin.style.left = `${(near.along / Math.max(total, 1)) * 100}%`;
+      const hasPhoto = photosOf(waypoint).length > 0;
+      const across = near.along / Math.max(total, 1);
+      const x = across * width;
+      const y = yOf(near.ele);
+      if (denseWaypoints && !hasPhoto
+        && placedPins.some((other) => Math.hypot(other.x - x, other.y - y) < 4)) continue;
+      placedPins.push({ x, y });
+      const pin = el('span', hasPhoto ? 'pin photo' : 'pin');
+      pin.style.left = `${across * 100}%`;
       pin.style.top = `${(yOf(near.ele) / height) * 100}%`;
       pin.hidden = !getPinsShown();
       localized(pin, () => waypoint.name || t('label.waypoint'), 'title');

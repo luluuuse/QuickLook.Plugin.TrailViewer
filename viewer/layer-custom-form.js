@@ -212,6 +212,7 @@ export function createCustomSourceForm({ el, t, onCancel, onSubmit }) {
     read,
     setEntry,
     showError,
+    check: checkUrl,
     focusName: () => nameField.input.focus({ preventScroll: true }),
   };
 }

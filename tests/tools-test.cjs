@@ -4,6 +4,7 @@ const {
   launchBrowser,
   openViewer,
   settlePopup,
+  switchLanguage,
   waitForLayout,
 } = require('./support/browser.cjs');
 const { createChecker } = require('./support/assertions.cjs');
@@ -96,7 +97,6 @@ async function main() {
     const weather = document.querySelector('.toolbox-weather-card').getBoundingClientRect();
     const gridBox = grid.getBoundingClientRect();
     return {
-      note: document.querySelector('.toolbox-head-note')?.textContent,
       aria: grid.getAttribute('aria-label'),
       cards,
       groupHeadings: document.querySelectorAll('.toolbox-group-title').length,
@@ -107,7 +107,7 @@ async function main() {
     };
   });
   check('the toolbox uses a compact 2 by 2 quick-tool grid',
-    menu.note === 'Quick launch' && menu.aria === 'Quick tools'
+    menu.aria === 'Quick tools'
       && menu.groupHeadings === 0
       && menu.cards.map((item) => item.tool).join('|') === 'measure|coordinates|export|attachments'
       && menu.cards[0].top === menu.cards[1].top
@@ -118,6 +118,76 @@ async function main() {
   check('the weather card remains a full-width action below the grid',
     menu.weatherTop >= menu.gridBottom,
     `${menu.weatherTop} >= ${menu.gridBottom}`);
+  const shortcutPlacement = await page.evaluate(() => ({
+    measureChip: document.querySelector('.toolbox-action[data-tool="measure"] .toolbox-key-chip')?.textContent || '',
+    oldHints: document.querySelector('.toolbox-shortcuts')?.textContent || '',
+    helpIcon: document.querySelector('.toolbox-help svg')?.dataset.icon || '',
+    helpBeforeClose: document.querySelector('.toolbox-help')?.nextElementSibling?.classList.contains('toolbox-close'),
+  }));
+  check('shortcut hints stay out of the main toolbox cards',
+    shortcutPlacement.measureChip === '' && shortcutPlacement.oldHints === ''
+      && shortcutPlacement.helpIcon === 'circle-help' && shortcutPlacement.helpBeforeClose,
+    JSON.stringify(shortcutPlacement));
+  await page.locator('.toolbox-help').click();
+  const shortcutPage = await page.evaluate(() => ({
+    mainHidden: document.querySelector('.toolbox-main')?.hidden,
+    pageHidden: document.querySelector('.toolbox-shortcut-page')?.hidden,
+    keys: [...document.querySelectorAll('.toolbox-shortcut-page .control-key')].map((node) => node.textContent),
+    labels: [...document.querySelectorAll('.toolbox-shortcut-page .toolbox-shortcut-row span')]
+      .map((node) => node.textContent),
+  }));
+  check('the help icon opens one keyboard reference page',
+    shortcutPage.mainHidden === true && shortcutPage.pageHidden === false
+      && shortcutPage.keys.join('|') === 'W|S|A / D|Q / E|C|M|T',
+    JSON.stringify(shortcutPage));
+  check('the keyboard reference names T for the toolbox',
+    shortcutPage.labels.length === 7 && shortcutPage.labels.slice(-1)[0] === 'Open or close the toolbox',
+    shortcutPage.labels.join('|'));
+  await page.locator('.toolbox-shortcut-page .toolbox-back').click();
+  check('the shortcut page returns through the shared back action',
+    await page.locator('.toolbox-main').isVisible());
+
+  // One language button in the toolbox header — not a two-option pill in the map corner, and not a pair of
+  // segmented choices: a globe marks it as a language switch, the glyph names the language in use, click flips.
+  const langSwitch = await page.evaluate(() => {
+    const button = document.querySelector('.toolbox-lang');
+    const header = document.querySelector('.toolbox-header');
+    return {
+      inHeader: Boolean(button) && header.contains(button),
+      corner: document.querySelectorAll('.lang-switch').length,
+      tag: button?.tagName || '',
+      text: button?.querySelector('.toolbox-lang-text')?.textContent || '',
+      globe: Boolean(button?.querySelector('[data-icon="globe"]')),
+      options: document.querySelectorAll('.toolbox-lang-option').length,
+      pressed: button?.getAttribute('aria-pressed'),
+      radius: button ? getComputedStyle(button).borderRadius : '',
+      label: button?.getAttribute('aria-label') || '',
+      title: button?.title || '',
+      height: button ? Math.round(button.getBoundingClientRect().height) : 0,
+      width: button ? Math.round(button.getBoundingClientRect().width) : 0,
+      fontSize: button ? getComputedStyle(button).fontSize : '',
+      iconWidth: button
+        ? Math.round(button.querySelector('.toolbox-lang-icon')?.getBoundingClientRect().width || 0)
+        : 0,
+    };
+  });
+  check('the language switch is one button in the toolbox header',
+    langSwitch.inHeader && langSwitch.corner === 0 && langSwitch.tag === 'BUTTON'
+      && langSwitch.options === 0 && langSwitch.pressed === null,
+    JSON.stringify(langSwitch));
+  check('it is a pill that names the language in use and marks itself as a flip',
+    /px$/.test(langSwitch.radius) && parseInt(langSwitch.radius, 10) >= 999
+      && langSwitch.text === 'EN' && langSwitch.globe
+      && langSwitch.title === '中文'
+      && langSwitch.label === 'Interface language: English. Click for 中文.',
+    JSON.stringify(langSwitch));
+  // A 20 px tall, 10 px type capsule read as a label rather than a control. The globe carries the meaning and
+  // the type sits at body size, so the button is sized like something clickable.
+  check('the language button is sized like a control, not a label',
+    langSwitch.height === 24 && langSwitch.fontSize === '12px' && langSwitch.iconWidth === 13
+      && langSwitch.width >= 44 && langSwitch.width <= 56,
+    `${langSwitch.width}x${langSwitch.height} / ${langSwitch.fontSize} / ${langSwitch.iconWidth}`);
+
   const callbacks = await page.evaluate(() => ({
     clipboard: typeof window.trailViewer.clipboardResult,
     attachment: typeof window.trailViewer.attachmentResult,
@@ -193,12 +263,46 @@ async function main() {
   check('the coordinate panel declares WGS-84 without an Esc-cancel instruction',
     await page.locator('.toolbox-coordinate-type').textContent() === 'Coordinate type: WGS-84'
       && !/Esc/i.test(await page.locator('.coordinate-pick-hint').textContent()));
+  await page.mouse.move(albumAt.x + 10, albumAt.y);
+  await page.waitForFunction(() => {
+    const svg = document.querySelector('.snap-indicator-marker svg');
+    const label = document.querySelector('.snap-label.coordinate-snap-label span');
+    return svg?.dataset.symbol === 'snap-marker' && Boolean(label?.textContent?.includes('marker'));
+  });
+  const coordinateHoverSnap = await page.evaluate(() => {
+    const reticle = document.querySelector('.snap-indicator-marker');
+    const label = document.querySelector('.snap-label.coordinate-snap-label span');
+    const pinPath = document.querySelector('.gpx-pin[title="Album"] .pin-symbol path');
+    const style = label ? getComputedStyle(label) : null;
+    const reticleBox = reticle?.getBoundingClientRect();
+    const pinBox = pinPath?.getBoundingClientRect();
+    return {
+      symbol: reticle?.querySelector('svg')?.dataset.symbol,
+      background: style?.backgroundColor,
+      border: style?.borderColor,
+      dx: reticleBox && pinBox
+        ? Math.abs((reticleBox.left + reticleBox.right) / 2 - (pinBox.left + pinBox.right) / 2)
+        : Infinity,
+      dy: reticleBox && pinBox
+        ? Math.abs((reticleBox.top + reticleBox.bottom) / 2 - pinBox.bottom)
+        : Infinity,
+    };
+  });
+  check('hovering near a marker in coordinate mode shows the standardized diamond snap indicator',
+    coordinateHoverSnap.symbol === 'snap-marker'
+      && coordinateHoverSnap.background === 'rgba(7, 20, 26, 0.74)'
+      && coordinateHoverSnap.border === 'rgba(255, 242, 168, 0.55)'
+      && coordinateHoverSnap.dx <= 1
+      && coordinateHoverSnap.dy <= 1.5,
+    JSON.stringify(coordinateHoverSnap));
   await page.mouse.click(albumAt.x + 13, albumAt.y);
   await page.waitForFunction(() => window.__clipboardText.includes('30.581000'));
   check('a click near a marker snaps to its exact coordinate',
     await page.evaluate(() => window.__clipboardText) === '30.581000, 114.301000'
       && /Snapped to marker/.test(await page.locator('.coordinate-focus-details').textContent())
-      && await page.locator('.coordinate-focus-label strong').textContent() === 'Picked point',
+      && await page.locator('.coordinate-focus-label strong').textContent() === 'Picked point'
+      && await page.locator('.coordinate-focus-label.is-snapped').count() === 1
+      && await page.locator('.snap-label.coordinate-snap-label').count() === 0,
     await page.evaluate(() => window.__clipboardText));
   check('the point popup and latest-coordinate card note the marker elevation',
     await page.locator('.coordinate-focus-elevation').textContent() === 'Elevation: 26 m'
@@ -322,11 +426,11 @@ async function main() {
         .filter((message) => message.startsWith('attachmentlocal\t')).length) === localOnlyBefore.locals
       && /3 already completed/.test(await page.locator('#toast').textContent()));
 
-  await page.click('.lang-switch button');
-  await page.waitForFunction(() => document.documentElement.lang === 'zh-CN');
+  await switchLanguage(page, 'zh');
   check('summary and coordinate controls follow the interface language',
     await page.locator('.info-copy').getAttribute('title') === '复制轨迹摘要'
-      && await page.locator('.toolbox-head-note').textContent() === '快速启动'
+      && await page.locator('.toolbox-lang-text').textContent() === '中'
+      && await page.locator('.toolbox-lang').getAttribute('title') === 'English'
       && await page.locator('.toolbox-quick-grid').getAttribute('aria-label') === '快捷工具');
   await page.click('.toolbox-attachments .toolbox-back');
   await page.click('.toolbox-action[data-tool="coordinates"]');
@@ -340,6 +444,14 @@ async function main() {
   check('the elevation note follows the interface language',
     await page.locator('.coordinate-focus-elevation').textContent() === '海拔：20 m'
       && await page.locator('.toolbox-coordinate-elevation').textContent() === '海拔：20 m');
+  await page.click('.toolbox-coordinate .toolbox-back');
+  await page.click('.toolbox-help');
+  check('the shortcut reference follows the interface language',
+    await page.locator('.toolbox-shortcut-page .toolbox-subtitle').textContent() === '快捷键速查'
+      && await page.locator('.toolbox-shortcut-page .toolbox-subhint').textContent() === '地图获得焦点时可用。'
+      && (await page.locator('.toolbox-shortcut-page .toolbox-shortcut-row span').allTextContents())
+        .join('|') === '标记点|隐藏界面|切换点位或照片|切换地图图源|全轨迹|测距|打开或关闭工具箱');
+  await page.click('.toolbox-shortcut-page .toolbox-back');
 
   await page.setViewportSize({ width: 360, height: 740 });
   await waitForLayout(page);

@@ -102,6 +102,20 @@ function attachScrub({
   let current = null;
   let frame = 0;
   let queued = null;
+  let chartRect = chart.getBoundingClientRect();
+  let readoutKey = '';
+  let readoutWidth = 0;
+  let readoutHeight = 0;
+
+  function measureChart() {
+    chartRect = chart.getBoundingClientRect();
+  }
+
+  const chartResize = typeof ResizeObserver === 'function'
+    ? new ResizeObserver(measureChart)
+    : null;
+  chartResize?.observe(chart);
+  addEventListener('resize', measureChart);
 
   for (const pin of state.pins || []) {
     pin.node.addEventListener('click', (event) => {
@@ -116,51 +130,62 @@ function attachScrub({
   }
 
   function distanceAt(clientX) {
-    const rect = svg.getBoundingClientRect();
-    const ratio = rect.width > 0 ? (clientX - rect.left) / rect.width : 0;
+    const ratio = chartRect.width > 0 ? (clientX - chartRect.left) / chartRect.width : 0;
     return Math.min(total, Math.max(0, ratio * total));
   }
 
   function place(distance) {
     const point = pointNear(points, Math.max(0, Math.min(total, distance)));
     current = point;
-    const rect = chart.getBoundingClientRect();
-    const x = (point.along / total) * rect.width;
-    guide.style.left = `${x}px`;
+    const x = (point.along / total) * chartRect.width;
+    guide.style.transform = `translate3d(${x}px, 0, 0)`;
     guide.hidden = false;
-    let y = rect.height - 6;
+    let y = chartRect.height - 6;
     if (point.ele !== undefined) {
-      y = (yOf(point.ele) / 100) * rect.height;
-      dot.style.left = `${x}px`;
-      dot.style.top = `${y}px`;
+      y = (yOf(point.ele) / 100) * chartRect.height;
+      dot.style.transform = `translate3d(${x}px, ${y}px, 0)`;
       dot.hidden = false;
     } else {
       dot.hidden = true;
     }
     if (heart?.enabled() && Number.isFinite(point.heartRate)) {
-      heart.dot.style.left = `${x}px`;
-      heart.dot.style.top = `${(heart.yOf(point.heartRate) / 100) * rect.height}px`;
+      const heartY = (heart.yOf(point.heartRate) / 100) * chartRect.height;
+      heart.dot.style.transform = `translate3d(${x}px, ${heartY}px, 0)`;
       heart.dot.hidden = false;
-      heart.value.textContent = `${Math.round(point.heartRate)} bpm`;
       heart.value.hidden = false;
     } else if (heart) {
       heart.dot.hidden = true;
       heart.value.hidden = true;
     }
 
-    value.textContent = point.ele !== undefined ? `${Math.round(point.ele)} ${t('unit.m')}` : '';
-    value.hidden = value.textContent === '';
+    const valueText = point.ele !== undefined ? `${Math.round(point.ele)} ${t('unit.m')}` : '';
     const parts = [formatDistance(point.along)];
     if (point.time) parts.push(formatters().time.format(point.time));
-    meta.textContent = parts.join(' \u00b7 ');
+    const metaText = parts.join(' \u00b7 ');
+    const heartText = heart?.enabled() && Number.isFinite(point.heartRate)
+      ? `${Math.round(point.heartRate)} bpm`
+      : '';
+    const nextReadoutKey = `${valueText}\u0000${metaText}\u0000${heartText}`;
+    if (nextReadoutKey !== readoutKey) {
+      value.textContent = valueText;
+      value.hidden = valueText === '';
+      meta.textContent = metaText;
+      if (heart) {
+        heart.value.textContent = heartText;
+        heart.value.hidden = heartText === '';
+      }
+      readoutWidth = readout.offsetWidth;
+      readoutHeight = readout.offsetHeight;
+      readoutKey = nextReadoutKey;
+    }
     readout.hidden = false;
 
-    const width = readout.offsetWidth;
-    const height = readout.offsetHeight;
-    const half = width / 2 + 2;
-    const left = rect.width <= width ? rect.width / 2 : Math.min(Math.max(x, half), rect.width - half);
-    readout.style.left = `${left}px`;
-    readout.style.top = `${Math.max(0, y - height - 10)}px`;
+    const half = readoutWidth / 2 + 2;
+    const left = chartRect.width <= readoutWidth
+      ? chartRect.width / 2
+      : Math.min(Math.max(x, half), chartRect.width - half);
+    const top = Math.max(0, y - readoutHeight - 12);
+    readout.style.transform = `translate3d(${left}px, ${top}px, 0) translateX(-50%)`;
 
     const latlng = [point.lat, point.lon];
     marker.setLatLng(latlng);
@@ -213,7 +238,12 @@ function attachScrub({
     point: () => current,
     pinned: () => pinned,
     refresh: () => {
+      measureChart();
       if (current) place(current.along);
+    },
+    destroy: () => {
+      chartResize?.disconnect();
+      removeEventListener('resize', measureChart);
     },
   };
 }

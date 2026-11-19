@@ -27,21 +27,17 @@ const UI_ICONS = Object.freeze({
     + '<circle cx="12" cy="12" r="1.5"/>',
   plus: '<path d="M12 5v14"/><path d="M5 12h14"/>',
   minus: '<path d="M5 12h14"/>',
-  locate: '<circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="1.5"/>'
-    + '<path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>',
+  locate: '<path d="M9 4H6a2 2 0 0 0-2 2v3M15 4h3a2 2 0 0 1 2 2v3'
+    + 'M20 15v3a2 2 0 0 1-2 2h-3M4 15v3a2 2 0 0 0 2 2h3"/>'
+    + '<path d="M8 8h2M14 8h2M8 16h2M14 16h2"/>',
   layers: '<path d="m12 3 9 5-9 5-9-5 9-5Z"/><path d="m3 12 9 5 9-5"/>'
     + '<path d="m3 16 9 5 9-5"/>',
   'map-grid': '<rect x="3" y="3" width="18" height="18" rx="2"/>'
     + '<path d="M3 9h18M3 15h18M9 3v18M15 3v18"/>',
-  settings: '<path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25'
-    + 'a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1'
-    + 'a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38'
-    + 'a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20'
-    + 'a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25'
-    + 'a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08'
-    + 'a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38'
-    + 'a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4'
-    + 'a2 2 0 0 0-2-2Z"/><circle cx="12" cy="12" r="3"/>',
+  settings: '<path d="M9.4 3h5.2l.7 2.2 1.9 1.1 2.2-.7 2.6 4.4-1.6 1.6v2.8'
+    + 'l1.6 1.6-2.6 4.4-2.2-.7-1.9 1.1-.7 2.2H9.4l-.7-2.2-1.9-1.1-2.2.7'
+    + 'L.7 17l1.6-1.6v-2.8L.7 11l2.6-4.4 2.2.7 1.9-1.1Z"/>'
+    + '<circle cx="12" cy="12" r="3.2"/>',
   'layer-road': '<path d="M3 19c5 0 4-9 9-9s4-7 9-7"/>'
     + '<circle cx="3" cy="19" r="1.8"/><circle cx="21" cy="3" r="1.8"/>',
   'layer-terrain': '<path d="M3 16c3-5 6-6 9-2s5 2 9-1"/>'
@@ -52,6 +48,7 @@ const UI_ICONS = Object.freeze({
     + '<circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/>',
   'chevron-down': '<path d="m6 9 6 6 6-6"/>',
   'chevron-left': '<path d="m15 18-6-6 6-6"/>',
+  'chevron-right': '<path d="m9 18 6-6-6-6"/>',
   close: '<path d="M6 6l12 12M18 6 6 18"/>',
   check: '<path d="m5 12 4 4L19 6"/>',
   pin: '<path d="M12 21s7-6.2 7-13a7 7 0 0 0-14 0c0 6.8 7 13 7 13Z"/>'
@@ -73,6 +70,10 @@ const UI_ICONS = Object.freeze({
     + '<path d="m13.5 8 3 3"/>',
   'arrow-left': '<path d="M19 12H5"/><path d="m11 18-6-6 6-6"/>',
   'arrow-right': '<path d="M5 12h14"/><path d="m13 6 6 6-6 6"/>',
+  // A two-way arrow: the language switch is a toggle, not a menu, so it says "this flips" rather than
+  // "pick one of two".
+  globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18"/>'
+    + '<path d="M12 3a14 14 0 0 1 0 18 14 14 0 0 1 0-18"/>',
   warning: '<path d="M12 3 2.8 20h18.4Z"/><path d="M12 9v5"/><path d="M12 17.5v.01"/>',
   activity: '<path d="M3 12h4l2-6 4 12 2-6h6"/>',
   heart: '<path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1'
@@ -98,6 +99,7 @@ const WEATHER_MARKS = Object.freeze({
 });
 
 export const WEATHER_MARK_NAMES = Object.freeze(Object.keys(WEATHER_MARKS));
+const templateCache = new Map();
 
 /** Static SVG markup for a weather point marker. Unknown names fall back to the start marker. */
 export function weatherMarkMarkup(name, { size = DEFAULT_ICON_SIZE, className = 'weather-mark' } = {}) {
@@ -110,16 +112,19 @@ export function weatherMarkMarkup(name, { size = DEFAULT_ICON_SIZE, className = 
 
 /** @returns {SVGElement} */
 export function weatherMarkElement(name, options = {}) {
-  const host = document.createElement('span');
-  host.innerHTML = weatherMarkMarkup(name, options);
-  const mark = host.firstElementChild;
-  if (!(mark instanceof SVGElement)) throw new Error(`weather mark ${name} could not be created`);
-  return mark;
+  const resolved = Object.hasOwn(WEATHER_MARKS, name) ? name : 'start';
+  const size = dimensions(options.size);
+  const className = options.className || 'weather-mark';
+  return elementOfType(
+    `weather:${resolved}:${size}:${className}`,
+    weatherMarkMarkup(resolved, { size, className }),
+    `weather mark ${name}`,
+  );
 }
 
 const DATA_SYMBOLS = Object.freeze({
   waypoint: {
-    viewBox: '0 0 30 34',
+    viewBox: '0 0 24 32',
     body: '<path class="symbol-fill" d="M12 1C6 1 1.5 5.6 1.5 11.5 1.5 19.5 12 33 12 33'
       + 's10.5-13.5 10.5-21.5C22.5 5.6 18 1 12 1Z"/>'
       + '<circle class="symbol-hole" cx="12" cy="11.5" r="4"/>',
@@ -142,6 +147,25 @@ const DATA_SYMBOLS = Object.freeze({
     viewBox: '0 0 24 24',
     body: '<path class="symbol-detail" d="M3 12h4l2-6 4 12 2-6h6"/>',
   },
+  // Standardized map-snapping reticles differentiated by target kind (marker: diamond, measure: square, track: cross).
+  'snap-marker': {
+    viewBox: '0 0 18 18',
+    body: '<path class="snap-casing" d="M9 2.2 15.8 9 9 15.8 2.2 9Z"/>'
+      + '<path class="snap-stroke" d="M9 2.2 15.8 9 9 15.8 2.2 9Z"/>'
+      + '<circle class="snap-dot" cx="9" cy="9" r="1.5"/>',
+  },
+  'snap-measure': {
+    viewBox: '0 0 18 18',
+    body: '<rect class="snap-casing" x="3.5" y="3.5" width="11" height="11" rx="1"/>'
+      + '<rect class="snap-stroke" x="3.5" y="3.5" width="11" height="11" rx="1"/>'
+      + '<circle class="snap-dot" cx="9" cy="9" r="1.5"/>',
+  },
+  'snap-track': {
+    viewBox: '0 0 18 18',
+    body: '<path class="snap-casing" d="M9 2.2V6.5M9 11.5V15.8M2.2 9H6.5M11.5 9H15.8"/>'
+      + '<path class="snap-stroke" d="M9 2.2V6.5M9 11.5V15.8M2.2 9H6.5M11.5 9H15.8"/>'
+      + '<circle class="snap-dot" cx="9" cy="9" r="1.5"/>',
+  },
 });
 
 export const UI_ICON_NAMES = Object.freeze(Object.keys(UI_ICONS));
@@ -154,6 +178,18 @@ function dimensions(size) {
 
 function attr(value) {
   return String(value).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+}
+
+function elementOfType(cacheKey, markup, label) {
+  let template = templateCache.get(cacheKey);
+  if (!template) {
+    template = document.createElement('template');
+    template.innerHTML = markup;
+    templateCache.set(cacheKey, template);
+  }
+  const element = template.content.firstElementChild.cloneNode(true);
+  if (!(element instanceof SVGElement)) throw new Error(`${label} could not be created`);
+  return element;
 }
 
 /** Static SVG markup for trusted application icon names. Unknown names fail visibly but safely. */
@@ -181,11 +217,13 @@ export function iconElement(name, {
   className = 'ui-icon',
   strokeWidth = ICON_STROKE,
 } = {}) {
-  const host = document.createElement('span');
-  host.innerHTML = iconMarkup(name, { size, className, strokeWidth });
-  const icon = host.firstElementChild;
-  if (!(icon instanceof SVGElement)) throw new Error(`icon ${name} could not be created`);
-  return icon;
+  const resolved = Object.hasOwn(UI_ICONS, name) ? name : 'circle-help';
+  const pixels = dimensions(size);
+  return elementOfType(
+    `icon:${resolved}:${pixels}:${className}:${strokeWidth}`,
+    iconMarkup(resolved, { size: pixels, className, strokeWidth }),
+    `icon ${name}`,
+  );
 }
 
 export function setIcon(target, name, options = {}) {
@@ -212,11 +250,16 @@ export function symbolMarkup(name, {
 
 /** @returns {SVGElement} */
 export function symbolElement(name, options = {}) {
-  const host = document.createElement('span');
-  host.innerHTML = symbolMarkup(name, options);
-  const symbol = host.firstElementChild;
-  if (!(symbol instanceof SVGElement)) throw new Error(`symbol ${name} could not be created`);
-  return symbol;
+  const resolved = Object.hasOwn(DATA_SYMBOLS, name) ? name : 'warning';
+  const width = dimensions(options.width);
+  const height = options.height === undefined ? width : dimensions(options.height);
+  const className = options.className || 'data-symbol';
+  const extra = options.extra || '';
+  return elementOfType(
+    `symbol:${resolved}:${width}:${height}:${className}:${extra}`,
+    symbolMarkup(resolved, { width, height, className, extra }),
+    `symbol ${name}`,
+  );
 }
 
 /** Replaces Leaflet's native text glyphs without touching the vendored stylesheet or script. */

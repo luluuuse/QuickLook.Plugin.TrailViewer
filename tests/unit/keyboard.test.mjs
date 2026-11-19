@@ -40,6 +40,7 @@ function makeController(overrides = {}) {
     }),
     fit: () => calls.push('fit'),
     toggleChrome: () => calls.push('chrome'),
+    toolbox: () => ({ toggle: () => calls.push('toolbox') }),
   });
   return { controller, calls, layer: () => selectedLayer, measurement };
 }
@@ -61,6 +62,17 @@ function keyEvent(key, extra = {}) {
   };
   return event;
 }
+
+test('T toggles the toolbox through both the page and host routes', () => {
+  const { controller, calls } = makeController();
+
+  const event = keyEvent('t');
+  controller.onKeyDown(event);
+  assert.equal(event.prevented, 1);
+  controller.pressKey('t');
+
+  assert.deepEqual(calls, ['toolbox', 'toolbox']);
+});
 
 test('viewer shortcuts route to their owning controllers', () => {
   const { controller, calls } = makeController();
@@ -123,11 +135,12 @@ test('arrow navigation remains available while a photo is open', () => {
 test('map shortcuts stand down behind a full-size photo', () => {
   const { controller, calls } = makeController({ photoOpen: true });
 
-  for (const key of ['w', 'q', 'e', 's', 'c']) {
+  for (const key of ['w', 'q', 'e', 's', 'c', 't']) {
     controller.onKeyDown(keyEvent(key));
   }
   controller.pressKey('w');
   controller.pressKey('c');
+  controller.pressKey('t');
 
   assert.deepEqual(calls, []);
 });

@@ -7,6 +7,7 @@ export function createKeyboardController({
   waypointController,
   measurement: getMeasurement,
   layerSwitch: getLayerSwitch,
+  toolbox: getToolbox,
   fit,
   toggleChrome,
 }) {
@@ -46,6 +47,10 @@ export function createKeyboardController({
       fit();
       return;
     }
+    if (name === 't') {
+      getToolbox?.()?.toggle();
+      return;
+    }
     if (name === 's') {
       toggleChrome();
       return;
@@ -74,7 +79,7 @@ export function createKeyboardController({
     }
     if (event.ctrlKey || event.altKey || event.metaKey) return;
     const plainShortcut = !event.shiftKey
-      && (key === 'w' || key === 's' || key === 'c' || key === 'm' || LAYER_KEYS[key]);
+      && (key === 'w' || key === 's' || key === 'c' || key === 'm' || key === 't' || LAYER_KEYS[key]);
     if (!photoOpen && plainShortcut) {
       if (event.repeat) return;
       event.preventDefault();

@@ -8,6 +8,7 @@ const fs = require('fs');
 const path = require('path');
 const {
   launchBrowser,
+  switchLanguage,
   waitForLayout,
   waitForTiles,
 } = require('./support/browser.cjs');
@@ -100,6 +101,8 @@ async function main() {
     await page.getAttribute('.layer-menu-toggle', 'aria-expanded') === 'true');
   check('the active map type is checked in the layer panel',
     await page.getAttribute('.layer-category-button[data-layer="road"]', 'aria-checked') === 'true');
+  check('the expanded layer menu shows the Q / E category shortcut',
+    await page.textContent('.layer-section-heading-row .control-key') === 'Q / E');
   await waitForLayout(page);
   check('the road menu offers OSM and Tianditu',
     (await page.$$eval('.layer-source-menu button[data-provider]:not([hidden])',
@@ -252,8 +255,7 @@ async function main() {
   await waitForLayout(page);
   await page.keyboard.press('Escape');
 
-  await page.locator('.lang-switch button').click();
-  await waitForLayout(page);
+  await switchLanguage(page, 'zh');
   await openLayers();
   const zhLabels = await page.$$eval('.layer-category-button', (nodes) => nodes.map((node) => node.textContent));
   check('the categories are translated', zhLabels.join('/') === '路网/地形/卫星/定制', zhLabels.join('/'));

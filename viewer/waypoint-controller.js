@@ -6,6 +6,7 @@ import { sampleScreenPoints } from './waypoint-sampling.js';
 import { readStored, writeStored } from './storage.js';
 import { iconElement, setIcon, symbolMarkup } from './icons.js';
 import { lineDistanceAt } from './route-model.js';
+import { createSnapReticleMarker } from './snap-indicator.js';
 
 const PINS_KEY = 'pins';
 const MAX_DOTS = 20000;
@@ -22,9 +23,11 @@ function pinIcon(L, withPhoto) {
         ? symbolMarkup('camera', { width: 11, height: 11, className: 'data-symbol pin-camera' })
         : '')
       + '</span>',
+    // The 24x32 pin silhouette scales into 24x27 with its horizontal centre at x=12 and geometric tip at
+    // y=27.84, so anchoring at [12, 28] aligns the pin tip dead-centre on the coordinate and snap reticle.
     iconSize: [24, 27],
-    iconAnchor: [10, 26],
-    popupAnchor: [0, -24],
+    iconAnchor: [12, 28],
+    popupAnchor: [0, -26],
   });
 }
 
@@ -89,7 +92,8 @@ export function createWaypointController({
   let photoNodes = [];
   let selectedNodeIndex = -1;
   let stopIndex = -1;
-  let halo = null;
+  let selectionReticle = null;
+  let selectionTarget = null;
   let trackMarkCount = 0;
   let pendingPinRender = 0;
   let waypointIndex = null;
@@ -125,10 +129,7 @@ export function createWaypointController({
       renderWaypointPins();
     } else {
       pinLayer?.remove();
-      if (halo) {
-        halo.remove();
-        halo = null;
-      }
+      clearSelectionReticle();
     }
     setProfilePinsVisible(show);
     onVisibilityChange?.(show);
@@ -208,21 +209,37 @@ export function createWaypointController({
     });
   }
 
-  function paintHalo(stop) {
-    if (!map) return;
-    const at = stop.marker.getLatLng();
-    if (!halo) {
-      halo = L.circleMarker(at, {
-        radius: 16,
-        color: '#2f9bff',
-        weight: 2,
-        opacity: 0.95,
-        fillColor: '#2f9bff',
-        fillOpacity: 0.14,
-        interactive: false,
-      }).addTo(map);
+  function clearSelectionReticle() {
+    if (selectionReticle) {
+      selectionReticle.remove();
+      selectionReticle = null;
     }
-    halo.setLatLng(at).bringToFront();
+    selectionTarget = null;
+  }
+
+  /**
+   * Marks the selected waypoint or route anchor with the same standardized double-stroked snap reticle
+   * (diamond for waypoints, cross for start/end track points) centred on its exact geographic coordinate.
+   */
+  function paintSelectionReticle(node) {
+    if (!map || !node) return;
+    const at = node.marker.getLatLng();
+    const kind = node.stop ? 'marker' : 'track';
+    if (selectionTarget
+      && selectionTarget.kind === kind
+      && selectionTarget.lat === at.lat
+      && selectionTarget.lng === at.lng) {
+      return;
+    }
+    clearSelectionReticle();
+    selectionTarget = { kind, lat: at.lat, lng: at.lng };
+    selectionReticle = createSnapReticleMarker(L, at, {
+      kind,
+      className: 'pin-selection-reticle',
+      animate: true,
+      zIndexOffset: 1200,
+    });
+    selectionReticle?.addTo(map);
   }
 
   function paintNavigationSelection(node) {
@@ -243,9 +260,11 @@ export function createWaypointController({
     stopIndex = node.stop ? stops.indexOf(node.stop) : -1;
     renderWaypointPins();
     paintNavigationSelection(node);
-    paintHalo(node);
+    paintSelectionReticle(node);
     overview.refresh(overviewItems(), stopIndex);
-    onFocus?.(node, node.markers.some((marker) => marker.isPopupOpen()));
+    // No reveal here. popupopen is the single place that pans, so every route into a popup -- a pin click, an
+    // arrow key, the overview list -- pans exactly once, with the popup already laid out. Revealing here as well
+    // was the bug: Leaflet opens the popup before it fires click, so both paths ran and the map jumped twice.
     return node;
   }
 
@@ -401,6 +420,8 @@ export function createWaypointController({
     for (const node of navigation) {
       for (const marker of node.markers) {
         marker.on('click', () => focusNode(node.navIndex));
+        // The one and only reveal. By the time this fires the popup exists and has a measurable box, so the pan
+        // is computed against real geometry instead of a rectangle that is still animating open.
         marker.on('popupopen', () => {
           requestAnimationFrame(() => onFocus?.(node, true));
         });
@@ -501,7 +522,7 @@ export function createWaypointController({
       selectedNodeIndex = -1;
       stopIndex = -1;
       overviewCache = null;
-      halo = null;
+      clearSelectionReticle();
       trackMarkCount = 0;
       waypointIndex = createPointIndex(gpx.waypoints || []);
       renderedStops.clear();
@@ -515,14 +536,19 @@ export function createWaypointController({
       if (withDots) {
         for (const segment of segments) {
           for (const point of segment.points) {
-            pinLayer.addLayer(L.circleMarker([point.lat, point.lon], {
+            const dot = L.circleMarker([point.lat, point.lon], {
               renderer: dots,
               radius: 3,
               color: '#1b1b1b',
               weight: 1,
               fillColor: segment.color,
               fillOpacity: 1,
-            }).bindPopup(() => pointPopup(point, segment.track.name)));
+            });
+            dot.bindPopup(() => pointPopup(point, segment.track.name, () => dot.closePopup()), {
+              className: 'place-popup',
+              autoPan: false,
+            });
+            pinLayer.addLayer(dot);
             trackMarkCount += 1;
           }
         }
@@ -553,16 +579,39 @@ export function createWaypointController({
             () => `${waypoint.name || t('label.photo')} \u00b7 ${units(photos.length, 'photo')}`,
           );
           marker.bindTooltip(label, { direction: 'top', offset: [0, -30] });
-          marker.bindPopup(() => photoPreview(photos, waypoint, () => marker.closePopup()), {
+          // "Next" walks the photo stops and opens that pin's card in place. Both the action and its label are
+          // resolved when the popup opens, not when the marker is bound: photoStops is filled by buildNavigation,
+          // which runs after this loop.
+          marker.bindPopup(() => {
+            const next = photoStops.length > 1
+              ? () => {
+                const at = photoStops.indexOf(stop);
+                const neighbour = photoStops[(at + 1) % photoStops.length];
+                // navigationIndex, not sourceIndex: sourceIndex is assigned while the stops are still in file
+                // order, and sortStops reorders them afterwards, so using it here jumped to an unrelated pin.
+                if (neighbour) selectNode(neighbour.navigationIndex);
+              }
+              : null;
+            const at = photoStops.indexOf(stop);
+            return photoPreview(photos, waypoint, () => marker.closePopup(), {
+              onNext: next,
+              position: at >= 0 ? at + 1 : 0,
+              total: photoStops.length,
+            });
+          }, {
             className: 'photo-popup',
-            maxWidth: 300,
-            minWidth: 220,
+            maxWidth: 240,
+            minWidth: 224,
             autoPan: false,
           });
         } else {
           marker.bindPopup(
-            () => pointPopup(waypoint, waypoint.name || t('label.waypoint')),
-            { autoPan: false },
+            () => pointPopup(
+              waypoint,
+              waypoint.name || t('label.waypoint'),
+              () => marker.closePopup(),
+            ),
+            { className: 'place-popup', maxWidth: 240, minWidth: 224, autoPan: false },
           );
         }
         bounds.extend([waypoint.lat, waypoint.lon]);

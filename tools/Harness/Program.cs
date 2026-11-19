@@ -171,6 +171,7 @@ internal static class Program
                 "q" => Key.Q,
                 "e" => Key.E,
                 "m" => Key.M,
+                "t" => Key.T,
                 "z" => Key.Z, // a key the viewer does not bind: it must pass through untouched
                 _ => Key.W,
             };

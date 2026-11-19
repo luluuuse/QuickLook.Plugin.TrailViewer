@@ -344,13 +344,13 @@ export function slopeBins(cells) {
 // warm, in one direction of the wheel, so neighbouring cells never meet at a seam.
 /** @type {Array<[number, [number, number, number]]>} */
 const SCALE_STOPS = [
-  [0, [58, 160, 110]], // level: a calm green, the one colour that never means "go harder"
-  [0.04, [102, 181, 82]], // most of a real route lives between here and eight percent, so the ramp gives
-  [0.08, [150, 196, 74]], // that stretch small steps: a large area of colour cannot carry a fast gradient
-  [0.12, [224, 182, 62]], // without turning into bands
-  [0.17, [230, 134, 59]], // the steep threshold, and past it
-  [0.21, [224, 85, 69]], // walking pace
-  [SLOPE_FULL, [201, 58, 122]], // the end of the scale, and past it
+  [0, [64, 128, 102]], // level: muted pine
+  [0.04, [99, 145, 96]], // most of a real route lives between here and eight percent
+  [0.08, [154, 156, 92]], // soft moss turning toward ochre
+  [0.12, [190, 154, 74]], // warm amber
+  [0.17, [189, 118, 67]], // the steep threshold: caramel orange
+  [0.21, [164, 74, 62]], // walking pace: burnt crimson
+  [SLOPE_FULL, [126, 48, 53]], // the end of the scale: dark oxblood
 ];
 
 /** @returns {[number, number, number]} */

@@ -1,6 +1,12 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { chooseSnap, measurementSummary, SNAP_PIXELS } from '../../viewer/measure.js';
+import {
+  SNAP_LABEL_KEYS,
+  SNAP_SYMBOL_NAMES,
+  snapLabelKey,
+  snapSymbolName,
+} from '../../viewer/snap-indicator.js';
 
 test('measurement totals add every leg and keep sections independent', () => {
   const sections = [
@@ -31,10 +37,39 @@ test('snapping uses the nearest target inside the screen-pixel radius', () => {
   ]), { kind: 'track', distancePixels: 4 });
 });
 
-test('a marker wins a tie and the threshold is exclusive outside its radius', () => {
+test('exact ties follow marker > measure > track and the threshold is exclusive outside its radius', () => {
   assert.equal(chooseSnap([
     { kind: 'track', distancePixels: 8 },
     { kind: 'marker', distancePixels: 8 },
   ]).kind, 'marker');
+  assert.equal(chooseSnap([
+    { kind: 'track', distancePixels: 8 },
+    { kind: 'measure', distancePixels: 8 },
+  ]).kind, 'measure');
+  assert.equal(chooseSnap([
+    { kind: 'measure', distancePixels: 8 },
+    { kind: 'marker', distancePixels: 8 },
+  ]).kind, 'marker');
+  assert.equal(chooseSnap([
+    { kind: 'marker', distancePixels: 9 },
+    { kind: 'measure', distancePixels: 4 },
+  ]).kind, 'measure');
   assert.equal(chooseSnap([{ kind: 'track', distancePixels: SNAP_PIXELS + 0.01 }]), null);
+});
+
+test('standardized snap indicator maps each snappable kind to its distinct symbol and label key', () => {
+  assert.deepEqual(SNAP_SYMBOL_NAMES, {
+    marker: 'snap-marker',
+    measure: 'snap-measure',
+    track: 'snap-track',
+  });
+  assert.deepEqual(SNAP_LABEL_KEYS, {
+    marker: 'measure.snapMarker',
+    measure: 'measure.snapPoint',
+    track: 'measure.snapTrack',
+  });
+  assert.equal(snapSymbolName('measure'), 'snap-measure');
+  assert.equal(snapSymbolName('free'), null);
+  assert.equal(snapLabelKey('marker'), 'measure.snapMarker');
+  assert.equal(snapLabelKey('unknown'), null);
 });

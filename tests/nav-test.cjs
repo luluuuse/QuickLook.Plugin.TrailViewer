@@ -47,7 +47,7 @@ async function main() {
     photoStops: window.trailViewer.nav.photoStops().length,
     selected: document.querySelector('.gpx-pin.selected')?.getAttribute('title') || '',
     card: document.querySelector('.leaflet-popup-content')?.textContent || '',
-    thumbs: document.querySelectorAll('.photo-popup .photo-thumb').length,
+    thumbs: document.querySelectorAll('.photo-popup .photo-frame').length,
     viewing: window.trailViewer.photos.isOpen(),
     caption: document.querySelector('.photo-titles strong')?.textContent || '',
     counter: document.querySelector('.photo-counter')?.hidden === false
@@ -75,15 +75,16 @@ async function main() {
   await page.waitForSelector('.leaflet-popup-content');
   s = await state();
   check('right arrow selects the first marker', s.index === 0 && s.selected === 'Remote', `${s.index} ${s.selected}`);
-  check('the first marker card is open', s.card.includes('Remote') && s.card.includes('Standing on the bridge'), s.card);
-  check('the card shows the photo thumbnail', s.thumbs === 1, `${s.thumbs}`);
+  // The card is the photo now, so the description no longer rides on it; the name and the position counter do.
+  check('the first marker card is open', s.card.includes('Remote') && /1\/3/.test(s.card), s.card);
+  check('the card shows the photo frame', s.thumbs === 1, `${s.thumbs}`);
   check('the arrow does not open the full viewer', s.viewing === false);
 
   // 2. Stepping forward and back through the markers.
   await press('ArrowRight');
   s = await state();
   check('right arrow moves to the second marker', s.index === 1 && s.selected === 'Album', `${s.index} ${s.selected}`);
-  check('the second marker card carries its album', s.thumbs === 2, `${s.thumbs}`);
+  check('the second marker card shows its album photo', s.thumbs === 1, `${s.thumbs}`);
   check('only one marker is selected', (await page.locator('.gpx-pin.selected').count()) === 1);
 
   await press('d');
@@ -109,7 +110,7 @@ async function main() {
   check('right arrow wraps to the first marker', s.index === 0 && s.selected === 'Remote', `${s.index} ${s.selected}`);
 
   // 4. The keys work while the full-size photo is open, and follow the markers' photos.
-  await page.locator('.photo-popup .photo-thumb').nth(0).click();
+  await page.locator('.photo-popup .photo-frame').nth(0).click();
   await waitForPhoto(page);
   s = await state();
   check('the viewer opens on the selected marker', s.viewing === true && s.caption === 'Remote', s.caption);
@@ -169,8 +170,9 @@ async function main() {
   // 8. A click does what a key press does. The card has to survive the click: it is opened by Leaflet's own
   // handler on the marker, and the plugin's handler runs before it, so an extra openPopup from the plugin
   // loses the race and is toggled shut again (which is exactly how the click appeared to do nothing).
-  if (await page.locator('.leaflet-popup-close-button').count()) {
-    await page.locator('.leaflet-popup-close-button').click();
+  // The photo card draws its own close control; Leaflet's is hidden because the card is the photo.
+  if (await page.locator('.photo-popup .photo-card-close').count()) {
+    await page.locator('.photo-popup .photo-card-close').click();
     await settlePopup(page, '.leaflet-popup', 0);
   }
 
@@ -178,11 +180,11 @@ async function main() {
   await settlePopup(page, '.leaflet-popup', 1);
   s = await state();
   check('a click selects the marker', s.index === 0 && s.selected === 'Remote', `${s.index} ${s.selected}`);
-  check('the click opens the card', s.card.includes('Standing on the bridge'), s.card);
+  check('the click opens the card', s.card.includes('Remote'), s.card);
   check('the card stays open after the click', (await page.locator('.leaflet-popup').count()) === 1);
-  check('the clicked card shows its thumbnail', s.thumbs === 1, `${s.thumbs}`);
+  check('the clicked card shows its photo frame', s.thumbs === 1, `${s.thumbs}`);
 
-  await page.locator('.photo-popup .photo-thumb').nth(0).click();
+  await page.locator('.photo-popup .photo-frame').nth(0).click();
   await waitForPhoto(page);
   s = await state();
   check('a thumbnail in the clicked card opens the photo', s.viewing === true && s.caption === 'Remote', s.caption);

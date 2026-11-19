@@ -1,3 +1,5 @@
+#nullable enable
+
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -155,7 +157,7 @@ internal static class KmzArchive
                     || !ImageExtensions.Contains(Path.GetExtension(resourcePath)))
                     continue;
 
-                var entry = FindEntry(archive, resourcePath);
+                var entry = FindEntry(archive, resourcePath!);
                 if (entry == null || entry.FullName.EndsWith("/", StringComparison.Ordinal))
                     continue; // A broken image should not hide the route around it.
 
@@ -166,7 +168,7 @@ internal static class KmzArchive
                 if (entry.Length > MaxTotalResourceBytes - totalBytes)
                     throw new InvalidDataException("the images in this .kmz exceed the 300 MB preview limit");
 
-                var target = SafeTarget(folder, resourcePath);
+                var target = SafeTarget(folder, resourcePath!);
                 Directory.CreateDirectory(Path.GetDirectoryName(target));
                 var remainingTotal = MaxTotalResourceBytes - totalBytes;
                 long written;
@@ -256,12 +258,12 @@ internal static class KmzArchive
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
     }
 
-    private static ZipArchiveEntry FindEntry(ZipArchive archive, string path)
+    private static ZipArchiveEntry? FindEntry(ZipArchive archive, string path)
     {
         var exact = archive.GetEntry(path);
         if (exact != null) return exact;
 
-        ZipArchiveEntry match = null;
+        ZipArchiveEntry? match = null;
         foreach (var entry in archive.Entries)
         {
             if (!string.Equals(entry.FullName, path, StringComparison.OrdinalIgnoreCase))
@@ -277,11 +279,12 @@ internal static class KmzArchive
     {
         if (!TryNormaliseArchivePath(entryName, "", out var safeEntry))
             return string.Empty;
-        var slash = safeEntry.LastIndexOf('/');
+        var slash = safeEntry!.LastIndexOf('/');
         return slash <= 0 ? string.Empty : safeEntry.Substring(0, slash);
     }
 
-    private static bool TryResolveArchivePath(string reference, string documentDirectory, out string path)
+    private static bool TryResolveArchivePath(
+        string reference, string documentDirectory, out string? path)
     {
         reference = WebUtility.HtmlDecode(reference ?? string.Empty).Trim();
         var query = reference.IndexOfAny(new[] { '?', '#' });
@@ -294,7 +297,8 @@ internal static class KmzArchive
         return TryNormaliseArchivePath(reference.TrimStart('/', '\\'), baseDirectory, out path);
     }
 
-    private static bool TryNormaliseArchivePath(string entryName, string baseDirectory, out string path)
+    private static bool TryNormaliseArchivePath(
+        string entryName, string baseDirectory, out string? path)
     {
         path = null;
         if (string.IsNullOrWhiteSpace(entryName) || entryName.IndexOf('\0') >= 0)
@@ -389,9 +393,9 @@ internal static class KmzArchive
     }
 
     /// <summary>doc.kml first wherever it sits, otherwise the first .kml entry in the archive.</summary>
-    private static ZipArchiveEntry FindDocument(ZipArchive archive)
+    private static ZipArchiveEntry? FindDocument(ZipArchive archive)
     {
-        ZipArchiveEntry first = null;
+        ZipArchiveEntry? first = null;
         foreach (var entry in archive.Entries)
         {
             // Folders end with a slash and carry no content.

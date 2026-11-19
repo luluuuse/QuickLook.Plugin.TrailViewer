@@ -665,6 +665,16 @@ internal static class SelfTests
                 System.Net.IPAddress.Parse("198.18.1.1"))
             && AttachmentExport.IsBlockedResolved(
                 System.Net.IPAddress.Parse("192.168.1.4")));
+        Check("the IPv6 unspecified address is blocked",
+            !AttachmentExport.IsAllowedUri("https://[::]/photo.jpg")
+            && AttachmentExport.IsBlockedResolved(System.Net.IPAddress.IPv6None));
+        using (var fallbackSource = new MemoryStream(new byte[] { 1, 2, 3, 4 }))
+        {
+            fallbackSource.Position = 3;
+            AttachmentExport.PrepareFallbackSource(fallbackSource);
+            Check("an attachment stream is rewound before the fallback copy",
+                fallbackSource.Position == 0);
+        }
         var signatures = new[]
         {
             AttachmentExport.ImageExtensionFor(new byte[] { 0xff, 0xd8, 0xff, 0xe0 }),
@@ -684,6 +694,14 @@ internal static class SelfTests
 
     private static void TestViewerMessages()
     {
+        string routed = null;
+        var router = new ViewerMessageRouter(new ViewerMessageActions
+        {
+            BeginAttachment = body => routed = body,
+        });
+        router.Route("attachmentbegin\tjob\theader");
+        Check("the host message router dispatches attachment headers",
+            routed == "job\theader", routed);
         Check("clipboard failure uses a string WebMessage with an explicit false flag",
             ViewerMessages.ClipboardResult("clip-1", false, "denied")
                 == "clipboardResult\tclip-1\t0\tdenied");

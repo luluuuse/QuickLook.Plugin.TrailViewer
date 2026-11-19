@@ -1,7 +1,7 @@
 // Summary card detail modes: compact is the default, full details are one explicit click away, and the chosen
 // mode persists without bringing back the redundant file-name line.
 const path = require('path');
-const { launchBrowser, openViewer, waitForLayout } = require('./support/browser.cjs');
+const { launchBrowser, openViewer, switchLanguage, waitForLayout } = require('./support/browser.cjs');
 const { createChecker } = require('./support/assertions.cjs');
 const { createArtifacts } = require('./support/artifacts.cjs');
 const { startStaticServer } = require('./support/server.cjs');
@@ -76,9 +76,7 @@ async function main() {
     JSON.stringify(restored));
 
   await page.locator('.info-details-toggle').click();
-  await page.locator('.lang-switch button').click();
-  await page.waitForFunction(() => document.documentElement.lang === 'zh-CN');
-  await waitForLayout(page);
+  await switchLanguage(page, 'zh');
   const translated = await state();
   check('compact mode stays compact across a language switch',
     translated.mode === 'compact' && translated.stats === 6 && translated.facts === 0,

@@ -20,6 +20,7 @@ internal sealed class OverlayTransfer : IDisposable
     private int _nextChunk;
     private int _bytes;
 
+    /// <param name="maxBytes">Ceiling on the decoded payload, so a hostile page cannot exhaust memory.</param>
     internal OverlayTransfer(int maxBytes = DefaultMaxBytes)
     {
         if (maxBytes <= 0)
@@ -136,13 +137,15 @@ internal sealed class OverlayTransfer : IDisposable
         _bytes = 0;
     }
 
-    internal static string SanitiseFileName(string name)
+    internal static string SanitiseFileName(string name, string fallback = "overlay.png")
     {
         var leaf = Path.GetFileName(name ?? "");
         foreach (var bad in Path.GetInvalidFileNameChars())
             leaf = leaf.Replace(bad, '_');
         leaf = leaf.Trim().TrimEnd('.', ' ');
-        return string.IsNullOrWhiteSpace(leaf) || leaf == "." || leaf == ".." ? "overlay.png" : leaf;
+        return string.IsNullOrWhiteSpace(leaf) || leaf == "." || leaf == ".."
+            ? string.IsNullOrWhiteSpace(fallback) ? "overlay.png" : fallback
+            : leaf;
     }
 
     public void Dispose() => Reset();

@@ -32,20 +32,32 @@ QuickLook
 | `viewer/layer-registry.js` | 内置图源注册表、旧分类归一化和定制图源注册 |
 | `viewer/layer-providers.js` | 普通、天地图和网格底图的 Leaflet 图层构造 |
 | `viewer/layer-custom-form.js` | 定制图源表单、字段归一化与实时模板校验 |
+| `viewer/layer-custom-manager.js` | 定制图源状态、列表、状态标记、保存和删除；新增表单只在定制页内展开 |
+| `viewer/layer-menu-render.js` | 图层菜单按钮、提供商选择与中英文重绘 |
+| `viewer/layer-key-controls.js` | 天地图密钥图层重建和网格模式切换 |
+| `viewer/layer-selection.js` | 图源选择、持久化和地图图层切换 |
+| `viewer/layer-settings-view.js` | 图层设置、定制图源和菜单 DOM |
 | `viewer/custom-layers.js` | 用户定制图源的模板校验、本地存储和 Leaflet 图层构造 |
-| `viewer/measure.js` | 多段手动测距、屏幕像素吸附、测距图层和实时距离 |
+| `viewer/measure.js` | 多段手动测距、屏幕像素吸附（含已打测距点）、测距图层和实时距离 |
+| `viewer/snap-indicator.js` | 标准化地图吸附准星（标记菱形/测距方块/轨迹十字）与轻量化吸附标签，供测距和坐标拾取共用 |
 | `viewer/coordinates.js` | 起点、终点和顶点坐标目标计算；任意点由地图拾取并复用标记点吸附 |
 | `viewer/attachments.js` | 内置图片本地直拷、Data URI 分块、HTTPS 外链三路并发调度 |
 | `viewer/toolbox.js` | 地图分析、分享导出和环境信息的统一工具箱入口 |
 | `viewer/toolbox-coordinates.js` | 坐标目标、任意点拾取、吸附和高亮提示 |
 | `viewer/toolbox-attachments.js` | 附件导出入口、进度和结果状态 |
+| `viewer/toolbox-main.js` | 2×2 快捷工具、天气入口和工具箱主页面 |
+| `viewer/toolbox-measure.js` | 测距总览、分段列表和操作按钮 |
 | `viewer/host-bridge.js` | WebView2 消息、剪贴板和定制图源持久化桥接 |
+| `viewer/test-api.js` | 浏览器测试与 Harness 诊断 API 装配 |
 | `viewer/weather.js` | 起点、终点、顶点的目标点计算、海拔可用性判断、Windy 外链生成和外链打开 |
 | `viewer/icons.js` | 统一 UI 图标与地图数据符号注册表、Leaflet 原生控件图标适配 |
 | `viewer/export*.js` | 离屏画布、版式和 PNG 分块传输 |
 
-`viewer/style.css` 只负责按顺序加载 `viewer/css/` 下的 tokens、panels、toolbox、layers、map-data 与
-photos 样式文件。主要浮层间距、面板和模态层级通过 `--z-*` 变量统一约束。
+`viewer/index.html` 并行加载 `viewer/css/` 下的 tokens、panels、toolbox、layers、map-data 与 photos
+样式文件，不再经过串行 `@import` 瀑布。主要浮层间距、面板和模态层级通过 `--z-*` 变量统一约束。
+浮层使用 `contain: layout style paint`；地图拖动期间临时关闭模糊。剖面色阶为低饱和松绿、暖琥珀、
+焦糖橙和暗绯红，并对密集航点做像素抽稀。剖面填充固定为一条 SVG 路径和一个横向渐变；静态 SVG 独立
+包含并提升为合成层，参考线、圆点和读数只更新 `translate3d`，鼠标移动不读取图表边界。
 
 模块通过显式参数注入依赖，不共享可变全局状态。`window.trailViewer` 仅用于浏览器测试和宿主诊断。
 
@@ -78,15 +90,41 @@ photos 样式文件。主要浮层间距、面板和模态层级通过 `--z-*` �
 工具箱、测距、叠加图导出和地图图层面板统一使用半透明工具表面，避免面板完全遮断底图上下文。测距的点新增、
 分段、清空、撤回和重做使用内部快照历史；宿主只在测距激活时接管 `Ctrl+Z` / `Ctrl+Shift+Z`，
 避免覆盖资源管理器的普通撤回。叠加图导出是工具箱内部页面，与测距、坐标和附件导出共享标题栏、返回键
-和关闭逻辑。工具箱主菜单把四个高频工具排成 2×2 图标格，轨迹天气保留为下方完整功能条；图源列表只渲染
-当前地图类型的来源。
+和关闭逻辑。工具箱主菜单把四个高频工具排成 2×2 图标格，轨迹天气保留为下方完整功能条；标题栏的问号
+进入共享返回栏的快捷键速查页，主菜单和标记点控制不再重复键位徽标。图源列表只渲染当前地图类型的来源。
 工具箱、图层面板和标记点列表的顶部位置由地图布局统一写出的 `--floating-panel-top` 决定；任一窗口打开
 时会先关闭另外两个，标记点列表因互斥被关闭时不恢复自己的按钮焦点。工具箱自身的开合不重放历史焦点，
 因为用户可能已经手动平移；摘要展开和窗口缩放等布局变化仍会让当前点位保持在安全地图区域内。
 顶部图层入口由 `updateMenuButton` 更新类别文字和类别图标，具体图源名称只进入 tooltip 和无障碍名称；
-图源切换和语言切换共用这一入口。
+图源切换只走这一入口。界面语言由工具箱标题栏的单个语言按钮切换：地球图标（`UI_ICONS.globe`）说明这是
+语言开关，旁边的 `中` / `EN` 说明当前用哪种，点击翻转；`title` 只写目标语言的本名（中文界面是
+`English`，英文界面是 `中文`），`aria-label` 保留完整句子「界面语言：X，点击切换到 Y」。刷新语言时
+工具箱通过 `relabel()` 就地重绘，不重建面板。标题栏不再有“快速启动”说明文字，空间留给标题和三个控件。
+
+两种图钉卡片共用一套外壳（`.photo-popup` / `.place-popup`）：224 px 固定宽度、`--radius-md` 圆角、
+Leaflet 自带关闭按钮隐藏后由卡片自己画在右上角、同一个入场动画，宽度与语言无关，切换语言不会让同一个
+图钉弹出不同尺寸的卡片。照片卡片由 `waypoint-content.js` 的 `photoPreview` 构建，卡片本体是
+`.photo-frame`（4:3，照片铺满），信息压在 `.photo-scrim` 渐隐层上，关闭按钮是 `.photo-card-close`。
+没有照片的图钉由同一文件的 `renderPointPopup` 构建 `.place-card`：`.place-head` 里是名称和“时间 · 海拔”，
+字级与照片卡片的 `.photo-card-title` / `.photo-card-meta` 完全一致（只在颜色上区分为面板文字色），
+描述用 `.place-text` 在卡内滚动；`.place-card-close` 与照片卡片共用同一组样式。卡片**不再显示经纬度**：
+图钉已经标出位置，六位小数的经纬度是 224 px 卡片里最宽也最少被读的一行。卡片的类名用
+`photo-card-*` / `place-card-*` 前缀，与全览查看器的 `photo-title`/`photo-meta` 区分开——两者同名会让
+`querySelector` 命中和样式互相串台。“下一张”在 popup 打开时才解析 `photoStops`（它由 `buildNavigation`
+在此后填充），避免绑定 marker 时读到空数组。选中标记点与测距/坐标拾取共用 `viewer/snap-indicator.js`
+的标准化双描边准星（标记点为菱形 `snap-marker`，起终点为十字 `snap-track`），锚定在图钉尖端真实坐标
+（`iconAnchor: [12, 28]`）并与图钉本体的暖金 `drop-shadow` 配合，不再使用模糊蓝光晕或地图单位描边圈。
+
+竖幅照片卡片（299 px）常高于短窗口的安全区（178–292 px），因此 `map-focus.js` 的 `focusOffset`
+在内容高于安全区时改为顶部对齐而不是居中；布局刷新走 `focusSelection`，只做最小移动的
+`revealPoint` 会让卡片跨在摘要卡上。`map-view.js` 的 `popupRect()` 跳过 `.photo-popup` 和
+`.place-popup`，不给它们写内联 `max-height`：照片卡片会截断底部，普通卡片的描述已有自己的滚动区域，
+再套一层会出现双层滚动条。
 
 轨迹摘要复制只在 `summary-view.js` 生成缺失字段安全省略的纯文本，再由宿主写入 Windows 剪贴板。
+信息卡的两行六项由 `statRow` 的 `primary`（字号层级）和 `accent`（左侧蓝色竖线）两个独立标记控制：
+`primary` 表示这一项比同排更重，`accent` 表示这一项是卡片最先回答的数值。两者分开，行内重要性和
+全局优先级才不会互相绑架。
 点位坐标复用天气的顶点有效性规则，起点/终点取轨迹或路线首末记录点；地图拾取与普通地图点击共用
 Leaflet 事件，但拾取态优先消费单击并保持工具箱打开。吸附结果保留源点海拔供地图提示和结果卡显示；
 剪贴板协议仍只发送经纬度，没有可靠海拔时使用显式空状态。附件图片清单在打开文件时按 URL 去重，
@@ -109,6 +147,8 @@ DNS 校验只缓存成功结果，瞬时失败会从缓存移除。下载完成�
 `KmzArchive.cs` 负责受限解包：保留 KML 的内部相对目录，
 并把 KML 引用的本地图片按同一目录结构写入临时文件夹，让虚拟文件主机可以直接响应照片 URL。
 `ViewerBridge.cs` 统一 Dispatcher 封送和字符串 WebMessage，`TiandituKeyDialog.cs` 独立管理天地图密钥窗口。
+`ViewerMessageRouter.cs` 统一分发 18 路页面消息，`TrailViewerPanel` 的 WebView 生命周期和消息处理位于
+单独 partial 文件，主文件只保留加载、状态和清理编排。
 宿主保留原始输入路径用于导出定位，KMZ 解包路径只供页面预览；所有输入类型在创建 WebView 前统一检查
 64 MB 上限。
 WebView2 共享环境在插件初始化时预热；每个面板仍拥有自己的文档、生命周期取消源和消息订阅。KMZ 解包、
@@ -145,7 +185,7 @@ attachmentlink  <batch> <index> <name> <encoded-url>
 宿主向页面返回剪贴板、附件、续传和叠加图结果时统一使用 `PostWebMessageAsString` 的制表符消息，
 不再把结果值拼入 `ExecuteScriptAsync` 源码；布尔值由页面按显式 `'1'` 解析。
 
-`text-input` 上报页面内文本字段的焦点状态。宿主的全局键盘钩子在操作系统层拦截 `W/Q/E/S/C/M`，
+`text-input` 上报页面内文本字段的焦点状态。宿主的全局键盘钩子在操作系统层拦截 `W/Q/E/S/C/M/T`，
 比 WebView 更早拿到按键，因此输入框里打字会被当成快捷键；钩子读到该状态为 1 时直接放行，
 页面关闭预览时宿主也会复位，避免状态残留。
 
@@ -171,6 +211,8 @@ attachmentlink  <batch> <index> <name> <encoded-url>
 这套规则。
 
 布局只在 `ResizeObserver`、窗口尺寸和面板状态变化时重新测量；地图平移和缩放不再触发整套 DOM 尺寸扫描。
+布局更新分两阶段执行：先读取一次矩形快照并写入 CSS/布局类，下一帧再读取最终几何、计算安全区域和取景，
+避免同帧 Read → Write → Read。
 `track-layer.js` 按缩放级别缓存距离采样，普通平移只从缓存更新视口内标记。
 摘要中的距离、高程和时间范围共用一次逐点扫描；默认缺口诊断按解析后的轨迹数组缓存，供摘要和地图图层
 复用。分段长度在绘制图层时计算一次，后续缩放不再重新扫描全部点求总里程。

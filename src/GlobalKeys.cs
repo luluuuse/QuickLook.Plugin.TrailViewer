@@ -8,10 +8,10 @@ using System.Windows.Threading;
 namespace QuickLook.Plugin.TrailViewer;
 
 /// <summary>
-/// W, Q, E, S, C, M and measuring undo/redo, caught below the application instead of inside it. Measured: QuickLook shows its preview
-/// with ShowActivated="False" and reads its own keys (Space, Esc, arrows) through a global keyboard hook, so the
-/// keyboard never enters this window -- a WPF handler only ever sees a key after someone clicks into the
-/// preview. A raw low-level hook is the only place that always sees it first.
+/// W, Q, E, S, C, M, T and measuring undo/redo, caught below the application instead of inside it. Measured:
+/// QuickLook shows its preview with ShowActivated="False" and reads its own keys (Space, Esc, arrows) through a
+/// global keyboard hook, so the keyboard never enters this window -- a WPF handler only ever sees a key after
+/// someone clicks into the preview. A raw low-level hook is the only place that always sees it first.
 ///
 /// The hook exists only while this preview is on screen, and it only swallows a key when the foreground is
 /// either this process or a file manager -- the windows a preview is opened from, and the ones whose selection
@@ -137,9 +137,7 @@ internal sealed class GlobalKeys : IDisposable
         var win = Down(VkLWin) || Down(VkRWin);
         var plain = !control && !shift && !alt && !win;
         var plainAction = plain && name != "z";
-        // Ctrl+Z and Ctrl+Shift+Z belong to measurement only while its mode is active, so an inactive preview
-        // leaves Explorer's own undo shortcut untouched.
-        var measureHistory = name == "z" && control && !alt && !win;
+        var measureHistory = control && !alt && !win && name == "z";
 
         if ((!plainAction && !measureHistory) || !SafeOnScreen() || !HostIsForeground())
         {
@@ -265,6 +263,7 @@ internal sealed class GlobalKeys : IDisposable
         0x53 => "s",
         0x43 => "c",
         0x4D => "m",
+        0x54 => "t",
         0x5A => "z",
         _ => null,
     };

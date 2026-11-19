@@ -1,12 +1,17 @@
 /* Waypoint photo cards and full-screen photo viewer. */
 
-/* ---------- waypoint photos ---------- */
+/* ---------- waypoint cards ---------- */
 
-.point-popup .point-text {
-  max-width: 260px;
-  margin-top: 4px;
+/* A placemark description can run to paragraphs; the card stays small and scrolls instead of growing. */
+.place-text {
+  max-height: 96px;
+  margin: 0;
+  overflow: auto;
   color: var(--muted);
+  font-size: 11px;
+  line-height: 1.45;
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 /* The badge means "there is something to open here". The first click opens a card, not the original. */
@@ -14,90 +19,104 @@
   cursor: pointer;
 }
 
-.gpx-pin.has-photo .pin-symbol {
-  filter: drop-shadow(0 0 4px rgba(245, 196, 0, 0.45));
+/* Selection shares the standardized snap-reticle visual system: the diamond reticle anchors the ground tip
+   while the selected pin lifts forward with a subtle warm accent glow matching --snap-accent. */
+.gpx-pin.selected {
+  z-index: 650 !important;
 }
 
-.gpx-pin.selected .pin-symbol {
-  filter: drop-shadow(0 0 5px rgba(47, 155, 255, 0.95));
+.gpx-pin.selected .pin-symbol-wrap svg {
+  filter: drop-shadow(0 0 4px rgba(255, 242, 168, 0.72));
 }
 
 .gpx-start.selected,
 .gpx-end.selected {
-  stroke: #2f9bff;
+  stroke: var(--snap-accent);
   stroke-width: 4;
-  filter: drop-shadow(0 0 4px rgba(47, 155, 255, 0.95));
 }
 
-/* The small card a photo pin opens first. Sized to the pin, not to the window: the window is for the
-   second click, when the original is actually wanted. */
-.photo-popup .leaflet-popup-close-button {
-  padding: 6px 7px 0 0;
-  color: var(--muted);
-  font-size: 18px;
-}
-
-.photo-popup .leaflet-popup-close-button:hover {
-  color: #fff;
-}
-
-/* A placemark description can run to paragraphs; the card stays small and scrolls instead of growing. */
-.photo-popup .leaflet-popup-content {
-  max-height: 60vh;
-  overflow: auto;
-}
-
-.photo-preview .point-text {
-  max-height: 84px;
-  overflow: auto;
-}
-
-.photo-thumbs {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 6px;
-  margin-top: 8px;
-}
-
-.photo-thumbs.single {
-  grid-template-columns: 1fr;
-}
-
-/* Two or four thumbnails fill their rows instead of leaving an empty third column behind. */
-.photo-thumbs:has(.photo-thumb:nth-child(2):last-child),
-.photo-thumbs:has(.photo-thumb:nth-child(4):last-child) {
-  grid-template-columns: repeat(2, 1fr);
-}
-
-.photo-thumb {
-  position: relative;
-  display: block;
-  overflow: hidden;
-  height: 64px;
+/* The card a pin opens first. One shell for both cards -- with a picture and without -- so a pin keeps its
+   shape whatever the file carries: fixed width, same radius, same corner close, same entrance. Sized to the
+   pin, not to the window: the window is for the second click, when the original is actually wanted. */
+.photo-popup .leaflet-popup-content-wrapper,
+.place-popup .leaflet-popup-content-wrapper {
   padding: 0;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 4px;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+}
+
+/* One fixed width for both languages and both cards: the card is a fixed-size object anchored to a 24 px pin,
+   and letting it grow with the label made the same pin open a different-sized card after a language switch.
+   No max-height on the photo card: its height comes from the 4:3 frame, and a viewport-relative cap cut the
+   bottom off a portrait card. */
+.photo-popup .leaflet-popup-content,
+.place-popup .leaflet-popup-content {
+  width: 224px !important;
+  margin: 0;
+}
+
+.photo-popup .leaflet-popup-content {
+  overflow: visible;
+}
+
+/* Leaflet's own close button is hidden: the card draws its own, inside the photo frame or in the card's
+   corner, so it lands where the eye expects rather than at the edge of the popup chrome. */
+.photo-popup .leaflet-popup-close-button,
+.place-popup .leaflet-popup-close-button {
+  display: none;
+}
+
+/* The card enters the way every other floating panel does -- a short fade plus a small rise -- so opening a pin
+   does not feel like a different application. The popup's own tip is animated separately by Leaflet. */
+.photo-popup .leaflet-popup-content-wrapper,
+.place-popup .leaflet-popup-content-wrapper {
+  animation: pin-card-enter var(--motion-panel) both;
+}
+
+.photo-popup .photo-frame > * {
+  animation: panel-content-enter var(--motion-panel) both;
+}
+
+@keyframes pin-card-enter {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Leaflet pans the map with the popup in place; scaling during that pan would fight the anchor, so the entrance
+   runs only when the card is first attached, not on every repaint. */
+.photo-popup.leaflet-zoom-animated .leaflet-popup-content-wrapper {
+  animation-duration: var(--motion-panel);
+}
+
+/* The card IS the photo. The frame is the whole 4:3 surface, so the visible image is twice what a
+   "picture above a facts band" layout could show in the same footprint. */
+/* Portrait 4:3 -- height : width -- which is how a phone shoots when held upright. aspect-ratio is written
+   width / height, so the value is 3 / 4. */
+.photo-frame {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  overflow: hidden;
+  border-radius: var(--radius-md);
   background: #1b1b1b;
   cursor: zoom-in;
 }
 
-.photo-thumbs.single .photo-thumb {
-  height: 148px;
-}
-
-.photo-thumb:hover {
-  border-color: rgba(255, 255, 255, 0.42);
-}
-
-.photo-thumb img {
+.photo-frame img {
   display: block;
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
 
-/* A broken thumbnail still has to lead somewhere: hiding the image leaves the frame as the button it is. */
-.photo-thumb.failed img {
+/* A broken photo still has to lead somewhere: hiding the image leaves the frame as the button it is. */
+.photo-frame.failed img {
   visibility: hidden;
 }
 
@@ -110,14 +129,166 @@
   transform: translate(-50%, -50%);
 }
 
-.photo-thumb.failed .photo-error-icon {
+.photo-frame.failed .photo-error-icon {
   display: block;
 }
 
-.photo-hint {
-  margin: 8px 0 0;
+/* The scrim is what makes white text legible over any photo: bright sky, snow, a sunlit slope. It is opaque at
+   the bottom where the text sits and gone by 72%, so the subject of the picture is never dimmed. */
+.photo-scrim {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to top,
+    rgba(0, 0, 0, 0.86) 0%,
+    rgba(0, 0, 0, 0.62) 26%,
+    rgba(0, 0, 0, 0.12) 56%,
+    transparent 72%
+  );
+  pointer-events: none;
+}
+
+/* Right inset clears the round next button; the text never has to fight it for room. */
+.photo-facts {
+  position: absolute;
+  right: 44px;
+  bottom: 10px;
+  left: 10px;
+  display: grid;
+  gap: 2px;
+  pointer-events: none;
+}
+
+/* The facts block is the same two lines on both cards -- same sizes, same weights, same truncation -- so the
+   only difference left is that the photo card paints them white over the picture and the plain card uses the
+   panel's own text colours. */
+.photo-card-title,
+.place-card-title {
+  display: block;
+  overflow: hidden;
+  font-size: 12.5px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.photo-card-meta,
+.place-card-meta {
+  display: block;
+  overflow: hidden;
+  font-size: 10.5px;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.photo-card-title {
+  color: #ffffff;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
+}
+
+.photo-card-meta {
+  color: rgba(255, 255, 255, 0.82);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
+}
+
+.place-card-title {
+  color: var(--text);
+}
+
+.place-card-meta {
   color: var(--muted);
-  font-size: 11px;
+}
+
+/* One close button for both cards, in the same corner at the same size. */
+.photo-card-close,
+.place-card-close {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: var(--radius-sm);
+  background: rgba(18, 18, 18, 0.82);
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.photo-card-close:hover,
+.place-card-close:hover {
+  border-color: rgba(255, 255, 255, 0.5);
+  background: rgba(18, 18, 18, 0.95);
+}
+
+/* One round arrow instead of a text button: it costs no horizontal room, so a long placemark name can use the
+   full width, and the counter sits above it in the same 28 px column. */
+.photo-next {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 50%;
+  background: rgba(18, 18, 18, 0.62);
+  color: #ffffff;
+  cursor: pointer;
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+
+.photo-next:hover {
+  border-color: rgba(255, 255, 255, 0.62);
+  background: rgba(18, 18, 18, 0.82);
+}
+
+.photo-position {
+  position: absolute;
+  right: 8px;
+  bottom: 42px;
+  width: 28px;
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 9.5px;
+  text-align: center;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+  pointer-events: none;
+}
+
+
+/* The plain-pin card: the photo card without the picture. Same width, same radius, same corner close; the
+   title and the facts line keep the same type, and the description scrolls inside a short box instead of
+   stretching the card down the map.
+   No background of its own: the popup wrapper already paints --panel, the same translucent surface the
+   waypoint list uses. Painting it twice stacked two 0.86 layers into an almost solid card. */
+.place-card {
+  position: relative;
+  display: grid;
+  gap: 5px;
+  padding: 9px 10px 10px;
+  background: transparent;
+}
+
+/* The left column is the text and the 26 px gutter is the close button's; a long name truncates rather than
+   sliding under it. */
+.place-head {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+  padding-right: 26px;
+}
+
+.place-head:empty {
+  display: none;
 }
 
 .photo-viewer {
@@ -166,7 +337,7 @@
 .photo-zoom {
   flex: 0 0 auto;
   padding: 2px 9px;
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   background: rgba(255, 255, 255, 0.09);
   color: var(--text);
   font: 12px Consolas, monospace;
@@ -191,7 +362,7 @@
   padding: 0;
   place-items: center;
   border: 0;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   background: none;
   color: var(--text);
   cursor: pointer;
@@ -218,7 +389,7 @@
   flex: none;
   max-width: none;
   max-height: none;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6);
   transform-origin: center;
   /* Not a button: clicking the original neither steps nor closes. */

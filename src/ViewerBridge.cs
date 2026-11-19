@@ -9,7 +9,7 @@ namespace QuickLook.Plugin.TrailViewer;
 internal static class ViewerBridge
 {
     internal static async System.Threading.Tasks.Task PostAsync(
-        Dispatcher dispatcher, Func<WebView2> view, string message)
+        Dispatcher dispatcher, Func<WebView2?> view, string message)
     {
         try
         {

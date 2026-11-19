@@ -33,7 +33,6 @@ const measure = (page) => page.evaluate(() => {
   add('layers', '.layer-switch');
   add('pins', '.pins-switch');
   add('overview', '.waypoint-overview-switch');
-  add('lang', '.lang-switch');
   add('profile', '#profile');
   add('scale', '.leaflet-control-scale');
   add('credit', '.leaflet-control-attribution');
@@ -105,10 +104,10 @@ async function main() {
   check('the three headline numbers share a row',
     pairs.length === 6 && pairs[0].top === pairs[1].top && pairs[1].top === pairs[2].top,
     pairs.map((x) => `${x.label}@${x.top}`).join(' '));
-  check('distance, time and points share the next',
+  check('descent, time and points share the next',
     pairs[3].top === pairs[4].top && pairs[4].top === pairs[5].top && pairs[3].top > pairs[0].top,
     pairs.slice(3).map((x) => `${x.label}@${x.top}`).join(' '));
-  // Three columns, not six numbers that happen to break into two lines: the point count sits under the drop.
+  // Three columns, not six numbers that happen to break into two lines.
   check('the columns line up between the two rows',
     pairs[3].left === pairs[0].left && pairs[4].left === pairs[1].left && pairs[5].left === pairs[2].left,
     pairs.map((x) => `${x.label}@${x.left}`).join(' '));
@@ -125,7 +124,6 @@ async function main() {
     '.pins-switch',
     '.waypoint-overview-switch',
     '.toolbox-switch',
-    '.lang-switch',
   ].map((selector) => document.querySelector(selector))
     .filter(Boolean)
     .map((node) => Math.round(node.getBoundingClientRect().height)));
@@ -204,8 +202,8 @@ async function main() {
   check('a 360 px window still has no overlaps', clashes(tm.parts).length === 0, clashes(tm.parts).join(' ') || 'clean');
   check('and it uses the docked tool band', tm.layout === 'docked', tm.layout);
   check('the compact map tools share one row',
-    new Set([tm.parts.tools.t, tm.parts.layers.t, tm.parts.pins.t, tm.parts.overview.t, tm.parts.lang.t]).size === 1,
-    `${tm.parts.tools.t}/${tm.parts.layers.t}/${tm.parts.pins.t}/${tm.parts.overview.t}/${tm.parts.lang.t}`);
+    new Set([tm.parts.tools.t, tm.parts.layers.t, tm.parts.pins.t, tm.parts.overview.t]).size === 1,
+    `${tm.parts.tools.t}/${tm.parts.layers.t}/${tm.parts.pins.t}/${tm.parts.overview.t}`);
   check('the compact layer entry keeps a full accessible label',
     await tiny.$eval('.layer-menu-toggle', (node) => Boolean(node.getAttribute('aria-label'))
       && Boolean(node.dataset.short) && Math.round(node.getBoundingClientRect().height) === 28));
