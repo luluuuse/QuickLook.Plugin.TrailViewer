@@ -11,7 +11,7 @@ const check = (message, ok, detail = '') => {
 
 const tracked = [
   'README.md',
-  'README.zh-CN.md',
+  'README.en.md',
   'CHANGELOG.md',
   'CONTRIBUTING.md',
   'docs/USAGE.md',
@@ -58,9 +58,9 @@ for (const file of tracked) {
   check(`${file} local links resolve`, missing.length === 0, missing.join(', ') || 'clean');
 }
 
-const english = visibleHeadings(fs.readFileSync(path.join(root, 'README.md'), 'utf8'))
+const english = visibleHeadings(fs.readFileSync(path.join(root, 'README.en.md'), 'utf8'))
   .filter((heading) => heading.level === 2);
-const chinese = visibleHeadings(fs.readFileSync(path.join(root, 'README.zh-CN.md'), 'utf8'))
+const chinese = visibleHeadings(fs.readFileSync(path.join(root, 'README.md'), 'utf8'))
   .filter((heading) => heading.level === 2);
 check('English and Chinese README structures match', english.length === chinese.length,
   `${english.length}/${chinese.length}`);

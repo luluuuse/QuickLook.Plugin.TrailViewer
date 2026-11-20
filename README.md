@@ -1,113 +1,105 @@
 # QuickLook.Plugin.TrailViewer
 
-[简体中文](README.zh-CN.md) | English
+简体中文 | [English](README.en.md)
 
-Preview GPX, KML, KMZ and FIT tracks directly in QuickLook on Windows. Press <kbd>Space</kbd> on a track file
-in Explorer to see the route, waypoints, photos and elevation profile without opening a map application.
+在 Windows 上直接用 QuickLook 预览 GPX、KML、KMZ 和 FIT 轨迹。在资源管理器中选中轨迹文件并按
+<kbd>Space</kbd>，无需打开地图软件即可查看路线、标记点、照片和海拔剖面。
 
-![Current route summary, split entry, map tools and elevation profile](docs/screenshot-map.png)
+![当前轨迹摘要、分段入口、地图工具和海拔剖面](docs/screenshot-map.png)
 
-## Quick start
+## 快速开始
 
-1. Download the latest `.qlplugin` from [GitHub Releases](https://github.com/luluuuse/QuickLook.Plugin.TrailViewer/releases/latest).
-2. Open the package, install it, and restart QuickLook from the tray.
-3. Select a `.gpx`, `.kml`, `.kmz` or `.fit` file in Explorer and press <kbd>Space</kbd>.
+1. 从 [GitHub Releases](https://github.com/luluuuse/QuickLook.Plugin.TrailViewer/releases/latest) 下载最新
+   `.qlplugin`。
+2. 打开安装包完成安装，并从托盘完全退出后重新启动 QuickLook。
+3. 在资源管理器中选中 `.gpx`、`.kml`、`.kmz` 或 `.fit` 文件，按 <kbd>Space</kbd>。
 
-Common controls:
+常用操作：
 
-| Action | Control |
+| 操作 | 控制 |
 |---|---|
-| Move between waypoints | <kbd>←</kbd> <kbd>→</kbd> or <kbd>A</kbd> <kbd>D</kbd> |
-| Fit the complete route | <kbd>C</kbd> |
-| Show/hide map markers | <kbd>W</kbd> |
-| Change map layer | <kbd>Q</kbd> / <kbd>E</kbd> |
-| Hide interface chrome | <kbd>S</kbd> |
-| Start/finish measuring | <kbd>M</kbd> |
-| Measuring undo / redo | <kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> |
-| Open/close toolbox | <kbd>T</kbd> |
-| Export overlay image | Toolbox → Export overlay |
-| Open route weather | Toolbox → Route weather |
+| 切换标记点 | <kbd>←</kbd> <kbd>→</kbd> 或 <kbd>A</kbd> <kbd>D</kbd> |
+| 回到完整轨迹 | <kbd>C</kbd> |
+| 显示/隐藏地图标记 | <kbd>W</kbd> |
+| 切换底图 | <kbd>Q</kbd> / <kbd>E</kbd> |
+| 隐藏界面 | <kbd>S</kbd> |
+| 开始/结束测距 | <kbd>M</kbd> |
+| 测距撤回 / 重做 | <kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> |
+| 打开/关闭工具箱 | <kbd>T</kbd> |
+| 查看轨迹天气 | 工具箱 → 轨迹天气 |
+| 导出叠加图 | 工具箱 → 叠加图导出 |
 
-## Highlights
+## 功能概览
 
-- **Track rendering:** GPX tracks, KML LineStrings and `gx:Track`, plus FIT activity/course records, each segment in its own colour, with
-  adaptive direction arrows and distance labels.
-- **Route intelligence:** moving time, recording gaps, implausible GPS jumps and a grade-aware time estimate
-  using Naismith, Langmuir descents and a steep-uphill correction.
-- **Per-kilometre splits:** an independent entry below the route summary opens on demand to show elapsed time
-  and moving speed for every kilometre, with total/moving-time totals. Selecting a row focuses and highlights
-  that part of the route on the map. A one-click details mode adds cumulative time, ascent/descent, average
-  heart rate, moving speed and vertical speed.
-- **Route networks:** merged networks are detected and rendered as independent routes instead of one trip;
-  global speed, split and combined-profile calculations are skipped for faster loading and lower memory use.
-- **Waypoints and photos:** route-ordered navigation, photo albums with portrait 4:3 cards, true source-pixel
-  percentages, wheel zoom up to 800% and drag-to-pan, scrollable plain waypoint cards, and a searchable
-  overview with local danger/water/camp/exit insight labels.
-- **Elevation profile:** gradient-coloured terrain, waypoint dots, scrub readout and optional per-point heart
-  rate overlaid on its own scale with a whole-route average line.
-- **Manual measurement:** multi-section point-to-point distance measurement on the map. Right-click adds a
-  point while left-drag pans and the wheel zooms; nearby waypoints, previously placed measurement points, and
-  recorded track samples snap automatically. Section subtotals and overall distance update live.
-- **Copy and attachment export:** copy a shareable summary from the track card, copy WGS-84 coordinates for
-  the start, end, peak, map centre or any picked point (with nearby marker snapping and elevation notes), and
-  export embedded, Data URI and HTTPS-linked photos beside the source track—either embedded-only or all images
-  concurrently with automatic resume.
-- **Map sources:** OpenStreetMap HOT (Road), CyclOSM / OpenHikingMap / OpenTopoMap (Terrain), Tianditu road
-  and satellite imagery with a user-owned key, an offline Grid (no-map) mode, and persistent HTTPS Custom
-  sources (including two-step placeholders and 512 px tiles).
-- **Overlay export:** export transparent square, portrait and landscape PNG route overlays with a live preview,
-  selectable ink and backing, route name, date and trip statistics (or route-network length and segment counts).
-- **Route weather:** opens Windy in your browser on the cloud layer with hourly forecasts expanded for the
-  route's start, end or peak (when reliable elevation is available), without embedding third-party maps.
-- **Bilingual interface:** switch in place between English and Chinese without reloading the preview, with
-  persistent map, marker and export preferences.
+- **轨迹显示**：GPX 轨迹、KML LineString、`gx:Track` 和 FIT 活动/路线按段着色，方向箭头和公里标签随缩放自适应。
+- **路线分析**：运动时间、数据缺口、GPS 异常跳点和基于 Naismith、Langmuir 下坡及陡上坡修正的用时估算。
+- **每公里分段**：简介下方提供独立的折叠项，主动展开后逐公里显示经过时间和运动速度，并汇总总时间与运动时间；
+  点击某一圈可在地图上聚焦并突出显示对应轨迹。一键切换详细模式可查看累计时间、上升/下降、平均心率、
+  运动速度和垂直速度。
+- **路网轨迹**：自动识别由多条独立路线合并成的路网，不把全网误算为一次行程；跳过全局速度、每公里表
+  和合并剖面以降低加载时间与内存占用。
+- **标记点与照片**：按路线顺序切换图钉，支持竖幅整卡照片预览与全览相册（真实原图像素比例、最高
+  800% 滚轮缩放与拖拽平移）、可滚动描述的普通标记点卡片、速览列表，以及危险/水源/营地/下撤等
+  本地语义提示。
+- **海拔剖面**：坡度着色、航点位置与鼠标读数；轨迹含逐点心率时可按需叠加到独立纵轴，并用横虚线标出
+  全程平均心率。
+- **手动测距**：支持多段手动打点测距，右键添加点、左键拖动地图、滚轮缩放，靠近标记点、已有手动测距点
+  或轨迹点时自动吸附；地图实时显示每段距离和总距离。
+- **复制与附件导出**：一键复制分享版轨迹摘要，复制起点、终点、顶点、地图中心或任意拾取点的 WGS-84
+  坐标（靠近标记点自动吸附并备注海拔）；支持将内置图片、Data URI 和 HTTPS 外链图片导出到轨迹旁，
+  可选仅导出内置图片或三路并发导出全部并支持断点续传。
+- **多图源底图**：内置 OpenStreetMap HOT（路网）与 CyclOSM / OpenHikingMap / OpenTopoMap（地形），
+  配置个人密钥后可使用天地图路网与卫星图，并支持本地网格（无底图）模式与持久化 HTTPS 定制图源（支持
+  两步路占位符与 512 px 地址）。
+- **叠加图导出**：支持导出方版、竖版和横版透明 PNG 轨迹叠加图，提供实时预览、墨色与底衬选择，自动
+  写入路线名称、日期与统计指标（路网文件仅显示路线总长与段数）。
+- **轨迹天气**：在浏览器中打开 Windy（默认云层）并直接展开所选起点、终点或顶点的逐小时天气预报，
+  预览页不内嵌第三方地图。
+- **双语界面**：支持中英文就地切换，自动保存底图、标记点与导出等常用偏好。
 
-Detailed behaviour, advanced controls and export examples are in [docs/USAGE.md](docs/USAGE.md).
+完整操作、快捷键和导出说明见 [docs/USAGE.md](docs/USAGE.md)。
 
-## Compatibility
+## 兼容范围
 
-Supported inputs:
+支持：
 
-- GPX 1.0 and 1.1
-- KML 2.2, including `gx:Track` and `MultiGeometry`
-- Zipped `.kmz` archives
-- FIT activities and courses with GPS records, compressed timestamps, elevation and course points
+- GPX 1.0 / 1.1
+- KML 2.2（含 `gx:Track` 和 `MultiGeometry`）
+- 压缩的 `.kmz`
+- 带 GPS 记录、压缩时间戳、海拔和路线点的 FIT 活动/路线
 
-FIT previews focus on route data. Recorded heart rate can be overlaid on the profile. Laps, cadence, power,
-temperature and workout steps are not shown in the first version.
+FIT 简要模式聚焦路线基础数据；记录的心率可按需叠加到剖面。步频、功率、温度、训练步骤和完整设备指标
+暂不展示。
 
-Long tracks render continuously with route lines, endpoints and sampled waypoints, skipping individual per-sample markers to stay smooth while panning and zooming. Invalid XML produces an explicit error page with the parser message.
-Each input file is limited to 64 MB.
+长轨迹会完整绘制路线线条、起终点及按视口抽样的航点，不再为每个原始采样点单独生成圆点标记，以保持拖动与缩放流畅。非法 XML 会显示包含解析器原始错误信息的页面。单个输入文件最大为 64 MB。
 
-## Privacy
+## 隐私
 
-The plugin sends no track data to a server. Opening a file reads that file locally. Online basemaps contact
-their tile providers when selected, and custom sources contact the addresses you configure. **No-map mode**
-renders the route on a local grid. Route weather sends the selected point to Windy. Preferences are stored in
-the user's local application data and are not tied to the versioned WebView cache.
+插件不会把轨迹数据发送到服务器。打开文件时只在本地读取。选择在线或定制底图时会向对应瓦片服务
+请求地图；**无底图模式** 由本地网格绘制。使用轨迹天气会把所选点坐标随链接发送给 Windy。偏好保存在
+本机应用数据中，与带版本号的 WebView 缓存无绑定关系。
 
-## Troubleshooting
+## 疑难处理
 
-- If the preview still looks like the selected file as XML text, confirm the plugin is installed and enabled.
-- If an upgrade does not appear, exit QuickLook from the tray completely and start it again.
-- If online tiles are blank, check network access or enable **Grid** (No-map mode).
-- Esc closes QuickLook previews; use the preview close button when needed.
+- 如果预览仍显示 XML 文本，请确认插件已安装并启用。
+- 升级后界面没有变化时，请从托盘完全退出并重新启动 QuickLook。
+- 在线瓦片空白时检查网络，或点击图层标题栏中的网格图标开启 **无底图模式**。
+- <kbd>Esc</kbd> 归 QuickLook 管理；需要时使用预览关闭按钮。
 
-More diagnostic details are in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) and
-[docs/TESTING.md](docs/TESTING.md).
+更多诊断信息见 [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) 和 [docs/TESTING.md](docs/TESTING.md)。
 
-## Development
+## 开发
 
-Start with [CONTRIBUTING.md](CONTRIBUTING.md). The main references are:
+先阅读 [CONTRIBUTING.md](CONTRIBUTING.md)。主要文档：
 
-- [Architecture](docs/ARCHITECTURE.md)
-- [Icon system](docs/ICON_SYSTEM.md)
-- [Development setup](docs/DEVELOPMENT.md)
-- [Testing](docs/TESTING.md)
-- [Releasing](docs/RELEASING.md)
-- [Changelog](CHANGELOG.md)
+- [架构](docs/ARCHITECTURE.md)
+- [图标规范](docs/ICON_SYSTEM.md)
+- [开发环境](docs/DEVELOPMENT.md)
+- [测试](docs/TESTING.md)
+- [发布](docs/RELEASING.md)
+- [更新日志](CHANGELOG.md)
 
-Typical local gate:
+常用本地检查：
 
 ```text
 npm ci
@@ -116,12 +108,10 @@ dotnet build src/QuickLook.Plugin.TrailViewer.csproj -c Release
 npm test
 ```
 
-Product versions follow Semantic Versioning. WebView cache identity is derived from viewer content and is
-independent from the release number.
+产品版本遵循 Semantic Versioning；WebView 缓存身份由前端内容生成，与发布版本号解耦。
 
-## Credits and license
+## 致谢与许可证
 
-This project is a fork of
-[McBenac/QuickLook.Plugin.GpxViewer](https://github.com/McBenac/QuickLook.Plugin.GpxViewer), licensed under
-the MIT License. The upstream copyright notice is preserved verbatim in [LICENSE](LICENSE), alongside the
-copyright for changes made in this fork.
+本项目基于 [McBenac/QuickLook.Plugin.GpxViewer](https://github.com/McBenac/QuickLook.Plugin.GpxViewer)
+二次开发，采用 MIT 许可证。上游版权声明原样保留在 [LICENSE](LICENSE) 中，并与本分支修改部分的版权
+声明并列。

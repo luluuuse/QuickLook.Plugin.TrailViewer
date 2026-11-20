@@ -35,7 +35,7 @@ npm run test:host
 
 ## 文档
 
-- 用户入口：`README.md` / `README.zh-CN.md`
+- 用户入口：`README.md` / `README.en.md`
 - 版本历史：`CHANGELOG.md`
 - 使用、架构、开发、测试、发布：`docs/`
 - 当前开发交接：仓库外的 `handoff.md`，只保存当前状态，不复制稳定知识。
