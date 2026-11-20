@@ -17,6 +17,32 @@ Added / Changed / Deprecated / Removed / Fixed / Security 分类；没有内容�
 
 - None.
 
+## 1.26.0 — 2026-11-20
+
+### 中文
+
+#### 新增
+
+- **海拔剖面图区间刷选分析**：支持在海拔剖面图上水平拖拽框选任意里程区间（≥ 6 px 触发，短点击仍保留钉住游标），并在选区上方实时展示该区间的里程、累计爬升/下降、平均坡度、用时、均速与平均心率，同步高亮对应地图轨迹；点击关闭按钮、画布外区域或按 `Esc` 即可清除选区。
+- **ClimbPro 主坡段自动识别**：内置纯本地爬坡识别算法，自动识别路线中的主要爬坡段并在剖面图标题栏显示“主坡段 (N)”单行横向滚动列表（支持滚轮与左键拖拽滑动），点击任意坡段卡片即可同步聚焦地图范围与海拔剖面图区间并展示统计栏。
+- **分段表排序、内嵌比例条与 HUD 双层描边**：每公里分段表支持点击任意表头按降序/升序/默认顺序循环排序，数值单元格背景绘制极淡比例条；全界面悬浮 HUD 面板统一采用外暗内亮双层描边阴影，兼顾亮色路网与深色卫星底图对比度。
+- **地图轨迹线多维热力着彩**：工具箱左侧新增纯图标轨迹着彩按钮，单击或按 `L` 键即可依次循环切换 **单色 / 海拔（翠绿→金黄→鲜红）/ 配速（紫→蓝→荧光青）/ 心率（粉→鲜红→暗红+光晕）**，按钮内轨迹线条同步变换对应色彩，基于共享画布分段绘制并支持宿主持久化偏好记忆，缺失对应字段时自动跳过不可用选项。
+- **海拔剖面图四等份里程刻度与一键折叠**：在剖面图底部紧贴绘图区增加 25% / 50% / 75% 三处细刻度与里程数值（辅以极淡竖向虚线参考线），并在标题栏右侧新增折叠按钮（快捷键 `P`），可一键收起/展开剖面图并同步释放地图视野。
+- **窄窗摘要胶囊**：窗口宽度 `≤ 720 px` 时左上角摘要自动收起为单行紧凑胶囊（`距离 · 爬升 · 用时 ▾`），点击即可展开完整数据。
+- **透明叠层导出升级**：工具箱“导出叠层”新增“仅轨迹”（隐藏标题、日期、遮罩与统计，输出文件名带 `-bare` 后缀）与“海拔轮廓”（在底部绘制极简海拔剪影曲线，输出文件名带 `-ele` 后缀，无高程数据时自动禁用）选项，实时刷新低分辨率预览并支持宿主持久化偏好保存。
+
+### English
+
+#### Added
+
+- **Elevation Profile Range Brush Analysis**: Drag horizontally across the elevation profile (≥ 6 px threshold, while keeping short-click pin behavior) to inspect distance, elevation gain/loss, average grade, duration, average speed, and average heart rate for any arbitrary segment with synchronized map trajectory highlighting; dismiss via the close button, outside click, or `Esc`.
+- **ClimbPro Major Climb Detection**: Automatically detects major climbs offline and exposes a collapsible single-row `Climbs (N)` horizontal strip (supporting wheel and left-drag scrolling) in the elevation profile header; clicking any climb chip highlights both the profile range and map bounds while displaying the range stats bar.
+- **Split Table Sorting, Inline Data Bars & HUD Double-Layer Border**: Clicking any split table header cycles descending, ascending, and default order, with subtle inline proportion bars behind numeric cells; floating HUD panels share a dark-outer/light-inner double-layer border shadow for crisp contrast over both bright road and dark satellite basemaps.
+- **Multi-Dimensional Track Coloring**: Added a compact trail-icon button to the left of the Toolbox that cycles on click or `L` key between **Single**, **Elevation** (emerald-to-red ramp), **Speed** (cool purple-to-cyan ramp), and **Heart rate** (rose-to-crimson ramp with soft outer halo), dynamically tinting the button's trail icon and persisting the preference while skipping unavailable modes.
+- **Elevation Profile Quartile Distance Ticks & Collapse (`P`)**: Added three quartile distance ticks (25%, 50%, 75%) along a subtle bottom axis below the elevation plot with faint vertical dashed reference lines, plus a header collapse toggle (`P` shortcut) to fold/restore the profile and reclaim map space.
+- **Narrow-Window Summary Pill**: At viewport widths `≤ 720 px`, `#info` collapses into a compact single-line summary pill (`distance · ascent · duration ▾`) that expands on click.
+- **Transparent Overlay Export Upgrade**: Added `Track only` (hides heading, date, scrim, and stats with `-bare` filename suffix) and `Elevation silhouette` (renders a minimalist elevation silhouette along the bottom with `-ele` filename suffix, disabled when elevation data is unavailable) options to the Toolbox Export panel, with live low-res preview updates and host preference persistence.
+
 ## 1.25.9 — 2026-11-20
 
 ### 中文

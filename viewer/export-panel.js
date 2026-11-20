@@ -1,9 +1,40 @@
 // The toolbox owns the window chrome; this module only builds its export settings page.
-export function createExportPanel({ el, t, node, settings, onChange, onExport, onPreview }) {
+export function createExportPanel({
+  el, t, node, settings, onChange, onExport, onPreview, profileAvailable = true,
+}) {
   const pickers = [];
   let previewVersion = 0;
+
+  /** A value that cannot be chosen right now: no elevation for a silhouette, no words to back on a bare track. */
+  function unavailable(field, key) {
+    if (field === 'profile' && key === 'ele') return !profileAvailable;
+    if (field === 'scrim') return settings.content === 'track';
+    return false;
+  }
+
+  function hintOf(field, value) {
+    if (field === 'profile' && value.key === 'ele' && !profileAvailable) return t('export.profileUnavailable');
+    if (field === 'scrim' && settings.content === 'track') return t('export.scrimBareHint');
+    return value.hint ? t(value.hint) : value.label();
+  }
+
+  function paintStates() {
+    for (const { field, buttons, values, row } of pickers) {
+      let anyEnabled = false;
+      buttons.forEach((button, index) => {
+        const disabled = unavailable(field, values[index].key);
+        button.disabled = disabled;
+        button.title = hintOf(field, values[index]);
+        button.setAttribute('aria-label', button.title);
+        if (!disabled) anyEnabled = true;
+      });
+      row.classList.toggle('muted', !anyEnabled || (field === 'profile' && !profileAvailable));
+    }
+  }
+
   const picker = (field, labelKey, values, current) => {
     const row = el('div', 'row');
+    row.dataset.field = field;
     const label = el('span', 'label', t(labelKey));
     const pick = el('div', 'pick');
     pick.setAttribute('role', 'group');
@@ -13,22 +44,22 @@ export function createExportPanel({ el, t, node, settings, onChange, onExport, o
       button.type = 'button';
       button.setAttribute('aria-pressed', String(value.key === current));
       button.dataset.value = value.key;
-      button.title = value.hint ? t(value.hint) : button.textContent;
-      button.setAttribute('aria-label', button.title);
       button.addEventListener('click', () => {
+        if (button.disabled) return;
         for (const other of pick.children) {
           const active = other === button;
           other.classList.toggle('on', active);
           other.setAttribute('aria-pressed', String(active));
         }
         onChange(field, value.key);
+        paintStates();
         void refreshPreview();
       });
       pick.append(button);
       return button;
     });
     row.append(label, pick);
-    pickers.push({ label, labelKey, pick, buttons, values });
+    pickers.push({ field, row, label, labelKey, pick, buttons, values });
     return row;
   };
 
@@ -45,6 +76,14 @@ export function createExportPanel({ el, t, node, settings, onChange, onExport, o
     { key: 'none', label: () => t('export.scrimNone'), hint: 'export.scrimNoneHint' },
     { key: 'soft', label: () => t('export.scrimSoft'), hint: 'export.scrimSoftHint' },
   ], settings.scrim);
+  const contentRow = picker('content', 'export.content', [
+    { key: 'full', label: () => t('export.contentFull'), hint: 'export.contentFullHint' },
+    { key: 'track', label: () => t('export.contentTrack'), hint: 'export.contentTrackHint' },
+  ], settings.content);
+  const profileRow = picker('profile', 'export.profile', [
+    { key: 'off', label: () => t('export.profileOff'), hint: 'export.profileOffHint' },
+    { key: 'ele', label: () => t('export.profileOn'), hint: 'export.profileOnHint' },
+  ], profileAvailable ? settings.profile : 'off');
 
   const preview = el('div', 'toolbox-export-preview');
   preview.setAttribute('role', 'img');
@@ -55,7 +94,8 @@ export function createExportPanel({ el, t, node, settings, onChange, onExport, o
   const go = el('button', 'go', t('export.go'));
   go.type = 'button';
   go.addEventListener('click', () => onExport());
-  node.replaceChildren(sizeRow, inkRow, scrimRow, preview, go);
+  node.replaceChildren(sizeRow, inkRow, scrimRow, contentRow, profileRow, preview, go);
+  paintStates();
 
   async function refreshPreview() {
     if (!onPreview) return;
@@ -75,6 +115,8 @@ export function createExportPanel({ el, t, node, settings, onChange, onExport, o
       preview.dataset.size = settings.size;
       preview.dataset.ink = settings.ink;
       preview.dataset.scrim = settings.scrim;
+      preview.dataset.content = settings.content;
+      preview.dataset.profile = profileAvailable ? settings.profile : 'off';
       preview.dataset.state = 'ready';
     } catch {
       preview.dataset.state = 'failed';
@@ -91,10 +133,9 @@ export function createExportPanel({ el, t, node, settings, onChange, onExport, o
         pick.setAttribute('aria-label', t(labelKey));
         buttons.forEach((button, index) => {
           button.textContent = values[index].label();
-          button.title = values[index].hint ? t(values[index].hint) : button.textContent;
-          button.setAttribute('aria-label', button.title);
         });
       }
+      paintStates();
       preview.setAttribute('aria-label', t('export.preview'));
       void refreshPreview();
     },

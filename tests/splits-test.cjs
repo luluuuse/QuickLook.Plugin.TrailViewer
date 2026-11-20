@@ -182,7 +182,7 @@ async function main() {
   check('the map safe area starts below the opened split panel', state.mapClearsPanel,
     JSON.stringify(state));
   check('phase one exposes four requested columns',
-    state.headers.join('|') === 'Split|Distance|Time|Moving speed', state.headers.join('|'));
+    state.headers.join('|') === 'Split|Time|Ascent|Moving speed', state.headers.join('|'));
   check('the expanded panel starts in basic mode with a one-click details control',
     state.mode === 'basic' && state.modeButton === 'Details' && state.modePressed === 'false'
       && state.tableMode === 'basic',
@@ -193,18 +193,19 @@ async function main() {
   check('the route has a whole-kilometre row for every split',
     state.rows.length === Math.ceil(state.model.totalDistance / 1000), `${state.rows.length}`);
   check('the basic grid has fixed columns and a uniform gutter',
-    state.columnWidths.join('|') === '28|54|54|64'
+    state.columnWidths.join('|') === '30|54|44|64'
       && state.cellPadding.every((value) => value === '6px/6px')
       && state.separatorWidths.slice(0, -1).every((value) => value === '1px')
       && state.separatorWidths.at(-1) === '0px'
       && state.panelWidth <= 250,
     `${state.columnWidths.join('|')} / ${state.cellPadding.join(',')} / ${state.panelWidth}px`);
-  check('the first row carries distance, time and speed',
-    state.rows[0][1] === '1.00 km' && /^\d+:\d{2}$/.test(state.rows[0][2])
+  check('the first row carries time, ascent and speed',
+    /^\d+:\d{2}$/.test(state.rows[0][1]) && /^\d+ m$/.test(state.rows[0][2])
       && /^\d+\.\d km\/h$/.test(state.rows[0][3]), state.rows[0].join('|'));
-  check('the final row is the remaining partial kilometre',
-    Number(state.rows.at(-1)[1].split(' ')[0]) > 0
-      && Number(state.rows.at(-1)[1].split(' ')[0]) < 1, state.rows.at(-1).join('|'));
+  const lastRowTitle = await page.locator('.splits-table tbody tr:last-child').getAttribute('title');
+  check('the final partial row marks its split index with an asterisk and keeps distance in tooltip',
+    state.rows.at(-1)[0].endsWith('*') && (lastRowTitle || '').includes('0.78 km'),
+    `${state.rows.at(-1).join('|')} / ${lastRowTitle}`);
   check('the rows scroll under a fixed table header',
     state.scrollable && state.stickyHeader === 'sticky', JSON.stringify(state));
   check('the fastest moving split is highlighted',
@@ -228,7 +229,7 @@ async function main() {
     return module.DETAIL_COLUMNS;
   });
   check('the detailed phase column contract is reserved',
-    detailedColumns.join('|') === 'index|distance|time|cumulativeTime|ascent|descent|heartRate|movingSpeed|verticalSpeed',
+    detailedColumns.join('|') === 'index|time|cumulativeTime|ascent|descent|heartRate|movingSpeed|verticalSpeed',
     detailedColumns.join('|'));
 
   const basicPanelWidth = state.panelWidth;
@@ -241,12 +242,12 @@ async function main() {
       && state.modeButton === 'Basic' && state.modePressed === 'true',
     JSON.stringify({ mode: state.mode, button: state.modeButton, pressed: state.modePressed }));
   check('a route without heart rate omits that detailed column',
-    state.headers.join('|') === 'Split|Distance|Time|Cumulative|Ascent|Descent|Moving speed|Vertical speed',
+    state.headers.join('|') === 'Split|Time|Cumulative|Ascent|Descent|Moving speed|Vertical speed',
     state.headers.join('|'));
   check('detailed rows carry cumulative time, elevation and vertical speed',
-    state.rows[0].length === 8 && state.rows[0][3] === '3:20'
-      && /^\d+ m$/.test(state.rows[0][4]) && /^\d+ m$/.test(state.rows[0][5])
-      && /^-?\d+ m\/h$/.test(state.rows[0][7]),
+    state.rows[0].length === 7 && state.rows[0][2] === '3:20'
+      && /^\d+ m$/.test(state.rows[0][3]) && /^\d+ m$/.test(state.rows[0][4])
+      && /^-?\d+ m\/h$/.test(state.rows[0][6]),
     state.rows[0].join('|'));
   check('detailed totals place rest time after total and moving time',
     state.totals.length === 3
@@ -254,7 +255,7 @@ async function main() {
       && state.totals[2].value === '0:00:00',
     JSON.stringify(state.totals));
   check('the detailed grid uses deterministic compact columns and equal gutters',
-    state.columnWidths.join('|') === '28|54|54|60|40|40|64|72'
+    state.columnWidths.join('|') === '30|54|60|44|44|64|72'
       && state.cellPadding.every((value) => value === '6px/6px')
       && state.separatorWidths.slice(0, -1).every((value) => value === '1px')
       && state.panelWidth <= 460,
@@ -347,7 +348,7 @@ async function main() {
   state = await splitState();
   check('an open split panel keeps its state while the labels change language',
     state.expanded === 'true'
-      && state.headers.join('|') === '圈|距离|时间|累计时间|上升|下降|运动速度|垂直速度'
+      && state.headers.join('|') === '圈|时间|累计时间|上升|下降|运动速度|垂直速度'
       && state.totals[0].label === '总时间' && state.totals[1].label === '运动时间'
       && state.totals[2].label === '休息时间'
       && state.selectedIndex === 2 && state.highlightLines >= 2 && state.modeButton === '简要'
@@ -451,11 +452,251 @@ async function main() {
   }));
   check('a FIT with heart rate adds the detailed heart-rate column',
     heartRate.headers.includes('心率') && /^\d+ bpm$/.test(heartRate.value || '')
-      && heartRate.widths.join('|') === '28|54|54|60|40|40|52|64|72'
+      && heartRate.widths.join('|') === '30|54|60|44|44|52|64|72'
       && heartRate.panelWidth <= 510
       && heartRate.totals.map((item) => item.value).join('|') === '1:00:00|0:55:00|0:05:00'
       && heartRate.totals[2].label === '休息时间',
     JSON.stringify(heartRate));
+
+  // Profile Brush & ClimbPro major climbs E2E.
+  await openViewer(page, base, '2026-02-01-alpine-snow-traverse-1793781751910.gpx');
+  await waitForLayout(page);
+  const brushChartBox = await page.locator('#profile .chart svg').boundingBox();
+  const dragY = Math.round(brushChartBox.y + brushChartBox.height * 0.5);
+  await page.mouse.move(Math.round(brushChartBox.x + brushChartBox.width * 0.25), dragY);
+  await page.mouse.down();
+  await page.mouse.move(Math.round(brushChartBox.x + brushChartBox.width * 0.55), dragY, { steps: 6 });
+  await page.mouse.up();
+  await waitForLayout(page);
+
+  const brushed = await page.evaluate(() => ({
+    statsVisible: !document.querySelector('#profile .brush-stats')?.hidden,
+    statsText: document.querySelector('#profile .brush-stats-text')?.textContent || '',
+    focusVisible: !document.querySelector('#profile .split-focus')?.hidden,
+    mapHighlight: document.querySelectorAll('.gpx-split-highlight').length,
+    pinned: document.querySelector('#profile .plot')?.classList.contains('pinned'),
+  }));
+  check('dragging across the elevation profile shows brush range stats and map highlight',
+    brushed.statsVisible
+      && brushed.focusVisible
+      && brushed.mapHighlight > 0
+      && !brushed.pinned
+      && /km/.test(brushed.statsText)
+      && /%/.test(brushed.statsText),
+    JSON.stringify(brushed));
+
+  await page.keyboard.press('Escape');
+  await waitForLayout(page);
+  const clearedByEsc = await page.evaluate(() => ({
+    statsHidden: Boolean(document.querySelector('#profile .brush-stats')?.hidden),
+    focusHidden: Boolean(document.querySelector('#profile .split-focus')?.hidden),
+    mapHighlight: document.querySelectorAll('.gpx-split-highlight').length,
+  }));
+  check('Escape clears the brush selection and map highlight',
+    clearedByEsc.statsHidden && clearedByEsc.focusHidden && clearedByEsc.mapHighlight === 0,
+    JSON.stringify(clearedByEsc));
+
+  await page.mouse.click(Math.round(brushChartBox.x + brushChartBox.width * 0.4), dragY);
+  await waitForLayout(page);
+  check('short click on the elevation profile still pins the scrub cursor',
+    await page.evaluate(() => Boolean(document.querySelector('#profile .plot')?.classList.contains('pinned'))));
+
+  const climbCount = await page.locator('[data-profile-climbs="toggle"]').count();
+  check('an alpine route detects major climbs and shows the climbs button', climbCount === 1);
+  await page.locator('[data-profile-climbs="toggle"]').click();
+  await waitForLayout(page);
+  const chipCount = await page.locator('#profile .climb-chip').count();
+  check('opening climbs reveals major climb chips', chipCount >= 1, `${chipCount}`);
+  await page.locator('#profile .climb-chip').first().click();
+  await waitForLayout(page);
+  const climbFocused = await page.evaluate(() => ({
+    activeChip: document.querySelectorAll('#profile .climb-chip.active').length,
+    statsVisible: !document.querySelector('#profile .brush-stats')?.hidden,
+    focusVisible: !document.querySelector('#profile .split-focus')?.hidden,
+    mapHighlight: document.querySelectorAll('.gpx-split-highlight').length,
+  }));
+  check('selecting a major climb highlights both the profile and the map',
+    climbFocused.activeChip === 1
+      && climbFocused.statsVisible
+      && climbFocused.focusVisible
+      && climbFocused.mapHighlight > 0,
+    JSON.stringify(climbFocused));
+  await page.locator('#profile .brush-stats-close').click();
+  await waitForLayout(page);
+  check('clicking the close button clears the climb selection',
+    await page.evaluate(() =>
+      Boolean(document.querySelector('#profile .brush-stats')?.hidden)
+      && document.querySelectorAll('#profile .climb-chip.active').length === 0));
+
+  await page.locator('#splits .split-toggle').click();
+  await waitForLayout(page);
+  const inlineBarState = await page.evaluate(() => {
+    const bars = Array.from(document.querySelectorAll('#splits td.has-bar'));
+    const hudShadows = ['#info', '#splits', '#profile'].map((sel) =>
+      getComputedStyle(document.querySelector(sel)).boxShadow);
+    return {
+      barCount: bars.length,
+      firstBarProp: bars[0]?.style.getPropertyValue('--split-bar') || '',
+      hasInsetHudBorder: hudShadows.every((s) => s.includes('inset')),
+    };
+  });
+  check('split cells render inline data bars and HUD panels share the double-layer border',
+    inlineBarState.barCount > 0 && inlineBarState.firstBarProp.endsWith('%') && inlineBarState.hasInsetHudBorder,
+    JSON.stringify(inlineBarState));
+
+  await page.locator('#splits .split-mode-toggle').click();
+  await waitForLayout(page);
+  const negBarState = await page.evaluate(() => {
+    const negCells = Array.from(document.querySelectorAll('#splits td.split-verticalSpeed.has-bar.is-negative'));
+    return {
+      negCount: negCells.length,
+      bg: negCells[0] ? getComputedStyle(negCells[0]).backgroundImage : '',
+      bar: negCells[0]?.style.getPropertyValue('--split-bar') || '',
+    };
+  });
+  check('negative vertical speed cells render right-aligned reverse inline bars',
+    negBarState.negCount > 0 && negBarState.bar.endsWith('%') && negBarState.bg.includes('linear-gradient'),
+    JSON.stringify(negBarState));
+
+  const speedHeader = page.locator('#splits th.split-movingSpeed');
+  await speedHeader.click();
+  const descState = await page.evaluate(() => ({
+    sort: document.querySelector('#splits th.split-movingSpeed')?.getAttribute('aria-sort'),
+    firstIndex: Number(document.querySelector('#splits tbody tr')?.getAttribute('data-split-index')),
+    lastIndex: Number(document.querySelector('#splits tbody tr:last-child')?.getAttribute('data-split-index')),
+  }));
+  await speedHeader.click();
+  const ascState = await page.evaluate(() => ({
+    sort: document.querySelector('#splits th.split-movingSpeed')?.getAttribute('aria-sort'),
+    firstIndex: Number(document.querySelector('#splits tbody tr')?.getAttribute('data-split-index')),
+    lastIndex: Number(document.querySelector('#splits tbody tr:last-child')?.getAttribute('data-split-index')),
+  }));
+  await speedHeader.click();
+  const resetState = await page.evaluate(() => ({
+    sort: document.querySelector('#splits th.split-movingSpeed')?.getAttribute('aria-sort'),
+    firstIndex: Number(document.querySelector('#splits tbody tr')?.getAttribute('data-split-index')),
+  }));
+  check('clicking a split column header cycles descending, ascending, and default order',
+    descState.sort === 'descending'
+      && ascState.sort === 'ascending'
+      && descState.firstIndex !== ascState.firstIndex
+      && descState.lastIndex === 24
+      && ascState.lastIndex === 24
+      && resetState.sort === 'none'
+      && resetState.firstIndex === 1,
+    JSON.stringify({ descState, ascState, resetState }));
+
+  const trackColorPlacement = await page.evaluate(() => {
+    const colorRect = document.querySelector('.track-color-toggle')?.getBoundingClientRect();
+    const toolboxRect = document.querySelector('.toolbox-switch > button')?.getBoundingClientRect();
+    const layerRect = document.querySelector('.layer-menu-toggle')?.getBoundingClientRect();
+    return {
+      leftOfToolbox: Boolean(colorRect && toolboxRect && colorRect.right <= toolboxRect.left + 2),
+      uniformHeight: Math.round(colorRect?.height || 0) === 32
+        && Math.round(toolboxRect?.height || 0) === 32
+        && Math.round(layerRect?.height || 0) === 32,
+      initialMode: document.querySelector('.track-color-toggle')?.getAttribute('data-track-color'),
+    };
+  });
+  check('track color icon button sits to the left of the toolbox button and matches toolbar height',
+    trackColorPlacement.leftOfToolbox && trackColorPlacement.uniformHeight && trackColorPlacement.initialMode === 'single',
+    JSON.stringify(trackColorPlacement));
+
+  await page.locator('.track-color-toggle').click();
+  await waitForLayout(page);
+  const eleColorState = await page.evaluate(() => ({
+    mode: document.querySelector('.track-color-toggle')?.getAttribute('data-track-color'),
+    active: document.querySelector('.track-color-toggle')?.classList.contains('has-active-mode'),
+    iconStroke: document.querySelector('.track-color-symbol path')?.getAttribute('stroke'),
+    canvases: document.querySelectorAll('canvas').length,
+  }));
+  check('first click switches to elevation coloring with gradient trail icon',
+    eleColorState.mode === 'elevation' && eleColorState.active
+      && eleColorState.iconStroke === 'url(#track-color-grad-elevation)' && eleColorState.canvases > 0,
+    JSON.stringify(eleColorState));
+
+  await page.locator('.track-color-toggle').click();
+  await waitForLayout(page);
+  const speedColorState = await page.evaluate(() => ({
+    mode: document.querySelector('.track-color-toggle')?.getAttribute('data-track-color'),
+    iconStroke: document.querySelector('.track-color-symbol path')?.getAttribute('stroke'),
+  }));
+  check('second click switches to speed coloring with purple-cyan trail icon',
+    speedColorState.mode === 'speed' && speedColorState.iconStroke === 'url(#track-color-grad-speed)',
+    JSON.stringify(speedColorState));
+
+  await page.locator('.track-color-toggle').click();
+  await waitForLayout(page);
+  check('third click skips unavailable heartRate and cycles back to single mode',
+    await page.evaluate(() =>
+      document.querySelector('.track-color-toggle')?.getAttribute('data-track-color') === 'single'
+      && !document.querySelector('.track-color-toggle')?.classList.contains('has-active-mode')));
+
+  const quartileState = await page.evaluate(() => ({
+    ticks: [...document.querySelectorAll('#profile .distance-tick')].map((node) => node.textContent),
+    gridLines: document.querySelectorAll('#profile .distance-grid-line').length,
+  }));
+  check('elevation profile displays three quartile distance ticks and dashed reference lines',
+    quartileState.ticks.length === 3
+      && quartileState.gridLines === 3
+      && quartileState.ticks.every((label) => /\d/.test(label)),
+    JSON.stringify(quartileState));
+
+  await page.locator('#profile .distance-tick').first().waitFor({ state: 'attached' });
+  await page.keyboard.press('l');
+  await waitForLayout(page);
+  check('pressing L cycles track coloring mode via keyboard shortcut',
+    await page.evaluate(() =>
+      document.querySelector('.track-color-toggle')?.getAttribute('data-track-color') === 'elevation'));
+  await page.keyboard.press('l');
+  await page.keyboard.press('l');
+  await waitForLayout(page);
+
+  await page.keyboard.press('p');
+  await waitForLayout(page);
+  const collapsedProfile = await page.evaluate(() => ({
+    collapsed: document.getElementById('profile')?.classList.contains('collapsed'),
+    plotHidden: getComputedStyle(document.querySelector('#profile .plot')).display === 'none',
+  }));
+  check('pressing P collapses the elevation profile',
+    collapsedProfile.collapsed && collapsedProfile.plotHidden,
+    JSON.stringify(collapsedProfile));
+  await page.keyboard.press('p');
+  await waitForLayout(page);
+  check('pressing P again restores the elevation profile',
+    await page.evaluate(() =>
+      !document.getElementById('profile')?.classList.contains('collapsed')
+      && getComputedStyle(document.querySelector('#profile .plot')).display !== 'none'));
+
+  await page.locator('#info h1').click();
+  await waitForLayout(page);
+  check('clicking summary title on wide window collapses summary into compact pill',
+    await page.evaluate(() =>
+      document.getElementById('info')?.classList.contains('desktop-collapsed')
+      && getComputedStyle(document.querySelector('.info-narrow-pill')).display !== 'none'));
+  await page.locator('.info-narrow-pill').click();
+  await waitForLayout(page);
+  check('clicking compact pill on wide window restores full summary card',
+    await page.evaluate(() =>
+      !document.getElementById('info')?.classList.contains('desktop-collapsed')
+      && getComputedStyle(document.querySelector('#info .stats')).display !== 'none'));
+
+  await page.setViewportSize({ width: 640, height: 740 });
+  await waitForLayout(page);
+  const narrowPill = await page.evaluate(() => ({
+    pillVisible: getComputedStyle(document.querySelector('.info-narrow-pill')).display !== 'none',
+    statsHidden: getComputedStyle(document.querySelector('#info .stats')).display === 'none',
+    pillText: document.querySelector('.info-narrow-text')?.textContent || '',
+  }));
+  check('narrow window <= 720 px collapses summary info into a compact pill',
+    narrowPill.pillVisible && narrowPill.statsHidden && narrowPill.pillText.includes('km'),
+    JSON.stringify(narrowPill));
+  await page.locator('.info-narrow-pill').click();
+  await waitForLayout(page);
+  check('clicking the narrow summary pill expands full summary details',
+    await page.evaluate(() =>
+      document.getElementById('info')?.classList.contains('narrow-expanded')
+      && getComputedStyle(document.querySelector('#info .stats')).display !== 'none'));
 
   check('no page errors', pageErrors.length === 0, pageErrors.join(' | '));
   await artifacts.capture(page, failures, pageErrors);

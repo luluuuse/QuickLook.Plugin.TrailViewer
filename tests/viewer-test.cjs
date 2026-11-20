@@ -184,7 +184,8 @@ async function main() {
   check('host preferences', 'pins', preferences.pins, false);
   check('host preferences', 'no-map downloads no tiles', preferences.tiles, 0);
   check('host preferences', 'export',
-    JSON.stringify(preferences.settings), '{"size":"1:1","ink":"white","scrim":"soft"}');
+    JSON.stringify(preferences.settings),
+    '{"size":"1:1","ink":"white","scrim":"soft","content":"full","profile":"off"}');
   await preferencePage.close();
 
   // Parse-only regressions that do not need another fixture on disk.

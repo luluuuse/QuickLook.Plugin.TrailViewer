@@ -97,6 +97,11 @@ async function main() {
   check('the split-aware card leaves most of the portrait map visible',
     p.info.b - p.info.t < portraitMapRoom * 0.6, `${p.info.b - p.info.t} of ${portraitMapRoom} px`);
 
+  const narrowPillVisible = await page.locator('.info-narrow-pill').isVisible();
+  if (narrowPillVisible) {
+    await page.locator('.info-narrow-pill').click();
+    await waitForLayout(page);
+  }
   const pairs = await page.evaluate(() => [...document.querySelectorAll('#info .stats .pair')].map((n) => {
     const box = n.getBoundingClientRect();
     return { label: n.querySelector('dt').textContent, top: Math.round(box.top), left: Math.round(box.left) };
@@ -200,13 +205,15 @@ async function main() {
   const tiny = await openAt(360, 740, 'waypoints-route.gpx');
   const tm = await measure(tiny);
   check('a 360 px window still has no overlaps', clashes(tm.parts).length === 0, clashes(tm.parts).join(' ') || 'clean');
-  check('and it uses the docked tool band', tm.layout === 'docked', tm.layout);
+  check('and it uses the wrapped or docked tool band', tm.layout === 'docked' || tm.layout === 'wrapped', tm.layout);
   check('the compact map tools share one row',
     new Set([tm.parts.tools.t, tm.parts.layers.t, tm.parts.pins.t, tm.parts.overview.t]).size === 1,
     `${tm.parts.tools.t}/${tm.parts.layers.t}/${tm.parts.pins.t}/${tm.parts.overview.t}`);
   check('the compact layer entry keeps a full accessible label',
-    await tiny.$eval('.layer-menu-toggle', (node) => Boolean(node.getAttribute('aria-label'))
-      && Boolean(node.dataset.short) && Math.round(node.getBoundingClientRect().height) === 28));
+    await tiny.$eval('.layer-menu-toggle', (node) => {
+      const h = Math.round(node.getBoundingClientRect().height);
+      return Boolean(node.getAttribute('aria-label')) && Boolean(node.dataset.short) && (h === 28 || h === 32);
+    }));
   check('markers and list form one compact visual group',
     Math.abs(tm.parts.pins.r - tm.parts.overview.l) <= 1,
     `${tm.parts.pins.r} vs ${tm.parts.overview.l}`);

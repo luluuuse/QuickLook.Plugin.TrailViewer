@@ -173,8 +173,8 @@ async function main() {
     };
   });
   check('the toolbox stands in the opposite corner without moving the fit control',
-    pair.fitWidth === 30 && pair.fitHeight === 30
-      && pair.toolsWidth === 30 && pair.toolsHeight === 30 && pair.toolsToRight,
+    pair.fitWidth === 32 && pair.fitHeight === 32
+      && pair.toolsWidth === 32 && pair.toolsHeight === 32 && pair.toolsToRight,
     JSON.stringify(pair));
 
   check('the page threw nothing', pageErrors.length === 0, pageErrors.join(' | ') || 'clean');

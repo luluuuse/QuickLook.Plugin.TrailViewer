@@ -3,6 +3,7 @@
 :root {
   --bg: #181818;
   --panel: rgba(24, 24, 24, 0.86);
+  --hud-shadow: 0 0 0 1px rgba(0, 0, 0, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 4px 14px rgba(0, 0, 0, 0.42);
   --text: #e6e6e6;
   --muted: #aeb8c4;
   --accent: #2f9bff;
@@ -47,8 +48,11 @@
   --snap-label-shadow: 0 1px 3px rgba(0, 0, 0, 0.28);
   --snap-motion: 120ms cubic-bezier(0.2, 0.8, 0.2, 1);
   --toolbar-height: 32px;
-  --toolbar-radius: 5px;
+  --toolbar-radius: 8px;
   --toolbar-gap: 8px;
+  --toolbar-surface: rgba(24, 24, 24, 0.78);
+  --toolbar-blur: blur(12px);
+  --toolbar-shadow: 0 0 0 1px rgba(0, 0, 0, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 3px 10px rgba(0, 0, 0, 0.38);
   --floating-panel-top: 54px;
   --floating-panel-header-height: 40px;
   --z-map-ui: 900;

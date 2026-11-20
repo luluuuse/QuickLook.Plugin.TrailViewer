@@ -397,7 +397,11 @@ async function main() {
       && Math.abs(narrow.boxes[2].right - narrow.boxes[0].left) <= 1,
     `${narrow.boxes[2].height}/${narrow.boxes[0].height}, ${narrow.boxes[2].right} vs ${narrow.boxes[0].left}`);
   check('the wrapped controls clear the summary',
-    narrow.boxes.every((box) => box.bottom <= narrow.info.top || box.top >= narrow.info.bottom),
+    narrow.boxes.every((box) =>
+      box.right <= narrow.info.left
+      || box.left >= narrow.info.right
+      || box.bottom <= narrow.info.top
+      || box.top >= narrow.info.bottom),
     `info ${Math.round(narrow.info.bottom)}, controls ${Math.round(Math.min(...narrow.boxes.map((box) => box.top)))}`);
   check('the narrow overview stays above the profile',
     narrow.panel.left >= 0 && narrow.panel.right <= narrow.width && narrow.panel.bottom <= narrow.profile.top,

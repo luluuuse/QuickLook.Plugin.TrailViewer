@@ -1,4 +1,5 @@
 import { analyse } from './profile.js';
+import { detectClimbs, summariseRange } from './climb-analysis.js';
 import { createProfileChart } from './profile-chart.js';
 import { isValidHeartRate } from './track-analysis.js';
 import { createRouteModel } from './route-model.js';
@@ -82,12 +83,15 @@ function attachScrub({
   state,
   formatters,
   formatDistance,
+  formatSpeed,
+  formatTimer,
   t,
   getStops,
   focusStop,
   revealPoint,
+  onRangeSelect,
 }) {
-  const { points, total, svg, plot, chart, guide, dot, readout, value, meta, yOf, heart } = state;
+  const { points, samples, total, svg, plot, chart, guide, dot, readout, value, meta, yOf, heart, box } = state;
   const marker = L.circleMarker([0, 0], {
     radius: 7,
     color: '#1b1b1b',
@@ -219,17 +223,125 @@ function attachScrub({
     });
   }
 
-  svg.addEventListener('pointermove', (event) => {
-    if (!pinned) schedule(event.clientX);
+  function formatRangeStats(stats) {
+    if (!stats) return '';
+    const parts = [formatDistance(stats.distanceMeters)];
+    if (stats.ascent !== null && stats.descent !== null) {
+      parts.push(`+${stats.ascent} / -${stats.descent} ${t('unit.m')}`);
+    }
+    if (stats.avgGrade !== null) {
+      const sign = stats.avgGrade > 0 ? '+' : '';
+      parts.push(`${sign}${(stats.avgGrade * 100).toFixed(1)}%`);
+    }
+    if (stats.durationSeconds !== null) parts.push(formatTimer(stats.durationSeconds));
+    if (stats.avgSpeedMps !== null) parts.push(formatSpeed(stats.avgSpeedMps));
+    if (stats.avgHeartRate !== null) parts.push(`${stats.avgHeartRate} bpm`);
+    return parts.join(' \u00b7 ');
+  }
+
+  let activeRange = null;
+  function clearRange() {
+    if (!activeRange && !state.hasActiveRange?.()) return;
+    activeRange = null;
+    state.clearSplitFocus();
+    onRangeSelect?.(null);
+  }
+
+  state.setClimbHandler?.((climb) => {
+    if (!climb) {
+      clearRange();
+      return;
+    }
+    const stats = summariseRange(points, samples, climb.fromMeters, climb.toMeters);
+    activeRange = { fromMeters: climb.fromMeters, toMeters: climb.toMeters, source: 'climb', index: climb.index };
+    state.setClimbFocus?.(climb, formatRangeStats(stats), clearRange);
+    onRangeSelect?.({ ...climb, source: 'climb', focusMap: true });
   });
-  svg.addEventListener('pointerleave', () => {
-    if (!pinned) clear();
-  });
-  svg.addEventListener('pointerdown', (event) => {
-    event.preventDefault();
+
+  let drag = null;
+  function applyBrush(startDist, endDist, finalize) {
+    const from = Math.min(startDist, endDist);
+    const to = Math.max(startDist, endDist);
+    const stats = summariseRange(points, samples, from, to);
+    if (!stats) return false;
+    activeRange = { fromMeters: stats.fromMeters, toMeters: stats.toMeters, source: 'brush' };
+    state.setBrushFocus?.(stats, formatRangeStats(stats), clearRange);
+    if (finalize) {
+      onRangeSelect?.({ fromMeters: stats.fromMeters, toMeters: stats.toMeters, source: 'brush', focusMap: false });
+    }
+    return true;
+  }
+
+  const onWindowPointerMove = (event) => {
+    if (!drag || event.pointerId !== drag.pointerId) return;
+    const dx = Math.abs(event.clientX - drag.startX);
+    if (!drag.active && dx >= 6) {
+      drag.active = true;
+      pinned = false;
+      plot.classList.remove('pinned');
+      clear();
+    }
+    if (drag.active) {
+      applyBrush(drag.startDist, distanceAt(event.clientX), false);
+    }
+  };
+
+  const onWindowPointerUp = (event) => {
+    if (!drag || event.pointerId !== drag.pointerId) return;
+    const finished = drag;
+    drag = null;
+    removeEventListener('pointermove', onWindowPointerMove);
+    removeEventListener('pointerup', onWindowPointerUp);
+    removeEventListener('pointercancel', onWindowPointerUp);
+    if (finished.active) {
+      const endDist = distanceAt(event.clientX);
+      if (Math.abs(event.clientX - finished.startX) >= 6 && applyBrush(finished.startDist, endDist, true)) {
+        return;
+      }
+      clearRange();
+      return;
+    }
+    if (event.type === 'pointercancel') return;
     place(distanceAt(event.clientX));
     pinned = !pinned;
     plot.classList.toggle('pinned', pinned);
+  };
+
+  const onDocumentPointerDown = (event) => {
+    if (!state.hasActiveRange?.()) return;
+    if (box && event.target instanceof Node && !box.contains(event.target)) {
+      clearRange();
+    }
+  };
+
+  const onDocumentKeyDown = (event) => {
+    if (event.key === 'Escape' && state.hasActiveRange?.()) {
+      event.preventDefault();
+      clearRange();
+    }
+  };
+
+  document.addEventListener('pointerdown', onDocumentPointerDown);
+  document.addEventListener('keydown', onDocumentKeyDown);
+
+  svg.addEventListener('pointermove', (event) => {
+    if (!drag && !pinned) schedule(event.clientX);
+  });
+  svg.addEventListener('pointerleave', () => {
+    if (!drag && !pinned) clear();
+  });
+  svg.addEventListener('pointerdown', (event) => {
+    if (event.pointerType === 'mouse' && event.button !== 0) return;
+    event.preventDefault();
+    drag = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startDist: distanceAt(event.clientX),
+      active: false,
+    };
+    addEventListener('pointermove', onWindowPointerMove);
+    addEventListener('pointerup', onWindowPointerUp);
+    addEventListener('pointercancel', onWindowPointerUp);
   });
 
   return {
@@ -237,6 +349,8 @@ function attachScrub({
     hide: clear,
     point: () => current,
     pinned: () => pinned,
+    brushRange: () => activeRange,
+    clearRange,
     refresh: () => {
       measureChart();
       if (current) place(current.along);
@@ -244,6 +358,11 @@ function attachScrub({
     destroy: () => {
       chartResize?.disconnect();
       removeEventListener('resize', measureChart);
+      removeEventListener('pointermove', onWindowPointerMove);
+      removeEventListener('pointerup', onWindowPointerUp);
+      removeEventListener('pointercancel', onWindowPointerUp);
+      document.removeEventListener('pointerdown', onDocumentPointerDown);
+      document.removeEventListener('keydown', onDocumentKeyDown);
     },
   };
 }
@@ -255,20 +374,26 @@ export function createProfileController({
   t,
   formatters,
   formatDistance,
+  formatSpeed,
+  formatTimer,
   photosOf,
   getPinsShown,
   setProfilePins,
   getStops,
   focusStop,
   revealPoint,
+  onLayoutChange,
+  onRangeSelect,
 }) {
   const renderProfile = createProfileChart({
     el,
     localized,
     t,
+    formatDistance,
     photosOf,
     getPinsShown,
     setPins: setProfilePins,
+    onLayoutChange,
   });
 
   return {
@@ -277,7 +402,14 @@ export function createProfileController({
       const points = trackPoints(model);
       const samples = points.filter((point) => point.ele !== undefined);
       if (samples.length < 2) return null;
-      return { points, samples, heartRate: heartRateData(points), ...analyse(samples) };
+      const analysed = analyse(samples);
+      return {
+        points,
+        samples,
+        heartRate: heartRateData(points),
+        climbs: detectClimbs(samples, analysed.cells),
+        ...analysed,
+      };
     },
     render(gpx, data) {
       return renderProfile(gpx, data);
@@ -289,10 +421,13 @@ export function createProfileController({
         state,
         formatters,
         formatDistance,
+        formatSpeed,
+        formatTimer,
         t,
         getStops,
         focusStop,
         revealPoint,
+        onRangeSelect,
       });
     },
   };

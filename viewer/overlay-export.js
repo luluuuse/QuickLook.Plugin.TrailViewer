@@ -5,9 +5,13 @@ import { readStored, writeStored } from './storage.js';
 const SIZE_KEY = 'exportSize';
 const INK_KEY = 'exportInk';
 const SCRIM_KEY = 'exportScrim';
+const CONTENT_KEY = 'exportContent';
+const PROFILE_KEY = 'exportProfile';
 const SIZES = ['1:1', '9:16', '4:3'];
 const INKS = ['black', 'white'];
 const SCRIMS = ['none', 'soft'];
+const CONTENTS = ['full', 'track'];
+const PROFILES = ['off', 'ele'];
 
 function remembered(params, key, allowed, fallback) {
   const fromHost = params.get(key);
@@ -20,9 +24,14 @@ function remember(key, value) {
   writeStored(key, value);
 }
 
-export function overlayFileName(base, size, ink, scrim, suffix) {
+/**
+ * The file name carries every setting that changes the picture, so two styles never overwrite each other.
+ * The bare-track and silhouette marks are appended only when used: the classic names stay exactly as before.
+ */
+export function overlayFileName(base, size, ink, scrim, suffix, { content = 'full', profile = 'off' } = {}) {
   const stem = String(base || 'track').replace(/\.[^.]+$/, '');
-  return `${stem}-${suffix}-${size.replace(':', 'x')}-${ink}-${scrim}.png`;
+  const extras = `${content === 'track' ? '-bare' : ''}${profile === 'ele' ? '-ele' : ''}`;
+  return `${stem}-${suffix}-${size.replace(':', 'x')}-${ink}-${scrim}${extras}.png`;
 }
 
 function base64Of(bytes) {
@@ -51,7 +60,13 @@ export function createOverlayExport({
     size: remembered(params, SIZE_KEY, SIZES, '9:16'),
     ink: remembered(params, INK_KEY, INKS, 'black'),
     scrim: remembered(params, SCRIM_KEY, SCRIMS, 'none'),
+    content: remembered(params, CONTENT_KEY, CONTENTS, 'full'),
+    profile: remembered(params, PROFILE_KEY, PROFILES, 'off'),
   };
+  const elevationSamples = elevations?.samples?.length >= 2 && elevations.max > elevations.min
+    ? elevations.samples
+    : null;
+  const profileAvailable = Boolean(elevationSamples);
   let panel = null;
   let exporting = false;
   const lines = routeModel
@@ -132,6 +147,9 @@ export function createOverlayExport({
       size: options?.size ?? settings.size,
       ink: options?.ink ?? settings.ink,
       scrim: options?.scrim ?? settings.scrim,
+      content: options?.content ?? settings.content,
+      profile: profileAvailable ? (options?.profile ?? settings.profile) : 'off',
+      elevation: elevationSamples,
       preview: options?.preview === true,
     });
   }
@@ -151,7 +169,10 @@ export function createOverlayExport({
       const data = base64Of(new Uint8Array(await blob.arrayBuffer()));
       const chunk = 1 << 18;
       const base = (fileName || 'track').replace(/\.[^.]+$/, '');
-      const name = overlayFileName(base, snapshot.size, snapshot.ink, snapshot.scrim, t('export.suffix'));
+      const name = overlayFileName(base, snapshot.size, snapshot.ink, snapshot.scrim, t('export.suffix'), {
+        content: snapshot.content,
+        profile: profileAvailable ? snapshot.profile : 'off',
+      });
       const chunks = Math.ceil(data.length / chunk);
       const id = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
       post(`export\t${id}\t${chunks}\t${encodeURIComponent(name)}`);
@@ -168,12 +189,15 @@ export function createOverlayExport({
 
   function mount(node) {
     if (panel || segments().length === 0) return panel;
-    const keys = { size: SIZE_KEY, ink: INK_KEY, scrim: SCRIM_KEY };
+    const keys = {
+      size: SIZE_KEY, ink: INK_KEY, scrim: SCRIM_KEY, content: CONTENT_KEY, profile: PROFILE_KEY,
+    };
     panel = createExportPanel({
       el,
       t,
       node,
       settings,
+      profileAvailable,
       onChange: (field, value) => {
         settings[field] = value;
         remember(keys[field], value);

@@ -8,6 +8,8 @@ export function createKeyboardController({
   measurement: getMeasurement,
   layerSwitch: getLayerSwitch,
   toolbox: getToolbox,
+  trackColor: getTrackColor,
+  profile: getProfile,
   fit,
   toggleChrome,
 }) {
@@ -51,6 +53,14 @@ export function createKeyboardController({
       getToolbox?.()?.toggle();
       return;
     }
+    if (name === 'p') {
+      getProfile?.()?.toggleCollapsed?.();
+      return;
+    }
+    if (name === 'l') {
+      getTrackColor?.()?.cycle?.();
+      return;
+    }
     if (name === 's') {
       toggleChrome();
       return;
@@ -79,7 +89,8 @@ export function createKeyboardController({
     }
     if (event.ctrlKey || event.altKey || event.metaKey) return;
     const plainShortcut = !event.shiftKey
-      && (key === 'w' || key === 's' || key === 'c' || key === 'm' || key === 't' || LAYER_KEYS[key]);
+      && (key === 'w' || key === 's' || key === 'c' || key === 'm' || key === 't'
+        || key === 'p' || key === 'l' || LAYER_KEYS[key]);
     if (!photoOpen && plainShortcut) {
       if (event.repeat) return;
       event.preventDefault();

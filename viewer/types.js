@@ -10,11 +10,12 @@
 /** @typedef {{ from: number, to: number, slope: number, grade: 'flat' | 'up' | 'steepUp' | 'down' | 'steepDown' }} GroundCell */
 /** @typedef {{ grade: GroundCell['grade'], from: number, to: number }} GroundRun */
 /** @typedef {{ flatUp: number, gentleUp: number, steepUp: number, flatDown: number, gentleDown: number, steepDown: number }} SlopeBins */
-/** @typedef {{ points: ElevationSample[], samples: ElevationSample[], heartRate?: HeartRateData | null, min: number, max: number, total: number, ascent: number, descent: number, rawAscent: number, rawDescent: number, cells: GroundCell[], runs: GroundRun[], steep: { metres: number, maxSlope: number }, slopeBins: SlopeBins }} ProfileData */
+/** @typedef {{ index: number, fromMeters: number, toMeters: number, lengthMeters: number, ascent: number, avgGrade: number, maxGrade: number }} ClimbSummary */
+/** @typedef {{ points: ElevationSample[], samples: ElevationSample[], heartRate?: HeartRateData | null, climbs?: ClimbSummary[], min: number, max: number, total: number, ascent: number, descent: number, rawAscent: number, rawDescent: number, cells: GroundCell[], runs: GroundRun[], steep: { metres: number, maxSlope: number }, slopeBins: SlopeBins }} ProfileData */
 /** @typedef {{ index: number, fromMeters: number, toMeters: number, distanceMeters: number, elapsedSeconds: number | null, movingSeconds: number | null, cumulativeSeconds: number | null, averageSpeedMps: number | null, ascentMeters: number, descentMeters: number, verticalSpeedMps: number | null, averageHeartRate: number | null }} SplitStats */
 /** @typedef {{ splits: SplitStats[], totalDistanceMeters: number, totalTimeSeconds: number | null, movingTimeSeconds: number | null, fastestIndex: number | null, hasHeartRate: boolean }} SplitData */
 /** @typedef {{ key: string, width: number, height: number, pixels: number }} ExportPreset */
 /** @typedef {{ name?: string, marker: any, point: TrackPoint, photos: string[] }} WaypointStop */
-/** @typedef {{ size: '1:1' | '9:16' | '4:3', ink: 'black' | 'white', scrim: 'none' | 'soft' }} ExportSettings */
+/** @typedef {{ size: '1:1' | '9:16' | '4:3', ink: 'black' | 'white', scrim: 'none' | 'soft', content?: 'full' | 'track', profile?: 'off' | 'ele' }} ExportSettings */
 
 export {};

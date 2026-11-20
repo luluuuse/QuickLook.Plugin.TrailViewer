@@ -138,10 +138,10 @@ async function main() {
   }));
   check('the help icon opens one keyboard reference page',
     shortcutPage.mainHidden === true && shortcutPage.pageHidden === false
-      && shortcutPage.keys.join('|') === 'W|S|A / D|Q / E|C|M|T',
+      && shortcutPage.keys.join('|') === 'W|S|A / D|Q / E|C|M|T|P|L',
     JSON.stringify(shortcutPage));
-  check('the keyboard reference names T for the toolbox',
-    shortcutPage.labels.length === 7 && shortcutPage.labels.slice(-1)[0] === 'Open or close the toolbox',
+  check('the keyboard reference names T, P and L with concise labels',
+    shortcutPage.labels.length === 9 && shortcutPage.labels.slice(-3).join('|') === 'Toolbox|Profile|Track color',
     shortcutPage.labels.join('|'));
   await page.locator('.toolbox-shortcut-page .toolbox-back').click();
   check('the shortcut page returns through the shared back action',
@@ -450,7 +450,7 @@ async function main() {
     await page.locator('.toolbox-shortcut-page .toolbox-subtitle').textContent() === '快捷键速查'
       && await page.locator('.toolbox-shortcut-page .toolbox-subhint').textContent() === '地图获得焦点时可用。'
       && (await page.locator('.toolbox-shortcut-page .toolbox-shortcut-row span').allTextContents())
-        .join('|') === '标记点|隐藏界面|切换点位或照片|切换地图图源|全轨迹|测距|打开或关闭工具箱');
+        .join('|') === '标记点|隐藏界面|点位/照片|切换图源|全轨迹|测距|工具箱|剖面图|轨迹着彩');
   await page.click('.toolbox-shortcut-page .toolbox-back');
 
   await page.setViewportSize({ width: 360, height: 740 });

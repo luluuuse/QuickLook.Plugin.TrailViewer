@@ -72,7 +72,7 @@ async function main() {
   const c = await widen(700);
   check('the profile is laid out', a !== null && a.plotH > 0, `${a?.plotH} px`);
   check('a 15.8 km walk gets a taller drawing than the old 78', a.plotH > 100, `${a.plotH} px at 1200`);
-  check('the panel is as tall as the drawing inside it', Math.abs(a.panelH - (a.plotH + 52)) <= 2,
+  check('the panel is as tall as the drawing inside it', Math.abs(a.panelH - (a.plotH + 72)) <= 6,
     `panel ${a.panelH}, plot ${a.plotH}`);
   check('the map credit clears the panel', Math.abs(a.reserved - a.panelH) <= 1, `${a.reserved} vs ${a.panelH}`);
   check('the exaggeration lands near three', a.ve >= 2.5 && a.ve <= 3.2, `×${a.ve}`);

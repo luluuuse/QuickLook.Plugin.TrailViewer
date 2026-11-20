@@ -24,9 +24,11 @@ export function createProfileChart({
   el,
   localized,
   t,
+  formatDistance,
   photosOf,
   getPinsShown,
   setPins,
+  onLayoutChange,
 }) {
   function gradeLegend(steep) {
     const row = el('div', 'legend');
@@ -63,6 +65,7 @@ export function createProfileChart({
   /** @param {import('./types.js').ParsedTrack} gpx @param {import('./types.js').ProfileData} data */
   return function renderProfile(gpx, data) {
     const { points, samples, min, max, total, cells, steep, heartRate } = data;
+    const climbs = data.climbs || [];
     const width = 600;
     const height = 100;
     const curve = profileSamples(samples, width);
@@ -127,6 +130,19 @@ export function createProfileChart({
       + ` L${width},${height} Z`);
     svg.append(area);
 
+    const gridGroup = document.createElementNS(ns, 'g');
+    gridGroup.setAttribute('class', 'distance-grid');
+    for (const fraction of [0.25, 0.5, 0.75]) {
+      const tickLine = document.createElementNS(ns, 'line');
+      tickLine.setAttribute('class', 'distance-grid-line');
+      tickLine.setAttribute('x1', (width * fraction).toFixed(1));
+      tickLine.setAttribute('x2', (width * fraction).toFixed(1));
+      tickLine.setAttribute('y1', '0');
+      tickLine.setAttribute('y2', String(height));
+      gridGroup.append(tickLine);
+    }
+    svg.append(gridGroup);
+
     const line = document.createElementNS(ns, 'path');
     line.setAttribute('class', 'line');
     line.setAttribute('d', `M${curve.map((point) => `${at(point.along).toFixed(1)},${yOf(point.ele).toFixed(1)}`).join(' L')}`);
@@ -178,6 +194,21 @@ export function createProfileChart({
     const splitDimRight = el('div', 'split-focus-dim right');
     const splitBand = el('div', 'split-focus-band');
     splitFocus.append(splitDimLeft, splitDimRight, splitBand);
+    const brushStats = el('div', 'brush-stats');
+    brushStats.hidden = true;
+    const brushStatsText = el('span', 'brush-stats-text');
+    const brushStatsClose = el('button', 'brush-stats-close');
+    brushStatsClose.type = 'button';
+    brushStatsClose.append(iconElement('close', { size: 11 }));
+    localized(brushStatsClose, () => t('profile.brushClear'), 'title');
+    localized(brushStatsClose, () => t('profile.brushClear'), 'aria-label');
+    brushStats.append(brushStatsText, brushStatsClose);
+    brushStats.addEventListener('pointerdown', (event) => event.stopPropagation());
+    let brushClearHandler = null;
+    brushStatsClose.addEventListener('click', (event) => {
+      event.stopPropagation();
+      brushClearHandler?.();
+    });
     chart.append(svg, splitFocus, heartDot);
 
     let heartAxis = null;
@@ -274,23 +305,55 @@ export function createProfileChart({
       );
       label.append(heartToggle);
     }
-    const splitBadge = localized(el('span', 'split-focus-badge'), () => (
-      splitFocusData
-        ? t('profile.splitFocus', {
-          index: splitFocusData.index,
-          range: `${formatKmMark(splitFocusData.from)}\u2013${formatKmMark(splitFocusData.to)} ${t('unit.km')}`,
-        })
-        : ''
-    ));
+    function focusBadgeText() {
+      if (!splitFocusData) return '';
+      const range = `${formatKmMark(splitFocusData.from)}\u2013${formatKmMark(splitFocusData.to)} ${t('unit.km')}`;
+      if (splitFocusData.kind === 'climb') {
+        return t('profile.climbLabel', { index: splitFocusData.index, range });
+      }
+      if (splitFocusData.kind === 'brush') return range;
+      return t('profile.splitFocus', { index: splitFocusData.index, range });
+    }
+    const splitBadge = localized(el('span', 'split-focus-badge'), focusBadgeText);
     splitBadge.hidden = true;
     label.append(splitBadge);
+
+    let climbsOpen = false;
+    let activeClimbIndex = null;
+    let climbSelectHandler = null;
+    let climbToggle = null;
+    let climbDrawer = null;
+    const climbChips = new Map();
+    if (climbs.length > 0) {
+      climbToggle = el('button', 'profile-climbs-toggle');
+      climbToggle.type = 'button';
+      climbToggle.dataset.profileClimbs = 'toggle';
+      climbToggle.setAttribute('aria-expanded', 'false');
+      localized(climbToggle, () => t('profile.climbsTitle'), 'title');
+      localized(climbToggle, () => t('profile.climbsTitle'), 'aria-label');
+      climbToggle.append(
+        iconElement('route', { size: 12 }),
+        localized(el('span'), () => t('profile.climbs', { count: climbs.length })),
+      );
+      label.append(climbToggle);
+    }
+
     let noteOff = false;
     let noteVe = 3;
     const scaleNote = localized(el('span', 'scale'), () => (noteOff
       ? t('profile.scale', { n: noteVe >= 10 ? String(Math.round(noteVe)) : noteVe.toFixed(1) })
       : ''));
     scaleNote.hidden = true;
-    label.append(scaleNote);
+    let collapsed = false;
+    const collapseButton = el('button', 'profile-collapse-toggle');
+    collapseButton.type = 'button';
+    collapseButton.dataset.profileCollapse = 'toggle';
+    collapseButton.setAttribute('aria-expanded', 'true');
+    const collapseTitle = () => t(collapsed ? 'profile.expandTitle' : 'profile.collapseTitle');
+    localized(collapseButton, collapseTitle, 'title');
+    localized(collapseButton, collapseTitle, 'aria-label');
+    collapseButton.append(iconElement('chevron-down', { size: 12, className: 'profile-collapse-icon' }));
+    label.append(scaleNote, collapseButton);
 
     function setHeartEnabled(enabled) {
       if (!heartRate || !heartGroup || !heartAxis || !heartToggle) return;
@@ -311,15 +374,142 @@ export function createProfileChart({
       heartToggle.addEventListener('click', () => setHeartEnabled(!heartEnabled));
     }
 
+    const formatQuarterDistance = (meters) => {
+      if (meters < 1000) return `${Math.round(meters)} ${t('unit.m')}`;
+      const km = meters / 1000;
+      return `${km >= 100 ? Math.round(km) : km.toFixed(1)} ${t('unit.km')}`;
+    };
+    const distanceAxis = el('div', 'distance-axis');
+    distanceAxis.setAttribute('aria-hidden', 'true');
+    for (const fraction of [0.25, 0.5, 0.75]) {
+      const tick = localized(el('span', 'distance-tick'), () => formatQuarterDistance(total * fraction));
+      tick.style.left = `${fraction * 100}%`;
+      distanceAxis.append(tick);
+    }
+
     const box = document.getElementById('profile');
-    box.append(label, gradeLegend(steep), plot);
+    if (climbs.length > 0) {
+      climbDrawer = el('div', 'climb-drawer');
+      climbDrawer.hidden = true;
+      climbDrawer.addEventListener('wheel', (event) => {
+        if (climbDrawer.scrollWidth <= climbDrawer.clientWidth) return;
+        const delta = Math.abs(event.deltaY) >= Math.abs(event.deltaX) ? event.deltaY : event.deltaX;
+        if (!delta) return;
+        event.preventDefault();
+        event.stopPropagation();
+        climbDrawer.scrollLeft += delta;
+      }, { passive: false });
+      let dragPointerId = null;
+      let dragStartX = 0;
+      let dragStartScroll = 0;
+      let dragged = false;
+      let suppressClick = false;
+      climbDrawer.addEventListener('pointerdown', (event) => {
+        if (event.button !== 0 || event.pointerType === 'touch') return;
+        event.stopPropagation();
+        dragPointerId = event.pointerId;
+        dragStartX = event.clientX;
+        dragStartScroll = climbDrawer.scrollLeft;
+        dragged = false;
+        suppressClick = false;
+      });
+      window.addEventListener('pointermove', (event) => {
+        if (event.pointerId !== dragPointerId) return;
+        const dx = event.clientX - dragStartX;
+        if (!dragged && Math.abs(dx) < 4) return;
+        if (!dragged) {
+          dragged = true;
+          climbDrawer.classList.add('dragging');
+        }
+        climbDrawer.scrollLeft = dragStartScroll - dx;
+      });
+      const finishDrawerDrag = (event) => {
+        if (event.pointerId !== dragPointerId) return;
+        dragPointerId = null;
+        climbDrawer.classList.remove('dragging');
+        if (dragged) {
+          suppressClick = true;
+          dragged = false;
+          setTimeout(() => { suppressClick = false; }, 0);
+        }
+      };
+      window.addEventListener('pointerup', finishDrawerDrag);
+      window.addEventListener('pointercancel', finishDrawerDrag);
+      climbDrawer.addEventListener('click', (event) => {
+        if (!suppressClick) return;
+        suppressClick = false;
+        event.preventDefault();
+        event.stopPropagation();
+      }, true);
+      for (const climb of climbs) {
+        const chip = el('button', 'climb-chip');
+        chip.type = 'button';
+        chip.dataset.climbIndex = String(climb.index);
+        chip.setAttribute('aria-pressed', 'false');
+        const chipParams = () => ({
+          index: climb.index,
+          length: formatDistance(climb.lengthMeters),
+          ascent: Math.round(climb.ascent),
+          avg: (climb.avgGrade * 100).toFixed(1),
+          max: Math.round(climb.maxGrade * 100),
+        });
+        localized(chip, () => t('profile.climbTooltip', chipParams()), 'title');
+        localized(chip, () => t('profile.climbTooltip', chipParams()), 'aria-label');
+        chip.append(
+          el('span', 'climb-chip-index', `#${climb.index}`),
+          localized(el('span', 'climb-chip-meta'), () => t('profile.climbMeta', chipParams())),
+        );
+        chip.addEventListener('click', () => {
+          const next = activeClimbIndex === climb.index ? null : climb;
+          climbSelectHandler?.(next);
+        });
+        climbChips.set(climb.index, chip);
+        climbDrawer.append(chip);
+      }
+      climbToggle.addEventListener('click', () => {
+        climbsOpen = !climbsOpen;
+        climbDrawer.hidden = !climbsOpen;
+        climbToggle.classList.toggle('active', climbsOpen);
+        climbToggle.setAttribute('aria-expanded', String(climbsOpen));
+        document.documentElement.style.setProperty('--profile-height', `${box.offsetHeight}px`);
+        onLayoutChange?.();
+      });
+      box.append(label, climbDrawer, gradeLegend(steep), plot, distanceAxis);
+    } else {
+      box.append(label, gradeLegend(steep), plot, distanceAxis);
+    }
+    box.append(brushStats);
+    box.classList.remove('collapsed');
     box.hidden = false;
     document.body.classList.add('with-profile');
+
+    function setCollapsed(next) {
+      collapsed = Boolean(next);
+      box.classList.toggle('collapsed', collapsed);
+      collapseButton.setAttribute('aria-expanded', String(!collapsed));
+      const title = collapseTitle();
+      collapseButton.title = title;
+      collapseButton.setAttribute('aria-label', title);
+      if (collapsed) brushStats.hidden = true;
+      document.documentElement.style.setProperty('--profile-height', `${box.offsetHeight}px`);
+      if (!collapsed) fit();
+      onLayoutChange?.();
+    }
+    collapseButton.addEventListener('click', () => setCollapsed(!collapsed));
 
     const MIN_PLOT = 56;
     const MAX_PLOT = 128;
     const TARGET_VE = 3;
     const MIN_SPLIT_BAND_PX = 8;
+
+    function setActiveClimb(index) {
+      activeClimbIndex = index ?? null;
+      for (const [candidate, chip] of climbChips.entries()) {
+        const active = candidate === activeClimbIndex;
+        chip.classList.toggle('active', active);
+        chip.setAttribute('aria-pressed', String(active));
+      }
+    }
 
     function positionSplitFocus() {
       if (!splitFocusData) return;
@@ -338,12 +528,27 @@ export function createProfileChart({
         splitDimRight.style.left = `${bandRight.toFixed(2)}px`;
         splitBand.style.left = `${bandLeft.toFixed(2)}px`;
         splitBand.style.width = `${bandWidth.toFixed(2)}px`;
+        if (!brushStats.hidden) {
+          const boxRect = box.getBoundingClientRect();
+          const chartRect = chart.getBoundingClientRect();
+          const statsWidth = brushStats.offsetWidth;
+          const localX = Math.max(4, Math.min(chartWidth - statsWidth - 4, center - statsWidth / 2));
+          const x = (chartRect.left - boxRect.left) + localX;
+          const y = (chartRect.top - boxRect.top) + 4;
+          brushStats.style.transform = `translate3d(${x.toFixed(1)}px, ${y.toFixed(1)}px, 0)`;
+        }
       } else {
         splitDimLeft.style.width = `${(startRatio * 100).toFixed(4)}%`;
         splitDimRight.style.left = `${(endRatio * 100).toFixed(4)}%`;
         splitBand.style.left = `${(startRatio * 100).toFixed(4)}%`;
         splitBand.style.width = `${((endRatio - startRatio) * 100).toFixed(4)}%`;
       }
+    }
+
+    function clearBrushStats() {
+      brushStats.hidden = true;
+      brushStatsText.textContent = '';
+      brushClearHandler = null;
     }
 
     function clearSplitFocus() {
@@ -355,6 +560,35 @@ export function createProfileChart({
       splitFocusLine.style.display = 'none';
       splitFocusCasing.removeAttribute('d');
       splitFocusLine.removeAttribute('d');
+      clearBrushStats();
+      setActiveClimb(null);
+    }
+
+    function applyRangeFocus({ fromMeters, toMeters, kind = 'split', index = 0, statsText = '', onClear = null }) {
+      const from = Math.max(0, Math.min(total, Number(fromMeters) || 0));
+      const to = Math.max(0, Math.min(total, Number(toMeters) || 0));
+      const sliced = sliceCurveByDistance(curve, from, to);
+      if (!(to > from) || sliced.length < 2) {
+        clearSplitFocus();
+        return;
+      }
+      splitFocusData = { kind, index, from, to };
+      const d = `M${sliced.map((point) => `${at(point.along).toFixed(1)},${yOf(point.ele).toFixed(1)}`).join(' L')}`;
+      splitFocusCasing.setAttribute('d', d);
+      splitFocusLine.setAttribute('d', d);
+      splitFocusCasing.style.display = '';
+      splitFocusLine.style.display = '';
+      splitBadge.textContent = focusBadgeText();
+      splitBadge.hidden = false;
+      splitFocus.hidden = false;
+      if (statsText) {
+        brushStatsText.textContent = statsText;
+        brushClearHandler = onClear;
+        brushStats.hidden = false;
+      } else {
+        clearBrushStats();
+      }
+      positionSplitFocus();
     }
 
     function setSplitFocus(split) {
@@ -362,26 +596,44 @@ export function createProfileChart({
         clearSplitFocus();
         return;
       }
-      const from = Math.max(0, Math.min(total, Number(split.fromMeters) || 0));
-      const to = Math.max(0, Math.min(total, Number(split.toMeters) || 0));
-      const sliced = sliceCurveByDistance(curve, from, to);
-      if (!(to > from) || sliced.length < 2) {
+      setActiveClimb(null);
+      applyRangeFocus({
+        fromMeters: split.fromMeters,
+        toMeters: split.toMeters,
+        kind: 'split',
+        index: split.index,
+      });
+    }
+
+    function setBrushFocus(range, statsText, onClear) {
+      if (!range) {
         clearSplitFocus();
         return;
       }
-      splitFocusData = { index: split.index, from, to };
-      const d = `M${sliced.map((point) => `${at(point.along).toFixed(1)},${yOf(point.ele).toFixed(1)}`).join(' L')}`;
-      splitFocusCasing.setAttribute('d', d);
-      splitFocusLine.setAttribute('d', d);
-      splitFocusCasing.style.display = '';
-      splitFocusLine.style.display = '';
-      splitBadge.textContent = t('profile.splitFocus', {
-        index: splitFocusData.index,
-        range: `${formatKmMark(from)}\u2013${formatKmMark(to)} ${t('unit.km')}`,
+      setActiveClimb(null);
+      applyRangeFocus({
+        fromMeters: range.fromMeters,
+        toMeters: range.toMeters,
+        kind: 'brush',
+        statsText,
+        onClear,
       });
-      splitBadge.hidden = false;
-      splitFocus.hidden = false;
-      positionSplitFocus();
+    }
+
+    function setClimbFocus(climb, statsText, onClear) {
+      if (!climb) {
+        clearSplitFocus();
+        return;
+      }
+      setActiveClimb(climb.index);
+      applyRangeFocus({
+        fromMeters: climb.fromMeters,
+        toMeters: climb.toMeters,
+        kind: 'climb',
+        index: climb.index,
+        statsText,
+        onClear,
+      });
     }
 
     function fit() {
@@ -434,10 +686,19 @@ export function createProfileChart({
         dot: heartDot,
         value: heartRateValue,
       } : null,
+      box,
+      climbs,
       pins,
       refit: fit,
       setSplitFocus,
       clearSplitFocus,
+      setBrushFocus,
+      setClimbFocus,
+      setClimbHandler: (handler) => { climbSelectHandler = handler; },
+      hasActiveRange: () => Boolean(splitFocusData && splitFocusData.kind !== 'split'),
+      isCollapsed: () => collapsed,
+      setCollapsed,
+      toggleCollapsed: () => setCollapsed(!collapsed),
       refreshSplitFocus: positionSplitFocus,
     };
   };

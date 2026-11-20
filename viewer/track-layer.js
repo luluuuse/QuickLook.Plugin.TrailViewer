@@ -9,6 +9,12 @@ import {
 import { formatDistance } from './format.js';
 import { iconMarkup, symbolMarkup } from './icons.js';
 import { createRouteModel } from './route-model.js';
+import {
+  computeColorSegments,
+  normalizeTrackColorMode,
+  trackColorCapabilities,
+  trackColorRange,
+} from './track-color.js';
 
 const COLORS = ['#ff5a36', '#2f9bff', '#f5c400', '#c23cff', '#18c964', '#ff3d9a', '#00c2c7', '#ff9f1a'];
 const ROUTE_COLOR = '#ffffff';
@@ -203,6 +209,10 @@ export function createTrackLayer({ L, el, localized, t, pointPopup, onFocusBound
       const gapLineLayer = L.layerGroup().addTo(map);
       const gapMarkerLayer = L.layerGroup();
       const splitHighlightLayer = L.layerGroup().addTo(map);
+      const colorOverlayGroup = L.layerGroup();
+      const colorRenderer = L.canvas({ padding: 0.5 });
+      const singleTrackEntries = [];
+      let colorMode = 'single';
       let anomalyEpisodes = [];
       let gapEpisodes = [];
       let colorIndex = 0;
@@ -530,18 +540,17 @@ export function createTrackLayer({ L, el, localized, t, pointPopup, onFocusBound
                 : null,
             });
           } else {
+            const tooltipNode = title ? localized(el('span'), () => title(segmentIndex + 1)) : null;
             const polyline = L.polyline(points.map((point) => [point.lat, point.lon]), {
               color,
               weight: 4,
               opacity: 0.9,
               className: 'gpx-track',
             }).addTo(map);
-            if (title) {
-              polyline.bindTooltip(
-                localized(el('span'), () => title(segmentIndex + 1)),
-                { sticky: true },
-              );
+            if (tooltipNode) {
+              polyline.bindTooltip(tooltipNode, { sticky: true });
             }
+            singleTrackEntries.push({ points, polyline, tooltipNode });
             distancePaths.push({
               points,
               offset: distanceOffset,
@@ -617,12 +626,62 @@ export function createTrackLayer({ L, el, localized, t, pointPopup, onFocusBound
       anomalyEpisodes = recordings.episodes.filter((gap) => gap.kind === 'jump');
       gapEpisodes = recordings.episodes.filter((gap) => gap.kind === 'segment');
 
+      const capabilities = trackColorCapabilities(gpx);
+      function setColorMode(nextMode) {
+        const normalized = normalizeTrackColorMode(nextMode);
+        const resolved = normalized !== 'single' && !capabilities[normalized] ? 'single' : normalized;
+        colorMode = resolved;
+        if (network || resolved === 'single') {
+          colorOverlayGroup.clearLayers();
+          colorOverlayGroup.remove();
+          for (const entry of singleTrackEntries) {
+            if (!map.hasLayer(entry.polyline)) entry.polyline.addTo(map);
+          }
+          return resolved;
+        }
+        for (const entry of singleTrackEntries) {
+          if (map.hasLayer(entry.polyline)) entry.polyline.removeFrom(map);
+        }
+        colorOverlayGroup.clearLayers();
+        const range = trackColorRange(gpx.tracks, resolved);
+        for (const entry of singleTrackEntries) {
+          if (resolved === 'heartRate' && entry.points.length >= 2) {
+            L.polyline(entry.points.map((point) => [point.lat, point.lon]), {
+              color: '#ff4757',
+              weight: 10,
+              opacity: 0.24,
+              renderer: colorRenderer,
+              interactive: false,
+              className: 'gpx-track-halo',
+            }).addTo(colorOverlayGroup);
+          }
+          const colored = computeColorSegments(entry.points, resolved, range);
+          const segWeight = resolved === 'speed' ? 4.5 : 4.2;
+          for (const sub of colored.segments) {
+            const subLine = L.polyline(sub.points.map((point) => [point.lat, point.lon]), {
+              color: sub.color,
+              weight: segWeight,
+              opacity: 0.94,
+              renderer: colorRenderer,
+              className: 'gpx-track gpx-track-colored',
+            }).addTo(colorOverlayGroup);
+            if (entry.tooltipNode) subLine.bindTooltip(entry.tooltipNode, { sticky: true });
+          }
+        }
+        colorOverlayGroup.addTo(map);
+        return resolved;
+      }
+
       return {
         bounds,
         segments,
         navigationMarks,
         annotationCount: anomalyEpisodes.length + gapEpisodes.length,
         networkStats: () => networkLayer ? networkStats : null,
+        colorMode: () => colorMode,
+        colorCapabilities: () => ({ ...capabilities }),
+        colorRange: (mode) => trackColorRange(gpx.tracks, mode),
+        setColorMode,
         refreshDistanceMarks() {
           if (network) return;
           renderDistanceMarks();

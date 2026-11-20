@@ -58,17 +58,65 @@ export function createSummaryView({
   el, fileName, photosOf, onCopySummary, onLayoutChange,
 }) {
   let detailsMode = savedDetailsMode();
+  let narrowExpanded = false;
+  let desktopCollapsed = false;
+  const isNarrow = () => window.innerWidth <= 720;
 
   return function renderInfo(gpx, summary, elevations, estimateSeconds) {
     const box = document.getElementById('info');
     box.replaceChildren();
     box.dataset.details = detailsMode;
+    box.classList.toggle('narrow-expanded', narrowExpanded);
+    box.classList.toggle('desktop-collapsed', desktopCollapsed);
+
+    const pillParts = [];
+    if (summary.distanceMeters > 0) pillParts.push(formatDistance(summary.distanceMeters));
+    if (elevations && summary.elevation) pillParts.push(`+${formatElevation(elevations.ascent)}`);
+    if (summary.durationSeconds !== null) pillParts.push(formatDuration(summary.durationSeconds));
+    const pillButton = el('button', 'info-narrow-pill');
+    pillButton.type = 'button';
+    const syncPill = () => {
+      const expanded = isNarrow() ? narrowExpanded : !desktopCollapsed;
+      pillButton.setAttribute('aria-expanded', String(expanded));
+      pillButton.title = t(expanded ? 'info.narrowCollapse' : 'info.narrowExpand');
+      pillButton.setAttribute('aria-label', pillButton.title);
+      pillButton.querySelector('.info-narrow-caret').textContent = expanded ? '\u25b4' : '\u25be';
+    };
+    pillButton.append(
+      el('span', 'info-narrow-text', pillParts.length > 0 ? pillParts.join(' · ') : (gpx.name || fileName)),
+      el('span', 'info-narrow-caret', '\u25be'),
+    );
+    syncPill();
+    pillButton.addEventListener('click', () => {
+      if (isNarrow()) {
+        narrowExpanded = !narrowExpanded;
+        box.classList.toggle('narrow-expanded', narrowExpanded);
+      } else {
+        desktopCollapsed = false;
+        box.classList.remove('desktop-collapsed');
+      }
+      syncPill();
+      onLayoutChange?.();
+    });
+    box.append(pillButton);
 
     const headingRow = el('div', 'info-heading');
     const heading = el('h1', null, gpx.name || fileName);
-    heading.title = gpx.name && gpx.name !== fileName
+    const baseHeadingTitle = gpx.name && gpx.name !== fileName
       ? `${gpx.name}\n${t('info.fileHint', { name: fileName })}`
       : fileName;
+    heading.title = `${baseHeadingTitle}\n${t('info.narrowCollapse')}`;
+    heading.addEventListener('click', () => {
+      if (isNarrow()) {
+        narrowExpanded = false;
+        box.classList.remove('narrow-expanded');
+      } else {
+        desktopCollapsed = true;
+        box.classList.add('desktop-collapsed');
+      }
+      syncPill();
+      onLayoutChange?.();
+    });
     const detailsButton = el('button', 'info-details-toggle',
       t(detailsMode === 'full' ? 'info.less' : 'info.more'));
     detailsButton.type = 'button';
@@ -79,10 +127,10 @@ export function createSummaryView({
       detailsMode = detailsMode === 'full' ? 'compact' : 'full';
       writeStored(DETAILS_KEY, detailsMode);
       renderInfo(gpx, summary, elevations, estimateSeconds);
+      onLayoutChange?.();
       requestAnimationFrame(() => {
         const nextButton = document.querySelector('.info-details-toggle');
         if (nextButton instanceof HTMLElement) nextButton.focus({ preventScroll: true });
-        onLayoutChange?.();
       });
     });
     const copyButton = el('button', 'info-copy');

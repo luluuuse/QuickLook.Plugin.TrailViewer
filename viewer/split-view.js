@@ -2,15 +2,14 @@
 // the user asks for the per-kilometre data; the full SplitData model is prepared for the detailed phase.
 import { iconElement } from './icons.js';
 
-const BASIC_COLUMNS = Object.freeze(['index', 'distance', 'time', 'movingSpeed']);
+const BASIC_COLUMNS = Object.freeze(['index', 'time', 'ascent', 'movingSpeed']);
 
 const COLUMN_WIDTHS = Object.freeze({
-  index: 28,
-  distance: 54,
+  index: 30,
   time: 54,
   cumulativeTime: 60,
-  ascent: 40,
-  descent: 40,
+  ascent: 44,
+  descent: 44,
   heartRate: 52,
   movingSpeed: 64,
   verticalSpeed: 72,
@@ -18,7 +17,6 @@ const COLUMN_WIDTHS = Object.freeze({
 
 export const DETAIL_COLUMNS = Object.freeze([
   'index',
-  'distance',
   'time',
   'cumulativeTime',
   'ascent',
@@ -27,6 +25,29 @@ export const DETAIL_COLUMNS = Object.freeze([
   'movingSpeed',
   'verticalSpeed',
 ]);
+
+const BAR_COLUMNS = new Set([
+  'distance',
+  'time',
+  'ascent',
+  'descent',
+  'heartRate',
+  'movingSpeed',
+  'verticalSpeed',
+]);
+
+function splitMetric(split, column) {
+  if (column === 'index') return split.index;
+  if (column === 'distance') return split.distanceMeters;
+  if (column === 'time') return split.elapsedSeconds;
+  if (column === 'cumulativeTime') return split.cumulativeSeconds;
+  if (column === 'ascent') return split.ascentMeters;
+  if (column === 'descent') return split.descentMeters;
+  if (column === 'heartRate') return split.averageHeartRate;
+  if (column === 'movingSpeed') return split.averageSpeedMps;
+  if (column === 'verticalSpeed') return split.verticalSpeedMps;
+  return null;
+}
 
 function headerCell(el, kind, label) {
   const cell = el('th');
@@ -80,6 +101,8 @@ export function createSplitsView({
   let expanded = false;
   let selectedIndex = null;
   let mode = 'basic';
+  let sortColumn = null;
+  let sortDirection = 'desc';
   let focusActivatedIndex = null;
 
   function ensureData() {
@@ -150,16 +173,72 @@ export function createSplitsView({
     panel.style.setProperty('--split-table-width', `${tableWidth}px`);
     for (const column of columns) {
       const cell = headerCell(el, column, labels[column]);
-      if (column === 'heartRate') {
-        cell.title = t('splits.heartRateTitle');
-        cell.setAttribute('aria-label', cell.title);
-      }
+      cell.classList.add('sortable');
+      cell.tabIndex = 0;
+      const active = sortColumn === column;
+      cell.setAttribute('aria-sort', active ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none');
+      const hint = t('splits.sortHint', { label: labels[column] });
+      cell.title = column === 'heartRate' ? `${t('splits.heartRateTitle')} · ${hint}` : hint;
+      cell.setAttribute('aria-label', cell.title);
+      const toggleSort = () => {
+        if (sortColumn !== column) {
+          sortColumn = column;
+          sortDirection = column === 'index' ? 'asc' : 'desc';
+        } else if (sortDirection === (column === 'index' ? 'asc' : 'desc')) {
+          sortDirection = column === 'index' ? 'desc' : 'asc';
+        } else {
+          sortColumn = null;
+          sortDirection = 'desc';
+        }
+        draw();
+      };
+      cell.addEventListener('click', toggleSort);
+      cell.addEventListener('keydown', (event) => {
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+        event.preventDefault();
+        toggleSort();
+      });
       headRow.append(cell);
     }
     head.append(headRow);
 
+    const barMax = {};
+    for (const column of columns) {
+      if (!BAR_COLUMNS.has(column)) continue;
+      let maxVal = 0;
+      for (const split of data.splits) {
+        const raw = splitMetric(split, column);
+        const val = column === 'verticalSpeed' && Number.isFinite(raw) ? Math.abs(raw) : raw;
+        if (Number.isFinite(val) && val > maxVal) maxVal = val;
+      }
+      barMax[column] = maxVal;
+    }
+
+    const isPartialSplit = (split) =>
+      split.index === data.splits.length && split.distanceMeters < 995;
+
+    const orderedSplits = sortColumn
+      ? [...data.splits].sort((a, b) => {
+        if (sortColumn !== 'index') {
+          const aPartial = isPartialSplit(a);
+          const bPartial = isPartialSplit(b);
+          if (aPartial !== bPartial) return aPartial ? 1 : -1;
+        }
+        const av = splitMetric(a, sortColumn);
+        const bv = splitMetric(b, sortColumn);
+        const aOk = Number.isFinite(av);
+        const bOk = Number.isFinite(bv);
+        if (!aOk && !bOk) return a.index - b.index;
+        if (!aOk) return 1;
+        if (!bOk) return -1;
+        if (av === bv) return a.index - b.index;
+        return sortDirection === 'asc' ? av - bv : bv - av;
+      })
+      : data.splits;
+
     const body = el('tbody');
-    for (const split of data.splits) {
+    for (const split of orderedSplits) {
+      const isPartialLast = isPartialSplit(split);
       const row = el('tr');
       row.classList.toggle('fastest', split.index === data.fastestIndex);
       row.classList.toggle('selected', split.index === selectedIndex);
@@ -175,9 +254,13 @@ export function createSplitsView({
 
       for (const column of columns) {
         const cell = el('td', column === 'index' ? 'split-number' : `split-${column}`);
-        if (column === 'index') cell.textContent = String(split.index);
-        else if (column === 'distance') cell.textContent = splitDistanceText(split.distanceMeters, t);
-        else if (column === 'time') cell.textContent = timeText(split.elapsedSeconds, formatTimer);
+        if (column === 'index') {
+          cell.textContent = isPartialLast ? `${split.index}*` : String(split.index);
+          if (isPartialLast) {
+            cell.classList.add('is-partial');
+            cell.title = row.title;
+          }
+        } else if (column === 'time') cell.textContent = timeText(split.elapsedSeconds, formatTimer);
         else if (column === 'cumulativeTime') cell.textContent = timeText(split.cumulativeSeconds, formatTimer);
         else if (column === 'ascent') cell.textContent = elevationText(split.ascentMeters, t);
         else if (column === 'descent') cell.textContent = elevationText(split.descentMeters, t);
@@ -188,6 +271,14 @@ export function createSplitsView({
           const value = el('span', null, speedText(split.averageSpeedMps, formatSpeed));
           value.title = t('splits.speedHint');
           cell.append(value);
+        }
+        const maxVal = barMax[column];
+        const metricVal = maxVal > 0 ? splitMetric(split, column) : null;
+        if (Number.isFinite(metricVal) && metricVal !== 0) {
+          const pct = Math.min(100, Math.max(0, (Math.abs(metricVal) / maxVal) * 100));
+          cell.classList.add('has-bar');
+          if (metricVal < 0) cell.classList.add('is-negative');
+          cell.style.setProperty('--split-bar', `${pct.toFixed(1)}%`);
         }
         row.append(cell);
       }
@@ -314,6 +405,8 @@ export function createSplitsView({
         clearSelection(false);
         expanded = false;
         mode = 'basic';
+        sortColumn = null;
+        sortDirection = 'desc';
         data = null;
       }
       summary = nextSummary;
@@ -329,6 +422,7 @@ export function createSplitsView({
     select: (index) => {
       if (Number.isInteger(index) && index >= 1 && index <= (data?.splits.length || 0)) choose(index);
     },
+    clearSelection: () => clearSelection(false),
     selected: () => selectedIndex,
     loaded: () => Boolean(data),
     mode: () => mode,

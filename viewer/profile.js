@@ -28,7 +28,7 @@ export const SLOPE_FULL = 0.25;
 
 /** Moving average over `window` samples, shrinking at the ends instead of padding with zeros. */
 /** @param {number[]} values @returns {number[]} */
-function smooth(values, window = SMOOTH_WINDOW) {
+export function smooth(values, window = SMOOTH_WINDOW) {
   const half = Math.floor(window / 2);
   const out = new Array(values.length);
   for (let i = 0; i < values.length; i += 1) {

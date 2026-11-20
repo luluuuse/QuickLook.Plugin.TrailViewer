@@ -306,6 +306,8 @@ export function createToolbox({
         ['C', 'toolbox.shortcutLocate'],
         ['M', 'toolbox.shortcutMeasure'],
         ['T', 'toolbox.shortcutToolbox'],
+        ['P', 'toolbox.shortcutProfile'],
+        ['L', 'toolbox.shortcutColor'],
       ]) {
         const row = el('div', 'toolbox-shortcut-row');
         row.setAttribute('role', 'listitem');

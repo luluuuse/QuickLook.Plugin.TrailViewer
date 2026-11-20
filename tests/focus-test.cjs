@@ -145,6 +145,11 @@ async function main() {
 
   await firstPage.locator('.info-details-toggle').click();
   await waitForLayout(firstPage);
+  await firstPage.waitForFunction(() => {
+    const safe = window.trailViewer.mapLayout().safe;
+    const popup = document.querySelector('.leaflet-popup')?.getBoundingClientRect();
+    return Boolean(popup) && popup.top >= safe.top - 1 && popup.bottom <= safe.bottom + 1;
+  });
   await waitForMapIdle(firstPage);
   frame = await selectedFrame(firstPage);
   check('expanding the summary keeps the current card visible',

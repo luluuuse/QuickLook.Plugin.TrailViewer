@@ -343,6 +343,15 @@ internal static class SelfTests
             ViewerPreferences.QueryFromFile(path) == "exportSize=4%3A3&lang=zh&layer=terrain&pins=1",
             ViewerPreferences.QueryFromFile(path));
         ViewerPreferences.SaveFromQueryToFile("layer=satellite.tianditu", path);
+        ViewerPreferences.SaveFromQueryToFile("exportContent=track&exportProfile=ele", path);
+        Check("export content and profile preferences persist valid values",
+            ViewerPreferences.QueryFromFile(path).Contains("exportContent=track")
+            && ViewerPreferences.QueryFromFile(path).Contains("exportProfile=ele"),
+            ViewerPreferences.QueryFromFile(path));
+        ViewerPreferences.SaveFromQueryToFile("exportContent=bad&exportProfile=bad", path);
+        Check("invalid export content/profile values are ignored",
+            ViewerPreferences.QueryFromFile(path).Contains("exportContent=track")
+            && ViewerPreferences.QueryFromFile(path).Contains("exportProfile=ele"));
         Check("Tianditu provider IDs are valid map preferences",
             ViewerPreferences.QueryFromFile(path).Contains("layer=satellite.tianditu"),
             ViewerPreferences.QueryFromFile(path));

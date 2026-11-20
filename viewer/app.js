@@ -30,6 +30,7 @@ import { createSummaryView } from './summary-view.js';
 import { analyseSplits, splitCount } from './split-analysis.js';
 import { createSplitsView } from './split-view.js';
 import { createTrackLayer } from './track-layer.js';
+import { createTrackColorControl, savedTrackColor } from './track-color-control.js';
 import { createWaypointController } from './waypoint-controller.js';
 import { createOverlayExport } from './overlay-export.js';
 import { createKeyboardController } from './keyboard-controller.js';
@@ -195,6 +196,17 @@ function focusSplit(split) {
     mapViewController?.focusBounds(highlight.bounds, { maxZoom: 16, animate: true });
   }
 }
+function focusProfileRange(range) {
+  if (!range) {
+    activeTrackLayer?.clearSplitHighlight();
+    return;
+  }
+  splitController.clearSelection?.();
+  const highlight = activeTrackLayer?.highlightRange(range.fromMeters, range.toMeters);
+  if (range.focusMap && highlight?.bounds.isValid()) {
+    mapViewController?.focusBounds(highlight.bounds, { maxZoom: 16, animate: true });
+  }
+}
 const waypointController = createWaypointController({
   L,
   el,
@@ -228,18 +240,23 @@ const profileController = createProfileController({
   t,
   formatters,
   formatDistance,
+  formatSpeed,
+  formatTimer,
   photosOf,
   getPinsShown: () => waypointController.visible(),
   setProfilePins: (pins) => { profilePins = pins; },
   getStops: () => waypointController.stops(),
   focusStop: (index) => waypointController.focus(index),
   revealPoint: (latlng) => mapViewController?.revealPoint(latlng),
+  onLayoutChange: () => mapViewController?.refreshControls({ refitHome: false }),
+  onRangeSelect: (range) => focusProfileRange(range),
 });
 let overlayExport = null;
 let toolboxController = null;
 let measurementController = null;
 let mapViewController = null;
 let layerSwitch = null;
+let trackColorControl = null;
 const uiFeedback = createUiFeedback({
   t,
   toolbox: () => toolboxController,
@@ -254,6 +271,8 @@ const keyboardController = createKeyboardController({
   measurement: () => measurementController,
   layerSwitch: () => layerSwitch,
   toolbox: () => toolboxController,
+  trackColor: () => trackColorControl,
+  profile: () => activeProfile,
   fit: () => mapViewController?.fit(),
   toggleChrome,
 });
@@ -262,7 +281,8 @@ const onKeyDown = keyboardController.onKeyDown;
 
 /** Keep the host's origin-independent copy in step with what the page is showing. */
 function syncPreferences(layerOverride = null) {
-  const settings = overlayExport?.settings() || { size: '9:16', ink: 'black', scrim: 'none' };
+  const settings = overlayExport?.settings()
+    || { size: '9:16', ink: 'black', scrim: 'none', content: 'full', profile: 'off' };
   const tileCache = layerSwitch?.tileCacheSettings() || initialTileCache;
   const activeLayer = typeof layerOverride === 'string' && layerOverride
     ? layerOverride
@@ -277,6 +297,9 @@ function syncPreferences(layerOverride = null) {
     tileCache: tileCache.enabled ? '1' : '0',
     tileCacheMaxMb: String(tileCache.maxMb),
     tileCacheDays: String(tileCache.maxAgeDays),
+    exportContent: settings.content || 'full',
+    exportProfile: settings.profile || 'off',
+    trackColor: trackColorControl?.mode() || savedTrackColor(params),
   });
   post(`settings\t${values.toString()}`);
 }
@@ -433,6 +456,19 @@ async function main() {
   };
   measurement.subscribe(reportMeasurementState);
   reportMeasurementState();
+  if (!gpx.network && tracks.segments.length > 0) {
+    trackColorControl = createTrackColorControl({
+      L,
+      map,
+      el,
+      t,
+      tracks,
+      initialMode: savedTrackColor(params),
+      showToast,
+      onChange: () => syncPreferences(),
+    });
+    trackColorControl.mount();
+  }
   toolboxController = createToolbox({
     L,
     map,
@@ -561,6 +597,7 @@ async function main() {
     locateCtrl.relabel();
     measurement.relabel();
     toolboxController.relabel();
+    trackColorControl?.relabel();
     waypointController.relabel();
     repaintLocalized();
     activeProfile?.refreshSplitFocus();
@@ -596,6 +633,7 @@ async function main() {
   window.addEventListener('pagehide', () => {
     toolboxController?.destroy();
     layerSwitch?.destroy();
+    trackColorControl?.destroy();
     waypointController.destroy();
   }, { once: true });
   installViewerMessages(api, clipboardResult);

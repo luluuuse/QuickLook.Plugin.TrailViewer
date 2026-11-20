@@ -434,7 +434,7 @@ async function main() {
   await page.click('.toolbox-action[data-tool="export"]');
   check('the choices survive a reload',
     JSON.stringify(await page.evaluate(() => window.trailViewer.exportSettings()))
-      === '{"size":"1:1","ink":"white","scrim":"soft"}');
+      === '{"size":"1:1","ink":"white","scrim":"soft","content":"full","profile":"off"}');
 
   await page.setViewportSize({ width: 360, height: 740 });
   const narrow = await page.locator('#toolbox-panel').evaluate((node) => {
@@ -484,6 +484,48 @@ async function main() {
     exportNames.join(' | '));
   check('the toolbox remains available after the second export',
     await page.evaluate(() => window.trailViewer.panelOpen()) === true);
+
+  // Pure track & elevation silhouette modes.
+  await page.click('.toolbox-export-settings .row[data-field="content"] .option[data-value="track"]');
+  await page.click('.toolbox-export-settings .row[data-field="profile"] .option[data-value="ele"]');
+  await page.waitForFunction(() =>
+    document.querySelector('.toolbox-export-preview')?.dataset.content === 'track'
+      && document.querySelector('.toolbox-export-preview')?.dataset.profile === 'ele'
+      && document.querySelector('.toolbox-export-preview')?.dataset.state === 'ready');
+  const bareState = await page.evaluate(() => ({
+    scrimDisabled: [...document.querySelectorAll('.toolbox-export-settings .row[data-field="scrim"] .option')]
+      .every((button) => button.disabled),
+    settings: window.trailViewer.exportSettings(),
+  }));
+  check('pure track mode disables backing options and updates settings',
+    bareState.scrimDisabled && bareState.settings.content === 'track' && bareState.settings.profile === 'ele',
+    JSON.stringify(bareState));
+  await page.click('.toolbox-export-settings .go');
+  await page.waitForFunction(() => window.__exportDone >= 3);
+  const bareExportName = await page.evaluate(() => window.__exportNames.at(-1) || '');
+  check('pure track with silhouette exports with -bare-ele suffix',
+    bareExportName.endsWith('-4x3-black-none-bare-ele.png'), bareExportName);
+  const bareTexts = await textOf(page, base, '2026-02-01-alpine-snow-traverse-1793781751910.gpx', {
+    content: 'track', profile: 'ele',
+  });
+  check('pure track export omits heading and stat text except start/end badges',
+    bareTexts.length <= 2 && !bareTexts.some((item) => item.includes('km')),
+    bareTexts.join(' | '));
+  const bareCanvas = await overlayOf(page, base, '2026-02-01-alpine-snow-traverse-1793781751910.gpx', {
+    content: 'track', profile: 'ele',
+  });
+  check('pure track with silhouette renders transparent PNG with ink',
+    bareCanvas.corners.every((a) => a === 0) && bareCanvas.opaque > 3000,
+    `${bareCanvas.opaque}`);
+
+  await page.goto(`${base}/viewer/index.html?src=../tests/fixtures/waypoints-route.gpx`);
+  await page.waitForFunction(() => document.body.classList.contains('loaded'));
+  await page.click('.toolbox-switch button');
+  await page.click('.toolbox-action[data-tool="export"]');
+  const noEleProfileDisabled = await page.locator(
+    '.toolbox-export-settings .row[data-field="profile"] .option[data-value="ele"]',
+  ).isDisabled();
+  check('elevation silhouette option is disabled on files without elevation', noEleProfileDisabled === true);
 
   check('no page errors', errors.length === 0, errors.join(' | '));
 

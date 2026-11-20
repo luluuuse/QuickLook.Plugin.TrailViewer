@@ -51,6 +51,7 @@ const PENS = {
     hair: 'rgba(0, 0, 0, 0.30)',
     shadow: null,
     wash: ['rgba(255, 255, 255, 0)', 'rgba(255, 255, 255, 0.26)', 'rgba(255, 255, 255, 0.52)'],
+    silhouette: ['rgba(0, 0, 0, 0.26)', 'rgba(0, 0, 0, 0.02)'],
   },
   white: {
     text: '#ffffff',
@@ -60,6 +61,7 @@ const PENS = {
     hair: 'rgba(255, 255, 255, 0.28)',
     shadow: 'rgba(0, 0, 0, 0.45)',
     wash: ['rgba(0, 0, 0, 0)', 'rgba(0, 0, 0, 0.22)', 'rgba(0, 0, 0, 0.44)'],
+    silhouette: ['rgba(255, 255, 255, 0.34)', 'rgba(255, 255, 255, 0.03)'],
   },
 };
 
@@ -587,16 +589,119 @@ function figures(ctx, rows, box, pen) {
 }
 
 /**
+ * The frame for a picture that carries no figures: the track fills the canvas, with a margin wide enough that
+ * the start and end badges and the white casing never touch the edge when the PNG is laid onto a video.
+ */
+function bareTrackBox(box) {
+  return {
+    left: box.width * 0.07,
+    top: box.height * 0.07,
+    right: box.width * 0.93,
+    bottom: box.height * 0.93,
+  };
+}
+
+/**
+ * The strip the elevation silhouette occupies: a band along the foot of the page, the full width of the track
+ * column it belongs to. The track box above it gives up the room, so the two never overlap.
+ */
+function silhouetteBand(box, trackBox, bare) {
+  const bandHeight = box.height * (box.row ? 0.12 : 0.1);
+  const bottom = box.height * (bare ? 0.95 : 0.965);
+  const right = bare ? trackBox.right : box.row ? box.width * 0.95 : box.width * 0.935;
+  return { left: trackBox.left, right, top: bottom - bandHeight, bottom };
+}
+
+/** At most `count` samples spread evenly by distance, so a 30,000 point recording is still one cheap path. */
+export function silhouettePoints(samples, count = 240) {
+  const valid = (samples || []).filter((sample) =>
+    Number.isFinite(sample?.along) && Number.isFinite(sample?.ele));
+  if (valid.length < 2) return [];
+  const start = valid[0].along;
+  const end = valid[valid.length - 1].along;
+  const span = end - start;
+  if (!(span > 0)) return [];
+  const result = [];
+  let cursor = 0;
+  for (let step = 0; step < count; step += 1) {
+    const target = start + (span * step) / (count - 1);
+    while (cursor < valid.length - 2 && valid[cursor + 1].along < target) cursor += 1;
+    const a = valid[cursor];
+    const b = valid[cursor + 1];
+    const k = b.along > a.along ? Math.min(1, Math.max(0, (target - a.along) / (b.along - a.along))) : 0;
+    result.push({ along: target - start, ele: a.ele + (b.ele - a.ele) * k });
+  }
+  return result;
+}
+
+/**
+ * A minimal elevation silhouette: the outline in the ink colour over a soft fill that fades to nothing at the
+ * base, so on a video frame it reads as a shape rather than a chart. No axis, no numbers.
+ */
+function paintSilhouette(ctx, samples, band, pen) {
+  const points = silhouettePoints(samples);
+  if (points.length < 2) return false;
+  let min = Infinity;
+  let max = -Infinity;
+  for (const point of points) {
+    if (point.ele < min) min = point.ele;
+    if (point.ele > max) max = point.ele;
+  }
+  const total = points[points.length - 1].along || 1;
+  const height = band.bottom - band.top;
+  const rise = Math.max(max - min, 1);
+  const xOf = (along) => band.left + (along / total) * (band.right - band.left);
+  // A flat ride keeps a low hump instead of being stretched into a mountain range.
+  const usable = height * Math.min(1, Math.max(0.25, rise / 300));
+  const yOf = (ele) => band.bottom - ((ele - min) / rise) * usable;
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(xOf(points[0].along), band.bottom);
+  for (const point of points) ctx.lineTo(xOf(point.along), yOf(point.ele));
+  ctx.lineTo(xOf(total), band.bottom);
+  ctx.closePath();
+  const fill = ctx.createLinearGradient(0, band.top, 0, band.bottom);
+  fill.addColorStop(0, pen.silhouette[0]);
+  fill.addColorStop(1, pen.silhouette[1]);
+  ctx.fillStyle = fill;
+  ctx.fill();
+
+  if (pen.shadow) {
+    ctx.shadowColor = pen.shadow;
+    ctx.shadowBlur = 8;
+  }
+  ctx.beginPath();
+  points.forEach((point, index) => {
+    const x = xOf(point.along);
+    const y = yOf(point.ele);
+    if (index === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  });
+  ctx.strokeStyle = pen.text;
+  ctx.lineWidth = 4;
+  ctx.stroke();
+  ctx.restore();
+  return true;
+}
+
+/**
  * Draws the whole overlay and returns the canvas.
  *
  * `segments` is an array of point arrays ({lat, lon, ele}); `rows` is what the figures show, already
  * formatted, so the drawing code knows nothing about languages or units. `ends` are the two words in the
- * start and end badges, and `size` / `scrim` / `ink` are the three settings the panel offers.
+ * start and end badges, and `size` / `scrim` / `ink` are the three settings the panel offers. `content`
+ * `track` drops every word for a bare track, and `profile` `ele` adds an elevation silhouette drawn from
+ * `elevation` samples ({along, ele}).
  */
-export function drawOverlay({ segments, rows, ends, title, meta, size, scrim, ink, preview = false }) {
+export function drawOverlay({
+  segments, rows, ends, title, meta, size, scrim, ink, content = 'full', profile = 'off', elevation = null,
+  preview = false,
+}) {
   const pen = PENS[ink] || PENS[DEFAULT_INK];
   const preset = presetOf(size);
   const box = layout(preset.width, preset.height);
+  const bare = content === 'track';
   // Drawing at preview resolution avoids allocating a full 2K canvas for every tool click.
   const scale = preview
     ? Math.min(236 / preset.width, 112 / preset.height)
@@ -610,8 +715,18 @@ export function drawOverlay({ segments, rows, ends, title, meta, size, scrim, in
   ctx.lineJoin = 'round';
   ctx.lineCap = 'round';
 
-  if (scrim && scrim !== 'none') paintScrim(ctx, box, pen.wash);
-  heading(ctx, title, meta, box, pen);
+  if (!bare) {
+    if (scrim && scrim !== 'none') paintScrim(ctx, box, pen.wash);
+    heading(ctx, title, meta, box, pen);
+  }
+
+  const trackBox = { ...(bare ? bareTrackBox(box) : box.track) };
+  const withSilhouette = profile === 'ele' && silhouettePoints(elevation).length >= 2;
+  if (withSilhouette) {
+    const band = silhouetteBand(box, trackBox, bare);
+    trackBox.bottom = Math.min(trackBox.bottom, band.top - box.height * 0.035);
+    paintSilhouette(ctx, elevation, band, pen);
+  }
 
   const fullLines = segments.filter((line) => line.length > 0);
   const lines = fullLines.map(decimate);
@@ -627,7 +742,7 @@ export function drawOverlay({ segments, rows, ends, title, meta, size, scrim, in
   const flat = !Number.isFinite(minEle) || !Number.isFinite(maxEle);
 
   if (lines.length > 0) {
-    const to = projector(fullLines, box.track);
+    const to = projector(fullLines, trackBox);
     const placed = lines
       .map((line) => simplifyPath(line.map((p) => ({ ...p, xy: to(p) }))))
       .filter((line) => line.length > 0);
@@ -641,7 +756,9 @@ export function drawOverlay({ segments, rows, ends, title, meta, size, scrim, in
     }
   }
 
-  if (box.row) figures(ctx, rows, box, pen);
-  else column(ctx, rows, box, pen);
+  if (!bare) {
+    if (box.row) figures(ctx, rows, box, pen);
+    else column(ctx, rows, box, pen);
+  }
   return canvas;
 }
