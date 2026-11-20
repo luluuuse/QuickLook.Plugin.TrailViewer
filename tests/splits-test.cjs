@@ -83,6 +83,34 @@ async function main() {
       selectedRows: document.querySelectorAll('.splits-table tbody tr.selected').length,
       selectedIndex: window.trailViewer.splitPanel.selected(),
       highlightLines: document.querySelectorAll('.gpx-split-highlight').length,
+      profileFocus: (() => {
+        const focus = document.querySelector('#profile .split-focus');
+        const band = document.querySelector('#profile .split-focus-band');
+        const badge = document.querySelector('#profile .label .split-focus-badge');
+        const label = document.querySelector('#profile .label');
+        const line = document.querySelector('#profile .split-focus-line');
+        const chart = document.querySelector('#profile .chart');
+        if (!focus || !chart || !label) return null;
+        const chartRect = chart.getBoundingClientRect();
+        const labelRect = label.getBoundingClientRect();
+        const bandRect = band?.getBoundingClientRect();
+        const badgeRect = badge && !badge.hidden ? badge.getBoundingClientRect() : null;
+        return {
+          visible: !focus.hidden && getComputedStyle(focus).display !== 'none',
+          badgeVisible: Boolean(badge && !badge.hidden && getComputedStyle(badge).display !== 'none'),
+          lineVisible: Boolean(line && line.style.display !== 'none' && line.getAttribute('d')),
+          badge: badge?.textContent || '',
+          bandLeft: bandRect ? bandRect.left - chartRect.left : null,
+          bandWidth: bandRect ? bandRect.width : null,
+          chartWidth: chartRect.width,
+          badgeInside: badgeRect
+            ? badgeRect.left >= labelRect.left - 1
+              && badgeRect.right <= labelRect.right + 1
+              && badgeRect.bottom <= chartRect.top + 1
+              && badgeRect.height <= 18
+            : null,
+        };
+      })(),
       zoom: window.trailViewer.map.getZoom(),
       center: window.trailViewer.map.getCenter(),
       home: window.trailViewer.mapLayout().home,
@@ -136,6 +164,12 @@ async function main() {
     `${state.expanded}/${state.rows.length}/${state.loaded}`);
   check('the opened panel does not sit underneath the zoom controls', state.zoomClear,
     JSON.stringify(state));
+  check('an unselected split panel leaves the profile focus hidden',
+    state.profileFocus
+      && state.profileFocus.visible === false
+      && state.profileFocus.badgeVisible === false
+      && state.profileFocus.lineVisible === false,
+    JSON.stringify(state.profileFocus));
   check('opening the split panel does not move the zoom/locate/export column',
     state.zoomLeft === collapsedZoomLeft, `${collapsedZoomLeft} -> ${state.zoomLeft}`);
   check('opening the split panel does not refit or move the map',
@@ -251,6 +285,17 @@ async function main() {
         || state.center.lat !== collapsedView.center.lat
         || state.center.lng !== collapsedView.center.lng),
     `${zoomBeforeSelection} -> ${state.zoom} @ ${state.center.lat},${state.center.lng}`);
+  const firstBandLeft = state.profileFocus?.bandLeft ?? null;
+  check('selecting a split highlights and labels its range on the elevation profile',
+    state.profileFocus?.visible === true
+      && state.profileFocus?.badgeVisible === true
+      && state.profileFocus?.lineVisible === true
+      && state.profileFocus?.badge === 'Split 1 · 0–1 km'
+      && state.profileFocus?.bandLeft >= -1
+      && state.profileFocus?.bandLeft <= 1
+      && state.profileFocus?.bandWidth >= 8
+      && state.profileFocus?.badgeInside === true,
+    JSON.stringify(state.profileFocus));
 
   const secondRow = page.locator('.splits-table tbody tr').nth(1);
   await secondRow.click();
@@ -259,6 +304,19 @@ async function main() {
   check('clicking another split moves the highlight',
     state.selectedIndex === 2 && state.selectedRows === 1 && state.highlightLines >= 2,
     JSON.stringify({ selected: state.selectedIndex, rows: state.selectedRows, lines: state.highlightLines }));
+  check('clicking another split shifts the profile focus to the new range',
+    state.profileFocus?.visible === true
+      && state.profileFocus?.lineVisible === true
+      && state.profileFocus?.badge === 'Split 2 · 1–2 km'
+      && firstBandLeft !== null
+      && state.profileFocus?.bandLeft > firstBandLeft,
+    JSON.stringify({ firstBandLeft, current: state.profileFocus }));
+
+  const chartBox = await page.locator('#profile .chart').boundingBox();
+  await page.mouse.move(chartBox.x + chartBox.width * 0.5, chartBox.y + chartBox.height * 0.5);
+  const scrubVisible = await page.evaluate(() => !document.querySelector('#profile .readout')?.hidden);
+  check('profile hover scrub remains interactive while a split is focused', scrubVisible, String(scrubVisible));
+  await page.mouse.move(10, 10);
 
   await page.locator('.info-details-toggle').click();
   await waitForLayout(page);
@@ -272,8 +330,11 @@ async function main() {
   state = await splitState();
   const fullCollapsedZoom = state.zoomLeft;
   check('collapsing splits clears the trajectory highlight',
-    state.selectedIndex === null && state.highlightLines === 0,
-    JSON.stringify({ selected: state.selectedIndex, lines: state.highlightLines }));
+    state.selectedIndex === null && state.highlightLines === 0
+      && state.profileFocus?.visible === false
+      && state.profileFocus?.badgeVisible === false
+      && state.profileFocus?.lineVisible === false,
+    JSON.stringify({ selected: state.selectedIndex, lines: state.highlightLines, profileFocus: state.profileFocus }));
   await page.locator('.split-toggle').click();
   await waitForLayout(page);
   state = await splitState();
@@ -289,8 +350,10 @@ async function main() {
       && state.headers.join('|') === '圈|距离|时间|累计时间|上升|下降|运动速度|垂直速度'
       && state.totals[0].label === '总时间' && state.totals[1].label === '运动时间'
       && state.totals[2].label === '休息时间'
-      && state.selectedIndex === 2 && state.highlightLines >= 2 && state.modeButton === '简要',
-    `${state.expanded}/${state.headers.join('|')}/${state.selectedIndex}`);
+      && state.selectedIndex === 2 && state.highlightLines >= 2 && state.modeButton === '简要'
+      && state.profileFocus?.visible === true
+      && state.profileFocus?.badge === '第 2 段 · 1–2 km',
+    `${state.expanded}/${state.headers.join('|')}/${state.selectedIndex}/${state.profileFocus?.badge}`);
 
   const stickyAlignment = await page.evaluate(async () => {
     const scroller = document.querySelector('.splits-scroll');
@@ -328,6 +391,10 @@ async function main() {
   check('the open split panel fits a 360 px window without horizontal overflow',
     narrow.left >= 0 && narrow.right <= 360 && narrow.overflow <= 1 && narrow.tableOverflow > 0,
     JSON.stringify(narrow));
+  const narrowProfile = await splitState();
+  check('profile focus stays inside the chart after resizing to 360 px',
+    narrowProfile.profileFocus?.visible === true && narrowProfile.profileFocus?.badgeInside === true,
+    JSON.stringify(narrowProfile.profileFocus));
 
   await page.locator('.split-toggle').click();
   await waitForLayout(page);

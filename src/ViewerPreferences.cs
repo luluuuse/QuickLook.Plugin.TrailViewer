@@ -7,6 +7,25 @@ using System.Text;
 
 namespace QuickLook.Plugin.TrailViewer;
 
+internal sealed class TileCacheOptions
+{
+    private readonly long? _maxBytesOverride;
+
+    internal bool Enabled { get; }
+    internal int MaxMegabytes { get; }
+    internal int MaxAgeDays { get; }
+    internal bool IsUnlimited => !_maxBytesOverride.HasValue && MaxMegabytes <= 0;
+    internal long MaxBytes => _maxBytesOverride ?? (MaxMegabytes > 0 ? MaxMegabytes * 1024L * 1024L : 0L);
+
+    internal TileCacheOptions(bool enabled, int maxMegabytes, int maxAgeDays, long? maxBytesOverride = null)
+    {
+        Enabled = enabled;
+        MaxMegabytes = maxMegabytes;
+        MaxAgeDays = maxAgeDays;
+        _maxBytesOverride = maxBytesOverride;
+    }
+}
+
 /// <summary>
 /// Preferences that must outlive the versioned WebView2 origin. localStorage is partitioned by origin, so an
 /// upgrade changed the origin and silently reset "No map" to the online Map layer. This small file is owned by
@@ -15,7 +34,38 @@ namespace QuickLook.Plugin.TrailViewer;
 internal static class ViewerPreferences
 {
     private const int MaxQueryLength = 4096;
+    private const int MaxCustomLayerIdLength = 40;
+    private const string CustomLayerPrefix = "custom.";
     private static readonly object Gate = new();
+
+    private static bool IsCustomLayerId(string value)
+    {
+        if (!value.StartsWith(CustomLayerPrefix, StringComparison.Ordinal)
+            || value.Length <= CustomLayerPrefix.Length
+            || value.Length > MaxCustomLayerIdLength)
+            return false;
+
+        for (var i = CustomLayerPrefix.Length; i < value.Length; i++)
+        {
+            var ch = value[i];
+            var valid = (ch >= 'a' && ch <= 'z')
+                || (ch >= 'A' && ch <= 'Z')
+                || (ch >= '0' && ch <= '9')
+                || ch == '.'
+                || ch == '_'
+                || ch == '-';
+            if (!valid)
+                return false;
+        }
+        return true;
+    }
+
+    private static bool IsAllowed(string key, string value)
+    {
+        if (Allowed.TryGetValue(key, out var allowed) && Array.IndexOf(allowed, value) >= 0)
+            return true;
+        return string.Equals(key, "layer", StringComparison.Ordinal) && IsCustomLayerId(value);
+    }
 
     private static readonly Dictionary<string, string[]> Allowed = new(StringComparer.Ordinal)
     {
@@ -32,6 +82,9 @@ internal static class ViewerPreferences
         ["exportSize"] = new[] { "1:1", "9:16", "4:3" },
         ["exportInk"] = new[] { "black", "white" },
         ["exportScrim"] = new[] { "none", "soft" },
+        ["tileCache"] = new[] { "0", "1" },
+        ["tileCacheMaxMb"] = new[] { "0", "256", "512", "2048" },
+        ["tileCacheDays"] = new[] { "0", "7", "30", "90" },
     };
 
     private static readonly string FilePath = Path.Combine(
@@ -66,6 +119,23 @@ internal static class ViewerPreferences
     {
         MigrateLegacyFile(LegacyFilePath, FilePath);
         SaveFromQueryToFile(query, FilePath);
+    }
+
+    internal static TileCacheOptions ReadTileCacheOptions(string? path = null)
+    {
+        if (path == null)
+            MigrateLegacyFile(LegacyFilePath, FilePath);
+
+        lock (Gate)
+        {
+            var values = Load(path ?? FilePath);
+            var enabled = !values.TryGetValue("tileCache", out var en) || en != "0";
+            var maxMb = values.TryGetValue("tileCacheMaxMb", out var mb)
+                && int.TryParse(mb, out var parsedMb) ? parsedMb : 512;
+            var days = values.TryGetValue("tileCacheDays", out var d)
+                && int.TryParse(d, out var parsedDays) ? parsedDays : 30;
+            return new TileCacheOptions(enabled, maxMb, days);
+        }
     }
 
     internal static bool MigrateLegacyFile(string legacy, string current)
@@ -122,8 +192,7 @@ internal static class ViewerPreferences
                 {
                     var key = Uri.UnescapeDataString(part.Substring(0, split));
                     var value = Uri.UnescapeDataString(part.Substring(split + 1).Replace("+", " "));
-                    if (Allowed.TryGetValue(key, out var allowed)
-                        && Array.IndexOf(allowed, value) >= 0)
+                    if (IsAllowed(key, value))
                     {
                         values[key] = value;
                     }
@@ -153,8 +222,7 @@ internal static class ViewerPreferences
 
                 var key = line.Substring(0, split);
                 var value = line.Substring(split + 1);
-                if (Allowed.TryGetValue(key, out var allowed)
-                    && Array.IndexOf(allowed, value) >= 0)
+                if (IsAllowed(key, value))
                 {
                     values[key] = value;
                 }

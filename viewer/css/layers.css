@@ -447,6 +447,159 @@
   color: #e39a9a;
 }
 
+.layer-cache-section {
+  gap: 8px;
+}
+
+.layer-cache-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.layer-cache-heading {
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.layer-switch .layer-source-menu .layer-cache-toggle {
+  width: auto;
+  flex: none;
+  padding: 3px 9px;
+  border: 1px solid var(--border-control);
+  border-radius: var(--radius-sm);
+  background: var(--surface-control);
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.3;
+  text-align: center;
+}
+
+.layer-switch .layer-source-menu .layer-cache-toggle:hover {
+  background: var(--surface-hover);
+  color: #fff;
+}
+
+.layer-switch .layer-source-menu .layer-cache-toggle.active {
+  border-color: var(--accent);
+  background: var(--icon-active-background);
+  color: var(--icon-active);
+  font-weight: 600;
+}
+
+.layer-cache-options {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.layer-cache-options.is-disabled {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.layer-cache-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.layer-cache-label {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.layer-cache-choices {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.layer-switch .layer-source-menu .layer-cache-choice {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 5px 2px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface-input);
+  color: var(--text);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.layer-switch .layer-source-menu .layer-cache-choice[data-tile-cache-mb="0"] {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.layer-switch .layer-source-menu .layer-cache-choice:hover:not(:disabled) {
+  background: var(--surface-hover);
+}
+
+.layer-switch .layer-source-menu .layer-cache-choice.selected {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
+}
+
+.layer-cache-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-top: 2px;
+}
+
+.layer-cache-status {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.layer-switch .layer-source-menu .layer-cache-clear {
+  display: inline-flex;
+  width: auto;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border: 1px solid var(--border-control);
+  border-radius: var(--radius-sm);
+  background: var(--surface-control);
+  color: var(--text);
+  font-size: 11px;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+
+.layer-switch .layer-source-menu .layer-cache-clear:hover:not(:disabled) {
+  background: var(--surface-hover);
+  color: #fff;
+}
+
+.layer-switch .layer-source-menu .layer-cache-clear:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.layer-switch .layer-source-menu .layer-cache-clear.confirm {
+  border-color: rgba(227, 138, 138, 0.55);
+  background: rgba(227, 138, 138, 0.16);
+  color: #f4b2b2;
+  font-weight: 600;
+}
+
 /* Custom sources: a list of the user's own entries plus an inline form. The plugin ships none of them, so the
    empty state and the disclaimer carry the meaning here. */
 .layer-custom-section {

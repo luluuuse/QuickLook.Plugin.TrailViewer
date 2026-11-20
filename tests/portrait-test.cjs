@@ -117,8 +117,8 @@ async function main() {
   check('the measured top-band layout is used before docking', ['inline', 'wrapped'].includes(m.layout), m.layout);
   check('the zoom buttons sit beside the card', Math.abs(p.zoom.l - p.info.r - 8) <= 1,
     `${p.zoom.l} vs ${p.info.r}`);
-  check('the switches share the top band', p.zoom.t === p.layers.t && p.layers.t === p.pins.t,
-    `${p.zoom.t}/${p.layers.t}/${p.pins.t}`);
+  check('the switches share the top band', p.zoom.t === p.layers.t && p.layers.t === p.tools.t,
+    `${p.zoom.t}/${p.layers.t}/${p.tools.t}`);
   const toolbarHeights = await page.evaluate(() => [
     '.layer-switch',
     '.pins-switch',

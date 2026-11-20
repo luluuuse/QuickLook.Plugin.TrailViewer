@@ -1,12 +1,20 @@
 import {
   profileSamples,
   seriesSamples,
+  sliceCurveByDistance,
   SLOPE_FULL,
   slopeColor,
   slopeScale,
 } from './profile.js';
 import { createPointIndex } from './spatial.js';
 import { iconElement } from './icons.js';
+
+function formatKmMark(meters) {
+  const km = meters / 1000;
+  const rounded = Math.round(km);
+  if (Math.abs(km - rounded) < 0.005) return String(rounded);
+  return km.toFixed(2).replace(/\.?0+$/, '');
+}
 
 /**
  * Builds the SVG elevation panel. Map dragging remains in app.js; this module owns only the chart and its
@@ -124,6 +132,14 @@ export function createProfileChart({
     line.setAttribute('d', `M${curve.map((point) => `${at(point.along).toFixed(1)},${yOf(point.ele).toFixed(1)}`).join(' L')}`);
     svg.append(line);
 
+    const splitFocusCasing = document.createElementNS(ns, 'path');
+    splitFocusCasing.setAttribute('class', 'split-focus-casing');
+    splitFocusCasing.style.display = 'none';
+    const splitFocusLine = document.createElementNS(ns, 'path');
+    splitFocusLine.setAttribute('class', 'split-focus-line');
+    splitFocusLine.style.display = 'none';
+    svg.append(splitFocusCasing, splitFocusLine);
+
     let heartGroup = null;
     if (heartRate) {
       heartGroup = document.createElementNS(ns, 'g');
@@ -155,7 +171,14 @@ export function createProfileChart({
     dot.hidden = true;
     heartDot.hidden = true;
     const chart = el('div', 'chart');
-    chart.append(svg, heartDot);
+    let splitFocusData = null;
+    const splitFocus = el('div', 'split-focus');
+    splitFocus.hidden = true;
+    const splitDimLeft = el('div', 'split-focus-dim left');
+    const splitDimRight = el('div', 'split-focus-dim right');
+    const splitBand = el('div', 'split-focus-band');
+    splitFocus.append(splitDimLeft, splitDimRight, splitBand);
+    chart.append(svg, splitFocus, heartDot);
 
     let heartAxis = null;
     let heartAverage = null;
@@ -251,6 +274,16 @@ export function createProfileChart({
       );
       label.append(heartToggle);
     }
+    const splitBadge = localized(el('span', 'split-focus-badge'), () => (
+      splitFocusData
+        ? t('profile.splitFocus', {
+          index: splitFocusData.index,
+          range: `${formatKmMark(splitFocusData.from)}\u2013${formatKmMark(splitFocusData.to)} ${t('unit.km')}`,
+        })
+        : ''
+    ));
+    splitBadge.hidden = true;
+    label.append(splitBadge);
     let noteOff = false;
     let noteVe = 3;
     const scaleNote = localized(el('span', 'scale'), () => (noteOff
@@ -286,6 +319,71 @@ export function createProfileChart({
     const MIN_PLOT = 56;
     const MAX_PLOT = 128;
     const TARGET_VE = 3;
+    const MIN_SPLIT_BAND_PX = 8;
+
+    function positionSplitFocus() {
+      if (!splitFocusData) return;
+      const { from, to } = splitFocusData;
+      const chartWidth = chart.getBoundingClientRect().width;
+      const startRatio = Math.min(1, Math.max(0, from / Math.max(total, 1)));
+      const endRatio = Math.min(1, Math.max(0, to / Math.max(total, 1)));
+      if (chartWidth > 0) {
+        const rawLeft = startRatio * chartWidth;
+        const rawRight = endRatio * chartWidth;
+        const bandWidth = Math.min(chartWidth, Math.max(rawRight - rawLeft, MIN_SPLIT_BAND_PX));
+        const center = (rawLeft + rawRight) / 2;
+        const bandLeft = Math.max(0, Math.min(chartWidth - bandWidth, center - bandWidth / 2));
+        const bandRight = bandLeft + bandWidth;
+        splitDimLeft.style.width = `${bandLeft.toFixed(2)}px`;
+        splitDimRight.style.left = `${bandRight.toFixed(2)}px`;
+        splitBand.style.left = `${bandLeft.toFixed(2)}px`;
+        splitBand.style.width = `${bandWidth.toFixed(2)}px`;
+      } else {
+        splitDimLeft.style.width = `${(startRatio * 100).toFixed(4)}%`;
+        splitDimRight.style.left = `${(endRatio * 100).toFixed(4)}%`;
+        splitBand.style.left = `${(startRatio * 100).toFixed(4)}%`;
+        splitBand.style.width = `${((endRatio - startRatio) * 100).toFixed(4)}%`;
+      }
+    }
+
+    function clearSplitFocus() {
+      splitFocusData = null;
+      splitFocus.hidden = true;
+      splitBadge.hidden = true;
+      splitBadge.textContent = '';
+      splitFocusCasing.style.display = 'none';
+      splitFocusLine.style.display = 'none';
+      splitFocusCasing.removeAttribute('d');
+      splitFocusLine.removeAttribute('d');
+    }
+
+    function setSplitFocus(split) {
+      if (!split) {
+        clearSplitFocus();
+        return;
+      }
+      const from = Math.max(0, Math.min(total, Number(split.fromMeters) || 0));
+      const to = Math.max(0, Math.min(total, Number(split.toMeters) || 0));
+      const sliced = sliceCurveByDistance(curve, from, to);
+      if (!(to > from) || sliced.length < 2) {
+        clearSplitFocus();
+        return;
+      }
+      splitFocusData = { index: split.index, from, to };
+      const d = `M${sliced.map((point) => `${at(point.along).toFixed(1)},${yOf(point.ele).toFixed(1)}`).join(' L')}`;
+      splitFocusCasing.setAttribute('d', d);
+      splitFocusLine.setAttribute('d', d);
+      splitFocusCasing.style.display = '';
+      splitFocusLine.style.display = '';
+      splitBadge.textContent = t('profile.splitFocus', {
+        index: splitFocusData.index,
+        range: `${formatKmMark(from)}\u2013${formatKmMark(to)} ${t('unit.km')}`,
+      });
+      splitBadge.hidden = false;
+      splitFocus.hidden = false;
+      positionSplitFocus();
+    }
+
     function fit() {
       if (!box.offsetParent) return;
       const chartWidth = chart.getBoundingClientRect().width;
@@ -302,6 +400,7 @@ export function createProfileChart({
         ? t('profile.scale', { n: ve >= 10 ? String(Math.round(ve)) : ve.toFixed(1) })
         : '';
       document.documentElement.style.setProperty('--profile-height', `${box.offsetHeight}px`);
+      positionSplitFocus();
     }
 
     let refitFrame = 0;
@@ -337,6 +436,9 @@ export function createProfileChart({
       } : null,
       pins,
       refit: fit,
+      setSplitFocus,
+      clearSplitFocus,
+      refreshSplitFocus: positionSplitFocus,
     };
   };
 }

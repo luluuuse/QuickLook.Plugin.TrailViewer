@@ -45,7 +45,9 @@ internal sealed partial class TrailViewerPanel
                 OpenInBrowser(args.Uri);
             };
             core.WebMessageReceived += OnWebMessage;
-            core.WebResourceResponseReceived += OnTiandituResponseReceived;
+            core.AddWebResourceRequestedFilter("https://*", CoreWebView2WebResourceContext.Image);
+            core.WebResourceRequested += OnWebResourceRequested;
+            core.WebResourceResponseReceived += OnWebResourceResponseReceived;
 
             // Allow = served as if with "Access-Control-Allow-Origin: *", so the page (another origin) can fetch
             // the file. The page treats everything in the file as text and has a Content-Security-Policy.
@@ -54,14 +56,22 @@ internal sealed partial class TrailViewerPanel
                 CoreWebView2HostResourceAccessKind.Allow);
 
             var tiandituKey = TiandituKeyStore.Load();
+            _tileCacheOptions = ViewerPreferences.ReadTileCacheOptions();
             var runtimeConfig = new System.Collections.Generic.List<string>();
             if (!string.IsNullOrEmpty(tiandituKey))
             {
                 runtimeConfig.Add($"tiandituKey: '{tiandituKey}', direct: true");
             }
             var customSources = CustomSourceStore.LoadJson();
+            _customHostMatchers = TileCache.BuildCustomHostMatchers(customSources);
             if (customSources != null)
                 runtimeConfig.Add("customSources: " + customSources);
+            runtimeConfig.Add(string.Format(
+                System.Globalization.CultureInfo.InvariantCulture,
+                "tileCache: {{ enabled: {0}, maxMb: {1}, maxAgeDays: {2} }}",
+                _tileCacheOptions.Enabled ? "true" : "false",
+                _tileCacheOptions.MaxMegabytes,
+                _tileCacheOptions.MaxAgeDays));
             if (runtimeConfig.Count > 0)
             {
                 await core.AddScriptToExecuteOnDocumentCreatedAsync(

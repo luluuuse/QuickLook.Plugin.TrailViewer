@@ -230,3 +230,35 @@ test('parseGpx throws GpxError on malformed XML or wrong root element', () => {
   assert.throws(() => parseGpx('<gpx><trk></gpx>'), GpxError);
   assert.throws(() => parseGpx('<kml></kml>'), GpxError);
 });
+
+test('parseGpx strips waypoint telemetry, falls back to cmt, backfills missing time and keeps placeholders', () => {
+  const xml = `<gpx version="1.1">
+    <wpt lat="30.5000" lon="114.3000">
+      <name>Telemetry Only</name>
+      <desc>Lon: 114.3000, Lat: 30.5000, Alt: 420 m, Time: 2026-10-03T12:24:22Z</desc>
+    </wpt>
+    <wpt lat="30.5100" lon="114.3100">
+      <name>Cmt Fallback</name>
+      <time>2026-10-03T06:00:00Z</time>
+      <desc>经度：114.31, 纬度：30.51, 时间：2026-10-03T09:00:00Z</desc>
+      <cmt>Reliable spring</cmt>
+    </wpt>
+    <wpt lat="30.5200" lon="114.3200">
+      <name>Placeholder</name>
+      <desc>Auto-generated</desc>
+    </wpt>
+  </gpx>`;
+
+  const gpx = parseGpx(xml);
+  assert.equal(gpx.waypoints.length, 3);
+  assert.equal(gpx.waypoints[0].description, undefined);
+  assert.equal(gpx.waypoints[0].insightText, undefined);
+  assert.equal(gpx.waypoints[0].time?.toISOString(), '2026-10-03T12:24:22.000Z');
+
+  assert.equal(gpx.waypoints[1].description, 'Reliable spring');
+  assert.equal(gpx.waypoints[1].insightText, 'Reliable spring');
+  assert.equal(gpx.waypoints[1].time?.toISOString(), '2026-10-03T06:00:00.000Z');
+
+  assert.equal(gpx.waypoints[2].description, 'Auto-generated');
+  assert.equal(gpx.waypoints[2].time, undefined);
+});

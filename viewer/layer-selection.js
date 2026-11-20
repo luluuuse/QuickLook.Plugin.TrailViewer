@@ -5,7 +5,7 @@ export function applyLayerSelection({
   value, remember, keepMenu = false, restoreFocus = false,
   current, lastProvider, layers, allLayers, providers, keyReady,
   normalizeLayer, defaultProvider, activeKey, map, ensureCustomLayer, menuOpen,
-  openMenu, showSettings, closeMenu, onRemember, setPendingKeyProvider, setNoMapReturn,
+  openMenu, showSettings, closeMenu, setPendingKeyProvider, setNoMapReturn,
 }) {
   const category = typeof value === 'string' && value in allLayers ? value : null;
   const key = category ? (lastProvider[category] || defaultProvider(category)) : normalizeLayer(value);
@@ -30,7 +30,6 @@ export function applyLayerSelection({
   lastProvider[target.category] = key;
   if (remember) {
     writeStored(activeKey, key);
-    onRemember?.();
   }
   if (menuOpen) {
     if (keepMenu) return { key, category: target.category, changed, keepMenu: true };

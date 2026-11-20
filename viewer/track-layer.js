@@ -209,6 +209,8 @@ export function createTrackLayer({ L, el, localized, t, pointPopup, onFocusBound
       let distanceOffset = 0;
       const showEnds = !network && model.trackGroups.length <= 20;
       let distanceCache = null;
+      let lastDistanceOrigin = null;
+      let lastAnnotationOrigin = null;
       let networkLayer = null;
       let networkStats = null;
 
@@ -282,13 +284,16 @@ export function createTrackLayer({ L, el, localized, t, pointPopup, onFocusBound
       }
 
       function renderDistanceMarks() {
+        if (network || distancePaths.length === 0) return;
         distanceLayer.clearLayers();
+        lastDistanceOrigin = map.containerPointToLayerPoint([0, 0]);
         const zoom = map.getZoom();
         if (!distanceCache || distanceCache.zoom !== zoom) {
           const paths = distancePaths.map((entry) => entry.points);
           const intervals = adaptiveDistanceIntervals(distanceOffset, projectedLength(map, paths));
           distanceCache = { zoom, samples: samplesForRoute(distancePaths, intervals) };
         }
+        if (distanceCache.samples.length === 0) return;
         const size = map.getSize();
         const mapBox = map.getContainer().getBoundingClientRect();
         const pinCentres = [...document.querySelectorAll('.gpx-pin')].map((pin) => {
@@ -344,6 +349,8 @@ export function createTrackLayer({ L, el, localized, t, pointPopup, onFocusBound
         anomalyMarkerLayer.clearLayers();
         gapLineLayer.clearLayers();
         gapMarkerLayer.clearLayers();
+        if (network || (anomalyEpisodes.length === 0 && gapEpisodes.length === 0)) return;
+        lastAnnotationOrigin = map.containerPointToLayerPoint([0, 0]);
         const zoom = map.getZoom();
         const size = map.getSize();
         const anomalyRadius = zoom <= 12 ? 120 : zoom <= 14 ? 72 : 30;
@@ -460,6 +467,18 @@ export function createTrackLayer({ L, el, localized, t, pointPopup, onFocusBound
           renderAnnotationMarks();
         });
       };
+      map.on('move', () => {
+        if (network || map._animatingZoom) return;
+        const origin = map.containerPointToLayerPoint([0, 0]);
+        if (distancePaths.length > 0 && (!lastDistanceOrigin
+          || Math.hypot(origin.x - lastDistanceOrigin.x, origin.y - lastDistanceOrigin.y) >= 120)) {
+          scheduleDistanceMarks();
+        }
+        if ((anomalyEpisodes.length > 0 || gapEpisodes.length > 0) && (!lastAnnotationOrigin
+          || Math.hypot(origin.x - lastAnnotationOrigin.x, origin.y - lastAnnotationOrigin.y) >= 120)) {
+          scheduleAnnotationMarks();
+        }
+      });
       map.on('zoomend', () => {
         scheduleDistanceMarks();
         scheduleAnnotationMarks();
@@ -602,6 +621,7 @@ export function createTrackLayer({ L, el, localized, t, pointPopup, onFocusBound
         bounds,
         segments,
         navigationMarks,
+        annotationCount: anomalyEpisodes.length + gapEpisodes.length,
         networkStats: () => networkLayer ? networkStats : null,
         refreshDistanceMarks() {
           if (network) return;

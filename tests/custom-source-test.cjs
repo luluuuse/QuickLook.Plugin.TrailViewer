@@ -273,6 +273,20 @@ async function main() {
   check('host-owned custom sources are available in a new WebView origin',
     await hostedPage.locator('[data-provider]').filter({ hasText: 'Hosted source' }).count() === 1
       && await hostedPage.evaluate(() => window.trailViewer.layer()).then((key) => key.startsWith('custom.')));
+  const firstSettingsMessage = await hostedPage.evaluate(() =>
+    window.__hostedMessages.filter((message) => message.startsWith('settings\t')).at(-1) || '');
+  check('switching layer immediately sends the new layer to the host instead of the previous one',
+    firstSettingsMessage.includes('layer=custom.hosted'),
+    firstSettingsMessage);
+  await hostedPage.locator('.layer-category-button[data-layer="terrain"]').click();
+  await hostedPage.locator('[data-provider="terrain.openTopo"]').click();
+  const secondSettingsMessage = await hostedPage.evaluate(() =>
+    window.__hostedMessages.filter((message) => message.startsWith('settings\t')).at(-1) || '');
+  check('switching to a built-in provider immediately persists that provider to the host',
+    secondSettingsMessage.includes('layer=terrain.openTopo'),
+    secondSettingsMessage);
+  await hostedPage.locator('.layer-menu-toggle').click();
+  await hostedPage.locator('.layer-category-button[data-layer="custom"]').click();
   await hostedPage.locator('[data-custom-manage]').click();
   await hostedPage.locator('[data-custom-edit]').click();
   await hostedPage.locator('[name="name"]').fill('Hosted edit');
@@ -282,6 +296,15 @@ async function main() {
   check('editing a custom source sends the durable host copy',
     await hostedPage.evaluate(() => window.__hostedMessages.some((message) =>
       message.startsWith('custom-sources\t') && message.includes('"id":"custom.hosted"'))));
+  await hostedPage.goto(`${base}/viewer/index.html?src=../tests/fixtures/${fixture}&layer=custom.hosted`);
+  await hostedPage.waitForFunction(() => document.body.classList.contains('loaded'));
+  check('host-persisted custom layer parameter activates the custom source on load',
+    await hostedPage.evaluate(() => window.trailViewer.layer() === 'custom.hosted'));
+  await hostedPage.evaluate(() => localStorage.clear());
+  await hostedPage.goto(`${base}/viewer/index.html?src=../tests/fixtures/${fixture}&layer=custom.missing`);
+  await hostedPage.waitForFunction(() => document.body.classList.contains('loaded'));
+  check('a deleted host-persisted custom layer falls back to road.osm',
+    await hostedPage.evaluate(() => window.trailViewer.layer() === 'road.osm'));
   await hostedPage.close();
 
   const migrationPage = await browser.newPage({ viewport: { width: 1200, height: 800 }, locale: 'zh-CN' });

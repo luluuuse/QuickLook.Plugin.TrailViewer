@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { LAYERS, normalizeLayer } from '../../viewer/map-controls.js';
+import { URLSearchParams } from 'node:url';
+import { LAYERS, normalizeLayer, savedTileCache } from '../../viewer/map-controls.js';
 
 test('legacy layer categories map to the new grouped providers', () => {
   assert.equal(normalizeLayer('map'), 'road.osm');
@@ -41,4 +42,30 @@ test('unknown and missing layer values are rejected', () => {
   assert.equal(normalizeLayer('track'), null);
   assert.equal(normalizeLayer(null), null);
   assert.equal(normalizeLayer(undefined), null);
+});
+
+test('savedTileCache defaults cleanly, preserves unlimited 0 MB, and rejects removed 1024 MB', () => {
+  assert.deepEqual(
+    savedTileCache(new URLSearchParams()),
+    { enabled: true, maxMb: 512, maxAgeDays: 30 },
+  );
+  assert.deepEqual(
+    savedTileCache(new URLSearchParams('tileCache=1&tileCacheMaxMb=0&tileCacheDays=0')),
+    { enabled: true, maxMb: 0, maxAgeDays: 0 },
+  );
+  assert.deepEqual(
+    savedTileCache(new URLSearchParams('tileCacheMaxMb=1024')),
+    { enabled: true, maxMb: 512, maxAgeDays: 30 },
+  );
+  assert.deepEqual(
+    savedTileCache(
+      new URLSearchParams('tileCacheMaxMb=256'),
+      { enabled: false, maxMb: 0, maxAgeDays: 90 },
+    ),
+    { enabled: false, maxMb: 0, maxAgeDays: 90 },
+  );
+  assert.deepEqual(
+    savedTileCache(new URLSearchParams('tileCache=1&tileCacheMaxMb=2048&tileCacheDays=7')),
+    { enabled: true, maxMb: 2048, maxAgeDays: 7 },
+  );
 });

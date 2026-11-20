@@ -7,6 +7,7 @@ export function createLayerSettingsView({
   onToggle, onBack, onSettings, onNoMap, onClose, onCategory,
   onCustomManage, onCustomAdd, onClearCustom, onSubmitCustom,
   onConfigureTianditu, onRemoveTianditu,
+  onToggleTileCache, onSelectTileCacheMaxMb, onSelectTileCacheDays, onClearTileCache,
 }) {
   const bar = el('div', 'layer-switch leaflet-bar');
   const menuToggle = el('button', 'layer-menu-toggle');
@@ -153,7 +154,76 @@ export function createLayerSettingsView({
   settingsActions.append(configureButton, removeButton);
   keyRow.append(keyIdentity, settingsActions);
   keySection.append(keyRow);
-  settingsView.append(keySection);
+
+  const cacheSection = el('section', 'layer-settings-section layer-cache-section');
+  const cacheHeader = el('div', 'layer-cache-header');
+  const cacheHeading = el('span', 'layer-cache-heading', t('layer.cacheHeading'));
+  cacheHeading.dataset.labelKey = 'layer.cacheHeading';
+  const tileCacheToggle = el('button', 'layer-cache-toggle');
+  tileCacheToggle.type = 'button';
+  tileCacheToggle.dataset.tileCache = 'toggle';
+  tileCacheToggle.setAttribute('role', 'switch');
+  tileCacheToggle.setAttribute('aria-checked', 'true');
+  tileCacheToggle.title = t('layer.cacheToggleHint');
+  tileCacheToggle.setAttribute('aria-label', t('layer.cacheToggleHint'));
+  tileCacheToggle.addEventListener('click', () => onToggleTileCache?.());
+  cacheHeader.append(cacheHeading, tileCacheToggle);
+
+  const tileCacheOptions = el('div', 'layer-cache-options');
+
+  const limitRow = el('div', 'layer-cache-row');
+  const limitLabel = el('span', 'layer-cache-label', t('layer.cacheLimit'));
+  limitLabel.dataset.labelKey = 'layer.cacheLimit';
+  const limitChoices = el('div', 'layer-cache-choices');
+  limitChoices.setAttribute('role', 'radiogroup');
+  limitChoices.setAttribute('aria-label', t('layer.cacheLimit'));
+  const tileCacheLimitButtons = {};
+  for (const [mb, text] of [['256', '256 MB'], ['512', '512 MB'], ['2048', '2 GB'], ['0', '\u221e']]) {
+    const button = el('button', 'layer-cache-choice', text);
+    button.type = 'button';
+    button.setAttribute('role', 'radio');
+    button.dataset.tileCacheMb = mb;
+    button.setAttribute('aria-checked', 'false');
+    button.addEventListener('click', () => onSelectTileCacheMaxMb?.(Number(mb)));
+    tileCacheLimitButtons[mb] = button;
+    limitChoices.append(button);
+  }
+  limitRow.append(limitLabel, limitChoices);
+
+  const daysRow = el('div', 'layer-cache-row');
+  const daysLabel = el('span', 'layer-cache-label', t('layer.cacheRetention'));
+  daysLabel.dataset.labelKey = 'layer.cacheRetention';
+  const daysChoices = el('div', 'layer-cache-choices');
+  daysChoices.setAttribute('role', 'radiogroup');
+  daysChoices.setAttribute('aria-label', t('layer.cacheRetention'));
+  const tileCacheDaysButtons = {};
+  for (const days of ['7', '30', '90', '0']) {
+    const button = el('button', 'layer-cache-choice');
+    button.type = 'button';
+    button.setAttribute('role', 'radio');
+    button.dataset.tileCacheDays = days;
+    button.setAttribute('aria-checked', 'false');
+    button.addEventListener('click', () => onSelectTileCacheDays?.(Number(days)));
+    tileCacheDaysButtons[days] = button;
+    daysChoices.append(button);
+  }
+  daysRow.append(daysLabel, daysChoices);
+  tileCacheOptions.append(limitRow, daysRow);
+
+  const cacheFooter = el('div', 'layer-cache-footer');
+  const tileCacheStatus = el('span', 'layer-cache-status', t('layer.cacheLoading'));
+  const tileCacheClearButton = el('button', 'layer-cache-clear');
+  tileCacheClearButton.type = 'button';
+  tileCacheClearButton.dataset.tileCache = 'clear';
+  tileCacheClearButton.title = t('layer.cacheClearTitle');
+  tileCacheClearButton.setAttribute('aria-label', t('layer.cacheClearTitle'));
+  const tileCacheClearLabel = el('span', 'layer-cache-clear-label', t('layer.cacheClear'));
+  tileCacheClearButton.append(iconElement('clear', { size: 12 }), tileCacheClearLabel);
+  tileCacheClearButton.addEventListener('click', () => onClearTileCache?.());
+  cacheFooter.append(tileCacheStatus, tileCacheClearButton);
+
+  cacheSection.append(cacheHeader, tileCacheOptions, cacheFooter);
+  settingsView.append(keySection, cacheSection);
 
   const customView = el('section', 'layer-custom-view');
   customView.hidden = true;
@@ -198,5 +268,7 @@ export function createLayerSettingsView({
     customManageButton, customCount, customEmpty, customList, customAddButton,
     configureButton, removeButton, keyStatus, customForm,
     customFormView: customForm,
+    tileCacheToggle, tileCacheOptions, tileCacheLimitButtons, tileCacheDaysButtons,
+    tileCacheStatus, tileCacheClearButton, tileCacheClearLabel,
   };
 }

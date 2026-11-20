@@ -543,6 +543,89 @@ async function main() {
     await page.screenshot({ path: shot });
   }
 
+  // 17. Telemetry boilerplate in KML descriptions is stripped from cards, photo meta and overview, while
+  // missing timestamps are backfilled from ExtendedData Time or description time.
+  const syntheticTelemetryKml = `<?xml version="1.0" encoding="utf-8"?>
+  <kml xmlns="http://www.opengis.net/kml/2.2">
+    <Document>
+      <name>Telemetry Cleanup</name>
+      <Placemark>
+        <name>Track</name>
+        <LineString><coordinates>114.3000,30.5000,100 114.3100,30.5100,500 114.3200,30.5200,800</coordinates></LineString>
+      </Placemark>
+      <Placemark>
+        <name>Start</name>
+        <description><![CDATA[<div>经度：114.300000</div><div>纬度：30.500000</div><div>海拔：100.4</div><div>时间：2026-10-03 12:24:22</div>]]></description>
+        <Point><coordinates>114.300000,30.500000,100.4</coordinates></Point>
+      </Placemark>
+      <Placemark>
+        <name>Turnoff</name>
+        <description><![CDATA[<div>经度：114.310000</div><div>纬度：30.510000</div><div>海拔：512.2</div><div>时间：2026-10-03 14:00:00</div>]]></description>
+        <ExtendedData>
+          <Data name="Time"><value>1791001462631</value></Data>
+        </ExtendedData>
+        <Point><coordinates>114.310000,30.510000,512.2</coordinates></Point>
+      </Placemark>
+      <Placemark>
+        <name>Lookout</name>
+        <description><![CDATA[<div><img src="https://example.test/lookout.jpg" />Ridge fork ahead</div></br><div>经度：114.320000</div><div>纬度：30.520000</div><div>海拔：825.0</div><div>时间：2026-10-03 15:10:00</div>]]></description>
+        <Point><coordinates>114.320000,30.520000,825.0</coordinates></Point>
+      </Placemark>
+    </Document>
+  </kml>`;
+  await page.route((url) => url.pathname.endsWith('/generated-telemetry-waypoints.kml'),
+    (route) => route.fulfill({ body: syntheticTelemetryKml, contentType: 'application/vnd.google-earth.kml+xml' }));
+  await page.goto(`${base}/viewer/index.html?src=../generated-telemetry-waypoints.kml`);
+  await page.waitForFunction(() => document.body.classList.contains('loaded'));
+  await waitForLayout(page);
+
+  await page.locator('.gpx-pin[title="Turnoff"]').click();
+  await settlePopup(page, '.place-popup', 1);
+  const turnoffCard = await page.evaluate(() => ({
+    hasPlaceText: document.querySelector('.place-popup .place-text') !== null,
+    meta: document.querySelector('.place-popup .place-card-meta')?.textContent || '',
+    cardText: document.querySelector('.place-popup .place-card')?.textContent || '',
+  }));
+  check('telemetry-only plain card hides boilerplate text and backfills ExtendedData time',
+    turnoffCard.hasPlaceText === false
+      && !/经度|纬度/.test(turnoffCard.cardText)
+      && /\d{2}\/\d{2}\/2026, \d{2}:\d{2}\s*·\s*512 m/.test(turnoffCard.meta),
+    JSON.stringify(turnoffCard));
+
+  await page.locator('.gpx-pin[title="Start"]').click();
+  await settlePopup(page, '.place-popup', 1);
+  const startCard = await page.evaluate(() => ({
+    hasPlaceText: document.querySelector('.place-popup .place-text') !== null,
+    meta: document.querySelector('.place-popup .place-card-meta')?.textContent || '',
+  }));
+  check('telemetry-only start card backfills description time with no place-text',
+    startCard.hasPlaceText === false && /10\/03\/2026, 12:24\s*·\s*100 m/.test(startCard.meta),
+    JSON.stringify(startCard));
+
+  await page.locator('.place-popup .place-card-close').click();
+  await settlePopup(page, '.place-popup', 0);
+
+  await openCard('Lookout');
+  await openFromCard();
+  const lookoutViewer = await viewer();
+  check('photo viewer meta keeps real user note and omits duplicated telemetry labels',
+    /Ridge fork ahead/.test(lookoutViewer.meta) && !/经度|纬度/.test(lookoutViewer.meta),
+    lookoutViewer.meta);
+  await page.locator('.photo-close').click();
+  await page.waitForFunction(() => !window.trailViewer.photos.isOpen());
+
+  await page.locator('.waypoint-overview-switch button').click();
+  const overviewRows = await page.evaluate(() =>
+    [...document.querySelectorAll('.waypoint-overview-item')].map((node) => ({
+      name: node.querySelector('.heading strong')?.textContent || '',
+      description: node.querySelector('.description')?.textContent || null,
+    })));
+  check('waypoint overview omits boilerplate descriptions and keeps real user notes',
+    overviewRows.find((r) => r.name === 'Start')?.description === null
+      && overviewRows.find((r) => r.name === 'Turnoff')?.description === null
+      && overviewRows.find((r) => r.name === 'Lookout')?.description === 'Ridge fork ahead',
+    JSON.stringify(overviewRows));
+
   check('no page errors', pageErrors.length === 0, pageErrors.join('; '));
   check('no CSP violations', cspViolations.length === 0, cspViolations.join('; ').slice(0, 300));
 

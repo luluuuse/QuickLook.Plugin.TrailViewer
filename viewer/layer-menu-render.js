@@ -77,11 +77,79 @@ export function renderLayerMenu({
   renderCustomList();
 }
 
+export function formatCacheBytes(bytes) {
+  if (!Number.isFinite(bytes) || bytes <= 0) return '0 B';
+  if (bytes < 1024) return `${Math.round(bytes)} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+}
+
+export function renderTileCacheSettings({
+  tileCacheToggle, tileCacheOptions, tileCacheLimitButtons, tileCacheDaysButtons,
+  tileCacheStatus, tileCacheClearButton, tileCacheClearLabel, state, hasHost, t,
+}) {
+  if (!tileCacheToggle) return;
+  const enabled = Boolean(state.enabled);
+  tileCacheToggle.classList.toggle('active', enabled);
+  tileCacheToggle.setAttribute('aria-checked', String(enabled));
+  tileCacheToggle.textContent = t(enabled ? 'layer.cacheEnabled' : 'layer.cacheDisabled');
+  tileCacheToggle.title = t('layer.cacheToggleHint');
+  tileCacheToggle.setAttribute('aria-label', tileCacheToggle.title);
+
+  if (tileCacheOptions) {
+    tileCacheOptions.classList.toggle('is-disabled', !enabled);
+  }
+  for (const [mb, button] of Object.entries(tileCacheLimitButtons || {})) {
+    const selected = Number(mb) === state.maxMb;
+    button.classList.toggle('selected', selected);
+    button.setAttribute('aria-checked', String(selected));
+    button.disabled = !enabled;
+    if (mb === '0') {
+      const label = t('layer.cacheUnlimited');
+      button.title = label;
+      button.setAttribute('aria-label', label);
+    }
+  }
+  for (const [days, button] of Object.entries(tileCacheDaysButtons || {})) {
+    const numeric = Number(days);
+    const selected = numeric === state.maxAgeDays;
+    button.classList.toggle('selected', selected);
+    button.setAttribute('aria-checked', String(selected));
+    button.disabled = !enabled;
+    button.textContent = numeric === 0 ? t('layer.cacheForever') : t('layer.cacheDays', { days: numeric });
+  }
+  if (tileCacheStatus) {
+    if (!hasHost) {
+      tileCacheStatus.textContent = t('layer.cacheHostOnly');
+    } else if (!state.statsLoaded) {
+      tileCacheStatus.textContent = t('layer.cacheLoading');
+    } else if (state.stats.tileCount <= 0) {
+      tileCacheStatus.textContent = t('layer.cacheEmpty');
+    } else {
+      tileCacheStatus.textContent = t('layer.cacheUsage', {
+        size: formatCacheBytes(state.stats.totalBytes),
+        count: state.stats.tileCount.toLocaleString(),
+      });
+    }
+  }
+  if (tileCacheClearButton && tileCacheClearLabel) {
+    const armed = Boolean(state.clearArmed);
+    tileCacheClearButton.classList.toggle('confirm', armed);
+    tileCacheClearLabel.textContent = t(armed ? 'layer.cacheClearConfirm' : 'layer.cacheClear');
+    tileCacheClearButton.title = t(armed ? 'layer.cacheClearConfirm' : 'layer.cacheClearTitle');
+    tileCacheClearButton.setAttribute('aria-label', tileCacheClearButton.title);
+    const canClear = !hasHost || !state.statsLoaded || state.stats.tileCount > 0;
+    tileCacheClearButton.disabled = hasHost && state.statsLoaded && state.stats.tileCount === 0;
+    tileCacheClearButton.dataset.clearable = String(canClear);
+  }
+}
+
 export function relabelLayerSwitcher({
   categoryButtons, categoryLabels, layers, t, menuHeading, customViewOpen, customManager,
   settingsViewOpen, backButton, settingsButton, closeButton, providerButtons, providerLabels,
   providers, menu, sourceEmpty, categoryKey, updateNoMapButton, updateMenuButton,
-  relabelKeyActions, renderMenu,
+  relabelKeyActions, renderTileCache, renderMenu,
 }) {
   for (const [key, button] of Object.entries(categoryButtons)) {
     categoryLabels[key].textContent = t(layers[key].label);
@@ -129,6 +197,7 @@ export function relabelLayerSwitcher({
   updateNoMapButton();
   updateMenuButton();
   relabelKeyActions();
+  renderTileCache?.();
   customManager.renderList();
   if (menu && !menu.hidden) renderMenu();
 }

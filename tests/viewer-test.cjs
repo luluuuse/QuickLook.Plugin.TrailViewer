@@ -8,6 +8,7 @@ const fs = require('fs');
 const path = require('path');
 const {
   launchBrowser,
+  waitForLayout,
   waitForTiles,
 } = require('./support/browser.cjs');
 const { createArtifacts } = require('./support/artifacts.cjs');
@@ -248,6 +249,65 @@ async function main() {
     return mismatch;
   });
   check('spatial index', 'matches the linear nearest-point result', indexCheck, -1);
+
+  // Dense tracks avoid per-point circleMarker canvases and keep the SVG track buffer populated across a long drag.
+  {
+    let denseXml = '<?xml version="1.0"?><gpx version="1.1" xmlns="http://www.topografix.com/GPX/1/1">'
+      + '<wpt lat="30.500" lon="117.800"><name>Start</name></wpt>'
+      + '<wpt lat="30.580" lon="117.840"><name>End</name></wpt>'
+      + '<trk><name>DenseDrag</name><trkseg>';
+    for (let i = 0; i < 2000; i += 1) {
+      const f = i / 1999;
+      const lat = 30.5 + f * 0.08 + Math.sin(f * 40) * 0.002;
+      const lon = 117.8 + f * 0.04 + Math.cos(f * 35) * 0.002;
+      denseXml += `<trkpt lat="${lat.toFixed(6)}" lon="${lon.toFixed(6)}"><ele>${300 + i * 0.2}</ele></trkpt>`;
+    }
+    denseXml += '</trkseg></trk></gpx>';
+    await page.route((url) => url.pathname.endsWith('/dense-drag.gpx'),
+      (route) => route.fulfill({ body: denseXml, contentType: 'application/gpx+xml' }));
+
+    await page.goto(`${base}/viewer/index.html?src=../dense-drag.gpx&layer=none&pins=1`);
+    await page.waitForFunction(() => document.body.classList.contains('loaded'));
+    await waitForLayout(page);
+
+    const canvasOverlays = await page.locator('#map .leaflet-overlay-pane canvas').count();
+    check('dense drag regression', 'no per-point canvas overlay when markers are on', canvasOverlays, 0);
+
+    await page.evaluate(() => { window.trailViewer.map.setZoom(15, { animate: false }); });
+    await page.waitForFunction(() => window.trailViewer.map.getZoom() === 15);
+    await waitForLayout(page);
+
+    const viewport = page.viewportSize();
+    const startX = Math.round(viewport.width * 0.5);
+    const startY = Math.round(viewport.height * 0.5);
+    await page.mouse.move(startX, startY);
+    await page.mouse.down();
+    // Move > 110% of the viewport height without releasing mouse.up, forcing a live SVG buffer refresh mid-drag.
+    const steps = 12;
+    const totalDragY = Math.round(viewport.height * 1.15);
+    for (let step = 1; step <= steps; step += 1) {
+      await page.mouse.move(startX, startY - Math.round((totalDragY * step) / steps), { steps: 2 });
+    }
+    await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+
+    const midDrag = await page.evaluate(() => {
+      const svg = document.querySelector('#map .leaflet-overlay-pane svg');
+      const rect = svg?.getBoundingClientRect();
+      const d = document.querySelector('#map .leaflet-overlay-pane path.gpx-track')?.getAttribute('d') || '';
+      return {
+        coversViewport: Boolean(rect
+          && rect.left <= 2
+          && rect.top <= 2
+          && rect.right >= window.innerWidth - 2
+          && rect.bottom >= window.innerHeight - 2),
+        hasPath: d.length > 0,
+      };
+    });
+    await page.mouse.up();
+    await page.unroute((url) => url.pathname.endsWith('/dense-drag.gpx'));
+    check('dense drag regression', 'SVG overlay buffer covers full viewport mid-drag', midDrag.coversViewport, true);
+    check('dense drag regression', 'track path remains drawn mid-drag', midDrag.hasPath, true);
+  }
 
   for (const e of pageErrors) failures.push(`page error: ${e}`);
   await artifacts.capture(page, failures, pageErrors);

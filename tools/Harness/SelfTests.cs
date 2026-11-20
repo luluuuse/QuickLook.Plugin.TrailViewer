@@ -31,6 +31,7 @@ internal static class SelfTests
             TestClipboardRetry();
             TestPreferences(temporary);
             TestCustomSources(temporary);
+            TestTileCache(temporary);
             TestProductIdentity(temporary);
             TestTianditu(temporary);
             TestViewerBuildId(temporary);
@@ -345,9 +346,141 @@ internal static class SelfTests
         Check("Tianditu provider IDs are valid map preferences",
             ViewerPreferences.QueryFromFile(path).Contains("layer=satellite.tianditu"),
             ViewerPreferences.QueryFromFile(path));
+        ViewerPreferences.SaveFromQueryToFile("layer=custom.mwkubd7l0", path);
+        Check("custom source IDs are persisted across previews",
+            ViewerPreferences.QueryFromFile(path).Contains("layer=custom.mwkubd7l0"),
+            ViewerPreferences.QueryFromFile(path));
+        ViewerPreferences.SaveFromQueryToFile("layer=custom.", path);
+        ViewerPreferences.SaveFromQueryToFile("layer=custom.bad%20id", path);
+        Check("malformed custom source IDs do not overwrite saved layer",
+            ViewerPreferences.QueryFromFile(path).Contains("layer=custom.mwkubd7l0"),
+            ViewerPreferences.QueryFromFile(path));
         Check("no temporary preference files are left",
             !Directory.GetFiles(Path.GetDirectoryName(path), "*.tmp").Any()
             && !Directory.GetFiles(Path.GetDirectoryName(path), "*.old").Any());
+
+        var cachePrefsPath = Path.Combine(temporary, "settings", "tile-cache-settings.txt");
+        var defaultCacheOpts = ViewerPreferences.ReadTileCacheOptions(cachePrefsPath);
+        Check("tile cache options default to enabled, 512 MB and 30 days",
+            defaultCacheOpts.Enabled && defaultCacheOpts.MaxMegabytes == 512 && defaultCacheOpts.MaxAgeDays == 30
+            && !defaultCacheOpts.IsUnlimited);
+        ViewerPreferences.SaveFromQueryToFile("tileCache=0&tileCacheMaxMb=2048&tileCacheDays=0", cachePrefsPath);
+        var updatedCacheOpts = ViewerPreferences.ReadTileCacheOptions(cachePrefsPath);
+        Check("tile cache options persist valid finite limit values",
+            !updatedCacheOpts.Enabled && updatedCacheOpts.MaxMegabytes == 2048 && updatedCacheOpts.MaxAgeDays == 0
+            && !updatedCacheOpts.IsUnlimited);
+        ViewerPreferences.SaveFromQueryToFile("tileCache=1&tileCacheMaxMb=0&tileCacheDays=7", cachePrefsPath);
+        var unlimitedCacheOpts = ViewerPreferences.ReadTileCacheOptions(cachePrefsPath);
+        Check("tile cache options persist unlimited capacity mode",
+            unlimitedCacheOpts.Enabled && unlimitedCacheOpts.MaxMegabytes == 0 && unlimitedCacheOpts.MaxAgeDays == 7
+            && unlimitedCacheOpts.IsUnlimited);
+        ViewerPreferences.SaveFromQueryToFile("tileCache=bad&tileCacheMaxMb=1024&tileCacheDays=12", cachePrefsPath);
+        ViewerPreferences.SaveFromQueryToFile("tileCache=bad&tileCacheMaxMb=9999&tileCacheDays=12", cachePrefsPath);
+        var preservedCacheOpts = ViewerPreferences.ReadTileCacheOptions(cachePrefsPath);
+        Check("invalid or removed tile cache option values do not overwrite saved settings",
+            preservedCacheOpts.Enabled && preservedCacheOpts.MaxMegabytes == 0 && preservedCacheOpts.MaxAgeDays == 7
+            && preservedCacheOpts.IsUnlimited);
+    }
+
+    private static void TestTileCache(string temporary)
+    {
+        var cacheDir = Path.Combine(temporary, "tile-cache");
+        var cache = new TileCache(cacheDir);
+        var customJson = "["
+            + "{\"id\":\"custom.g\",\"name\":\"G\",\"url\":\"https://mts1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}\"},"
+            + "{\"id\":\"custom.sub\",\"name\":\"Sub\",\"url\":\"https://{s}.tiles.example.org/{z}/{x}/{y}.png\",\"subdomains\":\"ab\"}"
+            + "]";
+        var matchers = TileCache.BuildCustomHostMatchers(customJson);
+
+        Check("built-in tile subdomains normalize to one cache key",
+            TileCache.TryBuildKey(new Uri("https://a.tile.openstreetmap.fr/hot/13/100/200.png"), matchers, out var osmA)
+            && TileCache.TryBuildKey(new Uri("https://c.tile.openstreetmap.fr/hot/13/100/200.png"), matchers, out var osmC)
+            && osmA == osmC && osmA == "tile.openstreetmap.fr/hot/13/100/200.png",
+            osmA);
+
+        Check("Tianditu keys strip personal tokens and normalize subdomains",
+            TileCache.TryBuildKey(new Uri("https://t2.tianditu.gov.cn/img_w/wmts?SERVICE=WMTS&tk=secret123&TILEMATRIX=10"), matchers, out var tdtA)
+            && TileCache.TryBuildKey(new Uri("https://t6.tianditu.gov.cn/img_w/wmts?TILEMATRIX=10&SERVICE=WMTS&tk=other456"), matchers, out var tdtB)
+            && tdtA == tdtB && !tdtA.Contains("secret123") && !tdtA.Contains("tk="),
+            tdtA);
+
+        var hasGoogleKey = TileCache.TryBuildKey(
+            new Uri("https://mts1.google.com/vt/lyrs=y&x=1&y=2&z=3"), matchers, out var googleKey);
+        var hasSubKey = TileCache.TryBuildKey(
+            new Uri("https://b.tiles.example.org/10/1/2.png"), matchers, out var subKey);
+        Check("custom tile sources including wildcard subdomains and Google satellites are cached",
+            hasGoogleKey
+            && googleKey.StartsWith("mts.google.com/vt", StringComparison.Ordinal)
+            && hasSubKey
+            && subKey == ".tiles.example.org/10/1/2.png",
+            googleKey + " | " + subKey);
+
+        Check("non-tile images, Esri non-tile paths and virtual hosts are never cached",
+            !TileCache.TryBuildKey(new Uri("https://example.com/photos/trail.jpg"), matchers, out _)
+            && !TileCache.TryBuildKey(new Uri("https://server.arcgisonline.com/other/asset.png"), matchers, out _)
+            && !TileCache.TryBuildKey(new Uri("https://app-1234.trailviewer.example/tile.png"), matchers, out _)
+            && !TileCache.TryBuildKey(new Uri("https://file.trailviewer.example/photo.png"), matchers, out _));
+
+        var pngBytes = new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 1, 2, 3, 4 };
+        var jpegBytes = new byte[] { 0xFF, 0xD8, 0xFF, 0xE0, 5, 6, 7 };
+        var htmlBytes = Encoding.UTF8.GetBytes("<html>error</html>");
+        Check("valid image signatures pass and HTML/empty payloads are rejected",
+            TileCache.TryDetectImageContentType(pngBytes, "text/plain", out _, out var pngType) && pngType == "image/png"
+            && TileCache.TryDetectImageContentType(jpegBytes, null, out _, out var jpgType) && jpgType == "image/jpeg"
+            && !TileCache.TryDetectImageContentType(htmlBytes, "image/png", out _, out _)
+            && !TileCache.TryDetectImageContentType(Array.Empty<byte>(), "image/png", out _, out _)
+            && !cache.Store(osmA, htmlBytes, "text/html", new TileCacheOptions(true, 512, 30), DateTime.UtcNow));
+
+        var now = new DateTime(2026, 11, 20, 12, 0, 0, DateTimeKind.Utc);
+        var opts30 = new TileCacheOptions(true, 512, 30);
+        Check("stored fresh tile reads back with exact payload and content type",
+            cache.Store(osmA, pngBytes, "image/png", opts30, now)
+            && cache.TryRead(osmA, opts30, now.AddDays(5), out var freshEntry) == TileLookupKind.Fresh
+            && freshEntry != null && freshEntry.ContentType == "image/png" && freshEntry.Data.SequenceEqual(pngBytes));
+
+        Check("disabled cache returns Miss without breaking stored entries",
+            cache.TryRead(osmA, new TileCacheOptions(false, 512, 30), now, out _) == TileLookupKind.Miss);
+
+        Check("expired tile returns Expired with stale bytes, while maxAgeDays=0 stays Fresh",
+            cache.TryRead(osmA, opts30, now.AddDays(31), out var staleEntry) == TileLookupKind.Expired
+            && staleEntry != null && staleEntry.Data.SequenceEqual(pngBytes)
+            && cache.TryRead(osmA, new TileCacheOptions(true, 512, 0), now.AddDays(365), out _) == TileLookupKind.Fresh);
+
+        var offlinePruned = cache.Prune(opts30, now.AddDays(31), removeExpired: false);
+        Check("offline prune preserves expired tiles for fallback",
+            offlinePruned.TileCount == 1
+            && cache.TryRead(osmA, opts30, now.AddDays(31), out _) == TileLookupKind.Expired);
+
+        var onlinePruned = cache.Prune(opts30, now.AddDays(31), removeExpired: true);
+        Check("online prune removes expired tiles",
+            onlinePruned.TileCount == 0 && cache.GetStats().TileCount == 0);
+
+        var tinyPayload = new byte[1024];
+        Buffer.BlockCopy(pngBytes, 0, tinyPayload, 0, pngBytes.Length);
+        var optsForever = new TileCacheOptions(true, 512, 0);
+        cache.Store("tile.openstreetmap.fr/hot/1/1/1.png", tinyPayload, "image/png", optsForever, now.AddMinutes(-30));
+        cache.Store("tile.openstreetmap.fr/hot/1/1/2.png", tinyPayload, "image/png", optsForever, now.AddMinutes(-20));
+        cache.Store("tile.openstreetmap.fr/hot/1/1/3.png", tinyPayload, "image/png", optsForever, now.AddMinutes(-10));
+        var stats3 = cache.GetStats();
+        Check("stats report accurate file count and byte total",
+            stats3.TileCount == 3 && stats3.TotalBytes == 3 * (5 + tinyPayload.Length));
+
+        var unlimitedStats = cache.Prune(new TileCacheOptions(true, 0, 0), now, removeExpired: false);
+        Check("unlimited storage limit (0) preserves all cached tiles during Prune",
+            unlimitedStats.TileCount == 3 && unlimitedStats.TotalBytes == stats3.TotalBytes);
+
+        // Two tiles weigh 2058 bytes; a 2500-byte override (90% target = 2250 bytes) evicts only the oldest tile.
+        var lruStats = cache.Prune(new TileCacheOptions(true, 512, 0, maxBytesOverride: 2500), now, removeExpired: false);
+        Check("LRU eviction removes oldest-accessed tile while keeping newer entries",
+            lruStats.TileCount == 2
+            && cache.TryRead("tile.openstreetmap.fr/hot/1/1/1.png", optsForever, now, out _) == TileLookupKind.Miss
+            && cache.TryRead("tile.openstreetmap.fr/hot/1/1/2.png", optsForever, now, out _) == TileLookupKind.Fresh
+            && cache.TryRead("tile.openstreetmap.fr/hot/1/1/3.png", optsForever, now, out _) == TileLookupKind.Fresh,
+            $"count={lruStats.TileCount}");
+
+        cache.Store("tile.openstreetmap.fr/hot/1/1/1.png", pngBytes, "image/png", optsForever, now);
+        var cleared = cache.Clear();
+        Check("Clear removes all cached tiles", cleared.TileCount == 0 && cleared.TotalBytes == 0);
     }
 
     private static void TestCustomSources(string temporary)
@@ -695,13 +828,24 @@ internal static class SelfTests
     private static void TestViewerMessages()
     {
         string routed = null;
+        var statsRequested = false;
+        var cacheCleared = false;
         var router = new ViewerMessageRouter(new ViewerMessageActions
         {
             BeginAttachment = body => routed = body,
+            RequestTileCacheStats = () => statsRequested = true,
+            ClearTileCache = () => cacheCleared = true,
         });
         router.Route("attachmentbegin\tjob\theader");
+        router.Route("tile-cache\tstats");
+        router.Route("tile-cache\tclear");
         Check("the host message router dispatches attachment headers",
             routed == "job\theader", routed);
+        Check("the host message router dispatches tile cache stats and clear commands",
+            statsRequested && cacheCleared);
+        Check("tile cache host messages format byte counts and tile totals",
+            ViewerMessages.TileCacheStats(1024, 3) == "tileCacheStats\t1024\t3"
+            && ViewerMessages.TileCacheCleared(0, 0) == "tileCacheCleared\t0\t0");
         Check("clipboard failure uses a string WebMessage with an explicit false flag",
             ViewerMessages.ClipboardResult("clip-1", false, "denied")
                 == "clipboardResult\tclip-1\t0\tdenied");

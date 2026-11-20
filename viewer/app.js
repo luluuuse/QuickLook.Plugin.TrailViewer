@@ -16,6 +16,7 @@ import {
   loadCustomProviders,
   createLocateControl,
   savedLayer,
+  savedTileCache,
 } from './map-controls.js';
 import {
   formatCoord,
@@ -74,6 +75,7 @@ const {
   installTextInputReporting,
 } = hostBridge;
 const runtimeConfig = window.__TRAILVIEWER_RUNTIME_CONFIG__ || {};
+const initialTileCache = savedTileCache(params, runtimeConfig.tileCache);
 let runtimeTiandituKey = runtimeConfig.direct === true
   && /^[0-9a-fA-F]{32}$/.test(runtimeConfig.tiandituKey || '')
   ? runtimeConfig.tiandituKey
@@ -180,12 +182,15 @@ const trackLayer = createTrackLayer({
   onFocusBounds: (bounds, options) => mapViewController?.focusBounds(bounds, options),
 });
 let activeTrackLayer = null;
+let activeProfile = null;
 function focusSplit(split) {
   if (!split) {
     activeTrackLayer?.clearSplitHighlight();
+    activeProfile?.clearSplitFocus();
     return;
   }
   const highlight = activeTrackLayer?.highlightRange(split.fromMeters, split.toMeters);
+  activeProfile?.setSplitFocus(split);
   if (highlight?.bounds.isValid()) {
     mapViewController?.focusBounds(highlight.bounds, { maxZoom: 16, animate: true });
   }
@@ -256,15 +261,22 @@ const pressKey = keyboardController.pressKey;
 const onKeyDown = keyboardController.onKeyDown;
 
 /** Keep the host's origin-independent copy in step with what the page is showing. */
-function syncPreferences() {
+function syncPreferences(layerOverride = null) {
   const settings = overlayExport?.settings() || { size: '9:16', ink: 'black', scrim: 'none' };
+  const tileCache = layerSwitch?.tileCacheSettings() || initialTileCache;
+  const activeLayer = typeof layerOverride === 'string' && layerOverride
+    ? layerOverride
+    : (layerSwitch?.current() || savedLayer(params));
   const values = new URLSearchParams({
     lang: getLang(),
-    layer: layerSwitch?.current() || savedLayer(params),
+    layer: activeLayer,
     pins: waypointController.visible() ? '1' : '0',
     exportSize: settings.size,
     exportInk: settings.ink,
     exportScrim: settings.scrim,
+    tileCache: tileCache.enabled ? '1' : '0',
+    tileCacheMaxMb: String(tileCache.maxMb),
+    tileCacheDays: String(tileCache.maxAgeDays),
   });
   post(`settings\t${values.toString()}`);
 }
@@ -364,8 +376,14 @@ async function main() {
   // Drawn before the map: the fit below needs to know whether the panel is there, and the panel's own height
   // is fixed in CSS, so the map never has to be told its size changed.
   const profile = elevations ? profileController.render(gpx, elevations) : null;
+  activeProfile = profile;
   timing.prepareMs = performance.now() - started;
-  const map = L.map('map', { keyboard: false, worldCopyJump: false });
+  const vectorRenderer = L.svg({ padding: 1 });
+  const map = L.map('map', {
+    keyboard: false,
+    worldCopyJump: false,
+    renderer: vectorRenderer,
+  });
   map.getContainer().tabIndex = -1;
   installLeafletIcons(map, { closeLabel: () => t('tool.close') });
   map.attributionControl.setPrefix('<a href="https://leafletjs.com" target="_blank">Leaflet</a>');
@@ -374,7 +392,7 @@ async function main() {
   const tracks = trackLayer.draw(map, gpx, routeModel);
   activeTrackLayer = tracks;
   const waypointBounds = waypointController.draw(
-    map, gpx, tracks.segments, tracks.navigationMarks, routeModel,
+    map, gpx, tracks.segments, tracks.navigationMarks, routeModel, tracks.annotationCount,
   );
   tracks.bounds.extend(waypointBounds);
   const bounds = tracks.bounds;
@@ -509,6 +527,16 @@ async function main() {
     onRemoveTianditu: () => {
       if (hasQuickLookHost) post(`tianditu-key\tremove\t${getLang()}`);
     },
+    hasHost: hasQuickLookHost,
+    tileCacheConfig: initialTileCache,
+    onTileCacheChange: () => syncPreferences(),
+    onRequestTileCacheStats: () => {
+      if (hasQuickLookHost) post('tile-cache\tstats');
+    },
+    onClearTileCache: () => {
+      if (hasQuickLookHost) post('tile-cache\tclear');
+      else showToast(t('layer.cacheHostOnlyToast'), 4000);
+    },
   }); // after the view is set: the grid needs the map bounds
   layerSwitch = switcher;
   // A file that draws no dots and has no waypoints gets no switch: there is nothing for it to show or hide.
@@ -535,6 +563,7 @@ async function main() {
     toolboxController.relabel();
     waypointController.relabel();
     repaintLocalized();
+    activeProfile?.refreshSplitFocus();
     activeTrackLayer?.refreshDistanceMarks();
     if (scrub?.point()) scrub.refresh();
     // Popup content is built on open, so the open one is closed and opened again to be typed in the new

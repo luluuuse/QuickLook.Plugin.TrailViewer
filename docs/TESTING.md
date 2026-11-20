@@ -69,8 +69,9 @@ Build workflow 使用声明的最低 Node 20，Release workflow 使用 Node 22�
 当前专项入口：
 
 - `tests/unit/icons.test.mjs`：图标注册表、尺寸、描边和未知图标回退。
-- `tests/unit/geo.test.mjs`、`tests/unit/gpx.test.mjs`、`tests/unit/kml.test.mjs`、`tests/unit/host-bridge.test.mjs`：
-  大圆距离/方位角、GPX/KML 解析边界与 HTML 图片白名单，以及 WebMessage 桥接分发与剪贴板合并失败路径。
+- `tests/unit/geo.test.mjs`、`tests/unit/gpx.test.mjs`、`tests/unit/kml.test.mjs`、`tests/unit/waypoint-description.test.mjs`
+  与 `tests/unit/host-bridge.test.mjs`：大圆距离/方位角、GPX/KML 解析边界与 HTML 图片白名单、遥测模板清洗与
+  防误伤保护（含缺失时间戳回填），以及 WebMessage 桥接分发与剪贴板合并失败路径。
 - `tests/unit/weather.test.mjs`：起点、终点、顶点、无坐标文件、缩放级别和 Windy 链接格式。
 - `tests/icons-test.cjs`：全部控件/数据符号、Leaflet 适配、激活态和纯文字分段列头。
   另覆盖六齿设置齿轮、四角取景框、标题栏无底图网格、四类图源 B 方案图标和分类悬停提示。
@@ -110,7 +111,8 @@ Build workflow 使用声明的最低 Node 20，Release workflow 使用 Node 22�
   撤回失效）、标准化准星与轻量标签、地图手势、快捷键、右侧布局、工具箱内导出页和彩色天气图钉。
 - `tests/photo-test.cjs`：照片卡片“整卡即照片（竖幅 4:3）+ 底部渐隐信息 + 圆形下一张箭头与位置进度”与
   无照片卡片同套外观及 `--panel` 单层透明度、卡片不再有坐标与“查看原图”按钮、点照片进入全览、“下一张”
-  跨标记点翻页并推进进度、选中标记点的标准化菱形准星精确居中（`dx ≤ 1 px / dy ≤ 1.5 px`）与暖金发光。
+  跨标记点翻页并推进进度、选中标记点的标准化菱形准星精确居中（`dx ≤ 1 px / dy ≤ 1.5 px`）与暖金发光，
+  以及普通卡片、全览大图顶栏和标记点列表中遥测模板清洗与缺失时间回填的端到端校验。
 
 ## 测试原则
 

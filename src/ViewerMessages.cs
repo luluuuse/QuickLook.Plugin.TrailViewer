@@ -26,5 +26,11 @@ internal static class ViewerMessages
 
     internal static string PressKey(string key) => $"pressKey\t{Encode(key)}";
 
+    internal static string TileCacheStats(long totalBytes, int tileCount) =>
+        $"tileCacheStats\t{totalBytes}\t{tileCount}";
+
+    internal static string TileCacheCleared(long totalBytes, int tileCount) =>
+        $"tileCacheCleared\t{totalBytes}\t{tileCount}";
+
     private static string Encode(string value) => Uri.EscapeDataString(value ?? "");
 }

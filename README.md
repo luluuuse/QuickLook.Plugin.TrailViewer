@@ -76,8 +76,7 @@ Supported inputs:
 FIT previews focus on route data. Recorded heart rate can be overlaid on the profile. Laps, cadence, power,
 temperature and workout steps are not shown in the first version.
 
-Files with more than 20,000 recorded points still draw the route and endpoints but stop creating a clickable
-marker for every sample. Invalid XML produces an explicit error page with the parser message.
+Long tracks render continuously with route lines, endpoints and sampled waypoints, skipping individual per-sample markers to stay smooth while panning and zooming. Invalid XML produces an explicit error page with the parser message.
 Each input file is limited to 64 MB.
 
 ## Privacy

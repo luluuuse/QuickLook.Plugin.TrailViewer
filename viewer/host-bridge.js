@@ -118,6 +118,10 @@ export function createHostBridge() {
         api.setTiandituKey(decodeMessage(parts[1]));
       } else if (parts[0] === 'pressKey') {
         api.pressKey(decodeMessage(parts[1]));
+      } else if (parts[0] === 'tileCacheStats') {
+        api.tileCacheStats?.(Number(parts[1]), Number(parts[2]));
+      } else if (parts[0] === 'tileCacheCleared') {
+        api.tileCacheCleared?.(Number(parts[1]), Number(parts[2]));
       }
     });
   }

@@ -9,7 +9,6 @@ import { lineDistanceAt } from './route-model.js';
 import { createSnapReticleMarker } from './snap-indicator.js';
 
 const PINS_KEY = 'pins';
-const MAX_DOTS = 20000;
 const OVERVIEW_MERGE_METERS = 25;
 const NAVIGATION_MERGE_METERS = 5;
 const WAYPOINT_SPACING_PIXELS = 34;
@@ -94,7 +93,8 @@ export function createWaypointController({
   let stopIndex = -1;
   let selectionReticle = null;
   let selectionTarget = null;
-  let trackMarkCount = 0;
+  let annotationMarkCount = 0;
+  let lastPinOrigin = null;
   let pendingPinRender = 0;
   let waypointIndex = null;
   const renderedStops = new Set();
@@ -160,6 +160,7 @@ export function createWaypointController({
     if (!map) return;
     if (!shown || stops.length === 0) return;
 
+    lastPinOrigin = map.containerPointToLayerPoint([0, 0]);
     const selected = selectedNode()?.stop || stops[stopIndex];
     const target = new Set();
     if (selected) target.add(selected);
@@ -207,6 +208,15 @@ export function createWaypointController({
       pendingPinRender = 0;
       renderWaypointPins();
     });
+  }
+
+  function onMapMove() {
+    if (!shown || stops.length === 0 || map?._animatingZoom) return;
+    const origin = map.containerPointToLayerPoint([0, 0]);
+    if (!lastPinOrigin
+      || Math.hypot(origin.x - lastPinOrigin.x, origin.y - lastPinOrigin.y) >= 120) {
+      scheduleWaypointPins();
+    }
   }
 
   function clearSelectionReticle() {
@@ -439,7 +449,7 @@ export function createWaypointController({
   }
 
   function createControl(targetMap) {
-    if (!pinLayer || trackMarkCount + stops.length === 0) return null;
+    if (!pinLayer || annotationMarkCount + stops.length === 0) return null;
     let button = null;
     let labelNode = null;
     const control = {
@@ -513,7 +523,7 @@ export function createWaypointController({
   }
 
   return {
-    draw(targetMap, gpx, segments, anchorMarks = [], routeModel = null) {
+    draw(targetMap, gpx, segments, anchorMarks = [], routeModel = null, annotationCount = 0) {
       map = targetMap;
       stops = [];
       photoStops = [];
@@ -523,36 +533,13 @@ export function createWaypointController({
       stopIndex = -1;
       overviewCache = null;
       clearSelectionReticle();
-      trackMarkCount = 0;
+      annotationMarkCount = Math.max(0, Number(annotationCount) || 0);
+      lastPinOrigin = null;
       waypointIndex = createPointIndex(gpx.waypoints || []);
       renderedStops.clear();
       pinLayer = L.layerGroup();
-      const dots = L.canvas({ padding: 0.5 });
-      const pointCount = segments.reduce((sum, segment) => sum + segment.points.length, 0);
-      const withDots = !gpx.network && pointCount <= MAX_DOTS;
       const bounds = L.latLngBounds([]);
       const routeIndex = gpx.network ? null : buildRouteIndex(segments, gpx, routeModel);
-
-      if (withDots) {
-        for (const segment of segments) {
-          for (const point of segment.points) {
-            const dot = L.circleMarker([point.lat, point.lon], {
-              renderer: dots,
-              radius: 3,
-              color: '#1b1b1b',
-              weight: 1,
-              fillColor: segment.color,
-              fillOpacity: 1,
-            });
-            dot.bindPopup(() => pointPopup(point, segment.track.name, () => dot.closePopup()), {
-              className: 'place-popup',
-              autoPan: false,
-            });
-            pinLayer.addLayer(dot);
-            trackMarkCount += 1;
-          }
-        }
-      }
 
       for (const waypoint of gpx.waypoints) {
         const photos = photosOf(waypoint);
@@ -618,10 +605,11 @@ export function createWaypointController({
       }
       sortStops();
       buildNavigation(anchorMarks, routeIndex);
+      map.on('move', onMapMove);
       map.on('zoomend', scheduleWaypointPins);
       map.on('moveend', scheduleWaypointPins);
       map.on('resize', scheduleWaypointPins);
-      if (shown && trackMarkCount + stops.length > 0) {
+      if (shown && annotationMarkCount + stops.length > 0) {
         pinLayer.addTo(map);
         renderWaypointPins();
       }
@@ -636,7 +624,7 @@ export function createWaypointController({
     hide: () => set(false, true),
     toggle: () => set(!shown, true),
     visible: () => shown,
-    count: () => trackMarkCount + stops.length,
+    count: () => stops.length,
     stops: () => stops,
     photoStops: () => photoStops,
     index: () => stopIndex,
@@ -651,6 +639,7 @@ export function createWaypointController({
     refreshMapMarks: renderWaypointPins,
     relabel,
     destroy() {
+      map.off('move', onMapMove);
       map.off('zoomend', scheduleWaypointPins);
       map.off('moveend', scheduleWaypointPins);
       map.off('resize', scheduleWaypointPins);

@@ -60,6 +60,8 @@ test('installViewerMessages routes pressKey, setTiandituKey, attachmentResult an
     tiandituResponse: (status) => calls.push(['tianditu', status]),
     setTiandituKey: (key) => calls.push(['setKey', key]),
     pressKey: (key) => calls.push(['key', key]),
+    tileCacheStats: (bytes, count) => calls.push(['cacheStats', bytes, count]),
+    tileCacheCleared: (bytes, count) => calls.push(['cacheCleared', bytes, count]),
   };
   bridge.installViewerMessages(api, (...args) => calls.push(['clipboard', ...args]));
 
@@ -68,6 +70,8 @@ test('installViewerMessages routes pressKey, setTiandituKey, attachmentResult an
   emitWebMessage('setTiandituKey\tabcd1234');
   emitWebMessage('setTiandituKey\t');
   emitWebMessage('tianditu-response\t403');
+  emitWebMessage('tileCacheStats\t5242880\t120');
+  emitWebMessage('tileCacheCleared\t0\t0');
   emitWebMessage('clipboardResult\tc1\t0\tdenied%20access');
   emitWebMessage('attachmentResult\tb1\t2\t0\tC%3A%5Ctmp%5Ca%20b.jpg\thttp%20404');
   emitWebMessage('attachmentResume\tb1\t0,1\tC%3A%5Cphotos');
@@ -79,6 +83,8 @@ test('installViewerMessages routes pressKey, setTiandituKey, attachmentResult an
     ['setKey', 'abcd1234'],
     ['setKey', ''],
     ['tianditu', 403],
+    ['cacheStats', 5242880, 120],
+    ['cacheCleared', 0, 0],
     ['clipboard', 'c1', false, 'denied%20access'],
     ['attachment', 'b1', 2, false, 'C:\\tmp\\a b.jpg', 'http 404'],
     ['resume', 'b1', '0,1', 'C:\\photos'],

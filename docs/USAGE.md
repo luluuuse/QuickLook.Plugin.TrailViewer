@@ -71,7 +71,9 @@ FIT 读取活动和路线中的 GPS 记录、时间、海拔、心率、会话�
   渐隐层上，右上角是关闭，右下角是圆形箭头和 `2/9` 位置进度。**点照片任意处**即进入全览；圆形箭头
   跳到下一处带照片的标记点并就地打开它的卡片，只有一处带照片时不显示箭头。
 - 没有照片的标记点卡片与它同属一套：同样的 224 px 宽度、圆角和右上角关闭，名称与“时间 · 海拔”两行
-  字级一致；描述较长时在卡片内滚动，卡片本身不会长长地压住地图。卡片不再显示经纬度，图钉已经标出位置。
+  字级一致；描述较长时在卡片内滚动，卡片本身不会长长地压住地图。卡片不再显示经纬度，图钉已经标出位置；
+  若部分轨迹 App 把经纬度、海拔或时间自动写入标记点备注，打开时会自动过滤这些重复遥测文字并保留用户手写
+  备注，同时把缺失的时间回填回卡片顶栏。
 - 进入全览后，右上角显示当前显示尺寸相对原图像素的真实百分比，例如原图为 2560 px 宽、窗口中显示
   640 px 时显示 `25%`。滚轮按绝对比例缩放，最高 800%；点击百分比恢复适应窗口，放大后可拖拽平移，
   切换照片时会重新适应窗口。
@@ -223,8 +225,7 @@ Canvas 绘制路线，并跳过普通轨迹点圆点、公里数字和路网级�
 
 ### 大文件与隐私
 
-超过 20,000 个记录点时仍绘制线条和起终点，但省略逐点可点击圆点。轨迹数据不发送到服务器；在线瓦片请求
-由所选底图触发。
+长轨迹仅绘制路线线条、起终点以及按视口抽样的航点，不再为每个原始采样点单独创建圆点标记，避免缩放或拖动时点位重叠与刷新卡顿。轨迹数据不发送到服务器；在线瓦片请求由所选底图触发。
 
 ## English
 
@@ -304,7 +305,9 @@ is used.
   its card in place, and is not shown when this is the only one.
 - A pin without photos opens the same card family: the same 224 px width, corner radius and top-right close, the
   name and "time · elevation" at the same two type sizes. A longer description scrolls inside the card instead of
-  stretching it down the map. Coordinates are no longer shown -- the pin already marks the spot.
+  stretching it down the map. Coordinates are no longer shown -- the pin already marks the spot, and
+  exporter-injected coordinate, elevation or timestamp boilerplate in waypoint descriptions is automatically stripped
+  while preserving user notes and recovering missing timestamps for the card header.
 - In the full-size viewer, the top-right percentage is the displayed width divided by the source width: a
   2560 px photo shown at 640 px reads 25%, and 100% means 1:1 pixels. Use the wheel to zoom up to 800%, drag a
   zoomed photo to pan, click the percentage to fit the window again, or change photos to start over.
@@ -472,5 +475,5 @@ export so another style can be produced immediately.
 
 ### Large files and privacy
 
-Files above 20,000 recorded points keep the route and endpoints but omit a clickable marker for every sample.
+Long tracks keep the full route line, endpoints and viewport-sampled waypoints without creating per-sample markers, keeping pan and zoom responsive.
 Track data is not sent to a server; selecting an online basemap triggers requests to that tile provider.

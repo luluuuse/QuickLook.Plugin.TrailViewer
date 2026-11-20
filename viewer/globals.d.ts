@@ -4,6 +4,11 @@ interface Window {
     tiandituKey?: string;
     direct?: boolean;
     customSources?: Array<Record<string, unknown>>;
+    tileCache?: {
+      enabled?: boolean;
+      maxMb?: number;
+      maxAgeDays?: number;
+    };
   };
   trailViewer?: any;
   chrome?: {

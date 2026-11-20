@@ -142,6 +142,44 @@ export function profileSamples(samples, width = 600) {
   return seriesSamples(samples, width, (sample) => sample.ele);
 }
 
+/** Slices a sorted elevation curve to [fromMeters, toMeters], interpolating endpoints. */
+/** @param {Array<{ along: number, ele: number }>} points @param {number} fromMeters @param {number} toMeters */
+export function sliceCurveByDistance(points, fromMeters, toMeters) {
+  if (!Array.isArray(points) || points.length < 2) return [];
+  const firstAlong = points[0].along;
+  const lastAlong = points[points.length - 1].along;
+  const from = Math.max(firstAlong, Number(fromMeters));
+  const to = Math.min(lastAlong, Number(toMeters));
+  if (!(to > from)) return [];
+
+  const interpolateAt = (target) => {
+    let low = 0;
+    let high = points.length - 1;
+    while (low < high) {
+      const middle = (low + high + 1) >> 1;
+      if (points[middle].along <= target) low = middle;
+      else high = middle - 1;
+    }
+    const a = points[low];
+    if (Math.abs(a.along - target) <= 1e-6 || low >= points.length - 1) {
+      return { along: target, ele: a.ele };
+    }
+    const b = points[low + 1];
+    const span = b.along - a.along;
+    const ratio = span > 0 ? Math.min(1, Math.max(0, (target - a.along) / span)) : 0;
+    return { along: target, ele: a.ele + (b.ele - a.ele) * ratio };
+  };
+
+  const sliced = [interpolateAt(from)];
+  for (const point of points) {
+    if (point.along > from + 1e-6 && point.along < to - 1e-6) {
+      sliced.push({ along: point.along, ele: point.ele });
+    }
+  }
+  sliced.push(interpolateAt(to));
+  return sliced;
+}
+
 /** @returns {GroundCell['grade']} */
 function gradeOf(slope) {
   if (Math.abs(slope) < FLAT) return 'flat';

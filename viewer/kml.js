@@ -4,6 +4,7 @@
 
 import { parseXml } from './gpx.js';
 import { t } from './i18n.js';
+import { cleanWaypointDescription } from './waypoint-description.js';
 
 /** @typedef {import('./types.js').TrackPoint} TrackPoint */
 /** @typedef {import('./types.js').ParsedTrack} ParsedTrack */
@@ -92,6 +93,31 @@ function parseGxCoord(raw, { skipElevation = false } = {}) {
   return point;
 }
 
+function readExtendedTime(placemark) {
+  const extended = child(placemark, 'ExtendedData');
+  if (!extended) return undefined;
+  for (const data of children(extended, 'Data')) {
+    const key = (data.getAttribute('name') || '').toLowerCase();
+    if (key !== 'time' && key !== 'timestamp') continue;
+    const raw = childText(data, 'value');
+    if (!raw) continue;
+    if (/^\d+(?:\.\d+)?$/.test(raw)) {
+      const num = Number(raw);
+      if (num >= 1e11 && num <= 8.64e15) {
+        const time = new Date(num);
+        if (!Number.isNaN(time.getTime())) return time;
+      } else if (num >= 1e8 && num < 1e11) {
+        const time = new Date(num * 1000);
+        if (!Number.isNaN(time.getTime())) return time;
+      }
+      continue;
+    }
+    const parsed = Date.parse(raw);
+    if (!Number.isNaN(parsed)) return new Date(parsed);
+  }
+  return undefined;
+}
+
 function readTime(placemark) {
   const stamp = child(placemark, 'TimeStamp');
   const when = stamp && childText(stamp, 'when');
@@ -105,7 +131,7 @@ function readTime(placemark) {
     const time = Date.parse(begin);
     if (!Number.isNaN(time)) return new Date(time);
   }
-  return undefined;
+  return readExtendedTime(placemark);
 }
 
 /**
@@ -114,15 +140,16 @@ function readTime(placemark) {
  */
 function readDescription(placemark) {
   const raw = childText(placemark, 'description');
-  if (!raw) return { text: undefined, insightText: undefined, images: [] };
-  const plain = raw.replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
-  const insightText = plain.length > MAX_INSIGHT_TEXT
-    ? `${plain.slice(0, MAX_INSIGHT_TEXT - 1)}…`
-    : plain;
+  if (!raw) return { text: undefined, insightText: undefined, images: [], time: undefined };
+  const { text: plain, time } = cleanWaypointDescription(raw, { html: true });
+  const insightText = plain
+    ? (plain.length > MAX_INSIGHT_TEXT ? `${plain.slice(0, MAX_INSIGHT_TEXT - 1)}…` : plain)
+    : undefined;
   return {
     text: plain ? (plain.length > MAX_DESCRIPTION ? `${plain.slice(0, MAX_DESCRIPTION - 1)}…` : plain) : undefined,
-    insightText: insightText || undefined,
+    insightText,
     images: readImages(raw),
+    time,
   };
 }
 
@@ -193,8 +220,8 @@ function addWaypoint(waypoints, seen, point) {
 
 function readPlacemark(placemark, out, styles, { skipTime = false, skipElevation = false } = {}) {
   const name = childText(placemark, 'name');
-  const time = skipTime ? undefined : readTime(placemark);
-  const { text: description, insightText, images } = readDescription(placemark);
+  const { text: description, insightText, images, time: descriptionTime } = readDescription(placemark);
+  const time = skipTime ? undefined : (readTime(placemark) || descriptionTime);
   const styleUrl = childText(placemark, 'styleUrl');
   const inlineStyle = child(placemark, 'Style');
   const inlineIcon = inlineStyle && child(child(inlineStyle, 'IconStyle') || inlineStyle, 'Icon');

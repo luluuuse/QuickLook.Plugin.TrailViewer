@@ -7,6 +7,7 @@ import {
   profileSamples,
   rawElevationGain,
   seriesSamples,
+  sliceCurveByDistance,
   slopeBins,
   slopeColor,
   SLOPE_FULL,
@@ -85,4 +86,21 @@ test('slope bins separate flat, gentle and steep ascent and descent', () => {
   assert.ok(Math.abs(bins.steepUp - 30) < 1e-9);
   assert.ok(Math.abs(bins.gentleDown - 10) < 1e-9);
   assert.ok(Math.abs(bins.steepDown - 30) < 1e-9);
+});
+
+test('sliceCurveByDistance interpolates exact split boundaries and clamps out-of-range ends', () => {
+  const curve = [
+    { along: 0, ele: 100 },
+    { along: 1000, ele: 200 },
+    { along: 2500, ele: 500 },
+    { along: 4000, ele: 350 },
+  ];
+  assert.deepEqual(sliceCurveByDistance(curve, 500, 2000), [
+    { along: 500, ele: 150 },
+    { along: 1000, ele: 200 },
+    { along: 2000, ele: 400 },
+  ]);
+  assert.deepEqual(sliceCurveByDistance(curve, -200, 5000), curve);
+  assert.deepEqual(sliceCurveByDistance(curve, 2000, 2000), []);
+  assert.deepEqual(sliceCurveByDistance(curve, 4500, 5000), []);
 });

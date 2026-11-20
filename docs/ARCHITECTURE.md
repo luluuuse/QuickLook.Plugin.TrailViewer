@@ -20,6 +20,7 @@ QuickLook
 |---|---|
 | `viewer/app.js` | 解析、模块装配和宿主消息 |
 | `viewer/gpx.js`, `viewer/kml.js`, `viewer/fit.js` | 文件解析与统一模型；FIT 使用受限原生二进制读取器 |
+| `viewer/waypoint-description.js` | 航点描述中 App 自动生成的遥测模板清洗与缺失时间戳回填 |
 | `viewer/route-model.js` | 共享只读轨迹几何、分段累计里程和起止偏移 |
 | `viewer/track-analysis.js` | 运动时间、断点、GPS 异常、用时估算和里程切片 |
 | `viewer/split-analysis.js`, `viewer/split-view.js` | 首次展开时计算的逐公里时间/速度模型、表格及详细版列契约 |
@@ -108,7 +109,10 @@ Leaflet 自带关闭按钮隐藏后由卡片自己画在右上角、同一个入
 没有照片的图钉由同一文件的 `renderPointPopup` 构建 `.place-card`：`.place-head` 里是名称和“时间 · 海拔”，
 字级与照片卡片的 `.photo-card-title` / `.photo-card-meta` 完全一致（只在颜色上区分为面板文字色），
 描述用 `.place-text` 在卡内滚动；`.place-card-close` 与照片卡片共用同一组样式。卡片**不再显示经纬度**：
-图钉已经标出位置，六位小数的经纬度是 224 px 卡片里最宽也最少被读的一行。卡片的类名用
+图钉已经标出位置，六位小数的经纬度是 224 px 卡片里最宽也最少被读的一行。针对部分户外客户端把经纬度、海拔和
+时间硬写入 `<description>` 的导出文件，解析阶段通过 `waypoint-description.js` 在存在有效坐标字段时剥离这些
+遥测模板（保留用户真实备注），并优先从 KML `ExtendedData` `Time` 或被剥离的时间字段回填缺失的航点时间戳。
+卡片的类名用
 `photo-card-*` / `place-card-*` 前缀，与全览查看器的 `photo-title`/`photo-meta` 区分开——两者同名会让
 `querySelector` 命中和样式互相串台。“下一张”在 popup 打开时才解析 `photoStops`（它由 `buildNavigation`
 在此后填充），避免绑定 marker 时读到空数组。选中标记点与测距/坐标拾取共用 `viewer/snap-indicator.js`

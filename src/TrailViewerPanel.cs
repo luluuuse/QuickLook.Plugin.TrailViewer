@@ -2,6 +2,7 @@ using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.Wpf;
 using QuickLook.Common.Helpers;
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -53,7 +54,10 @@ internal sealed partial class TrailViewerPanel : UserControl, IDisposable
     private volatile bool _onScreen;
     private volatile bool _textInput;
     private volatile bool _measureActive;
+    private volatile TileCacheOptions _tileCacheOptions = ViewerPreferences.ReadTileCacheOptions();
+    private volatile IReadOnlyList<CustomHostMatcher> _customHostMatchers = Array.Empty<CustomHostMatcher>();
     private bool _finished;
+    private volatile bool _disposed;
 
     public TrailViewerPanel()
     {
@@ -80,14 +84,14 @@ internal sealed partial class TrailViewerPanel : UserControl, IDisposable
             DownloadAttachment = DownloadAttachmentAsync,
             Ready = summary => Finish(null, summary),
             Error = detail => Finish(detail, ""),
-            SaveSettings = query => _ = System.Threading.Tasks.Task.Run(
-                () => ViewerPreferences.SaveFromQuery(query)),
-            SaveCustomSources = json => _ = System.Threading.Tasks.Task.Run(
-                () => CustomSourceStore.SaveJson(json)),
+            SaveSettings = SaveViewerSettings,
+            SaveCustomSources = SaveCustomSources,
             MeasureState = active => _measureActive = active,
             TextInput = active => _textInput = active,
             ConfigureTiandituKey = value => ConfigureTiandituKey(IsEnglishMessage(value)),
             RemoveTiandituKey = value => RemoveTiandituKey(IsEnglishMessage(value)),
+            RequestTileCacheStats = RequestTileCacheStats,
+            ClearTileCache = ClearTileCache,
         });
     }
 
@@ -388,6 +392,7 @@ internal sealed partial class TrailViewerPanel : UserControl, IDisposable
 
     public void Dispose()
     {
+        _disposed = true;
         _finished = true; // no callbacks after the preview is closed
         _lifecycle.Cancel();
         _onScreen = false;

@@ -1,6 +1,6 @@
 // Leaflet controls. Layer definitions and tile construction live in dedicated modules.
 
-import { readStored } from './storage.js';
+import { readStored, writeStored } from './storage.js';
 import { setIcon } from './icons.js';
 import { loadCustomLayers } from './custom-layers.js';
 import {
@@ -20,6 +20,7 @@ import {
   relabelLayerSwitcher,
   openLayerMenu,
   renderLayerMenu,
+  renderTileCacheSettings,
   updateChoiceButtons,
   updateMenuButton as renderMenuButton,
   updateNoMapButton as renderNoMapButton,
@@ -41,11 +42,45 @@ export function savedLayer(params) {
   return normalizeLayer(readStored(LAYER_KEY)) || 'road.osm';
 }
 
+const TILE_CACHE_LIMITS = [256, 512, 2048, 0];
+const TILE_CACHE_DAYS = [0, 7, 30, 90];
+
+function parseAllowedNumber(value, allowed) {
+  if (value === null || value === undefined || value === '') return null;
+  const numeric = Number(value);
+  return Number.isFinite(numeric) && allowed.includes(numeric) ? numeric : null;
+}
+
+export function savedTileCache(params, hosted = null) {
+  const hostedEnabled = typeof hosted?.enabled === 'boolean' ? hosted.enabled : null;
+  const hostedMb = parseAllowedNumber(hosted?.maxMb, TILE_CACHE_LIMITS);
+  const hostedDays = parseAllowedNumber(hosted?.maxAgeDays, TILE_CACHE_DAYS);
+  const paramEnabled = params?.get('tileCache');
+  const paramMb = parseAllowedNumber(params?.get('tileCacheMaxMb'), TILE_CACHE_LIMITS);
+  const paramDays = parseAllowedNumber(params?.get('tileCacheDays'), TILE_CACHE_DAYS);
+  const storedEnabled = readStored('tileCache');
+  const storedMb = parseAllowedNumber(readStored('tileCacheMaxMb'), TILE_CACHE_LIMITS);
+  const storedDays = parseAllowedNumber(readStored('tileCacheDays'), TILE_CACHE_DAYS);
+
+  const enabled = hostedEnabled !== null
+    ? hostedEnabled
+    : paramEnabled === '0' || paramEnabled === '1'
+      ? paramEnabled !== '0'
+      : storedEnabled === '0' || storedEnabled === '1'
+        ? storedEnabled !== '0'
+        : true;
+  const maxMb = hostedMb ?? paramMb ?? storedMb ?? 512;
+  const maxAgeDays = hostedDays ?? paramDays ?? storedDays ?? 30;
+  return { enabled, maxMb, maxAgeDays };
+}
+
 export function createLayerSwitcher({
   L, map, el, t, initial, onRemember, tiandituDirectKey = '',
   onConfigureTianditu = () => {}, onRemoveTianditu = () => {},
   onTiandituDirectError = () => {}, onCustomError = () => {},
   onOpen = () => {}, onCustomSave, customSources = null,
+  hasHost = false, tileCacheConfig = null,
+  onTileCacheChange = () => {}, onRequestTileCacheStats = () => {}, onClearTileCache = () => {},
 }) {
   const lifecycle = new AbortController();
   let directKey = tiandituDirectKey;
@@ -90,10 +125,29 @@ export function createLayerSwitcher({
   let providerList;
   let configureButton;
   let removeButton;
+  let tileCacheUi = null;
   let settingsViewOpen = false;
   let customView;
   let customViewOpen = false;
   let noMapReturn = 'road.osm';
+  const tileCacheState = {
+    enabled: tileCacheConfig?.enabled ?? true,
+    maxMb: parseAllowedNumber(tileCacheConfig?.maxMb, TILE_CACHE_LIMITS) ?? 512,
+    maxAgeDays: parseAllowedNumber(tileCacheConfig?.maxAgeDays, TILE_CACHE_DAYS) ?? 30,
+    stats: { totalBytes: 0, tileCount: 0 },
+    statsLoaded: false,
+    clearArmed: false,
+  };
+  function renderTileCache() {
+    if (!tileCacheUi) return;
+    renderTileCacheSettings({ ...tileCacheUi, state: tileCacheState, hasHost, t });
+  }
+  function persistTileCacheSettings() {
+    writeStored('tileCache', tileCacheState.enabled ? '1' : '0');
+    writeStored('tileCacheMaxMb', String(tileCacheState.maxMb));
+    writeStored('tileCacheDays', String(tileCacheState.maxAgeDays));
+    onTileCacheChange?.();
+  }
   const customManager = createCustomSourceManager({
     L,
     el,
@@ -129,13 +183,14 @@ export function createLayerSwitcher({
       layers, allLayers: LAYERS, providers: PROVIDERS, keyReady,
       normalizeLayer, defaultProvider, activeKey: LAYER_KEY, map,
       ensureCustomLayer: customManager.ensureLayer, menuOpen,
-      openMenu, showSettings, closeMenu, onRemember,
+      openMenu, showSettings, closeMenu,
       setPendingKeyProvider: (key) => { pendingKeyProvider = key; },
       setNoMapReturn: (key) => { noMapReturn = key; },
     });
     if (!result) return false;
     current = result.key;
     currentCategory = result.category;
+    if (remember) onRemember?.(result.key);
     updateChoiceButtons({ categoryButtons, providerButtons, providerLabels, currentCategory, current });
     updateMenuButton();
     renderNoMapButton({ noMapButton, current, t });
@@ -147,6 +202,7 @@ export function createLayerSwitcher({
     menuOpen = false;
     settingsViewOpen = false;
     customViewOpen = false;
+    tileCacheState.clearArmed = false;
     menu.hidden = true;
     menuToggle?.setAttribute('aria-expanded', 'false');
     if (restoreFocus) menuToggle?.focus({ preventScroll: true });
@@ -173,6 +229,7 @@ export function createLayerSwitcher({
     if (!mainView || !settingsView) return;
     settingsViewOpen = true;
     customViewOpen = false;
+    tileCacheState.clearArmed = false;
     mainView.hidden = true;
     settingsView.hidden = false;
     if (customView) customView.hidden = true;
@@ -180,6 +237,7 @@ export function createLayerSwitcher({
     settingsButton.hidden = true;
     menuHeading.textContent = t('layer.settingsTitle');
     renderMenu();
+    if (hasHost) onRequestTileCacheStats?.();
     if (focus) configureButton?.focus({ preventScroll: true });
   }
 
@@ -198,6 +256,7 @@ export function createLayerSwitcher({
   }
 
   function backFromCurrentView() {
+    tileCacheState.clearArmed = false;
     if (customViewOpen) {
       if (customManager.isEditing()) {
         customManager.clearForm();
@@ -223,6 +282,7 @@ export function createLayerSwitcher({
       renderCustomList: customManager.renderList,
       t,
     });
+    renderTileCache();
   }
 
   function openMenu({ focus = true } = {}) {
@@ -297,6 +357,40 @@ export function createLayerSwitcher({
         onSubmitCustom: () => customManager.submit(),
         onConfigureTianditu: () => onConfigureTianditu(),
         onRemoveTianditu: () => onRemoveTianditu(),
+        onToggleTileCache: () => {
+          tileCacheState.enabled = !tileCacheState.enabled;
+          tileCacheState.clearArmed = false;
+          persistTileCacheSettings();
+          renderTileCache();
+        },
+        onSelectTileCacheMaxMb: (mb) => {
+          if (!TILE_CACHE_LIMITS.includes(mb) || tileCacheState.maxMb === mb) return;
+          tileCacheState.maxMb = mb;
+          tileCacheState.clearArmed = false;
+          persistTileCacheSettings();
+          renderTileCache();
+        },
+        onSelectTileCacheDays: (days) => {
+          if (!TILE_CACHE_DAYS.includes(days) || tileCacheState.maxAgeDays === days) return;
+          tileCacheState.maxAgeDays = days;
+          tileCacheState.clearArmed = false;
+          persistTileCacheSettings();
+          renderTileCache();
+        },
+        onClearTileCache: () => {
+          if (!hasHost) {
+            onClearTileCache?.();
+            return;
+          }
+          if (!tileCacheState.clearArmed) {
+            tileCacheState.clearArmed = true;
+            renderTileCache();
+            return;
+          }
+          tileCacheState.clearArmed = false;
+          renderTileCache();
+          onClearTileCache?.();
+        },
       });
       const bar = view.bar;
       menuToggle = view.menuToggle;
@@ -320,6 +414,16 @@ export function createLayerSwitcher({
       configureButton = view.configureButton;
       removeButton = view.removeButton;
       keyStatus = view.keyStatus;
+      tileCacheUi = {
+        tileCacheToggle: view.tileCacheToggle,
+        tileCacheOptions: view.tileCacheOptions,
+        tileCacheLimitButtons: view.tileCacheLimitButtons,
+        tileCacheDaysButtons: view.tileCacheDaysButtons,
+        tileCacheStatus: view.tileCacheStatus,
+        tileCacheClearButton: view.tileCacheClearButton,
+        tileCacheClearLabel: view.tileCacheClearLabel,
+      };
+      renderTileCache();
       customManager.bind({
         formView: view.customFormView,
         form: view.customForm.form,
@@ -374,6 +478,23 @@ export function createLayerSwitcher({
     },
     current: () => current,
     currentCategory: () => currentCategory,
+    setTileCacheStats(totalBytes, tileCount) {
+      tileCacheState.stats = {
+        totalBytes: Math.max(0, Number(totalBytes) || 0),
+        tileCount: Math.max(0, Math.round(Number(tileCount) || 0)),
+      };
+      tileCacheState.statsLoaded = true;
+      tileCacheState.clearArmed = false;
+      renderTileCache();
+    },
+    tileCacheSettings: () => ({
+      enabled: tileCacheState.enabled,
+      maxMb: tileCacheState.maxMb,
+      maxAgeDays: tileCacheState.maxAgeDays,
+      stats: { ...tileCacheState.stats },
+      statsLoaded: tileCacheState.statsLoaded,
+      clearArmed: tileCacheState.clearArmed,
+    }),
     destroy() {
       lifecycle.abort();
       closeMenu();
@@ -385,7 +506,7 @@ export function createLayerSwitcher({
         customManager, settingsViewOpen, backButton, settingsButton, closeButton,
         providerButtons, providerLabels, providers: PROVIDERS, menu, sourceEmpty, categoryKey,
         updateNoMapButton: () => renderNoMapButton({ noMapButton, current, t }),
-        updateMenuButton, relabelKeyActions, renderMenu,
+        updateMenuButton, relabelKeyActions, renderTileCache, renderMenu,
       });
     },
   };

@@ -82,6 +82,14 @@ export function createTestApi({
     tiandituTransport: () => getRuntimeTiandituKey() ? 'direct' : 'none',
     layer: switcher.current,
     layerCategory: switcher.currentCategory,
+    tileCache: {
+      settings: () => switcher.tileCacheSettings(),
+    },
+    tileCacheStats: (totalBytes, tileCount) => switcher.setTileCacheStats(totalBytes, tileCount),
+    tileCacheCleared: (totalBytes, tileCount) => {
+      switcher.setTileCacheStats(totalBytes, tileCount);
+      showToast(t('layer.cacheCleared'), 3000);
+    },
     locate: () => mapViewController.fit(),
     mapLayout: () => ({
       state: mapViewController.layoutState(),

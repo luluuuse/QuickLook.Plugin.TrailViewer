@@ -262,3 +262,95 @@ test('parseKml rejects malformed XML with GpxError and non-kml roots with KmlErr
   assert.throws(() => parseKml('<kml><Document></kml>'), GpxError);
   assert.throws(() => parseKml('<gpx></gpx>'), KmlError);
 });
+
+test('parseKml strips app telemetry boilerplate, backfills missing times and ranks real notes above boilerplate', () => {
+  const xml = `<?xml version="1.0" encoding="utf-8"?>
+  <kml xmlns="http://www.opengis.net/kml/2.2">
+    <Document>
+      <Placemark>
+        <name>Telemetry ExtendedData</name>
+        <description><![CDATA[<div>经度：114.300000</div><div>纬度：30.500000</div><div>海拔：500.0</div><div>时间：2026-10-03 08:00:00</div>]]></description>
+        <ExtendedData>
+          <Data name="Time"><value>1791001462631</value></Data>
+        </ExtendedData>
+        <Point><coordinates>114.3,30.5,500</coordinates></Point>
+      </Placemark>
+      <Placemark>
+        <name>Telemetry Description Time</name>
+        <description><![CDATA[<div>经度：114.310000</div><div>纬度：30.510000</div><div>海拔：520.0</div><div>时间：2026-10-03 12:24:22</div>]]></description>
+        <Point><coordinates>114.31,30.51,520</coordinates></Point>
+      </Placemark>
+      <Placemark>
+        <name>TimeStamp Wins</name>
+        <description><![CDATA[<div>经度：114.320000</div><div>纬度：30.520000</div><div>时间：2026-10-03 09:00:00</div>]]></description>
+        <TimeStamp><when>2026-10-03T01:00:00Z</when></TimeStamp>
+        <ExtendedData><Data name="Time"><value>1791001462631</value></Data></ExtendedData>
+        <Point><coordinates>114.32,30.52,530</coordinates></Point>
+      </Placemark>
+      <Placemark>
+        <name>Mixed Photo Note</name>
+        <description><![CDATA[<div><img src="https://example.com/spot.jpg" />Steep descent ahead</div></br><div>经度：114.330000</div><div>纬度：30.530000</div><div>海拔：600.0</div><div>时间：2026-10-03 10:30:00</div>]]></description>
+        <Point><coordinates>114.33,30.53,600</coordinates></Point>
+      </Placemark>
+      <Placemark>
+        <name>Boilerplate Duplicate</name>
+        <description><![CDATA[<div>经度：114.340000</div><div>纬度：30.540000</div>]]></description>
+        <Point><coordinates>114.34,30.54,610</coordinates></Point>
+      </Placemark>
+      <Placemark>
+        <name>Real Note Duplicate</name>
+        <description>Camp flat near stream</description>
+        <Point><coordinates>114.340001,30.540001,610</coordinates></Point>
+      </Placemark>
+    </Document>
+  </kml>`;
+
+  const kml = parseKml(xml);
+  assert.equal(kml.waypoints.length, 5);
+
+  const ext = kml.waypoints[0];
+  assert.equal(ext.description, undefined);
+  assert.equal(ext.insightText, undefined);
+  assert.equal(ext.time?.toISOString(), new Date(1791001462631).toISOString());
+
+  const descTime = kml.waypoints[1];
+  assert.equal(descTime.description, undefined);
+  assert.equal(descTime.time?.getHours(), 12);
+  assert.equal(descTime.time?.getMinutes(), 24);
+
+  const tsWins = kml.waypoints[2];
+  assert.equal(tsWins.description, undefined);
+  assert.equal(tsWins.time?.toISOString(), '2026-10-03T01:00:00.000Z');
+
+  const mixed = kml.waypoints[3];
+  assert.equal(mixed.description, 'Steep descent ahead');
+  assert.deepEqual(mixed.images, ['https://example.com/spot.jpg']);
+  assert.equal(mixed.time?.getHours(), 10);
+
+  const deduped = kml.waypoints[4];
+  assert.equal(deduped.name, 'Real Note Duplicate');
+  assert.equal(deduped.description, 'Camp flat near stream');
+});
+
+test('parseKml does not backfill waypoint time on route networks', () => {
+  const xml = `<kml>
+    <Document>
+      <ExtendedData>
+        <Data name="segment_count"><value>25</value></Data>
+        <Data name="duration_seconds"><value>0</value></Data>
+        <Data name="distance_meters"><value>150000</value></Data>
+      </ExtendedData>
+      <Placemark>
+        <name>Network Point</name>
+        <description><![CDATA[<div>经度：114.300000</div><div>纬度：30.500000</div><div>时间：2026-10-03 12:00:00</div>]]></description>
+        <ExtendedData><Data name="Time"><value>1791001462631</value></Data></ExtendedData>
+        <Point><coordinates>114.3,30.5,500</coordinates></Point>
+      </Placemark>
+    </Document>
+  </kml>`;
+
+  const kml = parseKml(xml);
+  assert.equal(kml.network, true);
+  assert.equal(kml.waypoints[0].time, undefined);
+  assert.equal(kml.waypoints[0].description, undefined);
+});

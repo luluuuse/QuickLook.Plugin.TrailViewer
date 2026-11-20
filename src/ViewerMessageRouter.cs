@@ -27,6 +27,8 @@ internal sealed class ViewerMessageActions
     internal Action<bool> TextInput { get; set; } = _ => { };
     internal Action<string> ConfigureTiandituKey { get; set; } = _ => { };
     internal Action<string> RemoveTiandituKey { get; set; } = _ => { };
+    internal Action RequestTileCacheStats { get; set; } = () => { };
+    internal Action ClearTileCache { get; set; } = () => { };
 }
 
 internal sealed class ViewerMessageRouter
@@ -73,5 +75,9 @@ internal sealed class ViewerMessageRouter
             _actions.ConfigureTiandituKey(message);
         else if (message.StartsWith("tianditu-key\tremove", StringComparison.Ordinal))
             _actions.RemoveTiandituKey(message);
+        else if (message == "tile-cache\tstats")
+            _actions.RequestTileCacheStats();
+        else if (message == "tile-cache\tclear")
+            _actions.ClearTileCache();
     }
 }

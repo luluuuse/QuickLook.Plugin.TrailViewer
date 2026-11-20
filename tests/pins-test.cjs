@@ -167,19 +167,30 @@ async function main() {
     s.pins === 0 && s.title === '显示标记点与异常标记（W）', `${s.pins} ${s.title}`);
   await switchLanguage(page, 'en');
 
-  // 8. A pure track has no waypoints, but its dots are marks too: the switch must still be there.
+  // 8. Pure tracks without waypoints or anomalies need no switch; anomaly-only tracks do.
   await page.evaluate(() => localStorage.removeItem('trailviewer.pins'));
   await open('gpx10.gpx');
   s = await state();
-  check('a track without waypoints still gets the switch', s.hasControl === true && s.stops === 0,
-    `${s.hasControl}/${s.stops}`);
-  check('it counts the track dots and not the two flags', s.marks === 30, `${s.marks}`);
-  check('a track without waypoints draws no profile dots', s.profilePins === 0, `${s.profilePins}`);
+  const pureTrackCanvases = await page.locator('#map .leaflet-overlay-pane canvas').count();
+  check('a pure track without waypoints or anomalies omits the switch',
+    s.hasControl === false && s.stops === 0 && s.marks === 0 && s.tracks === 1 && s.ends === 2,
+    JSON.stringify(s));
+  check('no per-trackpoint canvas overlay is created for pure tracks',
+    pureTrackCanvases === 0, `${pureTrackCanvases}`);
+
+  await open('gps-anomaly.gpx');
+  s = await state();
+  const anomalyMarkersBefore = await page.locator('.gpx-anomaly-marker').count();
+  check('a track with anomaly labels keeps the marker switch without waypoints',
+    s.hasControl === true && s.stops === 0 && anomalyMarkersBefore > 0,
+    `${s.hasControl}/${s.stops}/${anomalyMarkersBefore}`);
   await page.locator('.pins-switch button').click();
   await waitForLayout(page);
   s = await state();
-  check('hiding a pure track takes every dot off the map', s.visible === false && s.pins === 0, `${s.visible}`);
-  check('and leaves the line and the two flags alone', s.tracks === 1 && s.ends === 2, `${s.tracks}/${s.ends}`);
+  const anomalyMarkersAfter = await page.locator('.gpx-anomaly-marker').count();
+  check('hiding hides anomaly labels while leaving the track and two flags alone',
+    s.visible === false && anomalyMarkersAfter === 0 && s.tracks === 1 && s.ends === 2,
+    `${s.visible}/${anomalyMarkersAfter}/${s.tracks}/${s.ends}`);
 
   await page.evaluate(() => localStorage.removeItem('trailviewer.pins'));
   await open('dense-waypoints.kml');

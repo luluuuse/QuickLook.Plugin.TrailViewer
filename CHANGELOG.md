@@ -17,6 +17,36 @@ Added / Changed / Deprecated / Removed / Fixed / Security 分类；没有内容�
 
 - None.
 
+## 1.25.9 — 2026-11-20
+
+### 中文
+
+#### 新增
+
+- 新增宿主端本地瓦片磁盘缓存机制：自动将看过的内置与自定义图源瓦片按归一化键（剥离天地图个人密钥并合并多子域）跨版本持久化保存在本地独立缓存目录；在“地图设置”中支持一键开关本地缓存、选择容量上限（256 MB / 512 MB / 2 GB / ∞）与过期保留时长（7 天 / 30 天 / 90 天 / 永久）、查看实时占用与瓦片张数以及二次确认清空缓存，并在断网或刷新超时时优先回退展示已过期旧瓦片。
+- 每公里分段与海拔剖面图联动聚焦：在每公里列表中选中某一段时，除在地图轨迹上聚焦高亮外，底部海拔剖面图同步在标题行展示分段徽标，并在绘图区以青色高光带、边界标线及轮廓高亮描边突出该公里区间并轻度压暗两侧非选区，避免遮挡峰顶标注与航点刻度，同时保留鼠标悬停/钉住游标读数及窗口缩放、语言切换和面板收起时的自动同步。
+
+#### 修复
+
+- 修复鼠标连续拖动地图时轨迹在半屏截断、开启标记点后刷新偏慢及密集路段发黑的问题：扩展矢量渲染区缓冲区并在连续拖动过程中按帧渐进刷新轨迹矢量视口、公里标和航点标注；同时移除普通轨迹逐采样点带黑边小圆点的绘制，避免高密度轨迹缩小时黑边叠压盖住彩色轨迹并显著降低拖动与悬停开销。
+- 修复切换底图图源时偏好同步滞后一步的问题（此前回调在内部当前图源状态更新之前读取，导致每次向宿主保存的是切换前的旧图源，且异步并发写入可能乱序），同时放行自定义图源 ID（`custom.*`）的宿主持久化读写，确保每次打开轨迹稳定恢复上次关闭前正在显示的图源。
+- 清洗 KML 与 GPX 航点描述中由导出工具自动写入的经纬度、海拔、时间等遥测模板文本（仅在同时存在有效经纬度字段时触发，完整保留用户手写备注、自然语言描述及普通占位文本），避免普通标记卡片、标记点列表和全览大图顶栏出现多余或重复的坐标信息，并修正同坐标标记点的去重优先级判断。
+- 当 KML `<TimeStamp>` / `<TimeSpan>` 或 GPX `<time>` 缺失时，自动从 KML `ExtendedData` 的时间戳或被清洗掉的遥测时间字段中回填标记点时间，恢复卡片顶栏的“时间 · 海拔”展示（路网文件继续保持跳过时间）。
+
+### English
+
+#### Added
+
+- Added host-owned local disk tile caching across versioned WebView2 origins: valid built-in and custom map tiles are stored under normalized cache keys (with Tianditu tokens stripped and subdomains merged), with new Map settings to enable/disable caching, pick storage limits (256 MB / 512 MB / 2 GB / ∞) and retention periods (7 d / 30 d / 90 d / Forever), view live size/tile counts, two-step clear the cache, and serve expired tiles automatically when offline or when refresh times out.
+- Synced per-kilometre split focus onto the elevation profile: selecting a split row now places a localized range badge in the profile header and spotlights the corresponding distance range on the chart with a cyan highlight band, boundary lines, matching cyan contour stroke and mild dimming of outside segments without obscuring summit labels or waypoint ticks, while keeping profile hover/pinned scrub intact and syncing across resize, language switches and panel collapse.
+
+#### Fixed
+
+- Fixed mid-drag track clipping, slow refresh after enabling Markers and solid-black dense track segments by expanding the vector SVG viewport buffer and incrementally refreshing vectors, distance marks and waypoint pins during continuous drags, while removing per-trackpoint black-outlined circle markers that overlapped into solid black when zoomed out.
+- Fixed map-layer preference syncing lagging one selection behind (the persistence callback previously read the active layer before it was updated, causing the previous layer to be saved to the host, and unordered background writes could race), while also allowing custom source IDs (`custom.*`) in host preference persistence so every preview reopens on the exact layer shown before closing.
+- Stripped exporter-generated coordinate, elevation and timestamp telemetry boilerplate from KML and GPX waypoint descriptions (triggered only when valid coordinate fields are present, leaving genuine user notes, prose and placeholders intact), keeping plain waypoint cards, the waypoint overview and the full-size photo header clean while fixing same-coordinate waypoint deduplication weights.
+- Backfilled missing KML and GPX waypoint timestamps from KML `ExtendedData` `Time` / `timestamp` values or stripped description timestamps so card headers show time alongside elevation (still skipped for route networks).
+
 ## 1.25.8 — 2026-11-20
 
 ### 中文

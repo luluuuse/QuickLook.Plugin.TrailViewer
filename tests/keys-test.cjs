@@ -106,7 +106,7 @@ async function main() {
   check('W hides the markers', s.pins === 0 && s.pinsVisible === false, `${s.pins}/${s.pinsVisible}`);
   check('and the button follows', s.pinsActive === false);
   check('and its pressed state follows', s.pinsPressed === 'false', s.pinsPressed);
-  check('the markers are still loaded for the keyboard', s.marks === 8, `${s.marks}`);
+  check('the markers are still loaded for the keyboard', s.marks === 5, `${s.marks}`);
 
   await press('w');
   s = await state();
@@ -201,15 +201,23 @@ async function main() {
   await page.locator('.pins-switch button').click();
   await waitForLayout(page);
 
-  // 6. A pure track has no waypoints but does have dots: W still clears them.
+  // 6. A pure track without waypoints/anomalies omits the switch; gap/anomaly tracks toggle with W.
   await page.evaluate(() => localStorage.removeItem('trailviewer.pins'));
   await open('gpx10.gpx');
   s = await state();
-  check('a pure track gets the switch', s.hasControl === true && s.marks === 30, `${s.marks}`);
+  check('a pure track without waypoints or anomalies omits the marker switch',
+    s.hasControl === false && s.marks === 0, `${s.hasControl}/${s.marks}`);
+  await open('multi-segment.gpx');
+  const tracksBefore = await page.locator('.gpx-track').count();
+  s = await state();
+  check('a track with recording gaps keeps the marker switch',
+    s.hasControl === true && tracksBefore === 3 && (await page.locator('.gpx-gap-marker').count()) > 0,
+    `${s.hasControl}/${tracksBefore}`);
   await press('w');
   s = await state();
-  check('W hides the dots of a pure track', s.pinsVisible === false, `${s.pinsVisible}`);
-  check('and keeps the line', (await page.locator('.gpx-track').count()) === 1);
+  check('W hides the gap markers on that track',
+    s.pinsVisible === false && (await page.locator('.gpx-gap-marker').count()) === 0, `${s.pinsVisible}`);
+  check('and keeps the line', (await page.locator('.gpx-track').count()) === tracksBefore);
   await press('w');
 
   // 7. When the host catches the key itself it calls pressKey: it has to mean exactly the same thing.

@@ -454,7 +454,32 @@ export function createMapView({ map, isChromeHidden }) {
     lastFocus = { latlng: storedLatLng(latlng), options: { popup: Boolean(options.popup), animate: false } };
   }
 
+  let panVectorFrame = 0;
+  function needsVectorBufferRefresh(renderer) {
+    if (!renderer?._bounds || map._animatingZoom) return false;
+    const size = map.getSize();
+    if (size.x <= 0 || size.y <= 0) return false;
+    const topLeft = map.containerPointToLayerPoint([0, 0]);
+    const pad = Number(renderer.options?.padding) || 0;
+    const marginX = size.x * Math.min(0.25, pad * 0.4);
+    const marginY = size.y * Math.min(0.25, pad * 0.4);
+    const vectorBounds = renderer._bounds;
+    return topLeft.x < vectorBounds.min.x + marginX
+      || topLeft.y < vectorBounds.min.y + marginY
+      || topLeft.x + size.x > vectorBounds.max.x - marginX
+      || topLeft.y + size.y > vectorBounds.max.y - marginY;
+  }
+
   map.on('movestart', () => document.body.classList.add('is-map-dragging'));
+  map.on('move', () => {
+    const renderer = map.options.renderer;
+    if (!renderer || typeof renderer._update !== 'function') return;
+    if (panVectorFrame || !needsVectorBufferRefresh(renderer)) return;
+    panVectorFrame = requestAnimationFrame(() => {
+      panVectorFrame = 0;
+      if (needsVectorBufferRefresh(renderer)) renderer._update();
+    });
+  });
   map.on('moveend', () => {
     document.body.classList.remove('is-map-dragging');
     if (homeView && sameView({

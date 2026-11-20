@@ -2,7 +2,10 @@ using Microsoft.Web.WebView2.Core;
 using QuickLook.Common.Helpers;
 using System;
 using System.IO;
+using System.Net;
+using System.Net.Http;
 using System.Runtime.InteropServices;
+using System.Threading.Tasks;
 using System.Windows;
 
 namespace QuickLook.Plugin.TrailViewer;
@@ -213,12 +216,290 @@ internal sealed partial class TrailViewerPanel
     private static bool IsEnglishMessage(string message) =>
         message.EndsWith("\ten", StringComparison.Ordinal);
 
+    private void SaveViewerSettings(string query)
+    {
+        var previous = _tileCacheOptions;
+        ViewerPreferences.SaveFromQuery(query);
+        var updated = ViewerPreferences.ReadTileCacheOptions();
+        _tileCacheOptions = updated;
+        var limitTightened = updated.MaxMegabytes > 0
+            && (previous.MaxMegabytes <= 0 || updated.MaxMegabytes < previous.MaxMegabytes);
+        var ageTightened = updated.MaxAgeDays > 0
+            && (previous.MaxAgeDays <= 0 || updated.MaxAgeDays < previous.MaxAgeDays);
+        if (updated.Enabled && (limitTightened || ageTightened))
+        {
+            TileCache.Shared.SchedulePrune(
+                updated,
+                removeExpired: TileCache.IsNetworkAvailable(),
+                stats =>
+                {
+                    if (!_disposed)
+                        _ = PostToViewerMessageAsync(ViewerMessages.TileCacheStats(stats.TotalBytes, stats.TileCount));
+                });
+        }
+    }
+
+    private void SaveCustomSources(string json)
+    {
+        _ = CustomSourceStore.SaveJson(json);
+        _customHostMatchers = TileCache.BuildCustomHostMatchers(CustomSourceStore.LoadJson());
+    }
+
+    private void RequestTileCacheStats()
+    {
+        _ = Task.Run(() => TileCache.Shared.GetStats()).ContinueWith(
+            task =>
+            {
+                if (task.IsCompleted && !task.IsFaulted && !task.IsCanceled && !_disposed)
+                {
+                    var stats = task.Result;
+                    _ = PostToViewerMessageAsync(ViewerMessages.TileCacheStats(stats.TotalBytes, stats.TileCount));
+                }
+            },
+            TaskScheduler.Default);
+    }
+
+    private void ClearTileCache()
+    {
+        _ = Task.Run(() => TileCache.Shared.Clear()).ContinueWith(
+            task =>
+            {
+                if (task.IsCompleted && !task.IsFaulted && !task.IsCanceled && !_disposed)
+                {
+                    var stats = task.Result;
+                    _ = PostToViewerMessageAsync(ViewerMessages.TileCacheCleared(stats.TotalBytes, stats.TileCount));
+                }
+            },
+            TaskScheduler.Default);
+    }
+
+    private void OnWebResourceRequested(
+        object? sender, CoreWebView2WebResourceRequestedEventArgs args)
+    {
+        var options = _tileCacheOptions;
+        var core = _webView?.CoreWebView2;
+        if (!options.Enabled || _disposed || core == null) return;
+        if (!string.Equals(args.Request.Method, "GET", StringComparison.OrdinalIgnoreCase)) return;
+        if (!Uri.TryCreate(args.Request.Uri, UriKind.Absolute, out var uri)) return;
+        if (!TileCache.TryBuildKey(uri, _customHostMatchers, out var key)) return;
+
+        var kind = TileCache.Shared.TryRead(key, options, DateTime.UtcNow, out var cached);
+        if (kind == TileLookupKind.Fresh && cached != null)
+        {
+            args.Response = CreateCachedTileResponse(core.Environment, cached, "hit");
+            return;
+        }
+        if (kind == TileLookupKind.Expired && cached != null)
+        {
+            if (!TileCache.IsNetworkAvailable())
+            {
+                args.Response = CreateCachedTileResponse(core.Environment, cached, "stale");
+                return;
+            }
+            var deferral = args.GetDeferral();
+            _ = RefreshExpiredTileAsync(core, args, deferral, uri, key, cached, options);
+        }
+    }
+
+    private async Task RefreshExpiredTileAsync(
+        CoreWebView2 core,
+        CoreWebView2WebResourceRequestedEventArgs args,
+        CoreWebView2Deferral deferral,
+        Uri uri,
+        string key,
+        TileCacheEntry stale,
+        TileCacheOptions options)
+    {
+        var responseSet = false;
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Get, uri);
+            try
+            {
+                foreach (var header in args.Request.Headers)
+                {
+                    if (string.Equals(header.Key, "User-Agent", StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(header.Key, "Referer", StringComparison.OrdinalIgnoreCase))
+                    {
+                        request.Headers.TryAddWithoutValidation(header.Key, header.Value);
+                    }
+                }
+            }
+            catch (Exception ex) when (IsViewerShutdown(ex))
+            {
+                return;
+            }
+
+            using var response = await TileCache.RefreshHttpClient.SendAsync(
+                request, HttpCompletionOption.ResponseContentRead, _lifecycle.Token);
+            if (_disposed) return;
+
+            if (response.StatusCode == HttpStatusCode.OK)
+            {
+                using var stream = await response.Content.ReadAsStreamAsync();
+                var bytes = ReadBoundedBytes(stream, TileCache.MaxTileBytes);
+                var headerContentType = response.Content.Headers.ContentType?.MediaType;
+                if (bytes != null && TileCache.TryDetectImageContentType(
+                    bytes, headerContentType, out _, out var detectedType))
+                {
+                    _ = Task.Run(() => TileCache.Shared.Store(
+                        key, bytes, detectedType, options, DateTime.UtcNow));
+                    if (!_disposed)
+                    {
+                        args.Response = core.Environment.CreateWebResourceResponse(
+                            new MemoryStream(bytes, writable: false),
+                            200,
+                            "OK",
+                            $"Content-Type: {detectedType}\r\nCache-Control: no-store\r\nX-TrailViewer-Cache: refreshed");
+                        responseSet = true;
+                    }
+                    return;
+                }
+            }
+            else if (IsTiandituTileUri(uri.AbsoluteUri)
+                && (response.StatusCode == HttpStatusCode.Unauthorized
+                    || response.StatusCode == HttpStatusCode.Forbidden))
+            {
+                _ = PostTiandituResponseAsync(core, (int)response.StatusCode);
+                if (!_disposed)
+                {
+                    args.Response = core.Environment.CreateWebResourceResponse(
+                        Stream.Null,
+                        (int)response.StatusCode,
+                        response.ReasonPhrase ?? "Forbidden",
+                        "Cache-Control: no-store\r\nX-TrailViewer-Cache: error");
+                    responseSet = true;
+                }
+                return;
+            }
+        }
+        catch (OperationCanceledException) when (_disposed)
+        {
+            return;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or IOException || IsViewerShutdown(ex))
+        {
+            // Fall back to the stale cached tile when refreshing fails or times out.
+        }
+        finally
+        {
+            if (!_disposed && !responseSet)
+            {
+                try
+                {
+                    args.Response = CreateCachedTileResponse(core.Environment, stale, "stale");
+                }
+                catch (Exception ex) when (IsViewerShutdown(ex))
+                {
+                    // Preview already closed while refresh was finishing.
+                }
+            }
+            try
+            {
+                deferral.Complete();
+            }
+            catch (Exception ex) when (IsViewerShutdown(ex))
+            {
+                // Preview already closed.
+            }
+        }
+    }
+
+    private static CoreWebView2WebResourceResponse CreateCachedTileResponse(
+        CoreWebView2Environment environment, TileCacheEntry entry, string cacheHeader) =>
+        environment.CreateWebResourceResponse(
+            new MemoryStream(entry.Data, writable: false),
+            200,
+            "OK",
+            $"Content-Type: {entry.ContentType}\r\nCache-Control: no-store\r\nX-TrailViewer-Cache: {cacheHeader}");
+
     /// <summary>
     /// Image loads do not expose an HTTP status to the page. Observe Tianditu responses out of band so only an
     /// explicit authentication failure can invalidate the in-page key; transient failures remain retryable.
+    /// Also persists newly fetched valid map tiles into the host disk cache.
     /// </summary>
-    private void OnTiandituResponseReceived(
-        object sender, CoreWebView2WebResourceResponseReceivedEventArgs args)
+    private void OnWebResourceResponseReceived(
+        object? sender, CoreWebView2WebResourceResponseReceivedEventArgs args)
+    {
+        ObserveTiandituResponse(args);
+
+        var options = _tileCacheOptions;
+        if (!options.Enabled || _disposed) return;
+        if ((int)args.Response.StatusCode != 200) return;
+
+        try
+        {
+            if (args.Response.Headers.Contains("X-TrailViewer-Cache")) return;
+        }
+        catch (Exception ex) when (IsViewerShutdown(ex))
+        {
+            return;
+        }
+
+        if (!Uri.TryCreate(args.Request.Uri, UriKind.Absolute, out var uri)) return;
+        if (!TileCache.TryBuildKey(uri, _customHostMatchers, out var key)) return;
+
+        string? contentType = null;
+        try
+        {
+            if (args.Response.Headers.Contains("Content-Type"))
+                contentType = args.Response.Headers.GetHeader("Content-Type");
+        }
+        catch (Exception ex) when (IsViewerShutdown(ex))
+        {
+            return;
+        }
+
+        if (!string.IsNullOrEmpty(contentType))
+        {
+            var trimmed = contentType!.TrimStart();
+            if (trimmed.StartsWith("text/", StringComparison.OrdinalIgnoreCase)
+                || trimmed.StartsWith("application/json", StringComparison.OrdinalIgnoreCase)
+                || trimmed.StartsWith("application/xml", StringComparison.OrdinalIgnoreCase)
+                || trimmed.StartsWith("application/javascript", StringComparison.OrdinalIgnoreCase))
+                return;
+        }
+
+        _ = CacheResponseBodyAsync(args.Response, key, contentType, options);
+    }
+
+    private async Task CacheResponseBodyAsync(
+        CoreWebView2WebResourceResponseView response,
+        string key,
+        string? contentType,
+        TileCacheOptions options)
+    {
+        try
+        {
+            using var stream = await response.GetContentAsync();
+            if (stream == null || _disposed) return;
+            var bytes = ReadBoundedBytes(stream, TileCache.MaxTileBytes);
+            if (bytes == null || _disposed) return;
+            await Task.Run(() => TileCache.Shared.Store(key, bytes, contentType, options, DateTime.UtcNow));
+        }
+        catch (Exception ex) when (IsViewerShutdown(ex) || ex is IOException or ArgumentException)
+        {
+            // Cache misses or shutdown races never fail tile rendering.
+        }
+    }
+
+    private static byte[]? ReadBoundedBytes(Stream stream, int maxBytes)
+    {
+        using var buffer = new MemoryStream();
+        var chunk = new byte[16 * 1024];
+        var total = 0;
+        int read;
+        while ((read = stream.Read(chunk, 0, chunk.Length)) > 0)
+        {
+            total += read;
+            if (total > maxBytes)
+                return null;
+            buffer.Write(chunk, 0, read);
+        }
+        return total > 0 ? buffer.ToArray() : null;
+    }
+
+    private void ObserveTiandituResponse(CoreWebView2WebResourceResponseReceivedEventArgs args)
     {
         if (!IsTiandituTileUri(args.Request.Uri)) return;
         var status = (int)args.Response.StatusCode;

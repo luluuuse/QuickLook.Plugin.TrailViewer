@@ -4,6 +4,7 @@
 import { t } from './i18n.js';
 import { findTrackGaps, movementSummary } from './track-analysis.js';
 import { createRouteModel } from './route-model.js';
+import { cleanWaypointDescription } from './waypoint-description.js';
 
 /** @typedef {import('./types.js').TrackPoint} TrackPoint */
 /** @typedef {import('./types.js').ParsedTrack} ParsedTrack */
@@ -56,10 +57,20 @@ function readPoint(el) {
   if (time !== null && !Number.isNaN(Date.parse(time))) point.time = new Date(time);
   const name = text('name');
   if (name !== null) point.name = name;
-  const description = text('desc') || text('cmt');
-  if (description !== null) {
-    point.description = description;
-    point.insightText = description;
+  const rawDesc = text('desc');
+  const rawCmt = text('cmt');
+  if (rawDesc !== null || rawCmt !== null) {
+    const cleanedDesc = rawDesc !== null ? cleanWaypointDescription(rawDesc, { html: false }) : null;
+    const cleanedCmt = !cleanedDesc?.text && rawCmt !== null && rawCmt !== rawDesc
+      ? cleanWaypointDescription(rawCmt, { html: false })
+      : null;
+    const description = cleanedDesc?.text || cleanedCmt?.text || null;
+    if (description !== null) {
+      point.description = description;
+      point.insightText = description;
+    }
+    const fallbackTime = cleanedDesc?.time || cleanedCmt?.time;
+    if (!point.time && fallbackTime) point.time = fallbackTime;
   }
   const symbol = text('sym');
   if (symbol !== null) point.icon = symbol;
