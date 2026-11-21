@@ -17,7 +17,7 @@ Added / Changed / Deprecated / Removed / Fixed / Security 分类；没有内容�
 
 None yet.
 
-## 1.27.2 — 2026-11-21
+## 1.27.3 — 2026-11-21
 
 ### 中文
 

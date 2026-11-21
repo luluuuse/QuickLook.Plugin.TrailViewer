@@ -194,9 +194,9 @@ export function createMapView({ map, isChromeHidden }) {
     const inline = !snapshot.tools || row.total <= inlineRoom;
     // A wrapped tool bar needs enough room for at least the compact waypoint group and language chip.
     // Below that the controls belong in the measured docked band rather than stacking one per row.
-    const minWrapped = Math.max(132, row.widest + 12);
+    const minWrapped = Math.max(168, row.widest + 12);
     const wrappedRoom = Math.max(0, innerWidth - zoomRight - 22);
-    const wrapped = !inline && wrappedRoom >= minWrapped;
+    const wrapped = !inline && wrappedRoom >= minWrapped && innerWidth > 419;
     const next = inline ? 'inline' : wrapped ? 'wrapped' : 'docked';
     const splitWouldMeetZoom = !infoCompact && splits && zoom
       && splits.right > zoomLeft - 6;
@@ -227,9 +227,9 @@ export function createMapView({ map, isChromeHidden }) {
       setVariable('--tools-left', 'auto');
       setVariable('--tools-right', '0px');
       setVariable('--tools-top', layoutState === 'docked' ? cssPixels((card?.bottom || 8) + 6) : '0px');
-      setVariable('--tools-max-width', cssPixels(layoutState === 'inline'
-        ? Math.max(120, innerWidth - 20)
-        : Math.max(minWrapped, wrappedRoom)));
+      setVariable('--tools-max-width', cssPixels(layoutState === 'wrapped'
+        ? Math.max(minWrapped, wrappedRoom)
+        : Math.max(120, innerWidth - 20)));
     } else if (layoutState === 'docked') {
       const cardBottom = card?.bottom || 8;
       const toolsRoom = Math.max(0, innerWidth - zoomWidth - 32);
@@ -246,9 +246,9 @@ export function createMapView({ map, isChromeHidden }) {
       setVariable('--tools-left', 'auto');
       setVariable('--tools-right', '0px');
       setVariable('--tools-top', '0px');
-      setVariable('--tools-max-width', cssPixels(layoutState === 'inline'
-        ? Math.max(120, innerWidth - 20)
-        : Math.max(minWrapped, wrappedRoom)));
+      setVariable('--tools-max-width', cssPixels(layoutState === 'wrapped'
+        ? Math.max(minWrapped, wrappedRoom)
+        : Math.max(120, innerWidth - 20)));
     }
 
     if (document.body.classList.contains('is-editing')) {
