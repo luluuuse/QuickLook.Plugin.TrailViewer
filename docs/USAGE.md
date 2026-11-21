@@ -223,6 +223,17 @@ Canvas 绘制路线，并跳过普通轨迹点圆点、公里数字和路网级�
 `路线-轨迹-1x1-white-soft.png`，同版式的不同样式不会互相覆盖。
 点击导出后设置页保持打开，可以继续切换版式、墨色或底衬并再次导出。
 
+### 轨迹着彩、剖面分析与无损编辑
+
+- **多维热力着彩**：点击工具箱左侧的轨迹图标或按 <kbd>L</kbd>，循环切换 **单色 / 海拔 / 配速 / 心率**（缺失对应字段时自动跳过）。
+- **海拔剖面交互**：水平拖拽剖面绘图区可框选任意区间查看里程、爬升/下降、坡度、用时与均速（按 `Esc` 清除）；支持自动识别 ClimbPro 主坡段、点击或按 <kbd>P</kbd> 一键折叠剖面，以及四等份里程刻度参考线。
+- **窄窗与矮窗联动精简**：窗口宽度 `≤ 720 px` 或高度 `≤ 520 px` 时，轨迹摘要、每公里分段微胶囊与 `26×26` 缩放/回到轨迹控件同步进入紧凑左列栈。
+- **四区无损轨迹编辑**：点击工具箱顶部的 **编辑轨迹** 进入离线编辑工作区：
+  - **顶部主控条**：显示文件名、修改状态圆点、里程增减徽标、撤销/重做（<kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd>）、复原、集成的图层/标记点图标，以及 **保存**（<kbd>Ctrl</kbd>+<kbd>S</kbd>，右侧设置可勾选手表友好去重、佳明 15 字符重名检查或覆盖原文件自动备份）。
+  - **裁剪与拆分**：支持 **剖面剪**（剖面双柄区间裁剪）与 **点击拆**（点击轨迹拆分并管理/删除分段）。
+  - **清洗与拓扑**：支持检测并一键清洗 GPS 异常漂移点，以及反转方向、往返倍增和闭合环线。
+  - **航点编辑**：支持点击轨迹吸附落点、`Alt+点击` 自由落点、序号化航点列表整行选中、右键航点图标删除，以及悬停 `?` 查看操作提示与折叠备注栏。
+
 ### 大文件与隐私
 
 长轨迹仅绘制路线线条、起终点以及按视口抽样的航点，不再为每个原始采样点单独创建圆点标记，避免缩放或拖动时点位重叠与刷新卡顿。轨迹数据不发送到服务器；在线瓦片请求由所选底图触发。
@@ -472,6 +483,17 @@ contrast they suit, and backing choices explain the transparency/readability tra
 ink and backing, for example `east-west-traverse-track-1x1-white-soft.png`, so different styles do not
 overwrite one another. The preview frame shows the exact canvas boundary, and the settings remain open after an
 export so another style can be produced immediately.
+
+### Track coloring, profile analysis & non-destructive editing
+
+- **Multi-dimensional track coloring:** click the trail icon to the left of the Toolbox or press <kbd>L</kbd> to cycle **Single / Elevation / Speed / Heart rate** (automatically skipping unavailable fields).
+- **Elevation profile analysis:** drag horizontally across the plot to inspect range distance, ascent/descent, grade, duration and average speed (`Esc` to clear); includes automatic ClimbPro major climb chips, quartile distance ticks and <kbd>P</kbd> shortcut collapse.
+- **Responsive compact left stack:** at `≤ 720 px` width or `≤ 520 px` height, the summary pill, per-km micro-badge and `26×26` zoom/locate controls collapse together into a compact left column.
+- **Four-zone non-destructive track editor:** open **Toolbox → Edit track** to trim, clean, reverse/close or edit waypoints:
+  - **Top bar:** shows track name, dirty indicator, distance delta pill, Undo/Redo (<kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd>), Reset, integrated Layers & Pins icon toggles, and **Save** (<kbd>Ctrl</kbd>+<kbd>S</kbd>) with Save As or overwrite-with-backup options.
+  - **Crop & Split:** switch between **Profile Crop** (dual-handle elevation range) and **Click Split** (click-to-split and segment deletion).
+  - **Clean & Topology:** detect/clean GPS drift spikes, reverse direction, create out-and-back routes or close loops.
+  - **Waypoints:** snap onto the track or `Alt+Click` to place freely, select from the indexed compact list, right-click a waypoint pin to delete, hover `?` for tips and expand Notes on demand.
 
 ### Large files and privacy
 

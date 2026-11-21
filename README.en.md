@@ -25,26 +25,26 @@ Common controls:
 | Start/finish measuring | <kbd>M</kbd> |
 | Measuring undo / redo | <kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> |
 | Open/close toolbox | <kbd>T</kbd> |
+| Cycle track coloring | <kbd>L</kbd> |
+| Collapse/expand profile | <kbd>P</kbd> |
+| Non-destructive track editor | Toolbox → Edit track |
+| Save GPX in edit mode | <kbd>Ctrl</kbd>+<kbd>S</kbd> |
 | Export overlay image | Toolbox → Export overlay |
 | Open route weather | Toolbox → Route weather |
 
 ## Highlights
 
-- **Track rendering:** GPX tracks, KML LineStrings and `gx:Track`, plus FIT activity/course records, each segment in its own colour, with
-  adaptive direction arrows and distance labels.
+- **Non-destructive track editor:** enter the four-zone editor from the Toolbox hero card for **Profile Crop** (dual-handle elevation range crop), **Click Split** (click-to-split and segment deletion), **Drift Cleaning**, **Topology** (reverse, out-and-back, close loop), and **Waypoint Editing** (indexed list and `Alt+Click` free placement), with multi-step undo/redo (`Ctrl+Z` / `Ctrl+Shift+Z`), `Ctrl+S` Save As or overwrite-with-backup, integrated topbar layers/pins icons, and auto-repositioning compact zoom controls.
+- **Track rendering & coloring:** GPX tracks, KML LineStrings and `gx:Track`, plus FIT activity/course records, each segment in its own colour, with adaptive direction arrows and distance labels; press <kbd>L</kbd> or click the trail-color button beside the Toolbox to cycle **Single / Elevation / Speed / Heart rate** modes.
 - **Route intelligence:** moving time, recording gaps, implausible GPS jumps and a grade-aware time estimate
   using Naismith, Langmuir descents and a steep-uphill correction.
-- **Per-kilometre splits:** an independent entry below the route summary opens on demand to show elapsed time
-  and moving speed for every kilometre, with total/moving-time totals. Selecting a row focuses and highlights
-  that part of the route on the map. A one-click details mode adds cumulative time, ascent/descent, average
-  heart rate, moving speed and vertical speed.
+- **Per-kilometre splits & responsive compact stack:** an independent entry below the route summary supports sortable headers, inline proportion bars, and synchronized elevation-profile spotlighting; at `≤ 720 px` width or `≤ 520 px` height, the summary pill, per-km micro-badge, and `26×26` zoom/locate controls collapse cleanly into a unified left-column stack.
 - **Route networks:** merged networks are detected and rendered as independent routes instead of one trip;
   global speed, split and combined-profile calculations are skipped for faster loading and lower memory use.
 - **Waypoints and photos:** route-ordered navigation, photo albums with portrait 4:3 cards, true source-pixel
   percentages, wheel zoom up to 800% and drag-to-pan, scrollable plain waypoint cards, and a searchable
   overview with local danger/water/camp/exit insight labels.
-- **Elevation profile:** gradient-coloured terrain, waypoint dots, scrub readout and optional per-point heart
-  rate overlaid on its own scale with a whole-route average line.
+- **Elevation profile & ClimbPro:** gradient-coloured terrain, quartile distance ticks, horizontal range brush stats (`Esc` to clear), automatic ClimbPro major climb chips, <kbd>P</kbd> shortcut collapse, scrub readout, and optional per-point heart rate overlaid on its own scale with a whole-route average line.
 - **Manual measurement:** multi-section point-to-point distance measurement on the map. Right-click adds a
   point while left-drag pans and the wheel zooms; nearby waypoints, previously placed measurement points, and
   recorded track samples snap automatically. Section subtotals and overall distance update live.

@@ -46,8 +46,14 @@ QuickLook
 | `viewer/toolbox.js` | 地图分析、分享导出和环境信息的统一工具箱入口 |
 | `viewer/toolbox-coordinates.js` | 坐标目标、任意点拾取、吸附和高亮提示 |
 | `viewer/toolbox-attachments.js` | 附件导出入口、进度和结果状态 |
-| `viewer/toolbox-main.js` | 2×2 快捷工具、天气入口和工具箱主页面 |
+| `viewer/toolbox-main.js` | 编辑轨迹置顶通栏、2×2 快捷格、天气入口和工具箱主页面 |
 | `viewer/toolbox-measure.js` | 测距总览、分段列表和操作按钮 |
+| `viewer/editor-shell.js` | 四区无损轨迹编辑器的顶栏（含集成图层/标记点图标）、工具轨、抽屉与快捷键 |
+| `viewer/editor-overlay.js` | 编辑态高精度轨迹、剖面裁剪预览、吸附落点与航点右键交互图层 |
+| `viewer/track-ops.js` | 纯函数轨迹裁剪、拆分删段、漂移清洗、反转/往返/闭合与航点编辑 |
+| `viewer/track-editor-store.js` | 无损编辑状态栈（多步撤销/重做、复原与里程差值快照） |
+| `viewer/gpx-serializer.js` | UTF-8 GPX 1.1 序列化、手表友好去重与佳明航点重名检查 |
+| `src/TrackSaveService.cs` | 宿主端 GPX 另存为弹窗、原子写入与覆盖原文件自动备份服务 |
 | `viewer/host-bridge.js` | WebView2 消息、剪贴板和定制图源持久化桥接 |
 | `viewer/test-api.js` | 浏览器测试与 Harness 诊断 API 装配 |
 | `viewer/weather.js` | 起点、终点、顶点的目标点计算、海拔可用性判断、Windy 外链生成和外链打开 |
