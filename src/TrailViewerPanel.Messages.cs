@@ -648,4 +648,103 @@ internal sealed partial class TrailViewerPanel
         Trace("export failed: " + detail);
         _ = PostToViewerMessageAsync(ViewerMessages.OverlayFailed(detail));
     }
+
+    private void BeginTrackSave(string body)
+    {
+        try
+        {
+            _trackSave.Begin(body);
+        }
+        catch (InvalidDataException ex)
+        {
+            var id = _trackSave.CurrentId;
+            _trackSave.Reset();
+            _ = PostToViewerMessageAsync(ViewerMessages.TrackSaveResult(id, 1, "", ex.Message));
+        }
+    }
+
+    private void AppendTrackSave(string body)
+    {
+        try
+        {
+            _trackSave.Append(body);
+        }
+        catch (Exception ex) when (ex is FormatException or InvalidDataException or IOException)
+        {
+            var id = _trackSave.CurrentId;
+            _trackSave.Reset();
+            _ = PostToViewerMessageAsync(ViewerMessages.TrackSaveResult(id, 1, "", ex.Message));
+        }
+    }
+
+    private async System.Threading.Tasks.Task FinishTrackSaveAsync(string id)
+    {
+        TrackSavePayload? payload;
+        try
+        {
+            payload = _trackSave.Complete(id);
+        }
+        catch (InvalidDataException ex)
+        {
+            _ = PostToViewerMessageAsync(ViewerMessages.TrackSaveResult(id, 1, "", ex.Message));
+            return;
+        }
+        if (payload == null)
+            return;
+
+        string? targetPath = null;
+        var createBackup = false;
+        var isGpxSource = !string.IsNullOrEmpty(_sourcePath)
+            && string.Equals(Path.GetExtension(_sourcePath), ".gpx", StringComparison.OrdinalIgnoreCase);
+        if (payload.Overwrite && isGpxSource)
+        {
+            targetPath = _sourcePath;
+            createBackup = true;
+        }
+        else
+        {
+            var dialog = new Microsoft.Win32.SaveFileDialog
+            {
+                FileName = payload.FileName,
+                DefaultExt = ".gpx",
+                Filter = "GPX Track (*.gpx)|*.gpx|All Files (*.*)|*.*",
+                InitialDirectory = !string.IsNullOrEmpty(_sourcePath)
+                    ? (Path.GetDirectoryName(_sourcePath) ?? Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments))
+                    : Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
+            };
+            var owner = Window.GetWindow(this);
+            var ok = owner != null ? dialog.ShowDialog(owner) : dialog.ShowDialog();
+            if (ok != true || string.IsNullOrWhiteSpace(dialog.FileName))
+            {
+                _ = PostToViewerMessageAsync(ViewerMessages.TrackSaveResult(payload.Id, 2, "", "cancelled"));
+                return;
+            }
+            targetPath = dialog.FileName;
+            if (!isGpxSource && !string.IsNullOrEmpty(_sourcePath)
+                && string.Equals(targetPath, _sourcePath, StringComparison.OrdinalIgnoreCase))
+            {
+                _ = PostToViewerMessageAsync(ViewerMessages.TrackSaveResult(
+                    payload.Id, 1, "", "Cannot overwrite a non-GPX source file."));
+                return;
+            }
+            createBackup = string.Equals(targetPath, _sourcePath, StringComparison.OrdinalIgnoreCase);
+        }
+
+        try
+        {
+            var resolvedPath = targetPath!;
+            await System.Threading.Tasks.Task.Run(
+                () => TrackSaveService.WriteWithBackup(resolvedPath, payload.Bytes, createBackup),
+                _lifecycle.Token);
+            _editorDirty = false;
+            _ = PostToViewerMessageAsync(ViewerMessages.TrackSaveResult(payload.Id, 0, resolvedPath, ""));
+        }
+        catch (OperationCanceledException) when (_finished)
+        {
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException)
+        {
+            _ = PostToViewerMessageAsync(ViewerMessages.TrackSaveResult(payload.Id, 1, "", ex.Message));
+        }
+    }
 }

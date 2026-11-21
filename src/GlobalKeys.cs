@@ -42,6 +42,7 @@ internal sealed class GlobalKeys : IDisposable
 
     private readonly Func<bool> _onScreen;
     private readonly Func<bool> _measureActive;
+    private readonly Func<bool> _editorActive;
     private readonly Func<bool> _textInputActive;
     private readonly Action<string> _onKey;
     private readonly HookProc _callback; // held in a field: the GC must not collect the thunk the OS calls
@@ -68,10 +69,12 @@ internal sealed class GlobalKeys : IDisposable
         Func<bool> onScreen,
         Func<bool> measureActive,
         Func<bool> textInputActive,
-        Action<string> onKey)
+        Action<string> onKey,
+        Func<bool>? editorActive = null)
     {
         _onScreen = onScreen;
         _measureActive = measureActive;
+        _editorActive = editorActive ?? (() => false);
         _textInputActive = textInputActive;
         _onKey = onKey;
         _callback = Filter;
@@ -138,17 +141,23 @@ internal sealed class GlobalKeys : IDisposable
         var plain = !control && !shift && !alt && !win;
         var plainAction = plain && name != "z";
         var measureHistory = control && !alt && !win && name == "z";
+        var editorSave = control && !shift && !alt && !win && name == "s";
 
-        if ((!plainAction && !measureHistory) || !SafeOnScreen() || !HostIsForeground())
+        if ((!plainAction && !measureHistory && !editorSave) || !SafeOnScreen() || !HostIsForeground())
         {
-            Reason = !plainAction && !measureHistory ? "modifier"
+            Reason = !plainAction && !measureHistory && !editorSave ? "modifier"
                 : TextInputActive() ? "text-input"
                 : !SafeOnScreen() ? "off-screen" : "foreground=" + ForegroundName();
             return Next(code, wParam, lParam);
         }
-        if (measureHistory && !_measureActive())
+        if (measureHistory && !_measureActive() && !_editorActive())
         {
             Reason = "measure-inactive";
+            return Next(code, wParam, lParam);
+        }
+        if (editorSave && !_editorActive())
+        {
+            Reason = "editor-inactive";
             return Next(code, wParam, lParam);
         }
 
@@ -158,7 +167,8 @@ internal sealed class GlobalKeys : IDisposable
 
         try
         {
-            _onKey(measureHistory && shift ? "Z" : name);
+            var payload = editorSave ? "ctrl+s" : (measureHistory && shift ? "Z" : name);
+            _onKey(payload);
         }
         catch (Exception ex)
         {

@@ -36,6 +36,7 @@ internal static class SelfTests
             TestTianditu(temporary);
             TestViewerBuildId(temporary);
             TestOverlayTransfer();
+            TestTrackSaveService(temporary);
             TestAtomicFile(temporary);
             TestViewerMessages();
             TestAttachmentExport(temporary);
@@ -654,6 +655,31 @@ internal static class SelfTests
         Check("empty file names fall back to overlay.png", OverlayTransfer.SanitiseFileName("") == "overlay.png");
         Check("dot-only file names fall back to overlay.png", OverlayTransfer.SanitiseFileName("..") == "overlay.png");
         Check("Unicode file names are preserved", OverlayTransfer.SanitiseFileName("轨迹.png") == "轨迹.png");
+    }
+
+    private static void TestTrackSaveService(string temporary)
+    {
+        using (var svc = new TrackSaveService())
+        {
+            var gpx = "<gpx version=\"1.1\"/>";
+            var b64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(gpx));
+            svc.Begin("s1\t1\t0\tdemo-edited.gpx");
+            svc.Append($"s1\t0\t{b64}");
+            var payload = svc.Complete("s1");
+            Check("track save reassembles UTF-8 GPX payload",
+                payload != null && Encoding.UTF8.GetString(payload.Bytes) == gpx && !payload.Overwrite);
+        }
+
+        var folder = Path.Combine(temporary, "tracksave");
+        Directory.CreateDirectory(folder);
+        var target = Path.Combine(folder, "route.gpx");
+        File.WriteAllText(target, "old-gpx");
+        TrackSaveService.WriteWithBackup(target, Encoding.UTF8.GetBytes("new-gpx"), createBackup: true);
+        Check("track save writes .bak backup before overwriting",
+            File.ReadAllText(target + ".bak") == "old-gpx" && File.ReadAllText(target) == "new-gpx");
+        TrackSaveService.WriteWithBackup(target, Encoding.UTF8.GetBytes("newer-gpx"), createBackup: true);
+        Check("track save preserves original .bak on subsequent overwrites",
+            File.ReadAllText(target + ".bak") == "old-gpx" && File.ReadAllText(target) == "newer-gpx");
     }
 
     private static void TestAtomicFile(string temporary)

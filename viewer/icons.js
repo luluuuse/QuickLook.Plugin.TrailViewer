@@ -60,6 +60,7 @@ const UI_ICONS = Object.freeze({
     + '<path d="M12 3v3M12 18v3M3 12h3M18 12h3"/>',
   undo: '<path d="m9 7-5 5 5 5"/><path d="M4 12h9a6 6 0 0 1 6 6"/>',
   redo: '<path d="m15 7 5 5-5 5"/><path d="M20 12h-9a6 6 0 0 0-6 6"/>',
+  reset: '<path d="M4 12a8 8 0 1 0 2.3-5.6L4 9"/><path d="M4 4v5h5"/>',
   clear: '<path d="M4 7h16"/><path d="M9 7V4h6v3"/><path d="m6 7 1 14h10l1-14"/>'
     + '<path d="M10 11v6M14 11v6"/>',
   stop: '<rect x="5" y="5" width="14" height="14" rx="2"/>',
@@ -82,20 +83,42 @@ const UI_ICONS = Object.freeze({
     + 'c-.9.5-1.4 1.1-1.4 2.1"/><path d="M12 17v.01"/>',
   weather: '<path d="M7.5 18a4.5 4.5 0 0 1-.3-8.99 6 6 0 0 1 11.3 1.6A3.9 3.9 0 0 1 17.6 18Z"/>'
     + '<path d="M9.5 21h5"/><path d="M11 15.5l-1.5 2.5"/><path d="M15 15.5 13.5 18"/>',
+  'editor-crop': '<path d="M6 3v12a3 3 0 0 0 3 3h12"/>'
+    + '<path d="M3 6h12a3 3 0 0 1 3 3v12"/>',
+  'editor-split': '<circle cx="6" cy="7" r="2.5"/><circle cx="6" cy="17" r="2.5"/>'
+    + '<path d="M8.2 8.4 20 16M8.2 15.6 20 8"/><path d="M14 4v2M14 18v2"/>',
+  'editor-merge': '<path d="M4 6h5a4 4 0 0 1 4 4v4a4 4 0 0 0 4 4h3"/>'
+    + '<path d="M4 18h5a4 4 0 0 0 4-4"/><path d="m17 15 3 3-3 3"/>',
+  'editor-clean': '<path d="M3 16c3 0 4-8 6.5-8S13 18 15 18s3-4 6-4"/>'
+    + '<path d="M17 4v4M15 6h4"/>',
+  'editor-box-erase': '<path d="M4 7V5a1 1 0 0 1 1-1h2M17 4h2a1 1 0 0 1 1 1v2'
+    + 'M20 17v2a1 1 0 0 1-1 1h-2M7 20H5a1 1 0 0 1-1-1v-2"/>'
+    + '<path d="M9.5 9.5 14.5 14.5M14.5 9.5 9.5 14.5"/>',
+  'editor-simplify': '<path d="M4 17 10 8l5 5 5-7"/>'
+    + '<circle cx="4" cy="17" r="1.6"/><circle cx="10" cy="8" r="1.6"/><circle cx="20" cy="6" r="1.6"/>',
+  'editor-reverse': '<path d="M4 9h14l-3.5-3.5"/><path d="M20 15H6l3.5 3.5"/>',
+  'editor-roundtrip': '<path d="M5 16V9a4 4 0 0 1 4-4h9"/><path d="m15 2 3 3-3 3"/>'
+    + '<path d="M19 10v5a4 4 0 0 1-4 4H6"/><path d="m9 16-3 3 3 3"/>',
+  'editor-loop-start': '<path d="M12 4a8 8 0 1 1-6.9 4"/>'
+    + '<circle cx="12" cy="4" r="2.2"/><path d="M4 4v4h4"/>',
+  'editor-vertex': '<path d="M4 18 10 9l10 4"/><rect x="8" y="7" width="4" height="4" rx="1"/>'
+    + '<circle cx="4" cy="18" r="1.5"/><circle cx="20" cy="13" r="1.5"/>',
+  'editor-wpt-add': '<path d="M11 21s6-5.4 6-11.2A6 6 0 0 0 5 9.8C5 15.6 11 21 11 21Z"/>'
+    + '<circle cx="11" cy="9.8" r="2"/><path d="M18 4v4M16 6h4"/>',
+  'editor-save': '<path d="M5 4h11l3 3v13H5Z"/><path d="M8 4v5h7V4"/><path d="M8 20v-6h8v6"/>',
+  'editor-time': '<circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/>',
 });
 
 /** The selected map-pin weather marks keep semantic colour while sharing one pin silhouette. */
 const WEATHER_MARKS = Object.freeze({
-  start: '<path d="M12 22s7-6.2 7-13a7 7 0 0 0-14 0c0 6.8 7 13 7 13Z"'
-    + ' fill="#18c964" stroke="#0d3d21" stroke-width="1.5"/>'
-    + '<path d="m9.8 6.6 5.2 2.9-5.2 2.9Z" fill="#0d3d21" stroke="none"/>',
-  end: '<path d="M12 22s7-6.2 7-13a7 7 0 0 0-14 0c0 6.8 7 13 7 13Z"'
-    + ' fill="#e5243b" stroke="#3d0d13" stroke-width="1.5"/>'
-    + '<rect x="8.6" y="6.6" width="6.8" height="6.8" rx="1" fill="#3d0d13" stroke="none"/>',
-  highest: '<path d="M12 22s7-6.2 7-13a7 7 0 0 0-14 0c0 6.8 7 13 7 13Z"'
-    + ' fill="#f5c400" stroke="#3d3108" stroke-width="1.5"/>'
-    + '<path d="m7.5 12 2.5-3 1.8 1.7 1.4-1.8 3.3 3.1" fill="none"'
-    + ' stroke="#3d3108" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>',
+  start: '<path d="M12 21s-6-5.3-6-11a6 6 0 1 1 12 0c0 5.7-6 11-6 11Z"'
+    + ' fill="rgba(106, 181, 139, 0.16)" stroke="#6ab58b" stroke-width="1.7" stroke-linejoin="round"/>'
+    + '<circle cx="12" cy="10" r="2.2" fill="#6ab58b" stroke="none"/>',
+  end: '<rect x="5.5" y="5.5" width="13" height="13" rx="3"'
+    + ' fill="rgba(204, 122, 125, 0.16)" stroke="#cc7a7d" stroke-width="1.7"/>'
+    + '<rect x="9.5" y="9.5" width="5" height="5" rx="1" fill="#cc7a7d" stroke="none"/>',
+  highest: '<path d="m3 18 6-10 4 6 3-4 5 8Z"'
+    + ' fill="rgba(207, 169, 91, 0.16)" stroke="#cfa95b" stroke-width="1.7" stroke-linejoin="round"/>',
 });
 
 export const WEATHER_MARK_NAMES = Object.freeze(Object.keys(WEATHER_MARKS));

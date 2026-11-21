@@ -106,6 +106,7 @@ export function createWaypointController({
   });
   let overviewCache = null;
   let shown = savedVisibility();
+  let editingSuspended = false;
 
   function savedVisibility() {
     const fromHost = params.get('pins');
@@ -124,7 +125,7 @@ export function createWaypointController({
 
   function set(show, remember) {
     shown = show;
-    if (show) {
+    if (show && !editingSuspended) {
       pinLayer?.addTo(map);
       renderWaypointPins();
     } else {
@@ -157,7 +158,7 @@ export function createWaypointController({
   }
 
   function renderWaypointPins() {
-    if (!map) return;
+    if (!map || editingSuspended) return;
     if (!shown || stops.length === 0) return;
 
     lastPinOrigin = map.containerPointToLayerPoint([0, 0]);
@@ -211,7 +212,7 @@ export function createWaypointController({
   }
 
   function onMapMove() {
-    if (!shown || stops.length === 0 || map?._animatingZoom) return;
+    if (editingSuspended || !shown || stops.length === 0 || map?._animatingZoom) return;
     const origin = map.containerPointToLayerPoint([0, 0]);
     if (!lastPinOrigin
       || Math.hypot(origin.x - lastPinOrigin.x, origin.y - lastPinOrigin.y) >= 120) {
@@ -637,6 +638,17 @@ export function createWaypointController({
     openOverview: () => overview.open(overviewItems(), stopIndex),
     closeOverview: (restoreFocus = true) => overview.close({ restoreFocus }),
     refreshMapMarks: renderWaypointPins,
+    setEditingSuspended(suspended) {
+      editingSuspended = Boolean(suspended);
+      if (editingSuspended) {
+        map?.closePopup?.();
+        pinLayer?.remove();
+        clearSelectionReticle();
+      } else if (map && shown && annotationMarkCount + stops.length > 0) {
+        pinLayer?.addTo(map);
+        renderWaypointPins();
+      }
+    },
     relabel,
     destroy() {
       map.off('move', onMapMove);

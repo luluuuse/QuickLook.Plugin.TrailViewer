@@ -362,10 +362,12 @@ export function createSplitsView({
     const label = el('span', 'split-toggle-label');
     label.id = 'splits-title';
     label.append(iconElement('route', { className: 'split-icon' }), el('span', null, t('splits.title')));
+    const splitCountValue = loaded?.splits.length || expectedCount;
     const count = el('span', 'split-toggle-count', t('splits.count', {
-      count: loaded?.splits.length || expectedCount,
+      count: splitCountValue,
     }));
-    toggle.append(label, count, iconElement('chevron-down', { className: 'split-chevron' }));
+    const compactCount = el('span', 'split-toggle-count-compact', String(splitCountValue));
+    toggle.append(label, count, compactCount, iconElement('chevron-down', { className: 'split-chevron' }));
     toggle.addEventListener('click', () => setExpanded(!expanded));
     header.append(toggle);
     if (expanded) {

@@ -219,7 +219,10 @@ const waypointController = createWaypointController({
   photoViewer,
   params,
   onPreferenceChange: () => syncPreferences(),
-  onVisibilityChange: (visible) => activeTrackLayer?.setAnnotationMarkersVisible(visible),
+  onVisibilityChange: (visible) => {
+    activeTrackLayer?.setAnnotationMarkersVisible(visible);
+    editorOverlay?.setWaypointsVisible?.(visible);
+  },
   onFocus: (stop, popup) => mapViewController?.focusSelection(
     [stop.point.lat, stop.point.lon],
     { popup },
@@ -250,6 +253,8 @@ const profileController = createProfileController({
   revealPoint: (latlng) => mapViewController?.revealPoint(latlng),
   onLayoutChange: () => mapViewController?.refreshControls({ refitHome: false }),
   onRangeSelect: (range) => focusProfileRange(range),
+  onCropRange: (fromMeters, toMeters) => openTrackEditor({ initialTool: 'crop', cropRange: [fromMeters, toMeters] }),
+  isEditingSuspended: () => Boolean(editorStore?.isActive()),
 });
 let overlayExport = null;
 let toolboxController = null;
@@ -257,6 +262,196 @@ let measurementController = null;
 let mapViewController = null;
 let layerSwitch = null;
 let trackColorControl = null;
+let activeScrub = null;
+let mapInstance = null;
+let editorStore = null;
+let editorOverlay = null;
+let editorShell = null;
+let editorLoadPromise = null;
+let openingEditor = false;
+let editorContext = null;
+let currentEditedGpx = null;
+let savedColorModeBeforeEdit = null;
+
+function ensureEditorCss() {
+  if (document.getElementById('editor-stylesheet')) return Promise.resolve();
+  return new Promise((resolve) => {
+    const link = document.createElement('link');
+    link.id = 'editor-stylesheet';
+    link.rel = 'stylesheet';
+    link.href = 'css/editor.css';
+    link.addEventListener('load', () => resolve(), { once: true });
+    link.addEventListener('error', () => resolve(), { once: true });
+    document.head.append(link);
+  });
+}
+
+async function ensureEditorLoaded() {
+  if (editorShell && editorStore && editorOverlay) return;
+  if (!editorLoadPromise) {
+    editorLoadPromise = (async () => {
+      try {
+        const [
+          storeMod,
+          overlayMod,
+          shellMod,
+          opsMod,
+        ] = await Promise.all([
+          import('./track-editor-store.js'),
+          import('./editor-overlay.js'),
+          import('./editor-shell.js'),
+          import('./track-ops.js'),
+          ensureEditorCss(),
+        ]);
+        const ctx = editorContext;
+        if (!ctx) return;
+        editorStore = storeMod.createTrackEditorStore({
+          onChange: (nextParsed) => {
+            currentEditedGpx = nextParsed;
+            const nextModel = createRouteModel(nextParsed);
+            const nextProfile = profileController.read(nextParsed, nextModel);
+            const profileBox = document.getElementById('profile');
+            if (profileBox) profileBox.textContent = '';
+            activeScrub?.destroy?.();
+            activeScrub = null;
+            if (nextProfile) {
+              activeProfile = profileController.render(nextParsed, nextProfile);
+              if (mapInstance) activeScrub = profileController.attach(mapInstance, activeProfile);
+            } else {
+              activeProfile = null;
+            }
+            activeTrackLayer?.updateDistancePaths?.(nextParsed);
+            editorShell?.refresh();
+          },
+          onStateChange: (state) => {
+            hostBridge.setEditorState(state.active);
+            hostBridge.setEditorDirty(state.dirty);
+          },
+        });
+        editorOverlay = overlayMod.createEditorOverlay({
+          L,
+          map: ctx.map,
+          el,
+          t,
+          onSplitAt: (splitMeters) => {
+            const current = editorStore.getCurrent();
+            if (!current) return;
+            editorStore.apply('split', opsMod.splitTrackAt(current, splitMeters));
+          },
+          onPickWaypointLocation: (loc) => editorShell?.pickWaypointLocation(loc),
+          onSelectWaypoint: (idx) => editorShell?.selectWaypoint(idx),
+          onMoveWaypoint: (idx, lat, lon) => {
+            const current = editorStore.getCurrent();
+            if (!current) return;
+            editorStore.apply('move-waypoint', opsMod.moveWaypoint(current, idx, lat, lon));
+          },
+          onContextMenu: (info) => editorShell?.showContextMenu(info),
+        });
+        editorShell = shellMod.createEditorShell({
+          el,
+          t,
+          formatDistance,
+          store: editorStore,
+          overlay: editorOverlay,
+          getTrackName: () => ctx.fileName,
+          getProfileState: () => activeProfile,
+          isGpxSource: () => /\.gpx$/i.test((ctx.fileName || ctx.src || '').split(/[?#]/)[0]),
+          onSaveTrack: ({ id, fileName: outName, xml, overwrite }) =>
+            hostBridge.saveTrackGpx({ id, fileName: outName, xml, overwrite }),
+          onExit: ({ overwroteOriginal = false, committed = null } = {}) => {
+            if (overwroteOriginal && committed) {
+              ctx.gpx = committed;
+              currentEditedGpx = committed;
+              const nextModel = createRouteModel(committed);
+              const nextSummary = summarize(committed, nextModel);
+              const nextElevations = nextSummary.elevation ? profileController.read(committed, nextModel) : null;
+              ctx.elevations = nextElevations;
+              const nextHikeEstimate = nextElevations ? gradeAwareHikeSeconds({
+                distance: nextSummary.distanceMeters,
+                ascent: nextElevations.ascent,
+                descent: nextElevations.descent,
+                bins: nextElevations.slopeBins,
+              }) : null;
+              renderInfo(committed, nextSummary, nextElevations, nextHikeEstimate);
+              splitController.render(nextSummary, {
+                reset: true,
+                count: splitCount(nextSummary.distanceMeters),
+                available: nextSummary.points > 0 && nextSummary.start !== null && nextSummary.end !== null,
+              });
+              activeTrackLayer?.destroy?.();
+              waypointController.destroy();
+              const newTracks = trackLayer.draw(ctx.map, committed, nextModel);
+              activeTrackLayer = newTracks;
+              const wpBounds = waypointController.draw(
+                ctx.map, committed, newTracks.segments, newTracks.navigationMarks, nextModel, newTracks.annotationCount,
+              );
+              newTracks.bounds.extend(wpBounds);
+              newTracks.refreshDistanceMarks();
+              waypointController.setEditingSuspended?.(false);
+              waypointController.refreshMapMarks();
+              newTracks.setAnnotationMarkersVisible(waypointController.visible());
+              if (savedColorModeBeforeEdit) {
+                newTracks.setColorMode?.(savedColorModeBeforeEdit);
+                savedColorModeBeforeEdit = null;
+              }
+              mapViewController?.setRoute(newTracks.bounds);
+            } else {
+              currentEditedGpx = ctx.gpx;
+              if (savedColorModeBeforeEdit) {
+                activeTrackLayer?.setColorMode?.(savedColorModeBeforeEdit);
+                savedColorModeBeforeEdit = null;
+              }
+              activeTrackLayer?.updateDistancePaths?.(ctx.gpx);
+              activeTrackLayer?.setBaseVisible?.(true);
+              activeTrackLayer?.setAnnotationMarkersVisible?.(waypointController.visible());
+              waypointController?.setEditingSuspended?.(false);
+            }
+            const profileBox = document.getElementById('profile');
+            if (profileBox) profileBox.textContent = '';
+            activeScrub?.destroy?.();
+            activeScrub = null;
+            if (ctx.elevations) {
+              activeProfile = profileController.render(ctx.gpx, ctx.elevations);
+              activeScrub = profileController.attach(ctx.map, activeProfile);
+            }
+            mapViewController?.refreshControls({ refitHome: false, revealFocus: false });
+          },
+          onLayoutChange: () => mapViewController?.refreshControls({ refitHome: false, revealFocus: false }),
+          showToast,
+        });
+      } catch (err) {
+        editorLoadPromise = null;
+        throw err;
+      }
+    })();
+  }
+  await editorLoadPromise;
+}
+
+async function openTrackEditor({ initialTool = 'crop', cropRange = null } = {}) {
+  const source = currentEditedGpx;
+  if (!source || source.network || openingEditor || editorStore?.isActive()) return;
+  openingEditor = true;
+  try {
+    await ensureEditorLoaded();
+    if (!editorShell || !editorOverlay || editorStore?.isActive()) return;
+    if (measurementController?.active()) measurementController.stop();
+    toolboxController?.close();
+    layerSwitch?.close();
+    savedColorModeBeforeEdit = trackColorControl?.mode() || null;
+    if (savedColorModeBeforeEdit && savedColorModeBeforeEdit !== 'single') {
+      activeTrackLayer?.setColorMode?.('single');
+    }
+    activeTrackLayer?.setBaseVisible?.(false);
+    activeTrackLayer?.setAnnotationMarkersVisible?.(false);
+    waypointController?.setEditingSuspended?.(true);
+    editorOverlay.setWaypointsVisible(waypointController?.visible?.() ?? true);
+    editorShell.open({ parsed: source, initialTool, cropRange });
+    mapViewController?.refreshControls({ refitHome: false, revealFocus: false });
+  } finally {
+    openingEditor = false;
+  }
+}
 const uiFeedback = createUiFeedback({
   t,
   toolbox: () => toolboxController,
@@ -273,6 +468,12 @@ const keyboardController = createKeyboardController({
   toolbox: () => toolboxController,
   trackColor: () => trackColorControl,
   profile: () => activeProfile,
+  editor: () => ({
+    isActive: () => Boolean(editorStore?.isActive()),
+    undo: () => editorStore?.undo(),
+    redo: () => editorStore?.redo(),
+    save: () => editorShell?.triggerSave(),
+  }),
   fit: () => mapViewController?.fit(),
   toggleChrome,
 });
@@ -407,6 +608,9 @@ async function main() {
     worldCopyJump: false,
     renderer: vectorRenderer,
   });
+  mapInstance = map;
+  currentEditedGpx = gpx;
+  editorContext = { map, gpx, fileName, src, elevations };
   map.getContainer().tabIndex = -1;
   installLeafletIcons(map, { closeLabel: () => t('tool.close') });
   map.attributionControl.setPrefix('<a href="https://leafletjs.com" target="_blank">Leaflet</a>');
@@ -504,6 +708,7 @@ async function main() {
     weatherHasElevation: () => availableTargets(gpx).includes('highest'),
     lang: getLang,
     setLang,
+    onEdit: () => openTrackEditor({ initialTool: 'crop' }),
     onWeather: (mode) => {
       const target = weatherTarget(gpx, mode);
       const url = windyUrl(target, zoomFor(mode));
@@ -581,8 +786,31 @@ async function main() {
   mapViewController.fit();
   document.fonts?.ready.then(() => mapViewController.refreshControls());
   const scrub = profile ? profileController.attach(map, profile) : null;
+  activeScrub = scrub;
   installSpaceGuard();
-  document.addEventListener('keydown', onKeyDown);
+  document.addEventListener('keydown', (event) => {
+    if (editorStore?.isActive()) {
+      const mod = event.ctrlKey || event.metaKey;
+      const key = event.key.toLowerCase();
+      if (mod && key === 'z') {
+        event.preventDefault();
+        if (event.shiftKey) editorStore.redo();
+        else editorStore.undo();
+        return;
+      }
+      if (mod && key === 's') {
+        event.preventDefault();
+        editorShell?.triggerSave();
+        return;
+      }
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        editorShell?.requestExit();
+        return;
+      }
+    }
+    onKeyDown(event);
+  });
   const textFieldOf = (node) => node instanceof Element
     && Boolean(node.closest('input, textarea, select, [contenteditable="true"]'));
   installTextInputReporting(textFieldOf);

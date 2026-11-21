@@ -47,6 +47,7 @@ internal sealed partial class TrailViewerPanel : UserControl, IDisposable
     private string? _fileRoot;
     private string? _unpackedFolder;
     private readonly OverlayTransfer _overlay = new();
+    private readonly TrackSaveService _trackSave = new();
     private readonly ViewerMessageRouter _messageRouter;
     private AttachmentExport? _attachments;
     private WebView2? _webView;
@@ -54,6 +55,8 @@ internal sealed partial class TrailViewerPanel : UserControl, IDisposable
     private volatile bool _onScreen;
     private volatile bool _textInput;
     private volatile bool _measureActive;
+    private volatile bool _editorActive;
+    private volatile bool _editorDirty;
     private volatile TileCacheOptions _tileCacheOptions = ViewerPreferences.ReadTileCacheOptions();
     private volatile IReadOnlyList<CustomHostMatcher> _customHostMatchers = Array.Empty<CustomHostMatcher>();
     private bool _finished;
@@ -87,6 +90,11 @@ internal sealed partial class TrailViewerPanel : UserControl, IDisposable
             SaveSettings = SaveViewerSettings,
             SaveCustomSources = SaveCustomSources,
             MeasureState = active => _measureActive = active,
+            EditorState = active => _editorActive = active,
+            EditorDirty = dirty => _editorDirty = dirty,
+            BeginTrackSave = BeginTrackSave,
+            AppendTrackSave = AppendTrackSave,
+            FinishTrackSave = body => _ = FinishTrackSaveAsync(body),
             TextInput = active => _textInput = active,
             ConfigureTiandituKey = value => ConfigureTiandituKey(IsEnglishMessage(value)),
             RemoveTiandituKey = value => RemoveTiandituKey(IsEnglishMessage(value)),
@@ -190,7 +198,7 @@ internal sealed partial class TrailViewerPanel : UserControl, IDisposable
             // someone clicks into the preview. The viewer keys are caught below the application instead.
             var hookClock = Stopwatch.StartNew();
             _keys = new GlobalKeys(
-                () => _onScreen, () => _measureActive, () => _textInput, OnGlobalKey);
+                () => _onScreen, () => _measureActive, () => _textInput, OnGlobalKey, () => _editorActive);
             _keys.Start();
             Trace($"keyboard hook ready in {hookClock.ElapsedMilliseconds} ms (installed={_keys.Installed})");
             // Kept as a fallback: when the hook is unavailable, a preview that did get the keyboard still works.

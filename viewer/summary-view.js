@@ -60,7 +60,19 @@ export function createSummaryView({
   let detailsMode = savedDetailsMode();
   let narrowExpanded = false;
   let desktopCollapsed = false;
-  const isNarrow = () => window.innerWidth <= 720;
+  let activeSyncPill = null;
+  const isNarrow = () => window.innerWidth <= 720 || window.innerHeight <= 520;
+
+  if (typeof window !== 'undefined') {
+    window.addEventListener('resize', () => {
+      if (!activeSyncPill) return;
+      const wasCompact = document.body.classList.contains('info-compact');
+      activeSyncPill();
+      if (document.body.classList.contains('info-compact') !== wasCompact) {
+        onLayoutChange?.();
+      }
+    });
+  }
 
   return function renderInfo(gpx, summary, elevations, estimateSeconds) {
     const box = document.getElementById('info');
@@ -81,7 +93,9 @@ export function createSummaryView({
       pillButton.title = t(expanded ? 'info.narrowCollapse' : 'info.narrowExpand');
       pillButton.setAttribute('aria-label', pillButton.title);
       pillButton.querySelector('.info-narrow-caret').textContent = expanded ? '\u25b4' : '\u25be';
+      document.body.classList.toggle('info-compact', !expanded);
     };
+    activeSyncPill = syncPill;
     pillButton.append(
       el('span', 'info-narrow-text', pillParts.length > 0 ? pillParts.join(' · ') : (gpx.name || fileName)),
       el('span', 'info-narrow-caret', '\u25be'),

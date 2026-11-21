@@ -32,5 +32,8 @@ internal static class ViewerMessages
     internal static string TileCacheCleared(long totalBytes, int tileCount) =>
         $"tileCacheCleared\t{totalBytes}\t{tileCount}";
 
+    internal static string TrackSaveResult(string id, int statusCode, string path, string detail) =>
+        $"trackSaveResult\t{id}\t{statusCode}\t{Encode(path)}\t{Encode(detail)}";
+
     private static string Encode(string value) => Uri.EscapeDataString(value ?? "");
 }

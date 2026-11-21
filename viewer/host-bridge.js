@@ -4,6 +4,7 @@ export function createHostBridge() {
   let clipboardWriting = false;
   let queuedClipboardWrite = null;
   const pendingClipboard = new Map();
+  const pendingTrackSaves = new Map();
   const hasHost = Boolean(
     window.chrome?.webview?.postMessage && window.chrome.webview.addEventListener,
   );
@@ -92,6 +93,57 @@ export function createHostBridge() {
     if (hasHost) post(`custom-sources\t${JSON.stringify(entries)}`);
   }
 
+  function setEditorState(active) {
+    if (hasHost) post(`editor-state\t${active ? '1' : '0'}`);
+  }
+
+  function setEditorDirty(dirty) {
+    if (hasHost) post(`editor-dirty\t${dirty ? '1' : '0'}`);
+  }
+
+  function trackSaveResult(id, statusCode, path = '', detail = '') {
+    const pending = pendingTrackSaves.get(id);
+    if (!pending) return;
+    pendingTrackSaves.delete(id);
+    clearTimeout(pending.timer);
+    if (statusCode === 0) {
+      pending.resolve({ ok: true, cancelled: false, path: decodeMessage(path), detail: decodeMessage(detail) });
+    } else if (statusCode === 2) {
+      pending.resolve({ ok: false, cancelled: true, path: '', detail: '' });
+    } else {
+      pending.resolve({ ok: false, cancelled: false, path: '', detail: decodeMessage(detail) });
+    }
+  }
+
+  function saveTrackGpx({ id, fileName, xml, overwrite = false }) {
+    if (!hasHost) {
+      return Promise.resolve({ ok: true, cancelled: false, path: fileName, detail: 'browser-preview' });
+    }
+    const bytes = new TextEncoder().encode(xml);
+    let binary = '';
+    const sliceSize = 0x8000;
+    for (let i = 0; i < bytes.length; i += sliceSize) {
+      binary += String.fromCharCode(...bytes.subarray(i, i + sliceSize));
+    }
+    const base64 = btoa(binary);
+    const chunkSize = 196608;
+    const totalChunks = Math.max(1, Math.ceil(base64.length / chunkSize));
+
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => {
+        pendingTrackSaves.delete(id);
+        resolve({ ok: false, cancelled: false, path: '', detail: 'save timed out' });
+      }, 30000);
+      pendingTrackSaves.set(id, { resolve, timer });
+      post(`trackbegin\t${id}\t${totalChunks}\t${overwrite ? '1' : '0'}\t${encodeURIComponent(fileName)}`);
+      for (let i = 0; i < totalChunks; i += 1) {
+        const chunk = base64.slice(i * chunkSize, (i + 1) * chunkSize);
+        post(`trackchunk\t${id}\t${i}\t${chunk}`);
+      }
+      post(`trackdone\t${id}`);
+    });
+  }
+
   function installViewerMessages(api, clipboardResultHandler) {
     window.chrome?.webview?.addEventListener('message', (event) => {
       if (typeof event.data !== 'string') return;
@@ -122,6 +174,8 @@ export function createHostBridge() {
         api.tileCacheStats?.(Number(parts[1]), Number(parts[2]));
       } else if (parts[0] === 'tileCacheCleared') {
         api.tileCacheCleared?.(Number(parts[1]), Number(parts[2]));
+      } else if (parts[0] === 'trackSaveResult') {
+        trackSaveResult(parts[1], Number(parts[2]), parts[3], parts[4]);
       }
     });
   }
@@ -146,6 +200,9 @@ export function createHostBridge() {
     copyText,
     clipboardResult,
     persistCustomSources,
+    setEditorState,
+    setEditorDirty,
+    saveTrackGpx,
     installViewerMessages,
     installTextInputReporting,
   };

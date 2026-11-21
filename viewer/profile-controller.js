@@ -90,6 +90,8 @@ function attachScrub({
   focusStop,
   revealPoint,
   onRangeSelect,
+  onCropRange,
+  isEditingSuspended = () => false,
 }) {
   const { points, samples, total, svg, plot, chart, guide, dot, readout, value, meta, yOf, heart, box } = state;
   const marker = L.circleMarker([0, 0], {
@@ -247,7 +249,13 @@ function attachScrub({
     onRangeSelect?.(null);
   }
 
+  state.setBrushCropHandler?.((fromMeters, toMeters) => {
+    clearRange();
+    onCropRange?.(fromMeters, toMeters);
+  });
+
   state.setClimbHandler?.((climb) => {
+    if (isEditingSuspended()) return;
     if (!climb) {
       clearRange();
       return;
@@ -331,6 +339,7 @@ function attachScrub({
     if (!drag && !pinned) clear();
   });
   svg.addEventListener('pointerdown', (event) => {
+    if (isEditingSuspended()) return;
     if (event.pointerType === 'mouse' && event.button !== 0) return;
     event.preventDefault();
     drag = {
@@ -384,6 +393,8 @@ export function createProfileController({
   revealPoint,
   onLayoutChange,
   onRangeSelect,
+  onCropRange,
+  isEditingSuspended = () => false,
 }) {
   const renderProfile = createProfileChart({
     el,
@@ -428,6 +439,8 @@ export function createProfileController({
         focusStop,
         revealPoint,
         onRangeSelect,
+        onCropRange,
+        isEditingSuspended,
       });
     },
   };

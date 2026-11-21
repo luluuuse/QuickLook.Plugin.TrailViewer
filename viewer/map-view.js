@@ -128,6 +128,9 @@ export function createMapView({ map, isChromeHidden }) {
       exportPanel: rectWithin(document.getElementById('export'), base),
       toolbox: rectWithin(document.getElementById('toolbox-panel'), base),
       overview: rectWithin(document.querySelector('.waypoint-overview'), base),
+      editorTopbar: rectWithin(document.getElementById('editor-topbar'), base),
+      editorRail: rectWithin(document.getElementById('editor-rail'), base),
+      editorDrawer: rectWithin(document.getElementById('editor-drawer'), base),
       scale: rectWithin(document.querySelector('.leaflet-control-scale'), base),
       attribution: rectWithin(document.querySelector('.leaflet-control-attribution'), base),
     };
@@ -147,6 +150,9 @@ export function createMapView({ map, isChromeHidden }) {
       '#profile',
       '#toolbox-panel',
       '.waypoint-overview',
+      '#editor-topbar',
+      '#editor-rail',
+      '#editor-drawer',
       '.leaflet-top.leaflet-left',
       '.leaflet-top.leaflet-right',
     ]) {
@@ -179,9 +185,11 @@ export function createMapView({ map, isChromeHidden }) {
     if (!zoom) return;
     const zoomWidth = zoom?.width || 30;
     const row = controlWidths(snapshot.toolChildren);
-    // The red zoom/locate/export column belongs to the summary card. Expanding the split panel must not move it.
-    const zoomLeft = card ? card.right + 8 : 10;
-    const zoomRight = zoomLeft + zoomWidth;
+    const infoCompact = document.body.classList.contains('info-compact')
+      && !document.body.classList.contains('is-editing');
+    // The zoom/locate column belongs to the summary card normally, and tucks beneath #splits in compact mode.
+    const zoomLeft = infoCompact ? 10 : (card ? card.right + 8 : 10);
+    const zoomRight = infoCompact ? (card ? card.right + 8 : 10) : (zoomLeft + zoomWidth);
     const inlineRoom = innerWidth - zoomRight - 22;
     const inline = !snapshot.tools || row.total <= inlineRoom;
     // A wrapped tool bar needs enough room for at least the compact waypoint group and language chip.
@@ -190,10 +198,10 @@ export function createMapView({ map, isChromeHidden }) {
     const wrappedRoom = Math.max(0, innerWidth - zoomRight - 22);
     const wrapped = !inline && wrappedRoom >= minWrapped;
     const next = inline ? 'inline' : wrapped ? 'wrapped' : 'docked';
-    const splitWouldMeetZoom = splits && zoom
+    const splitWouldMeetZoom = !infoCompact && splits && zoom
       && splits.right > zoomLeft - 6;
     const splitTop = Math.max(
-      (card?.bottom || 0) + 8,
+      (card?.bottom || 0) + (infoCompact ? 6 : 8),
       snapshot.splitElement?.classList.contains('expanded') && splitWouldMeetZoom
         ? (zoom?.bottom || 0) + 8
         : 0,
@@ -209,7 +217,20 @@ export function createMapView({ map, isChromeHidden }) {
       document.body.classList.toggle('stepped', layoutState === 'docked');
     }
 
-    if (layoutState === 'docked') {
+    if (infoCompact) {
+      const splitsHeight = splits ? splits.height : 0;
+      const underSplitsTop = splitsHeight > 0
+        ? splitTop + splitsHeight + 6
+        : (card?.bottom || 8) + 6;
+      setVariable('--zoom-left', '10px');
+      setVariable('--zoom-top', cssPixels(underSplitsTop));
+      setVariable('--tools-left', 'auto');
+      setVariable('--tools-right', '0px');
+      setVariable('--tools-top', layoutState === 'docked' ? cssPixels((card?.bottom || 8) + 6) : '0px');
+      setVariable('--tools-max-width', cssPixels(layoutState === 'inline'
+        ? Math.max(120, innerWidth - 20)
+        : Math.max(minWrapped, wrappedRoom)));
+    } else if (layoutState === 'docked') {
       const cardBottom = card?.bottom || 8;
       const toolsRoom = Math.max(0, innerWidth - zoomWidth - 32);
       const toolsBelowZoom = toolsRoom < minWrapped;
@@ -229,9 +250,35 @@ export function createMapView({ map, isChromeHidden }) {
         ? Math.max(120, innerWidth - 20)
         : Math.max(minWrapped, wrappedRoom)));
     }
+
+    if (document.body.classList.contains('is-editing')) {
+      const editorTopbar = document.getElementById('editor-topbar');
+      const topbarRect = editorTopbar && !editorTopbar.hidden ? editorTopbar.getBoundingClientRect() : null;
+      if (topbarRect && topbarRect.width > 0) {
+        if (topbarRect.left < 10 + zoomWidth + 8) {
+          setVariable('--zoom-left', '10px');
+          setVariable('--zoom-top', cssPixels(Math.ceil(topbarRect.bottom)));
+        } else {
+          setVariable('--zoom-left', '10px');
+          setVariable('--zoom-top', '0px');
+        }
+        if (row.total > 0) {
+          const toolsLeftEdge = innerWidth - row.total - 10;
+          if (topbarRect.right + 8 > toolsLeftEdge) {
+            setVariable('--tools-top', cssPixels(Math.max(0, Math.ceil(topbarRect.bottom))));
+            setVariable('--tools-left', 'auto');
+            setVariable('--tools-right', '0px');
+          }
+        }
+      }
+    }
     const profileHeight = snapshot.profile?.height || 0;
     const infoCeiling = Math.max(120, Math.min(innerHeight * 0.48, innerHeight - profileHeight - 120));
     setVariable('--info-max-height', cssPixels(infoCeiling));
+    const editorRailTop = snapshot.editorRail
+      ? Math.max(68, Math.ceil((zoom?.bottom || 0) + 8))
+      : 68;
+    setVariable('--editor-rail-top', cssPixels(editorRailTop));
   }
 
   function measureSafeRect(snapshot) {
@@ -244,6 +291,7 @@ export function createMapView({ map, isChromeHidden }) {
       snapshot.tools,
       snapshot.exportPanel,
       snapshot.toolbox,
+      snapshot.editorTopbar,
     ].filter(Boolean);
     let top = topBoxes.reduce((largest, rect) => Math.max(largest, rect.bottom), 0);
 
@@ -267,7 +315,12 @@ export function createMapView({ map, isChromeHidden }) {
     top = top > 0 ? top + GAP : GAP;
     bottom = Number.isFinite(bottom) ? height - bottom + GAP : GAP;
     right = right > 0 ? right + GAP : GAP;
-    const measured = safeMapRect(width, height, { left: GAP, top, right, bottom });
+    const leftBoxes = [
+      snapshot.editorRail,
+      width >= 760 ? snapshot.editorDrawer : null,
+    ].filter(Boolean);
+    const left = Math.max(GAP, leftBoxes.reduce((largest, rect) => Math.max(largest, rect.right + GAP), GAP));
+    const measured = safeMapRect(width, height, { left, top, right, bottom });
     if (measured.width >= 80 && measured.height >= 80) return measured;
 
     // Keep a navigable rectangle at extreme sizes; reveal then clamps into what remains.
@@ -319,16 +372,22 @@ export function createMapView({ map, isChromeHidden }) {
     const card = snapshot.info;
     const splits = snapshot.splits;
     const zoom = snapshot.zoom;
-    const zoomLeft = card ? card.right + 8 : 10;
-    const splitWouldMeetZoom = splits && zoom && splits.right > zoomLeft - 6;
+    const infoCompact = document.body.classList.contains('info-compact')
+      && !document.body.classList.contains('is-editing');
+    const zoomLeft = infoCompact ? 10 : (card ? card.right + 8 : 10);
+    const splitWouldMeetZoom = !infoCompact && splits && zoom && splits.right > zoomLeft - 6;
     const splitTop = Math.max(
-      (card?.bottom || 0) + 8,
+      (card?.bottom || 0) + (infoCompact ? 6 : 8),
       snapshot.splitElement?.classList.contains('expanded') && splitWouldMeetZoom
         ? (zoom?.bottom || 0) + 8
         : 0,
       10,
     );
     setVariable('--splits-top', cssPixels(splitTop));
+    if (infoCompact && zoom) {
+      const underSplitsTop = splits ? splitTop + splits.height + 6 : (card?.bottom || 8) + 6;
+      setVariable('--zoom-top', cssPixels(underSplitsTop));
+    }
     const toolsBottom = snapshot.tools?.bottom || 0;
     setVariable('--floating-panel-top', cssPixels(Math.max(54, toolsBottom + 4)));
     if (!splits || sameNumber(splits.top, splitTop)) return snapshot;

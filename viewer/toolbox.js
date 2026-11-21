@@ -28,6 +28,7 @@ export function createToolbox({
   weatherAvailable,
   weatherModes = [],
   weatherHasElevation = () => true,
+  onEdit,
   lang = () => 'zh',
   setLang = () => false,
   onOpen,
@@ -135,6 +136,7 @@ export function createToolbox({
       if (measurement.active()) measurement.stop();
       showView('attachments');
     },
+    onEdit: () => onEdit?.(),
     onWeather: (mode) => onWeather?.(mode),
     onClose: () => closePanel(),
   });

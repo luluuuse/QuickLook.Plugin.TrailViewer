@@ -3,13 +3,14 @@ import { iconMarkup, weatherMarkMarkup } from './icons.js';
 /** Main toolbox menu: quick actions, keyboard hints and route weather card. */
 export function createToolboxMain({
   el, t, exportAvailable, weatherAvailable, weatherHasElevation,
-  weatherModes, onMeasure, onCoordinates, onExport, onAttachments, onWeather, onClose,
+  weatherModes, onMeasure, onCoordinates, onExport, onAttachments, onWeather, onEdit, onClose,
 }) {
   let weatherMode = weatherModes[0] || 'start';
   let measureButton;
   let coordinateButton;
   let exportButton;
   let attachmentButton;
+  let editButton;
   let weatherButton;
   let weatherPicker;
   let quickGrid;
@@ -49,6 +50,21 @@ export function createToolboxMain({
     attachmentButton.querySelector('strong').textContent = t('toolbox.attachments');
     attachmentButton.addEventListener('click', onAttachments);
 
+    editButton = el('button', 'toolbox-action toolbox-hero-action');
+    editButton.type = 'button';
+    editButton.dataset.tool = 'edit';
+    editButton.innerHTML = `<span class="toolbox-action-icon">${iconMarkup('edit')}</span>`
+      + '<span><strong></strong><small></small></span>'
+      + '<span class="toolbox-hero-chevron" aria-hidden="true">\u203a</span>';
+    editButton.querySelector('strong').textContent = t('toolbox.edit');
+    editButton.querySelector('small').textContent = t('toolbox.editHint');
+    editButton.title = t('toolbox.editHint');
+    editButton.setAttribute('aria-label', editButton.title);
+    editButton.addEventListener('click', () => {
+      onClose();
+      onEdit?.();
+    });
+
     weatherButton = el('button', 'toolbox-action');
     weatherButton.type = 'button';
     weatherButton.dataset.tool = 'weather';
@@ -84,7 +100,7 @@ export function createToolboxMain({
     const weatherRow = el('div', 'toolbox-weather-card');
     weatherRow.append(weatherButton, weatherPicker);
     quickGrid.append(measureButton, coordinateButton, exportButton, attachmentButton);
-    view.append(quickGrid, weatherRow);
+    view.append(editButton, quickGrid, weatherRow);
     return view;
   }
 
@@ -118,6 +134,10 @@ export function createToolboxMain({
     coordinateButton.querySelector('strong').textContent = t('toolbox.coordinates');
     exportButton.querySelector('strong').textContent = t('toolbox.export');
     attachmentButton.querySelector('strong').textContent = t('toolbox.attachments');
+    editButton.querySelector('strong').textContent = t('toolbox.edit');
+    editButton.querySelector('small').textContent = t('toolbox.editHint');
+    editButton.title = t('toolbox.editHint');
+    editButton.setAttribute('aria-label', editButton.title);
     weatherButton.querySelector('strong').textContent = t('toolbox.weather');
     weatherButton.querySelector('small').textContent = t('toolbox.weatherHint');
     weatherPicker.setAttribute('aria-label', t('toolbox.weatherTarget'));

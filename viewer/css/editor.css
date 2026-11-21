@@ -1,0 +1,909 @@
+/* Four-zone non-destructive track editor layout and micro-surfaces. */
+
+body.is-editing #info,
+body.is-editing #splits,
+body.is-editing .track-color-switch,
+body.is-editing .toolbox-switch,
+body.is-editing .waypoint-overview-switch,
+body.is-editing .pins-switch,
+body.is-editing .layer-switch .layer-menu-toggle,
+body.is-editing .toolbox-panel,
+body.is-editing .waypoint-overview,
+body.is-editing .layer-panel,
+body.is-editing .gpx-pin {
+  display: none !important;
+}
+
+body.is-editing .layer-switch {
+  border: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  width: 0 !important;
+  height: 0 !important;
+  overflow: visible !important;
+  pointer-events: none;
+}
+
+body.is-editing .layer-source-menu {
+  pointer-events: auto;
+  top: 54px;
+}
+
+.editor-wpt-pin {
+  background: none;
+  border: 0;
+}
+
+body.is-editing #map.editor-cursor-crosshair {
+  cursor: crosshair;
+}
+
+body.is-editing #map.editor-cursor-grab {
+  cursor: grab;
+}
+
+body.is-editing #map.editor-cursor-grabbing {
+  cursor: grabbing;
+}
+
+.editor-shell[hidden],
+.editor-topbar[hidden],
+.editor-rail[hidden],
+.editor-drawer[hidden],
+.editor-context-menu[hidden],
+.editor-exit-guard[hidden],
+.editor-save-popover[hidden] {
+  display: none !important;
+}
+
+.editor-save-opts-btn {
+  padding: 0 6px;
+  min-width: 24px;
+}
+
+.editor-save-popover {
+  position: fixed;
+  top: 52px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: var(--z-editor-topbar);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  background: var(--editor-surface);
+  backdrop-filter: var(--toolbar-blur);
+  box-shadow: var(--hud-shadow);
+  border: 1px solid var(--border-control);
+}
+
+.editor-save-popover[hidden] {
+  display: none !important;
+}
+
+.editor-exit-guard[hidden] {
+  display: none !important;
+}
+
+/* Zone 1: Top floating action bar */
+.editor-topbar {
+  position: fixed;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: var(--z-editor-topbar);
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  max-width: min(740px, calc(100vw - 20px));
+  padding: 0 10px;
+  border-radius: var(--radius-md);
+  background: var(--editor-surface);
+  backdrop-filter: var(--toolbar-blur);
+  box-shadow: var(--hud-shadow);
+  color: var(--text);
+  font-size: 12.5px;
+  user-select: none;
+}
+
+.editor-topbar-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-weight: 600;
+  color: var(--text-bright);
+}
+
+.editor-topbar-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 180px;
+}
+
+.editor-dirty-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--editor-active-fg);
+  flex: 0 0 auto;
+  display: none;
+}
+
+.editor-topbar.is-dirty .editor-dirty-dot {
+  display: inline-block;
+}
+
+.editor-diff-pill {
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--editor-active-fg);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+.editor-topbar-sep {
+  width: 1px;
+  height: 16px;
+  background: rgba(255, 255, 255, 0.14);
+  flex: 0 0 auto;
+}
+
+.editor-topbar-icon-btn {
+  padding: 0 7px;
+  min-width: 28px;
+  justify-content: center;
+}
+
+.editor-topbar-icon-btn.is-active {
+  background: var(--editor-active-bg);
+  border-color: var(--editor-active-border);
+  color: var(--editor-active-fg);
+}
+
+.editor-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  height: 26px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--motion-panel), color var(--motion-panel);
+}
+
+.editor-btn:hover:not(:disabled) {
+  background: var(--surface-hover);
+  color: var(--text-bright);
+}
+
+.editor-btn:disabled {
+  color: var(--icon-disabled);
+  cursor: default;
+}
+
+.editor-btn-primary {
+  background: var(--editor-save-bg);
+  color: var(--text-bright);
+  font-weight: 600;
+  padding: 0 10px;
+}
+
+.editor-btn-primary:hover:not(:disabled) {
+  background: var(--editor-save-hover);
+}
+
+.editor-btn-success {
+  background: #15803d;
+  color: var(--text-bright);
+  font-weight: 600;
+  padding: 0 10px;
+}
+
+.editor-btn-success:hover:not(:disabled) {
+  background: #16a34a;
+}
+
+.editor-btn-danger {
+  color: var(--editor-danger-text);
+}
+
+.editor-btn-danger:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.22);
+  color: #fecaca;
+}
+
+/* Exit dirty guard inline strip inside topbar */
+.editor-exit-guard {
+  position: fixed;
+  top: 52px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: var(--z-editor-topbar);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: var(--radius-md);
+  background: var(--editor-surface);
+  backdrop-filter: var(--toolbar-blur);
+  box-shadow: var(--hud-shadow);
+  font-size: 12px;
+  color: var(--text-bright);
+}
+
+/* Zone 2A: Left vertical tool rail (44px, vertically centered) */
+.editor-rail {
+  position: fixed;
+  top: 50%;
+  left: 10px;
+  transform: translateY(-50%);
+  z-index: var(--z-editor-rail);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 44px;
+  padding: 5px;
+  border-radius: var(--radius-md);
+  background: var(--editor-surface);
+  backdrop-filter: var(--toolbar-blur);
+  box-shadow: var(--hud-shadow);
+}
+
+.editor-rail-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--icon-color);
+  cursor: pointer;
+  transition: background var(--motion-panel), color var(--motion-panel);
+}
+
+.editor-rail-btn:hover {
+  background: var(--surface-hover);
+  color: var(--icon-hover);
+}
+
+.editor-rail-btn[aria-pressed="true"] {
+  background: var(--editor-active-bg);
+  color: var(--editor-active-fg);
+}
+
+.editor-rail-btn[aria-pressed="true"]::before {
+  content: "";
+  position: absolute;
+  left: -5px;
+  top: 6px;
+  bottom: 6px;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--accent);
+}
+
+/* Zone 2B: Contextual tool drawer (248px) */
+.editor-drawer {
+  position: fixed;
+  top: 50%;
+  left: 62px;
+  transform: translateY(-50%);
+  z-index: var(--z-editor-drawer);
+  width: 248px;
+  max-height: calc(100vh - 200px);
+  overflow-y: auto;
+  padding: 12px;
+  border-radius: var(--radius-md);
+  background: var(--editor-surface);
+  backdrop-filter: var(--toolbar-blur);
+  box-shadow: var(--hud-shadow);
+  color: var(--text);
+  font-size: 12.5px;
+  transition: opacity var(--motion-panel), transform var(--motion-panel);
+}
+
+.editor-drawer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-bottom: 8px;
+  margin-bottom: 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.editor-drawer-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-bright);
+  margin: 0;
+}
+
+.editor-drawer-head-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.editor-drawer-help {
+  position: relative;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 18px;
+  text-align: center;
+  cursor: help;
+}
+
+.editor-drawer-help:hover,
+.editor-drawer-help:focus-visible {
+  color: var(--text-bright);
+  border-color: var(--accent);
+  background: rgba(56, 189, 248, 0.16);
+}
+
+.editor-drawer-tooltip {
+  position: fixed;
+  z-index: calc(var(--z-editor-drawer) + 10);
+  max-width: 220px;
+  padding: 7px 9px;
+  border-radius: 7px;
+  background: rgba(13, 18, 24, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.55);
+  color: var(--text);
+  font-size: 11.5px;
+  line-height: 1.45;
+  pointer-events: none;
+}
+
+.editor-drawer-tooltip[hidden] {
+  display: none;
+}
+
+.editor-drawer-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.editor-drawer-hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.editor-mode-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.editor-mode-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 8px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  font: inherit;
+  font-size: 12.5px;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--motion-panel), border-color var(--motion-panel);
+}
+
+.editor-mode-btn:hover:not(:disabled) {
+  background: var(--surface-hover);
+}
+
+.editor-mode-btn:disabled {
+  opacity: 0.45;
+  color: var(--icon-disabled);
+  cursor: default;
+}
+
+.editor-mode-btn.is-active,
+.editor-mode-btn.is-active:hover:not(:disabled) {
+  background: rgba(35, 79, 121, 0.55);
+  border-color: rgba(143, 217, 255, 0.45);
+  color: var(--text-bright);
+}
+
+.editor-stat-box {
+  padding: 8px;
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.05);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.editor-stat-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.editor-stat-label {
+  color: var(--muted);
+}
+
+.editor-drawer-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.editor-drawer-actions > button {
+  flex: 1 1 0;
+  height: 28px;
+}
+
+.editor-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.editor-field label {
+  font-size: 11.5px;
+  color: var(--muted);
+}
+
+.editor-field input,
+.editor-field select,
+.editor-field textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-control);
+  background: var(--surface-input);
+  color: var(--text-bright);
+  font: inherit;
+  font-size: 12px;
+}
+
+.editor-check-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.editor-wpt-form {
+  gap: 6px;
+}
+
+.editor-wpt-row {
+  display: grid;
+  grid-template-columns: 1.35fr 1fr;
+  gap: 6px;
+}
+
+.editor-wpt-row input,
+.editor-wpt-row select {
+  width: 100%;
+  min-width: 0;
+  height: 28px;
+  box-sizing: border-box;
+  padding: 4px 7px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-control);
+  background: var(--surface-input);
+  color: var(--text-bright);
+  font: inherit;
+  font-size: 12px;
+}
+
+.editor-wpt-actions {
+  margin-top: 0;
+  gap: 6px;
+}
+
+.editor-wpt-actions > .editor-btn {
+  flex: 0 0 auto;
+  height: 26px;
+  padding: 0 10px;
+}
+
+.editor-wpt-note-toggle {
+  flex: 0 0 auto;
+  height: 26px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 11.5px;
+  cursor: pointer;
+}
+
+.editor-wpt-note-toggle:hover {
+  color: var(--text-bright);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.editor-wpt-spacer {
+  flex: 1 1 auto;
+}
+
+.editor-wpt-note-box[hidden] {
+  display: none;
+}
+
+.editor-wpt-list,
+.editor-seg-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.editor-wpt-list {
+  gap: 0;
+  max-height: 118px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.editor-list-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 5px 7px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 12px;
+  transition: background var(--motion-panel), border-color var(--motion-panel);
+}
+
+.editor-wpt-list .editor-list-row {
+  padding: 3px 6px;
+  min-height: 26px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.editor-wpt-list .editor-list-row + .editor-list-row {
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.editor-wpt-list .editor-list-row:hover {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.editor-list-row-index {
+  min-width: 18px;
+  text-align: right;
+  color: var(--muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  flex: 0 0 auto;
+}
+
+.editor-list-row.is-selected {
+  background: rgba(35, 79, 121, 0.55);
+  border-color: rgba(143, 217, 255, 0.45);
+  color: var(--text-bright);
+}
+
+.editor-wpt-list .editor-list-row.is-selected {
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+.editor-list-row.is-selected .editor-list-row-index {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.editor-wpt-pin {
+  transition: transform var(--motion-panel), filter var(--motion-panel);
+}
+
+.editor-wpt-pin.is-selected {
+  transform: scale(1.18);
+  transform-origin: 50% 100%;
+  filter: drop-shadow(0 0 6px var(--snap-accent, #fbbf24));
+}
+
+.editor-wpt-tooltip {
+  width: max-content;
+  min-width: 96px;
+  max-width: 240px;
+  background: var(--editor-surface);
+  color: var(--text-bright);
+  border: 1px solid var(--border-control);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--hud-shadow);
+  padding: 6px 9px;
+  font-size: 12px;
+  line-height: 1.4;
+  white-space: normal;
+  word-break: keep-all;
+}
+
+.editor-wpt-tooltip::before {
+  border-top-color: var(--editor-surface);
+}
+
+.editor-wpt-tooltip-title {
+  font-weight: 600;
+  color: var(--text-bright);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.editor-wpt-tooltip-meta {
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.editor-wpt-tooltip-desc {
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--text);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+}
+
+.editor-list-row-main {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.editor-seg-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+}
+
+/* Zone 4: Editor bottom profile crop overlay (no SVG mask) */
+body.is-editing #profile {
+  z-index: var(--z-editor-profile);
+}
+
+.editor-crop-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 6;
+}
+
+.editor-crop-overlay[hidden] {
+  display: none !important;
+}
+
+.editor-crop-dim {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: rgba(15, 23, 42, 0.56);
+  pointer-events: none;
+}
+
+.editor-crop-dim-left {
+  left: 0;
+}
+
+.editor-crop-dim-right {
+  right: 0;
+}
+
+.editor-crop-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 24px;
+  margin-left: -12px;
+  pointer-events: auto;
+  cursor: ew-resize;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  touch-action: none;
+  will-change: transform;
+}
+
+.editor-crop-handle::before {
+  content: "";
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  width: 2px;
+  background: #38bdf8;
+}
+
+.editor-crop-handle-pill {
+  position: relative;
+  width: 10px;
+  height: 28px;
+  border-radius: 3px;
+  background: #38bdf8;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
+}
+
+.editor-crop-handle-pill::before,
+.editor-crop-handle-pill::after {
+  content: "";
+  position: absolute;
+  top: 7px;
+  bottom: 7px;
+  width: 1px;
+  background: rgba(15, 23, 42, 0.72);
+}
+
+.editor-crop-handle-pill::before {
+  left: 3px;
+}
+
+.editor-crop-handle-pill::after {
+  right: 3px;
+}
+
+/* Context menu */
+.editor-context-menu {
+  position: fixed;
+  z-index: var(--z-editor-menu);
+  min-width: 168px;
+  padding: 4px;
+  border-radius: var(--radius-md);
+  background: var(--editor-surface);
+  backdrop-filter: var(--toolbar-blur);
+  box-shadow: var(--hud-shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.editor-context-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: 32px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 12.5px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.editor-context-item:hover {
+  background: var(--surface-hover);
+  color: var(--text-bright);
+}
+
+.editor-context-item.is-danger {
+  color: var(--editor-danger-text);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  margin-top: 2px;
+  padding-top: 2px;
+}
+
+/* Responsive breakpoints */
+@media (max-width: 1079px) {
+  .editor-topbar-name {
+    max-width: 140px;
+  }
+
+  .editor-drawer {
+    width: 232px;
+  }
+}
+
+@media (max-width: 759px) {
+  .editor-topbar {
+    max-width: calc(100vw - 20px);
+    gap: 4px;
+    padding: 0 8px;
+  }
+
+  .editor-topbar:not(.is-dirty) .editor-topbar-title {
+    display: none;
+  }
+
+  .editor-topbar-name {
+    display: none;
+  }
+
+  .editor-topbar .editor-btn-label {
+    display: none;
+  }
+
+  .editor-topbar .editor-btn {
+    min-width: 28px;
+    height: 26px;
+    padding: 0 6px;
+    justify-content: center;
+  }
+
+  .editor-topbar-sep {
+    margin: 0 2px;
+  }
+
+  .editor-diff-pill {
+    padding: 2px 7px;
+    font-size: 11px;
+  }
+
+  .editor-rail {
+    width: 40px;
+  }
+
+  .editor-rail-btn {
+    width: 30px;
+    height: 30px;
+  }
+
+  .editor-drawer {
+    left: 58px;
+    width: min(236px, calc(100vw - 70px));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .editor-btn,
+  .editor-rail-btn,
+  .editor-drawer,
+  .editor-mode-btn {
+    transition: none;
+  }
+}

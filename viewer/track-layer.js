@@ -201,8 +201,9 @@ export function createTrackLayer({ L, el, localized, t, pointPopup, onFocusBound
       const bounds = L.latLngBounds([]);
       const segments = [];
       const navigationMarks = [];
-      const distancePaths = [];
+      let distancePaths = [];
       const networkEntries = [];
+      const baseLayer = L.layerGroup().addTo(map);
       const distanceLayer = L.layerGroup().addTo(map);
       const anomalyLineLayer = L.layerGroup().addTo(map);
       const anomalyMarkerLayer = L.layerGroup();
@@ -510,7 +511,7 @@ export function createTrackLayer({ L, el, localized, t, pointPopup, onFocusBound
           fillColor: '#378ADD',
           fillOpacity: 0.06,
           className: 'kml-area',
-        }).addTo(map);
+        }).addTo(baseLayer);
         if (area.name) shape.bindTooltip(el('span', null, area.name), { sticky: true });
         bounds.extend(shape.getBounds());
       }
@@ -546,7 +547,7 @@ export function createTrackLayer({ L, el, localized, t, pointPopup, onFocusBound
               weight: 4,
               opacity: 0.9,
               className: 'gpx-track',
-            }).addTo(map);
+            }).addTo(baseLayer);
             if (tooltipNode) {
               polyline.bindTooltip(tooltipNode, { sticky: true });
             }
@@ -571,7 +572,7 @@ export function createTrackLayer({ L, el, localized, t, pointPopup, onFocusBound
             fillColor: '#e5243b',
             fillOpacity: 1,
             className: 'gpx-end',
-          }).bindPopup(() => pointPopup(last, t('label.end'))).addTo(map);
+          }).bindPopup(() => pointPopup(last, t('label.end'))).addTo(baseLayer);
           navigationMarks.push({ kind: 'end', marker, point: last });
         }
         if (first && showEnds) {
@@ -582,7 +583,7 @@ export function createTrackLayer({ L, el, localized, t, pointPopup, onFocusBound
             fillColor: '#18c964',
             fillOpacity: 1,
             className: 'gpx-start',
-          }).bindPopup(() => pointPopup(first, t('label.start'))).addTo(map);
+          }).bindPopup(() => pointPopup(first, t('label.start'))).addTo(baseLayer);
           navigationMarks.push({ kind: 'start', marker, point: first });
         }
       });
@@ -608,7 +609,7 @@ export function createTrackLayer({ L, el, localized, t, pointPopup, onFocusBound
             opacity: 0.9,
             dashArray: '8 8',
             className: 'gpx-route',
-          }).addTo(map);
+          }).addTo(baseLayer);
           if (route.name) line.bindTooltip(el('span', null, route.name), { sticky: true });
           distancePaths.push({
             points: routeLine.points,
@@ -725,6 +726,62 @@ export function createTrackLayer({ L, el, localized, t, pointPopup, onFocusBound
             anomalyMarkerLayer.remove();
             gapMarkerLayer.remove();
           }
+        },
+        setBaseVisible(visible) {
+          if (visible) {
+            baseLayer.addTo(map);
+            anomalyLineLayer.addTo(map);
+            gapLineLayer.addTo(map);
+          } else {
+            baseLayer.remove();
+            colorOverlayGroup.remove();
+            anomalyLineLayer.remove();
+            gapLineLayer.remove();
+          }
+        },
+        updateDistancePaths(nextParsed) {
+          if (network) return;
+          const nextModel = createRouteModel(nextParsed);
+          const nextPaths = [];
+          let nextOffset = 0;
+          for (const grp of nextModel.trackGroups) {
+            for (const segmentLine of grp.segments) {
+              nextPaths.push({
+                points: segmentLine.points,
+                offset: nextOffset,
+                length: segmentLine.length,
+              });
+              nextOffset += segmentLine.length;
+            }
+          }
+          for (const routeLine of nextModel.routes) {
+            nextPaths.push({
+              points: routeLine.points,
+              offset: nextOffset,
+              length: routeLine.length,
+            });
+            nextOffset += routeLine.length;
+          }
+          distancePaths = nextPaths;
+          distanceOffset = nextOffset;
+          distanceCache = null;
+          distanceLayer.clearLayers();
+          renderDistanceMarks();
+          const nextRecordings = findTrackGaps(nextParsed?.tracks || []);
+          anomalyEpisodes = nextRecordings.episodes.filter((gap) => gap.kind === 'jump');
+          gapEpisodes = nextRecordings.episodes.filter((gap) => gap.kind === 'segment');
+          lastAnnotationOrigin = null;
+          renderAnnotationMarks();
+        },
+        destroy() {
+          baseLayer.remove();
+          distanceLayer.remove();
+          colorOverlayGroup.remove();
+          anomalyLineLayer.remove();
+          gapLineLayer.remove();
+          anomalyMarkerLayer.remove();
+          gapMarkerLayer.remove();
+          splitHighlightLayer.remove();
         },
       };
     },

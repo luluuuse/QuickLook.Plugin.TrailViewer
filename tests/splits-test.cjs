@@ -674,6 +674,28 @@ async function main() {
     await page.evaluate(() =>
       document.getElementById('info')?.classList.contains('desktop-collapsed')
       && getComputedStyle(document.querySelector('.info-narrow-pill')).display !== 'none'));
+
+  await page.locator('.split-toggle').click();
+  await waitForLayout(page);
+  const compactExpandedOrder = await page.evaluate(() => {
+    const info = document.getElementById('info')?.getBoundingClientRect();
+    const splits = document.getElementById('splits')?.getBoundingClientRect();
+    const zoom = document.querySelector('#map .leaflet-top.leaflet-left')?.getBoundingClientRect();
+    return {
+      infoBottom: info?.bottom || 0,
+      splitsTop: splits?.top || 0,
+      splitsBottom: splits?.bottom || 0,
+      zoomTop: zoom?.top || 0,
+      ordered: Boolean(info && splits && zoom
+        && splits.top >= info.bottom && splits.top <= info.bottom + 12
+        && zoom.top >= splits.bottom),
+    };
+  });
+  check('expanded splits in compact mode stays directly below info pill above zoom controls',
+    compactExpandedOrder.ordered, JSON.stringify(compactExpandedOrder));
+  await page.locator('.split-toggle').click();
+  await waitForLayout(page);
+
   await page.locator('.info-narrow-pill').click();
   await waitForLayout(page);
   check('clicking compact pill on wide window restores full summary card',
@@ -681,22 +703,55 @@ async function main() {
       !document.getElementById('info')?.classList.contains('desktop-collapsed')
       && getComputedStyle(document.querySelector('#info .stats')).display !== 'none'));
 
+  await page.locator('#splits .split-toggle').click();
+  await waitForLayout(page);
   await page.setViewportSize({ width: 640, height: 740 });
   await waitForLayout(page);
-  const narrowPill = await page.evaluate(() => ({
-    pillVisible: getComputedStyle(document.querySelector('.info-narrow-pill')).display !== 'none',
-    statsHidden: getComputedStyle(document.querySelector('#info .stats')).display === 'none',
-    pillText: document.querySelector('.info-narrow-text')?.textContent || '',
-  }));
-  check('narrow window <= 720 px collapses summary info into a compact pill',
-    narrowPill.pillVisible && narrowPill.statsHidden && narrowPill.pillText.includes('km'),
+  const narrowPill = await page.evaluate(() => {
+    const splits = document.getElementById('splits')?.getBoundingClientRect();
+    const zoom = document.querySelector('#map .leaflet-top.leaflet-left')?.getBoundingClientRect();
+    return {
+      pillVisible: getComputedStyle(document.querySelector('.info-narrow-pill')).display !== 'none',
+      statsHidden: getComputedStyle(document.querySelector('#info .stats')).display === 'none',
+      pillText: document.querySelector('.info-narrow-text')?.textContent || '',
+      bodyCompact: document.body.classList.contains('info-compact'),
+      splitsWidth: splits ? Math.round(splits.width) : 0,
+      zoomLeft: zoom ? Math.round(zoom.left) : 0,
+      zoomBelowSplits: Boolean(splits && zoom && zoom.top >= splits.bottom),
+    };
+  });
+  check('narrow window <= 720 px collapses summary, splits, and zoom into compact stack',
+    narrowPill.pillVisible && narrowPill.statsHidden && narrowPill.pillText.includes('km')
+      && narrowPill.bodyCompact && narrowPill.splitsWidth < 120
+      && narrowPill.zoomLeft <= 12 && narrowPill.zoomBelowSplits,
     JSON.stringify(narrowPill));
   await page.locator('.info-narrow-pill').click();
   await waitForLayout(page);
   check('clicking the narrow summary pill expands full summary details',
     await page.evaluate(() =>
       document.getElementById('info')?.classList.contains('narrow-expanded')
+      && !document.body.classList.contains('info-compact')
       && getComputedStyle(document.querySelector('#info .stats')).display !== 'none'));
+  await page.locator('#info h1').click();
+  await waitForLayout(page);
+
+  await page.setViewportSize({ width: 1200, height: 800 });
+  await waitForLayout(page);
+  check('resizing back to wide window exits compact mode',
+    await page.evaluate(() =>
+      !document.body.classList.contains('info-compact')
+      && getComputedStyle(document.querySelector('#info .stats')).display !== 'none'));
+
+  await page.setViewportSize({ width: 1000, height: 480 });
+  await waitForLayout(page);
+  const shortWindow = await page.evaluate(() => ({
+    bodyCompact: document.body.classList.contains('info-compact'),
+    pillVisible: getComputedStyle(document.querySelector('.info-narrow-pill')).display !== 'none',
+    statsHidden: getComputedStyle(document.querySelector('#info .stats')).display === 'none',
+  }));
+  check('short window <= 520 px height auto-enters compact mode',
+    shortWindow.bodyCompact && shortWindow.pillVisible && shortWindow.statsHidden,
+    JSON.stringify(shortWindow));
 
   check('no page errors', pageErrors.length === 0, pageErrors.join(' | '));
   await artifacts.capture(page, failures, pageErrors);

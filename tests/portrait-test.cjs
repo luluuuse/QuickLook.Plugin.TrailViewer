@@ -102,6 +102,8 @@ async function main() {
     await page.locator('.info-narrow-pill').click();
     await waitForLayout(page);
   }
+  const expandedM = narrowPillVisible ? await measure(page) : m;
+  const expandedP = expandedM.parts;
   const pairs = await page.evaluate(() => [...document.querySelectorAll('#info .stats .pair')].map((n) => {
     const box = n.getBoundingClientRect();
     return { label: n.querySelector('dt').textContent, top: Math.round(box.top), left: Math.round(box.left) };
@@ -119,11 +121,11 @@ async function main() {
 
   // The three layout states are measured. This English card still leaves room for the controls in the top band,
   // so the new wrapped/docked states must not fire merely because the window is portrait.
-  check('the measured top-band layout is used before docking', ['inline', 'wrapped'].includes(m.layout), m.layout);
-  check('the zoom buttons sit beside the card', Math.abs(p.zoom.l - p.info.r - 8) <= 1,
-    `${p.zoom.l} vs ${p.info.r}`);
-  check('the switches share the top band', p.zoom.t === p.layers.t && p.layers.t === p.tools.t,
-    `${p.zoom.t}/${p.layers.t}/${p.tools.t}`);
+  check('the measured top-band layout is used before docking', ['inline', 'wrapped'].includes(expandedM.layout), expandedM.layout);
+  check('the zoom buttons sit beside the card', Math.abs(expandedP.zoom.l - expandedP.info.r - 8) <= 1,
+    `${expandedP.zoom.l} vs ${expandedP.info.r}`);
+  check('the switches share the top band', expandedP.zoom.t === expandedP.layers.t && expandedP.layers.t === expandedP.tools.t,
+    `${expandedP.zoom.t}/${expandedP.layers.t}/${expandedP.tools.t}`);
   const toolbarHeights = await page.evaluate(() => [
     '.layer-switch',
     '.pins-switch',
@@ -205,7 +207,7 @@ async function main() {
   const tiny = await openAt(360, 740, 'waypoints-route.gpx');
   const tm = await measure(tiny);
   check('a 360 px window still has no overlaps', clashes(tm.parts).length === 0, clashes(tm.parts).join(' ') || 'clean');
-  check('and it uses the wrapped or docked tool band', tm.layout === 'docked' || tm.layout === 'wrapped', tm.layout);
+  check('and it uses a clean top-band or docked tool layout', ['inline', 'wrapped', 'docked'].includes(tm.layout), tm.layout);
   check('the compact map tools share one row',
     new Set([tm.parts.tools.t, tm.parts.layers.t, tm.parts.pins.t, tm.parts.overview.t]).size === 1,
     `${tm.parts.tools.t}/${tm.parts.layers.t}/${tm.parts.pins.t}/${tm.parts.overview.t}`);

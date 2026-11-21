@@ -56,11 +56,25 @@
   --floating-panel-top: 54px;
   --floating-panel-header-height: 40px;
   --z-map-ui: 900;
+  --z-editor-profile: 950;
+  --z-editor-rail: 960;
+  --z-editor-drawer: 980;
   --z-floating-panel: 1000;
+  --z-editor-topbar: 1020;
+  --z-editor-menu: 1060;
   --z-toast: 1100;
   --z-overlay: 1200;
   --z-tool-panel: 1400;
   --z-photo-modal: 3000;
+  --editor-surface: rgba(24, 24, 24, 0.88);
+  --editor-active-bg: #234f79;
+  --editor-active-fg: #8fd9ff;
+  --editor-keep: #f97316;
+  --editor-cut: #64748b;
+  --editor-danger: #ef4444;
+  --editor-danger-text: #fca5a5;
+  --editor-save-bg: #0369a1;
+  --editor-save-hover: #0284c7;
   font: 13px/1.4 "Segoe UI", system-ui, sans-serif;
   color-scheme: dark;
 }

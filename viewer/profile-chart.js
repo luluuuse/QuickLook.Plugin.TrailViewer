@@ -197,12 +197,24 @@ export function createProfileChart({
     const brushStats = el('div', 'brush-stats');
     brushStats.hidden = true;
     const brushStatsText = el('span', 'brush-stats-text');
+    let brushCropHandler = null;
+    const brushStatsCrop = el('button', 'brush-stats-crop');
+    brushStatsCrop.type = 'button';
+    brushStatsCrop.hidden = true;
+    brushStatsCrop.append(
+      iconElement('editor-crop', { size: 11 }),
+      localized(el('span'), () => t('profile.cropSelection')),
+    );
+    brushStatsCrop.addEventListener('click', (event) => {
+      event.stopPropagation();
+      if (splitFocusData) brushCropHandler?.(splitFocusData.from, splitFocusData.to);
+    });
     const brushStatsClose = el('button', 'brush-stats-close');
     brushStatsClose.type = 'button';
     brushStatsClose.append(iconElement('close', { size: 11 }));
     localized(brushStatsClose, () => t('profile.brushClear'), 'title');
     localized(brushStatsClose, () => t('profile.brushClear'), 'aria-label');
-    brushStats.append(brushStatsText, brushStatsClose);
+    brushStats.append(brushStatsText, brushStatsCrop, brushStatsClose);
     brushStats.addEventListener('pointerdown', (event) => event.stopPropagation());
     let brushClearHandler = null;
     brushStatsClose.addEventListener('click', (event) => {
@@ -584,6 +596,7 @@ export function createProfileChart({
       if (statsText) {
         brushStatsText.textContent = statsText;
         brushClearHandler = onClear;
+        brushStatsCrop.hidden = !(splitFocusData.kind === 'brush' && brushCropHandler);
         brushStats.hidden = false;
       } else {
         clearBrushStats();
@@ -695,6 +708,7 @@ export function createProfileChart({
       setBrushFocus,
       setClimbFocus,
       setClimbHandler: (handler) => { climbSelectHandler = handler; },
+      setBrushCropHandler: (handler) => { brushCropHandler = handler; },
       hasActiveRange: () => Boolean(splitFocusData && splitFocusData.kind !== 'split'),
       isCollapsed: () => collapsed,
       setCollapsed,

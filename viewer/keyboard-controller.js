@@ -10,6 +10,7 @@ export function createKeyboardController({
   toolbox: getToolbox,
   trackColor: getTrackColor,
   profile: getProfile,
+  editor: getEditor,
   fit,
   toggleChrome,
 }) {
@@ -34,6 +35,24 @@ export function createKeyboardController({
 
   function pressKey(name) {
     if (photoViewer.isOpen()) return;
+    const editor = getEditor?.();
+    if (editor?.isActive?.()) {
+      if (name === 'z') {
+        editor.undo();
+        return;
+      }
+      if (name === 'Z') {
+        editor.redo();
+        return;
+      }
+      if (name === 'ctrl+s') {
+        editor.save();
+        return;
+      }
+      if (name === 'l' || name === 'm' || name === 't' || name === 's') {
+        return;
+      }
+    }
     const measurement = getMeasurement?.();
     if (name === 'm') {
       if (measurement?.active()) measurement.stop();

@@ -24,6 +24,12 @@ internal sealed class ViewerMessageActions
     internal Action<string> SaveSettings { get; set; } = _ => { };
     internal Action<string> SaveCustomSources { get; set; } = _ => { };
     internal Action<bool> MeasureState { get; set; } = _ => { };
+    internal Action<bool> EditorState { get; set; } = _ => { };
+    internal Action<bool> EditorDirty { get; set; } = _ => { };
+    internal Action<string> BeginTrackSave { get; set; } = _ => { };
+    internal Action<string> AppendTrackSave { get; set; } = _ => { };
+    internal Func<string, System.Threading.Tasks.Task> FinishTrackSave { get; set; } =
+        _ => System.Threading.Tasks.Task.CompletedTask;
     internal Action<bool> TextInput { get; set; } = _ => { };
     internal Action<string> ConfigureTiandituKey { get; set; } = _ => { };
     internal Action<string> RemoveTiandituKey { get; set; } = _ => { };
@@ -69,6 +75,16 @@ internal sealed class ViewerMessageRouter
             _actions.SaveCustomSources(message.Substring("custom-sources\t".Length));
         else if (message == "measure-state\t1" || message == "measure-state\t0")
             _actions.MeasureState(message.EndsWith("\t1", StringComparison.Ordinal));
+        else if (message == "editor-state\t1" || message == "editor-state\t0")
+            _actions.EditorState(message.EndsWith("\t1", StringComparison.Ordinal));
+        else if (message == "editor-dirty\t1" || message == "editor-dirty\t0")
+            _actions.EditorDirty(message.EndsWith("\t1", StringComparison.Ordinal));
+        else if (message.StartsWith("trackbegin\t", StringComparison.Ordinal))
+            _actions.BeginTrackSave(message.Substring("trackbegin\t".Length));
+        else if (message.StartsWith("trackchunk\t", StringComparison.Ordinal))
+            _actions.AppendTrackSave(message.Substring("trackchunk\t".Length));
+        else if (message.StartsWith("trackdone\t", StringComparison.Ordinal))
+            _ = _actions.FinishTrackSave(message.Substring("trackdone\t".Length));
         else if (message == "text-input\t1" || message == "text-input\t0")
             _actions.TextInput(message.EndsWith("\t1", StringComparison.Ordinal));
         else if (message.StartsWith("tianditu-key\tconfigure", StringComparison.Ordinal))

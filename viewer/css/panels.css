@@ -167,7 +167,7 @@
   cursor: pointer;
 }
 
-@media (max-width: 720px) {
+@media (max-width: 720px), (max-height: 520px) {
   #info:not(.narrow-expanded) {
     max-width: calc(100% - 20px);
     padding: 6px 10px;
@@ -448,6 +448,65 @@
   color: var(--muted);
   font-size: 11px;
   white-space: nowrap;
+}
+
+.split-toggle-count-compact {
+  display: none;
+}
+
+body.info-compact #splits:not(.expanded) {
+  border-radius: 999px;
+}
+
+body.info-compact #splits:not(.expanded) .split-toggle {
+  min-height: 26px;
+  height: 26px;
+  padding: 0 9px;
+  gap: 5px;
+}
+
+body.info-compact #splits:not(.expanded) .split-toggle-label > span,
+body.info-compact #splits:not(.expanded) .split-toggle-count {
+  display: none;
+}
+
+body.info-compact #splits:not(.expanded) .split-toggle-count-compact {
+  display: inline;
+  color: var(--icon-active);
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+body.info-compact #splits:not(.expanded) .split-chevron {
+  width: 12px;
+  height: 12px;
+}
+
+body.info-compact:not(.is-editing) #map .leaflet-top.leaflet-left .leaflet-control {
+  margin-top: 0;
+}
+
+body.info-compact:not(.is-editing) #map .leaflet-top.leaflet-left .locate-switch,
+body.is-editing #map .leaflet-top.leaflet-left .locate-switch {
+  margin-top: 6px;
+}
+
+body.info-compact:not(.is-editing) .leaflet-control-zoom a.leaflet-control-zoom-in,
+body.info-compact:not(.is-editing) .leaflet-control-zoom a.leaflet-control-zoom-out,
+body.info-compact:not(.is-editing) .locate-switch button,
+body.is-editing .leaflet-control-zoom a.leaflet-control-zoom-in,
+body.is-editing .leaflet-control-zoom a.leaflet-control-zoom-out,
+body.is-editing .locate-switch button {
+  width: 26px;
+  height: 26px;
+  font-size: 14px;
+}
+
+body.info-compact:not(.is-editing) .locate-switch svg,
+body.is-editing .locate-switch svg {
+  width: 13px;
+  height: 13px;
 }
 
 .split-chevron {

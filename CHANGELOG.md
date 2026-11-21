@@ -11,11 +11,47 @@ Added / Changed / Deprecated / Removed / Fixed / Security 分类；没有内容�
 
 ### 中文
 
-- 无。
+暂无。
 
 ### English
 
-- None.
+None yet.
+
+## 1.27.2 — 2026-11-21
+
+### 中文
+
+#### 新增
+
+- **四区无损轨迹编辑器**：新增非破坏性轨迹编辑工作区，支持 **剖面剪**（剖面双柄区间裁剪）、**点击拆**（轨迹点击拆分与删段）、**漂移点清洗**、**拓扑操作**（反转方向、往返倍增、闭合环线）及 **航点增删改**，全操作支持多步撤销/重做（`Ctrl+Z` / `Ctrl+Shift+Z`）与一键复原。
+- **独立安全保存与快捷键**：新增本地文件保存服务，支持 `Ctrl+S` 快捷保存、另存为新 GPX（可选手表友好去重与佳明航点 15 字符重名检查）及覆盖原文件自动备份并在退出后实时刷新预览。
+
+#### 变更
+
+- **工具箱布局与天气图标重设计**：将 **编辑轨迹** 设为工具箱顶部通栏主入口，下方四项工具重组为工整 `2×2` 横排小卡并去除黑底方框；轨迹天气起点/终点/顶点切换为低饱和柔色线框图标。
+- **编辑顶栏集成与航点面板精简**：将图层与标记点图标并入编辑顶栏（极窄屏自动隐藏文字与文件名并补齐复原图标）；航点编辑抽屉将引导语移至标题右侧 `?` 外侧浮层、名称与图标并排、备注默认折叠，航点列表新增序号列、整行点击选中与行间细分割线。
+- **窄窗/矮窗全列同步精简**：窗口宽度 `<= 720 px` 或高度 `<= 520 px` 时，轨迹信息、每公里微胶囊与 `26×26` 缩放/回到轨迹控件同步进入紧凑左列栈；编辑模式下缩放/回到轨迹同步采用紧凑尺寸并在与顶栏冲突时自动下移。
+
+#### 修复
+
+- **布局定位与交互细节**：修复精简模式下展开“每公里”表格时错位跳至缩放控件下方的问题；统一全界面工具按钮激活态着色；限制编辑模式下仅右键点击航点图标本身才显示“删除该航点”菜单，右键空白地图不再弹窗；退出编辑后完整恢复原轨迹着色模式。
+
+### English
+
+#### Added
+
+- **Four-Zone Non-Destructive Track Editor**: Added an offline track editing workspace with **Profile Crop** (dual-handle elevation range crop), **Click Split** (click-to-split and segment deletion), **Drift Cleaning**, **Topology** (reverse direction, out-and-back, close loop), and **Waypoint Editing**, backed by multi-step undo/redo (`Ctrl+Z` / `Ctrl+Shift+Z`) and reset.
+- **Safe Save Service & Shortcuts**: Added native GPX save support with `Ctrl+S`, Save As with optional watch-friendly deduplication and Garmin 15-char waypoint collision checks, plus overwrite-with-backup and live preview refresh on exit.
+
+#### Changed
+
+- **Toolbox Layout & Weather Icon Redesign**: Promoted **Edit Track** to a full-width top hero card above a clean `2×2` horizontal tool grid without heavy dark icon boxes, and softened the Route Weather start/end/peak icons into low-saturation outlined marks.
+- **Integrated Editor Topbar & Compact Waypoint Drawer**: Merged icon-only Layers and Pins toggles into the editor topbar (hiding labels/filename on narrow windows and adding a Reset icon); moved waypoint guidance into an unclipped `?` hover tooltip beside the drawer, placed Name & Icon side-by-side, collapsed Notes by default, and added an index column, full-row click selection, and hairline dividers to the waypoint list.
+- **Synchronized Compact Stack on Narrow/Short Windows**: Automatically switches Info, per-km splits, and `26×26` zoom/locate controls into a unified compact left-column stack at `<= 720 px` width or `<= 520 px` height; applies compact zoom controls in edit mode and shifts them below the editor topbar on collision.
+
+#### Fixed
+
+- **Layout & Interaction Fixes**: Fixed expanded per-km splits jumping below zoom controls in compact mode; unified active button highlight styling across toolbars; restricted the "Delete waypoint" context menu item to right-clicks on waypoint pins rather than empty map areas; and restored the original track color mode on exiting the editor.
 
 ## 1.26.0 — 2026-11-20
 
