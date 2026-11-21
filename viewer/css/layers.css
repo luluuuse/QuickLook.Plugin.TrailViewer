@@ -1154,11 +1154,13 @@
 
 .pins-switch.joined-left {
   border-radius: var(--toolbar-radius) 0 0 var(--toolbar-radius) !important;
-  border-right: 1px solid rgba(255, 255, 255, 0.09);
+  border-right: 0;
+  clip-path: inset(-12px 0 -12px -12px);
 }
 
 #map .leaflet-top.leaflet-right > .leaflet-control.waypoint-overview-switch {
   border-radius: 0 var(--toolbar-radius) var(--toolbar-radius) 0 !important;
+  clip-path: inset(-12px -12px -12px 0);
 }
 
 .pins-switch > button.active,
@@ -1186,7 +1188,7 @@
 }
 
 .waypoint-overview-switch.joined-right {
-  border-left: 1px solid var(--border-control);
+  border-left: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 0 var(--toolbar-radius) var(--toolbar-radius) 0;
 }
 

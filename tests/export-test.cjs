@@ -215,7 +215,7 @@ async function main() {
     loopText.includes('Alpine snow traverse'), loopText.join(' | '));
   check('the exported track date identifies the day',
     loopText.includes('2026.01.05'), loopText.join(' | '));
-  const labels = ['总用时', '上升', '最高海拔', '运动均速'];
+  const labels = ['总用时', '爬升', '最高海拔', '运动均速'];
   const labelPositions = labels.map((label) => loopText.indexOf(label));
   check('hiking metrics put ascent ahead of elevation and speed',
     labelPositions.every((index) => index >= 0)
@@ -323,7 +323,7 @@ async function main() {
   const networkText = await textOf(page, base, 'kml-network.kml');
   check('a route network keeps its document name', networkText.includes('West Lake route network'),
     networkText.join(' | '));
-  check('and is labelled as a network', networkText.includes('线路网'), networkText.join(' | '));
+  check('and is labelled as a network', networkText.includes('路网'), networkText.join(' | '));
   check('a network reports route length and segment count',
     networkText.includes('路线长度') && networkText.includes('轨迹段'), networkText.join(' | '));
   check('a network does not invent start, end or trip metrics',

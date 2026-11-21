@@ -26,7 +26,7 @@ test('the icon registry is unique and covers every shared control', () => {
     'layer-road', 'layer-terrain', 'layer-satellite', 'layer-custom', 'map-grid',
     'editor-crop', 'editor-split', 'editor-merge', 'editor-clean', 'editor-box-erase',
     'editor-simplify', 'editor-reverse', 'editor-roundtrip', 'editor-loop-start',
-    'editor-vertex', 'editor-wpt-add', 'editor-save', 'editor-time',
+    'editor-vertex', 'editor-waypoint-add', 'editor-save', 'editor-time',
   ]) {
     assert.ok(UI_ICON_NAMES.includes(name), name);
   }

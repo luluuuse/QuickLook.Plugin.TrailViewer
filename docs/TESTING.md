@@ -45,7 +45,7 @@ npm run test:live
 | 照片、附件弹窗、全览返回 | `photo focus` |
 | 剖面、心率、速览或高程 | `profile ve scrub` |
 | 测距、工具箱、坐标、摘要与附件导出 | `measure tools portrait`，并运行单元测试 |
-| 标记点、导航和列表 | `nav pins insights` |
+| 航点、导航和列表 | `nav pins insights` |
 | 图层、定制图源、缩放和定位 | `terrain custom-source zoom locate` |
 | 图标 | `icons`，并运行单元测试 |
 | 导出 | `export` |
@@ -87,7 +87,7 @@ Build workflow 使用声明的最低 Node 20，Release workflow 使用 Node 22�
   导出跳过外链。
 - `tools/Harness/SelfTests.cs`：消息路由分发、宿主消息格式、失败布尔值、剪贴板占用重试、关闭取消、DNS/SSRF 范围、
   TUN 假地址例外、图片文件头、异步附件路径、共享原子文本/字节写入、清单续传和本地回退路径。
-- `tests/editor-test.cjs`：四区无损轨迹编辑器、剖面剪与点击拆、清洗/拓扑、航点增删改与 `?` 外侧浮层/序号列表、`Ctrl+Z` / `Ctrl+S`、窄窗顶栏集成图层/标记点图标与缩放避让、右键航点菜单边界及覆盖保存刷新。
+- `tests/editor-test.cjs`：四区无损轨迹编辑器、剖面剪与点击拆、清洗/拓扑、航点增删改与 `?` 外侧浮层/序号列表、`Ctrl+Z` / `Ctrl+S`、窄窗顶栏集成图层/航点图标与缩放避让、右键航点菜单边界及覆盖保存刷新。
 - `tests/unit/track-ops.test.mjs`、`tests/unit/track-editor-store.test.mjs`、`tests/unit/gpx-serializer.test.mjs`：裁剪/拆分/清洗/拓扑纯函数、编辑状态撤销重做栈与 GPX 1.1 序列化及佳明航点重名检查单元测试。
 - `tests/profile-test.cjs`：单路径/单渐变填充、无遮罩合成层、摘要两行六项（里程/上升/下降 + 总用时/运动均速/
   点数）与里程、总用时的蓝色竖线、可选心率开关/双轴/缺口、
@@ -102,19 +102,19 @@ Build workflow 使用声明的最低 Node 20，Release workflow 使用 Node 22�
   单行四分类、非空分类的常规选择器、重新打开分流、管理入口在图层列表与定制页之间的显隐、图标操作、
   二次删除确认、持久化、删除回退和主次按钮样式、跨面板文字拖动选择、320 px 面板宽度与右对齐，以及
   宿主配置注入和保存消息。
-- `tests/floating-panels-test.cjs`：工具箱、图层和标记点列表的共享顶部/标题几何、三者互斥，以及工具箱
+- `tests/floating-panels-test.cjs`：工具箱、图层和航点列表的共享顶部/标题几何、三者互斥，以及工具箱
   开合不会把手动平移后的地图拉回旧焦点；地图拖动时验证高开销面板模糊被关闭。
 - `tests/focus-test.cjs`：多尺寸安全区域取景和浮层面板 `contain` 隔离；竖幅照片卡片高于安全区时
   按“水平在内 + 顶部对齐 + 完整在窗口内”校验。
 - `tests/unit/map-focus.test.mjs`：舒适区、边缘居中、弹窗联合矩形，以及内容高于安全区时顶部对齐。
 - `tests/runner-test.cjs`：专项筛选、套件列表、未知名称和未知参数处理。
-- `tests/network-test.cjs`：生成式多路线路网、时间对象跳过、拖动中视口刷新、LOD Canvas、标注点虚拟化及性能预算。
+- `tests/network-test.cjs`：生成式多路路网、时间对象跳过、拖动中视口刷新、LOD Canvas、标注点虚拟化及性能预算。
 - `tests/measure-test.cjs`：测距索引懒加载、航点/手动测距点/轨迹吸附（含末点防自吸、闭合环线、跨段续接与
   撤回失效）、标准化准星与轻量标签、地图手势、快捷键、右侧布局、工具箱内导出页和彩色天气图钉。
 - `tests/photo-test.cjs`：照片卡片“整卡即照片（竖幅 4:3）+ 底部渐隐信息 + 圆形下一张箭头与位置进度”与
   无照片卡片同套外观及 `--panel` 单层透明度、卡片不再有坐标与“查看原图”按钮、点照片进入全览、“下一张”
-  跨标记点翻页并推进进度、选中标记点的标准化菱形准星精确居中（`dx ≤ 1 px / dy ≤ 1.5 px`）与暖金发光，
-  以及普通卡片、全览大图顶栏和标记点列表中遥测模板清洗与缺失时间回填的端到端校验。
+  跨航点翻页并推进进度、选中航点的标准化菱形准星精确居中（`dx ≤ 1 px / dy ≤ 1.5 px`）与暖金发光，
+  以及普通卡片、全览大图顶栏和航点列表中遥测模板清洗与缺失时间回填的端到端校验。
 
 ## 测试原则
 

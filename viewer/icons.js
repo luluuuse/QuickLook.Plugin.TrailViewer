@@ -103,7 +103,7 @@ const UI_ICONS = Object.freeze({
     + '<circle cx="12" cy="4" r="2.2"/><path d="M4 4v4h4"/>',
   'editor-vertex': '<path d="M4 18 10 9l10 4"/><rect x="8" y="7" width="4" height="4" rx="1"/>'
     + '<circle cx="4" cy="18" r="1.5"/><circle cx="20" cy="13" r="1.5"/>',
-  'editor-wpt-add': '<path d="M11 21s6-5.4 6-11.2A6 6 0 0 0 5 9.8C5 15.6 11 21 11 21Z"/>'
+  'editor-waypoint-add': '<path d="M11 21s6-5.4 6-11.2A6 6 0 0 0 5 9.8C5 15.6 11 21 11 21Z"/>'
     + '<circle cx="11" cy="9.8" r="2"/><path d="M18 4v4M16 6h4"/>',
   'editor-save': '<path d="M5 4h11l3 3v13H5Z"/><path d="M8 4v5h7V4"/><path d="M8 20v-6h8v6"/>',
   'editor-time': '<circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/>',

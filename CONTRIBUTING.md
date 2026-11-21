@@ -33,6 +33,16 @@ npm run test:host
 - UI 行为变化附带浏览器测试；纯算法变化附单元测试；宿主边界变化附 Harness 自测。
 - 文档中的命令、链接和路径必须能在当前仓库直接找到。
 
+## Naming conventions
+
+以下 5 条约定仅约束后续新增代码与新改功能，不要求为旧接口做破坏性重命名：
+
+1. 中文 UI 术语固定为 **航点**、**爬升**、**路网**；代码标识符统一美式拼写（`color` / `meter` / `center` / `normalize` / `summarize` / `sanitize`）。
+2. 通用轨迹模型变量使用 `track` / `parsedTrack`，不再用格式名 `gpx`。
+3. 数据层统一 `waypoints`，地图图层对象统一 `markers`，不再新增 `pins` / `stops` 别名。
+4. 新增宿主消息统一 `kebab-case`（如 `editor-state`），分隔符统一 `\t`。
+5. 新增 CSS 类统一带模块前缀（如 `.editor-*`），图标键名禁用缩写（使用全拼如 `editor-waypoint-add`）。
+
 ## 文档
 
 - 用户入口：`README.md` / `README.en.md`

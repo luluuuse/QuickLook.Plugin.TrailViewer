@@ -17,6 +17,28 @@ Added / Changed / Deprecated / Removed / Fixed / Security 分类；没有内容�
 
 None yet.
 
+## 1.27.4 — 2026-11-21
+
+### 中文
+
+#### 变更
+
+- **统一中文术语与图标命名**：全界面、活跃文档及测试中的「标记点」「上升」「线路网」统一规范为「航点」「爬升」「路网」；`editor-wpt-add` 图标键名改为全拼 `editor-waypoint-add`，并在 [CONTRIBUTING.md](CONTRIBUTING.md) 固化后续命名约定。
+
+#### 修复
+
+- **工具栏接缝阴影与工具箱展开高亮**：裁除「航点 | 列表」相邻按钮接缝处重叠的暗色外阴影并合并为单条 `1px` 细分隔线；为工具箱按钮补齐面板展开态（`aria-expanded="true"`）的蓝底高亮与底部指示线。
+
+### English
+
+#### Changed
+
+- **Unified Chinese Terminology & Icon Naming**: Standardized Chinese UI, active docs, and test assertions to「航点」「爬升」「路网」; renamed the `editor-wpt-add` icon key to `editor-waypoint-add` and documented the naming conventions in [CONTRIBUTING.md](CONTRIBUTING.md).
+
+#### Fixed
+
+- **Joined Control Seam Shadow & Toolbox Active Highlight**: Clipped overlapping outer shadows on the seam between the joined Waypoints and Overview buttons to a single `1px` hairline divider, and styled the Toolbox button's expanded (`aria-expanded="true"`) active state to match the rest of the toolbar.
+
 ## 1.27.3 — 2026-11-21
 
 ### 中文

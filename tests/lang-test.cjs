@@ -87,9 +87,9 @@ async function main() {
   check('the document title is translated', s.title === '轨迹预览', s.title);
   check('the summary labels are translated',
     ['点数', '里程', '内容', '照片'].every((word) => s.labels.includes(word)), s.labels.join('/'));
-  check('the contents line counts in Chinese', s.values.includes('1 条轨迹、5 个标记点'),
+  check('the contents line counts in Chinese', s.values.includes('1 条轨迹、5 个航点'),
     s.values.join(' | ').slice(0, 120));
-  check('the photo line is translated', s.values.some((v) => v.includes('张照片，分布在 3 个标记点')),
+  check('the photo line is translated', s.values.some((v) => v.includes('张照片，分布在 3 个航点')),
     s.values[s.values.length - 1]);
   check('the tooltips name the keys in Chinese',
     /Q \/ E 切换/.test(s.tips) && /（W）/.test(s.tips) && /（C）/.test(s.tips) && !/⇧X/.test(s.tips), s.tips);
@@ -109,7 +109,7 @@ async function main() {
   s = await snapshot(page);
   check('the position counter is language-neutral', s.position === '2/3', s.position);
   check('the next arrow tooltip names where it goes in Chinese',
-    /下一处带照片的标记点/.test(s.nextTitle), s.nextTitle);
+    /下一处带照片的航点/.test(s.nextTitle), s.nextTitle);
   check('the elevation line is Chinese but the unit is not', s.card.includes('海拔 26 m'), s.card.slice(0, 40));
 
   await page.evaluate(() => window.trailViewer.scrub.at(200));

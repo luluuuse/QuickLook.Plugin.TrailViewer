@@ -22,7 +22,7 @@ const RAIL_TOOLS = [
   { id: 'crop', icon: 'editor-crop', labelKey: 'editor.rail.crop' },
   { id: 'clean', icon: 'editor-clean', labelKey: 'editor.rail.clean' },
   { id: 'topology', icon: 'editor-reverse', labelKey: 'editor.rail.topology' },
-  { id: 'waypoint', icon: 'editor-wpt-add', labelKey: 'editor.rail.waypoint' },
+  { id: 'waypoint', icon: 'editor-waypoint-add', labelKey: 'editor.rail.waypoint' },
 ];
 
 const WAYPOINT_SYMS = ['pin', 'water', 'supply', 'camp', 'summit', 'danger', 'junction'];
@@ -805,7 +805,7 @@ export function createEditorShell({
         store.apply('split', splitTrackAt(store.getCurrent(), splitMeters));
       });
       contextMenu.append(splitItem);
-      const addWptItem = makeBtn('editor-context-item', 'editor-wpt-add', t('editor.ctx.addWaypoint'), () => {
+      const addWptItem = makeBtn('editor-context-item', 'editor-waypoint-add', t('editor.ctx.addWaypoint'), () => {
         closeContextMenu();
         activeTool = 'waypoint';
         drawerOpen = true;

@@ -131,7 +131,7 @@ async function main() {
     trigger: document.querySelector('.waypoint-filter-trigger')?.textContent,
   }));
   check('insight labels follow the interface language',
-    translated.title === '标记点速览' && translated.chips.includes('危险 2')
+    translated.title === '航点速览' && translated.chips.includes('危险 2')
       && translated.chips.includes('水源 2') && translated.badges.includes('危险'),
     `${translated.title}/${translated.chips.join('|')}/${translated.badges.join('|')}`);
   check('the active category survives a language switch', translated.filter === 'water', translated.filter);

@@ -21,7 +21,9 @@
 }
 
 .toolbox-switch > button.active,
-.toolbox-switch > button.active:hover {
+.toolbox-switch > button.active:hover,
+.toolbox-switch > button[aria-expanded="true"],
+.toolbox-switch > button[aria-expanded="true"]:hover {
   background: var(--icon-active-background);
   color: var(--icon-active);
   box-shadow: inset 0 -2px var(--icon-active-line);

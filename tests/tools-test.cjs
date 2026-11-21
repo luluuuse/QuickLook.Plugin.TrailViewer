@@ -450,7 +450,7 @@ async function main() {
     await page.locator('.toolbox-shortcut-page .toolbox-subtitle').textContent() === '快捷键速查'
       && await page.locator('.toolbox-shortcut-page .toolbox-subhint').textContent() === '地图获得焦点时可用。'
       && (await page.locator('.toolbox-shortcut-page .toolbox-shortcut-row span').allTextContents())
-        .join('|') === '标记点|隐藏界面|点位/照片|切换图源|全轨迹|测距|工具箱|剖面图|轨迹着彩');
+        .join('|') === '航点|隐藏界面|点位/照片|切换图源|全轨迹|测距|工具箱|剖面图|轨迹着彩');
   await page.click('.toolbox-shortcut-page .toolbox-back');
 
   await page.setViewportSize({ width: 360, height: 740 });

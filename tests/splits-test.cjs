@@ -348,7 +348,7 @@ async function main() {
   state = await splitState();
   check('an open split panel keeps its state while the labels change language',
     state.expanded === 'true'
-      && state.headers.join('|') === '圈|时间|累计时间|上升|下降|运动速度|垂直速度'
+      && state.headers.join('|') === '圈|时间|累计时间|爬升|下降|运动速度|垂直速度'
       && state.totals[0].label === '总时间' && state.totals[1].label === '运动时间'
       && state.totals[2].label === '休息时间'
       && state.selectedIndex === 2 && state.highlightLines >= 2 && state.modeButton === '简要'

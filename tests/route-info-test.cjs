@@ -375,8 +375,8 @@ async function main() {
     button: document.querySelector('.waypoint-overview-switch button')?.title,
   }));
   check('the overview follows the interface language',
-    translated.title === '标记点速览' && translated.close === '关闭标记点速览'
-      && translated.button === '打开标记点速览',
+    translated.title === '航点速览' && translated.close === '关闭航点速览'
+      && translated.button === '打开航点速览',
     `${translated.title}/${translated.close}/${translated.button}`);
 
   await page.setViewportSize({ width: 360, height: 740 });

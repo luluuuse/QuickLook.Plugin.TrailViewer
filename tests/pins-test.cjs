@@ -156,15 +156,15 @@ async function main() {
   // 7. The label follows the interface language, the state does not change.
   await switchLanguage(page, 'zh');
   s = await state();
-  check('the switch speaks Chinese', s.label === '标记点', s.label);
-  check('the tooltip is Chinese too', s.title === '隐藏标记点与异常标记（W）', s.title);
+  check('the switch speaks Chinese', s.label === '航点', s.label);
+  check('the tooltip is Chinese too', s.title === '隐藏航点与异常标记（W）', s.title);
   check('the pins are still shown', s.pins === 5 && s.active === true, `${s.pins}`);
 
   await page.locator('.pins-switch button').click();
   await waitForLayout(page);
   s = await state();
   check('the Chinese button hides them',
-    s.pins === 0 && s.title === '显示标记点与异常标记（W）', `${s.pins} ${s.title}`);
+    s.pins === 0 && s.title === '显示航点与异常标记（W）', `${s.pins} ${s.title}`);
   await switchLanguage(page, 'en');
 
   // 8. Pure tracks without waypoints or anomalies need no switch; anomaly-only tracks do.
