@@ -1,32 +1,22 @@
 import { summariseRange } from './climb-analysis.js';
+import { createEditorDrawers } from './editor-drawers.js';
 import { findGarminWaypointWarnings, serializeGpx } from './gpx-serializer.js';
 import { iconElement } from './icons.js';
 import {
-  addWaypoint,
-  cleanAnomalies,
-  closeLoop,
-  cropTrack,
-  deleteTrackSegment,
+  deleteTrackVertex,
   deleteWaypoint,
-  detectAnomalyPoints,
-  isTrackClosedLoop,
-  makeOutAndBack,
-  normalizedTracks,
-  reverseTrack,
   splitTrackAt,
   trackTotalDistance,
-  updateWaypoint,
 } from './track-ops.js';
 
 const RAIL_TOOLS = [
   { id: 'crop', icon: 'editor-crop', labelKey: 'editor.rail.crop' },
   { id: 'clean', icon: 'editor-clean', labelKey: 'editor.rail.clean' },
   { id: 'topology', icon: 'editor-reverse', labelKey: 'editor.rail.topology' },
+  { id: 'vertex', icon: 'editor-vertex', labelKey: 'editor.rail.vertex' },
   { id: 'waypoint', icon: 'editor-waypoint-add', labelKey: 'editor.rail.waypoint' },
+  { id: 'time', icon: 'editor-time', labelKey: 'editor.rail.time' },
 ];
-
-const WAYPOINT_SYMS = ['pin', 'water', 'supply', 'camp', 'summit', 'danger', 'junction'];
-const SPLIT_COLORS = ['#f97316', '#38bdf8', '#22c55e', '#eab308'];
 
 /**
  * Four-zone editor workbench UI (Topbar + Left Rail + Contextual Drawer + Profile Crop Overlay + Context Menu).
@@ -41,6 +31,11 @@ const SPLIT_COLORS = ['#f97316', '#38bdf8', '#22c55e', '#eab308'];
  *   isGpxSource?: () => boolean,
  *   onSaveTrack: (opts: { id: string, fileName: string, xml: string, overwrite: boolean }) => Promise<any>,
  *   onExit: (info?: { overwroteOriginal?: boolean, committed?: any }) => void,
+ *   onToggleLayers?: () => void,
+ *   isLayersOpen?: () => boolean,
+ *   onTogglePins?: () => void,
+ *   onShowPins?: () => void,
+ *   isPinsVisible?: () => boolean,
  *   onLayoutChange?: () => void,
  *   showToast?: (msg: string, ms?: number) => void,
  * }} opts
@@ -56,6 +51,11 @@ export function createEditorShell({
   isGpxSource = () => true,
   onSaveTrack,
   onExit,
+  onToggleLayers = () => {},
+  isLayersOpen = () => false,
+  onTogglePins = () => {},
+  onShowPins = () => {},
+  isPinsVisible = () => true,
   onLayoutChange = () => {},
   showToast = () => {},
 }) {
@@ -110,6 +110,8 @@ export function createEditorShell({
   let cachedTotalMeters = 0;
   let cropRangeLabelEl = null;
   let cropAscentLabelEl = null;
+  let excludedAnomalyKeys = new Set();
+  let excludedAnomalyTrackRef = null;
 
   function updateCropStatTexts() {
     if (!cropRangeLabelEl || !cropAscentLabelEl) return;
@@ -260,260 +262,55 @@ export function createEditorShell({
     handleLayoutChange();
   }
 
-  function renderCropDrawer() {
-    const modeList = el('div', 'editor-mode-list');
-    const cropModeBtn = el('button', `editor-mode-btn${activeSubMode === 'crop' ? ' is-active' : ''}`);
-    cropModeBtn.type = 'button';
-    cropModeBtn.textContent = t('editor.crop.mode');
-    cropModeBtn.addEventListener('click', () => {
-      activeSubMode = 'crop';
-      overlay.setTool('crop', 'crop');
-      mountCropOverlay();
-      renderDrawer();
-    });
-
-    const splitModeBtn = el('button', `editor-mode-btn${activeSubMode === 'split' ? ' is-active' : ''}`);
-    splitModeBtn.type = 'button';
-    splitModeBtn.textContent = t('editor.split.mode');
-    splitModeBtn.addEventListener('click', () => {
-      activeSubMode = 'split';
-      overlay.setTool('crop', 'split');
-      mountCropOverlay();
-      renderDrawer();
-    });
-
-    modeList.append(cropModeBtn, splitModeBtn);
-    drawerBody.append(modeList);
-
-    const current = store.getCurrent();
-    cropRangeLabelEl = null;
-    cropAscentLabelEl = null;
-    if (activeSubMode === 'crop') {
-      const statsBox = el('div', 'editor-stat-box');
-      const rangeRow = el('div', 'editor-stat-row');
-      cropRangeLabelEl = el('span', 'editor-stat-label', '');
-      rangeRow.append(cropRangeLabelEl);
-      const ascentRow = el('div', 'editor-stat-row');
-      cropAscentLabelEl = el('span', 'editor-stat-label', '');
-      ascentRow.append(cropAscentLabelEl);
-      statsBox.append(rangeRow, ascentRow);
-      updateCropStatTexts();
-
-      const actions = el('div', 'editor-drawer-actions');
-      const applyBtn = makeBtn('editor-btn editor-btn-success', null, t('editor.crop.apply'), () => {
-        const next = cropTrack(store.getCurrent(), cropFromMeters, cropToMeters);
-        store.apply('crop', next);
-        const total = trackTotalDistance(next);
-        cropFromMeters = 0;
-        cropToMeters = total;
-        overlay.setCropRange(0, total);
-        mountCropOverlay();
-      });
-      const cancelBtn = makeBtn('editor-btn', null, t('editor.cancel'), () => {
-        const total = trackTotalDistance(store.getCurrent());
-        cropFromMeters = 0;
-        cropToMeters = total;
-        overlay.setCropRange(0, total);
-        updateCropOverlayPositions();
-        updateCropStatTexts();
-      });
-      actions.append(applyBtn, cancelBtn);
-      drawerBody.append(statsBox, actions);
-    } else {
-      drawerBody.append(el('p', 'editor-drawer-hint', t('editor.split.hint')));
-      const tracks = normalizedTracks(current);
-      const segTitle = el('div', 'editor-stat-label', t('editor.split.segments', { count: tracks.length }));
-      const segList = el('div', 'editor-seg-list');
-      tracks.forEach((trk, idx) => {
-        const row = el('div', 'editor-list-row');
-        const swatch = el('span', 'editor-seg-swatch');
-        swatch.style.background = SPLIT_COLORS[idx % SPLIT_COLORS.length];
-        const label = trk.name || `#${idx + 1}`;
-        const main = el('span', 'editor-list-row-main');
-        main.append(swatch, document.createTextNode(label));
-        row.append(main);
-        if (tracks.length > 1) {
-          const del = makeBtn('editor-btn editor-btn-danger', null, t('editor.split.deleteSeg'), () => {
-            store.apply('delete-segment', deleteTrackSegment(store.getCurrent(), idx));
-          });
-          row.append(del);
-        }
-        segList.append(row);
-      });
-      drawerBody.append(segTitle, segList);
+  function ensureWaypointVisibility() {
+    if (activeTool !== 'waypoint') return;
+    if (!isPinsVisible()) {
+      onShowPins();
+      overlay.setWaypointsVisible?.(true);
+      syncTopbarMapControls();
     }
   }
 
-  function renderCleanDrawer() {
-    const anomalies = detectAnomalyPoints(store.getCurrent());
-    if (anomalies.length === 0) {
-      drawerBody.append(el('p', 'editor-drawer-hint', t('editor.clean.none')));
-      return;
-    }
-    drawerBody.append(el('p', 'editor-drawer-hint', t('editor.clean.found', { count: anomalies.length })));
-    const applyBtn = makeBtn('editor-btn editor-btn-success', null, t('editor.clean.apply'), () => {
-      const { track, removedCount } = cleanAnomalies(store.getCurrent());
-      if (removedCount > 0) {
-        store.apply('clean', track);
-        notifyToast(t('editor.clean.done', { count: removedCount }));
-      }
-    });
-    drawerBody.append(applyBtn);
-  }
-
-  function renderTopologyDrawer() {
-    const list = el('div', 'editor-mode-list');
-    const revBtn = makeBtn('editor-mode-btn', 'editor-reverse', t('editor.topology.reverse'), () => {
-      const { track, clearedTimestamps } = reverseTrack(store.getCurrent());
-      store.apply('reverse', track);
-      if (clearedTimestamps) notifyToast(t('editor.topology.reverseCleared'));
-    });
-    const rtBtn = makeBtn('editor-mode-btn', 'editor-roundtrip', t('editor.topology.roundtrip'), () => {
-      const { track } = makeOutAndBack(store.getCurrent());
-      store.apply('roundtrip', track);
-    });
-    const loopBtn = makeBtn('editor-mode-btn', 'editor-loop-start', t('editor.topology.closeLoop'), () => {
-      const { track, closureMeters } = closeLoop(store.getCurrent());
-      if (closureMeters <= 0.5) return;
-      store.apply('close-loop', track);
-      notifyToast(t('editor.topology.closed', { dist: formatDistance(closureMeters) }));
-    });
-    loopBtn.disabled = isTrackClosedLoop(store.getCurrent());
-    list.append(revBtn, rtBtn, loopBtn);
-    drawerBody.append(list);
-  }
-
-  function renderWaypointDrawer() {
-    const current = store.getCurrent();
-    const wpts = current?.waypoints || [];
-    if (selectedWptIndex < 0 && !pendingWptCoords && wpts.length > 0) {
+  function ensureWaypointSelection() {
+    if (activeTool !== 'waypoint' || selectedWptIndex >= 0 || pendingWptCoords) return;
+    const wpts = store.getCurrent()?.waypoints || [];
+    if (wpts.length > 0) {
       selectedWptIndex = 0;
       overlay.setSelectedWaypoint(0);
     }
-
-    const editingWpt = selectedWptIndex >= 0 && selectedWptIndex < wpts.length ? wpts[selectedWptIndex] : null;
-    const hasActiveForm = Boolean(editingWpt || pendingWptCoords);
-    const form = el('div', 'editor-drawer-section editor-wpt-form');
-    const topRow = el('div', 'editor-wpt-row');
-    const nameInput = el('input');
-    nameInput.type = 'text';
-    nameInput.placeholder = t('editor.wpt.name');
-    nameInput.setAttribute('aria-label', t('editor.wpt.name'));
-    nameInput.value = editingWpt?.name || (pendingWptCoords ? t('editor.wpt.defaultName', { index: wpts.length + 1 }) : '');
-    nameInput.disabled = !hasActiveForm;
-
-    const symSelect = el('select');
-    symSelect.setAttribute('aria-label', t('editor.wpt.sym'));
-    for (const sym of WAYPOINT_SYMS) {
-      const opt = el('option', '', t(`editor.wpt.sym.${sym}`));
-      opt.value = sym;
-      if ((editingWpt?.icon || 'pin') === sym) opt.selected = true;
-      symSelect.append(opt);
-    }
-    symSelect.disabled = !hasActiveForm;
-    topRow.append(nameInput, symSelect);
-
-    const noteBox = el('div', 'editor-field editor-wpt-note-box');
-    noteBox.hidden = !wptNoteOpen;
-    const descInput = el('input');
-    descInput.type = 'text';
-    descInput.placeholder = t('editor.wpt.desc');
-    descInput.setAttribute('aria-label', t('editor.wpt.desc'));
-    descInput.value = editingWpt?.description || '';
-    descInput.disabled = !hasActiveForm;
-    noteBox.append(descInput);
-
-    const actions = el('div', 'editor-drawer-actions editor-wpt-actions');
-    const noteToggle = el('button', 'editor-wpt-note-toggle', `${t('editor.wpt.noteToggle')} ${wptNoteOpen ? '\u25b4' : '\u25be'}`);
-    noteToggle.type = 'button';
-    noteToggle.setAttribute('aria-expanded', String(wptNoteOpen));
-    noteToggle.addEventListener('click', () => {
-      wptNoteOpen = !wptNoteOpen;
-      noteBox.hidden = !wptNoteOpen;
-      noteToggle.textContent = `${t('editor.wpt.noteToggle')} ${wptNoteOpen ? '\u25b4' : '\u25be'}`;
-      noteToggle.setAttribute('aria-expanded', String(wptNoteOpen));
-      if (wptNoteOpen && !descInput.disabled) descInput.focus();
-    });
-    actions.append(noteToggle);
-    const spacer = el('span', 'editor-wpt-spacer');
-    actions.append(spacer);
-
-    if (editingWpt) {
-      actions.append(makeBtn('editor-btn editor-btn-primary', null, t('editor.wpt.update'), () => {
-        const next = updateWaypoint(store.getCurrent(), selectedWptIndex, {
-          name: nameInput.value.trim(),
-          icon: symSelect.value,
-          description: descInput.value.trim(),
-        });
-        store.apply('update-waypoint', next);
-      }));
-      actions.append(makeBtn('editor-btn editor-btn-danger', null, t('editor.wpt.delete'), () => {
-        const next = deleteWaypoint(store.getCurrent(), selectedWptIndex);
-        selectedWptIndex = -1;
-        overlay.setSelectedWaypoint(-1);
-        store.apply('delete-waypoint', next);
-      }));
-    } else if (pendingWptCoords) {
-      actions.append(makeBtn('editor-btn editor-btn-success', null, t('editor.wpt.add'), () => {
-        const next = addWaypoint(store.getCurrent(), {
-          lat: pendingWptCoords.lat,
-          lon: pendingWptCoords.lon,
-          ele: pendingWptCoords.ele,
-          name: nameInput.value.trim() || t('editor.wpt.defaultName', { index: wpts.length + 1 }),
-          icon: symSelect.value,
-          description: descInput.value.trim(),
-        });
-        pendingWptCoords = null;
-        selectedWptIndex = next.waypoints.length - 1;
-        overlay.setSelectedWaypoint(selectedWptIndex);
-        store.apply('add-waypoint', next);
-      }));
-      actions.append(makeBtn('editor-btn', null, t('editor.cancel'), () => {
-        pendingWptCoords = null;
-        renderDrawer();
-      }));
-    } else {
-      const placeholderAdd = makeBtn('editor-btn editor-btn-primary', null, t('editor.wpt.add'), () => {});
-      placeholderAdd.disabled = true;
-      actions.append(placeholderAdd);
-    }
-    form.append(topRow, actions, noteBox);
-    drawerBody.append(form);
-
-    if (wpts.length > 0) {
-      const list = el('div', 'editor-wpt-list');
-      /** @type {HTMLElement | null} */
-      let selectedRow = null;
-      wpts.forEach((wpt, idx) => {
-        const isSelected = idx === selectedWptIndex;
-        const row = el('div', `editor-list-row${isSelected ? ' is-selected' : ''}`);
-        const indexEl = el('span', 'editor-list-row-index', String(idx + 1));
-        const label = el('span', 'editor-list-row-main', wpt.name || t('editor.wpt.defaultName', { index: idx + 1 }));
-        row.addEventListener('click', () => {
-          pendingWptCoords = null;
-          selectedWptIndex = idx;
-          overlay.setSelectedWaypoint(idx);
-          overlay.focusWaypoint?.(idx);
-          renderDrawer();
-        });
-        row.append(indexEl, label);
-        row.append(makeBtn('editor-btn editor-btn-danger', 'close', null, (event) => {
-          event?.stopPropagation?.();
-          const next = deleteWaypoint(store.getCurrent(), idx);
-          if (selectedWptIndex === idx) selectedWptIndex = -1;
-          else if (selectedWptIndex > idx) selectedWptIndex -= 1;
-          overlay.setSelectedWaypoint(selectedWptIndex);
-          store.apply('delete-waypoint', next);
-        }));
-        if (isSelected) selectedRow = row;
-        list.append(row);
-      });
-      drawerBody.append(list);
-      if (selectedRow) {
-        /** @type {HTMLElement} */ (selectedRow).scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-      }
-    }
   }
+
+  const drawers = createEditorDrawers({
+    el,
+    t,
+    formatDistance,
+    makeBtn,
+    store,
+    overlay,
+    notifyToast,
+    getDrawerBody: () => drawerBody,
+    mountCropOverlay,
+    updateCropOverlayPositions,
+    updateCropStatTexts,
+    renderDrawer: () => renderDrawer(),
+    setCropStatEls: (rangeEl, ascentEl) => {
+      cropRangeLabelEl = rangeEl;
+      cropAscentLabelEl = ascentEl;
+    },
+    state: {
+      getSubMode: () => activeSubMode,
+      setSubMode: (mode) => { activeSubMode = mode; },
+      getCropRange: () => ({ from: cropFromMeters, to: cropToMeters }),
+      setCropRange: (from, to) => { cropFromMeters = from; cropToMeters = to; },
+      getSelectedWptIndex: () => selectedWptIndex,
+      setSelectedWptIndex: (idx) => { selectedWptIndex = idx; },
+      getPendingWptCoords: () => pendingWptCoords,
+      setPendingWptCoords: (coords) => { pendingWptCoords = coords; },
+      getWptNoteOpen: () => wptNoteOpen,
+      setWptNoteOpen: (openVal) => { wptNoteOpen = openVal; },
+      getExcludedAnomalyKeys: () => excludedAnomalyKeys,
+    },
+  });
 
   function closeSavePopover() {
     if (savePopover) savePopover.hidden = true;
@@ -556,10 +353,12 @@ export function createEditorShell({
       if (drawerHelp.hidden && drawerTooltip) drawerTooltip.hidden = true;
     }
 
-    if (activeTool === 'crop') renderCropDrawer();
-    else if (activeTool === 'clean') renderCleanDrawer();
-    else if (activeTool === 'topology') renderTopologyDrawer();
-    else if (activeTool === 'waypoint') renderWaypointDrawer();
+    if (activeTool === 'crop') drawers.renderCropDrawer();
+    else if (activeTool === 'clean') drawers.renderCleanDrawer();
+    else if (activeTool === 'topology') drawers.renderTopologyDrawer();
+    else if (activeTool === 'vertex') drawers.renderVertexDrawer();
+    else if (activeTool === 'waypoint') drawers.renderWaypointDrawer();
+    else if (activeTool === 'time') drawers.renderTimeDrawer();
 
     handleLayoutChange();
   }
@@ -631,16 +430,14 @@ export function createEditorShell({
     redoBtn = makeBtn('editor-btn', 'redo', t('editor.redo'), () => store.redo());
     resetBtn = makeBtn('editor-btn', 'reset', t('editor.reset'), () => store.reset());
     layersBtn = makeBtn('editor-btn editor-topbar-icon-btn', 'layers', null, () => {
-      const target = document.querySelector('.layer-menu-toggle');
-      if (target instanceof HTMLElement) target.click();
+      onToggleLayers();
       syncTopbarMapControls();
     });
     layersBtn.title = t('layer.menuTitle');
     layersBtn.setAttribute('aria-label', t('layer.menuTitle'));
     layersBtn.dataset.editorControl = 'layers';
     pinsBtn = makeBtn('editor-btn editor-topbar-icon-btn', 'pin', null, () => {
-      const target = document.querySelector('.pins-switch button');
-      if (target instanceof HTMLElement) target.click();
+      onTogglePins();
       syncTopbarMapControls();
     });
     pinsBtn.title = t('pins.label');
@@ -713,8 +510,10 @@ export function createEditorShell({
           drawerOpen = !drawerOpen;
         } else {
           activeTool = tool.id;
-          if (tool.id === 'crop') activeSubMode = 'crop';
+          activeSubMode = tool.id === 'crop' ? 'crop' : '';
           drawerOpen = true;
+          ensureWaypointVisibility();
+          ensureWaypointSelection();
         }
         overlay.setTool(activeTool, activeSubMode);
         mountCropOverlay();
@@ -775,23 +574,21 @@ export function createEditorShell({
 
   function syncTopbarMapControls() {
     if (layersBtn) {
-      const menu = document.getElementById('layer-source-menu');
-      const openMenu = Boolean(menu && !menu.hidden);
+      const openMenu = Boolean(isLayersOpen());
       layersBtn.classList.toggle('is-active', openMenu);
       layersBtn.setAttribute('aria-expanded', String(openMenu));
     }
     if (pinsBtn) {
-      const sourcePin = document.querySelector('.pins-switch button');
-      const active = sourcePin?.getAttribute('aria-pressed') === 'true';
+      const active = Boolean(isPinsVisible());
       pinsBtn.classList.toggle('is-active', active);
       pinsBtn.setAttribute('aria-pressed', String(active));
     }
   }
 
-  function showContextMenu({ clientX, clientY, lat, lon, ele, splitMeters, waypointIndex = -1 }) {
+  function showContextMenu({ clientX, clientY, lat, lon, ele, splitMeters, waypointIndex = -1, vertexTarget = null }) {
     closeContextMenu();
     const targetWptIndex = Number.isInteger(waypointIndex) ? waypointIndex : -1;
-    if (splitMeters == null && targetWptIndex < 0) return;
+    if (splitMeters == null && targetWptIndex < 0 && !vertexTarget) return;
     contextMenu.textContent = '';
     if (splitMeters != null) {
       const splitItem = makeBtn('editor-context-item', 'editor-split', t('editor.ctx.splitHere'), () => {
@@ -808,10 +605,12 @@ export function createEditorShell({
       const addWptItem = makeBtn('editor-context-item', 'editor-waypoint-add', t('editor.ctx.addWaypoint'), () => {
         closeContextMenu();
         activeTool = 'waypoint';
+        activeSubMode = '';
         drawerOpen = true;
         selectedWptIndex = -1;
         pendingWptCoords = { lat, lon, ele };
-        overlay.setTool('waypoint', 'waypoint');
+        ensureWaypointVisibility();
+        overlay.setTool('waypoint', '');
         mountCropOverlay();
         updateRail();
         renderDrawer();
@@ -827,6 +626,14 @@ export function createEditorShell({
         store.apply('delete-waypoint', next);
       });
       contextMenu.append(delItem);
+    }
+    if (vertexTarget) {
+      const delVertexItem = makeBtn('editor-context-item is-danger', 'clear', t('editor.ctx.deleteVertex'), () => {
+        closeContextMenu();
+        const next = deleteTrackVertex(store.getCurrent(), vertexTarget.flatSegIndex, vertexTarget.ptIndex);
+        store.apply('delete-vertex', next);
+      });
+      contextMenu.append(delVertexItem);
     }
     contextMenu.style.left = `${Math.min(innerWidth - 180, Math.max(8, clientX))}px`;
     contextMenu.style.top = `${Math.min(innerHeight - 130, Math.max(8, clientY))}px`;
@@ -849,12 +656,14 @@ export function createEditorShell({
       cropToMeters = total;
     }
     activeTool = initialTool;
-    activeSubMode = initialTool === 'crop' ? 'crop' : initialTool;
+    activeSubMode = initialTool === 'crop' ? 'crop' : '';
     drawerOpen = true;
     selectedWptIndex = -1;
     pendingWptCoords = null;
     wptNoteOpen = false;
     sessionOverwroteOriginal = false;
+    excludedAnomalyKeys = new Set();
+    excludedAnomalyTrackRef = store.getCurrent();
 
     document.body.classList.add('is-editing');
     root.hidden = false;
@@ -863,6 +672,8 @@ export function createEditorShell({
     closeContextMenu();
 
     overlay.mount(store.getCurrent());
+    ensureWaypointVisibility();
+    ensureWaypointSelection();
     overlay.setTool(activeTool, activeSubMode);
     overlay.setCropRange(cropFromMeters, cropToMeters);
 
@@ -923,6 +734,12 @@ export function createEditorShell({
         selectedWptIndex = -1;
         overlay.setSelectedWaypoint(-1);
       }
+      if (excludedAnomalyTrackRef !== current) {
+        excludedAnomalyKeys = new Set();
+        excludedAnomalyTrackRef = current;
+        overlay.setExcludedAnomalyKeys?.(excludedAnomalyKeys, { render: false });
+      }
+      ensureWaypointSelection();
       overlay.setTrack(current);
       overlay.setCropRange(0, total);
       mountCropOverlay();
@@ -941,12 +758,17 @@ export function createEditorShell({
       selectedWptIndex = index;
       if (activeTool !== 'waypoint' || !drawerOpen) {
         activeTool = 'waypoint';
+        activeSubMode = '';
         drawerOpen = true;
-        overlay.setTool('waypoint', 'waypoint');
+        ensureWaypointVisibility();
+        overlay.setTool('waypoint', '');
         mountCropOverlay();
         updateRail();
       }
       renderDrawer();
+    },
+    refreshVertexStatus() {
+      if (activeTool === 'vertex' && drawerOpen) renderDrawer();
     },
   };
 }

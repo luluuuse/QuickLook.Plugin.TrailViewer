@@ -17,6 +17,38 @@ Added / Changed / Deprecated / Removed / Fixed / Security 分类；没有内容�
 
 None yet.
 
+## 1.27.5 — 2026-11-22
+
+### 中文
+
+#### 新增
+
+- **轨迹编辑器高级工具补全**：新增分段一键合并（支持乱序时间重排、重叠时间段清理与大断距警示）、异常漂移点逐条勾选与地图定位、环线点击重设起点（支持 `50m` GPS 容差与时间戳清除提示）、轨迹容差抽稀、放大至 `15` 级及以上顶点精修（拖拽、中点 `+` 插点含海拔/时间/心率插值、右键菜单确认删除）、框选擦除（同步删除框内航点，支持右键/中键拖图）以及时间平移与自定义出发时间的虚拟配速时间轴。
+
+#### 变更
+
+- **剖面选区裁剪按钮精简**：移除“裁剪此段”文字，改为紧凑纯图标按钮并保留悬停提示。
+- **编辑器抽屉拆分与解耦**：将 6 个工具抽屉拆分为独立模块，消除航点渲染副作用，并通过回调注入替换顶栏对预览层 DOM 的硬编码依赖。
+
+#### 修复
+
+- **编辑器缩放重绘与交互边界**：修复进入编辑器后误清地图全局缩放/平移监听导致的线条不重绘与切换错位问题；修复含退化短段时顶点段索引错位、工具切换子模式残留、重进编辑器异常点勾选状态未重置，以及进入航点编辑时自动开启航点显示。
+
+### English
+
+#### Added
+
+- **Advanced Track Editor Tools**: Added segment merging (with time-order sorting, overlapping-timestamp clearing, and large-gap warnings), checkable GPS spike list with map focus, loop start rotation (with `50m` GPS tolerance and timestamp-cleared notice), Douglas-Peucker simplification, zoom-aware (`>= 15`) vertex refinement (drag, midpoint `+` insert with elevation/time/HR interpolation, context-menu delete), box erase (erasing track points and waypoints inside bounds with right/middle-drag map panning), and timestamp shifting / virtual timeline generation with custom start time.
+
+#### Changed
+
+- **Compact Profile Brush Crop Button**: Removed text from the elevation-profile brush crop button, keeping a clean icon-only button with hover tooltip.
+- **Drawer Modularization & Decoupling**: Extracted the 6 editor tool drawers into a dedicated module, removed state-mutation side effects from waypoint rendering, and replaced hardcoded preview DOM queries with injected callbacks.
+
+#### Fixed
+
+- **Zoom Redraw & Editor Edge Cases**: Fixed missing map redraws and tool-switch misalignment caused by clearing global `zoomend`/`moveend` listeners on overlay unmount; fixed vertex segment-index offset with degenerate segments, sub-mode leaks across tool switches, stale anomaly exclusions on editor re-entry, and auto-enabling waypoint visibility when switching to waypoint editing.
+
 ## 1.27.4 — 2026-11-21
 
 ### 中文

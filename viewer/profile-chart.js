@@ -201,10 +201,9 @@ export function createProfileChart({
     const brushStatsCrop = el('button', 'brush-stats-crop');
     brushStatsCrop.type = 'button';
     brushStatsCrop.hidden = true;
-    brushStatsCrop.append(
-      iconElement('editor-crop', { size: 11 }),
-      localized(el('span'), () => t('profile.cropSelection')),
-    );
+    brushStatsCrop.append(iconElement('editor-crop', { size: 12 }));
+    localized(brushStatsCrop, () => t('profile.cropSelection'), 'title');
+    localized(brushStatsCrop, () => t('profile.cropSelection'), 'aria-label');
     brushStatsCrop.addEventListener('click', (event) => {
       event.stopPropagation();
       if (splitFocusData) brushCropHandler?.(splitFocusData.from, splitFocusData.to);

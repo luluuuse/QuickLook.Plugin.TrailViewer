@@ -44,8 +44,8 @@ async function run() {
       };
     });
     check('enters editing mode and hides read-only chrome', mounted.editing && mounted.infoHidden && mounted.colorHidden);
-    check('renders 4 active rail tools, drawer and 2 profile crop handles',
-      mounted.railCount === 4 && mounted.drawerVisible && mounted.cropHandles === 2);
+    check('renders 6 active rail tools, drawer and 2 profile crop handles',
+      mounted.railCount === 6 && mounted.drawerVisible && mounted.cropHandles === 2);
     check('left rail does not overlap zoom or locate controls',
       mounted.railClearOfZoom && mounted.railClearOfLocate);
     check('left rail is vertically centered on screen', await page.evaluate(() => {
@@ -183,7 +183,7 @@ async function run() {
     await page.click('.toolbox-switch button');
     await page.click('[data-tool="edit"]');
     await page.waitForSelector('body.is-editing #editor-topbar:not([hidden])');
-    check('re-entering editor mounts cleanly', await page.locator('#editor-rail .editor-rail-btn').count() === 4);
+    check('re-entering editor mounts cleanly', await page.locator('#editor-rail .editor-rail-btn').count() === 6);
 
     // 7b. Right-click context menu hides on click and splits track into 2 segments
     const ctxInitialHidden = await page.evaluate(() =>
@@ -275,6 +275,24 @@ async function run() {
     const ctxHiddenOnEmptyMap = await page.evaluate(() =>
       document.querySelector('.editor-context-menu')?.hidden === true);
     check('right-clicking empty map keeps context menu hidden', ctxHiddenOnEmptyMap);
+
+    // 12. P2/P3 tools: clean auto/box modes, topology simplify, vertex refine zoom guard, timeline generation
+    await page.click('[data-editor-tool="clean"]');
+    const hasCleanModes = await page.locator('#editor-drawer .editor-mode-btn').count();
+    check('clean tool exposes auto-detect and box-erase mode buttons', hasCleanModes === 2);
+
+    await page.click('[data-editor-tool="topology"]');
+    const topoCount = await page.locator('#editor-drawer .editor-mode-btn').count();
+    check('topology tool includes reverse, roundtrip, close-loop and loop-start buttons', topoCount === 4);
+
+    await page.click('[data-editor-tool="vertex"]');
+    const vertexHintVisible = await page.locator('#editor-drawer .editor-drawer-hint').isVisible();
+    check('vertex tool displays zoom/edit hint', vertexHintVisible);
+
+    await page.click('[data-editor-tool="time"]');
+    await page.click('#editor-drawer .editor-btn-success');
+    const timeDirty = await page.evaluate(() => document.getElementById('editor-topbar')?.classList.contains('is-dirty'));
+    check('timeline generator marks track dirty after generating virtual timestamps', Boolean(timeDirty));
   } finally {
     await browser.close();
     server.close();

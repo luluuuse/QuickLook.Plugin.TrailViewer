@@ -470,7 +470,7 @@ export function makeOutAndBack(parsed) {
  * @param {import('./types.js').ParsedTrack} parsed
  * @param {number} [thresholdMeters]
  */
-export function isTrackClosedLoop(parsed, thresholdMeters = 0.5) {
+export function isTrackClosedLoop(parsed, thresholdMeters = 50) {
   const sourceTracks = normalizedTracks(parsed);
   const firstSeg = sourceTracks[0]?.segments?.[0];
   const lastTrack = sourceTracks[sourceTracks.length - 1];
@@ -509,6 +509,206 @@ export function closeLoop(parsed) {
     next.routes = [];
   }
   return { track: clearSummaryMetadata(next), closureMeters };
+}
+
+/**
+ * Merges all tracks/segments into one continuous track segment.
+ * Reorders timestamped segments if out-of-order and reports max gap across segment joins.
+ * @param {import('./types.js').ParsedTrack} parsed
+ */
+export function mergeTrackSegments(parsed) {
+  const next = cloneParsedTrack(parsed);
+  const sourceTracks = normalizedTracks(next);
+  const segments = [];
+  for (const track of sourceTracks) {
+    for (const seg of track.segments || []) {
+      if (seg.length === 0) continue;
+      const firstTimed = seg.find((pt) => pt.time instanceof Date && Number.isFinite(pt.time.getTime()));
+      segments.push({
+        pts: seg.map(clonePoint),
+        startMs: firstTimed ? firstTimed.time.getTime() : null,
+      });
+    }
+  }
+  if (sourceTracks.length <= 1 && (sourceTracks[0]?.segments?.length || 0) <= 1) {
+    return {
+      track: next,
+      mergedCount: sourceTracks.length,
+      reorderedByTime: false,
+      timestampsCleared: false,
+      maxGapMeters: 0,
+    };
+  }
+  let reorderedByTime = false;
+  let prevTimedMs = -Infinity;
+  for (const item of segments) {
+    if (item.startMs != null) {
+      if (item.startMs < prevTimedMs) {
+        reorderedByTime = true;
+        break;
+      }
+      prevTimedMs = item.startMs;
+    }
+  }
+  if (reorderedByTime) {
+    segments.sort((a, b) => {
+      if (a.startMs == null && b.startMs == null) return 0;
+      if (a.startMs == null) return 1;
+      if (b.startMs == null) return -1;
+      return a.startMs - b.startMs;
+    });
+  }
+  let maxGapMeters = 0;
+  const mergedPoints = [];
+  for (let i = 0; i < segments.length; i += 1) {
+    const pts = segments[i].pts;
+    if (i > 0 && mergedPoints.length > 0 && pts.length > 0) {
+      const gap = distanceMeters(mergedPoints[mergedPoints.length - 1], pts[0]);
+      if (gap > maxGapMeters) maxGapMeters = gap;
+    }
+    for (const pt of pts) mergedPoints.push(pt);
+  }
+  let timestampsCleared = false;
+  let lastValidMs = -Infinity;
+  for (const pt of mergedPoints) {
+    if (pt.time instanceof Date && Number.isFinite(pt.time.getTime())) {
+      const ms = pt.time.getTime();
+      if (ms < lastValidMs) {
+        timestampsCleared = stripTimestamps(mergedPoints);
+        break;
+      }
+      lastValidMs = ms;
+    }
+  }
+  next.tracks = [{
+    name: sourceTracks[0]?.name || next.name || '',
+    segments: mergedPoints.length > 0 ? [mergedPoints] : [],
+  }];
+  next.routes = [];
+  return {
+    track: clearSummaryMetadata(next),
+    mergedCount: sourceTracks.length,
+    reorderedByTime,
+    timestampsCleared,
+    maxGapMeters,
+  };
+}
+
+/**
+ * Rotates a closed loop so its start/end sits at the point closest to alongMeters.
+ * @param {import('./types.js').ParsedTrack} parsed
+ * @param {number} alongMeters
+ */
+export function rotateLoopStart(parsed, alongMeters) {
+  const next = cloneParsedTrack(parsed);
+  if (!isTrackClosedLoop(next)) return { track: next, rotated: false, timestampsCleared: false };
+  const sourceTracks = normalizedTracks(next);
+  const flat = [];
+  for (const track of sourceTracks) {
+    for (const seg of track.segments || []) {
+      for (const pt of seg) flat.push(clonePoint(pt));
+    }
+  }
+  if (flat.length < 4) return { track: next, rotated: false, timestampsCleared: false };
+  let acc = 0;
+  let bestIdx = 0;
+  let bestDiff = Infinity;
+  for (let i = 0; i < flat.length; i += 1) {
+    if (i > 0) acc += distanceMeters(flat[i - 1], flat[i]);
+    const diff = Math.abs(acc - alongMeters);
+    if (diff < bestDiff) {
+      bestDiff = diff;
+      bestIdx = i;
+    }
+  }
+  const hasDuplicateEnd = distanceMeters(flat[0], flat[flat.length - 1]) < 1;
+  const body = hasDuplicateEnd ? flat.slice(0, flat.length - 1) : flat;
+  if (bestIdx <= 0 || bestIdx >= body.length) {
+    return { track: next, rotated: false, timestampsCleared: false };
+  }
+  const rotatedPts = [...body.slice(bestIdx), ...body.slice(0, bestIdx), clonePoint(body[bestIdx])];
+  const timestampsCleared = stripTimestamps(rotatedPts);
+  next.tracks = [{
+    name: sourceTracks[0]?.name || next.name || '',
+    segments: [rotatedPts],
+  }];
+  next.routes = [];
+  return { track: clearSummaryMetadata(next), rotated: true, timestampsCleared };
+}
+
+function perpDistanceMeters(pt, a, b) {
+  const refLat = ((a.lat + b.lat) * 0.5) * (Math.PI / 180);
+  const mx = 111320 * Math.cos(refLat);
+  const my = 111320;
+  const ax = a.lon * mx;
+  const ay = a.lat * my;
+  const bx = b.lon * mx;
+  const by = b.lat * my;
+  const px = pt.lon * mx;
+  const py = pt.lat * my;
+  const dx = bx - ax;
+  const dy = by - ay;
+  const lenSq = dx * dx + dy * dy;
+  if (lenSq <= 1e-9) return Math.hypot(px - ax, py - ay);
+  const t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / lenSq));
+  return Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
+}
+
+function douglasPeucker(points, toleranceMeters) {
+  if (points.length <= 2 || toleranceMeters <= 0) return points.map(clonePoint);
+  const keep = new Uint8Array(points.length);
+  keep[0] = 1;
+  keep[points.length - 1] = 1;
+  const stack = [[0, points.length - 1]];
+  while (stack.length > 0) {
+    const [start, end] = stack.pop();
+    if (end - start <= 1) continue;
+    let maxDist = 0;
+    let maxIdx = -1;
+    const a = points[start];
+    const b = points[end];
+    for (let i = start + 1; i < end; i += 1) {
+      const dist = perpDistanceMeters(points[i], a, b);
+      if (dist > maxDist) {
+        maxDist = dist;
+        maxIdx = i;
+      }
+    }
+    if (maxIdx > start && maxDist > toleranceMeters) {
+      keep[maxIdx] = 1;
+      stack.push([start, maxIdx], [maxIdx, end]);
+    }
+  }
+  const out = [];
+  for (let i = 0; i < points.length; i += 1) {
+    if (keep[i]) out.push(clonePoint(points[i]));
+  }
+  return out;
+}
+
+/**
+ * Simplifies all segments using iterative Douglas-Peucker within toleranceMeters.
+ * @param {import('./types.js').ParsedTrack} parsed
+ * @param {number} [toleranceMeters]
+ */
+export function simplifyTrack(parsed, toleranceMeters = 5) {
+  const next = cloneParsedTrack(parsed);
+  if (next.tracks.length === 0 && next.routes.length > 0) {
+    next.tracks = normalizedTracks(next);
+    next.routes = [];
+  }
+  let beforeCount = 0;
+  let afterCount = 0;
+  for (const track of next.tracks) {
+    track.segments = (track.segments || []).map((seg) => {
+      beforeCount += seg.length;
+      const simplified = douglasPeucker(seg, toleranceMeters);
+      afterCount += simplified.length;
+      return simplified;
+    });
+  }
+  if (afterCount < beforeCount) clearSummaryMetadata(next);
+  return { track: next, beforeCount, afterCount };
 }
 
 /**
@@ -552,4 +752,194 @@ export function deleteWaypoint(parsed, index) {
   if (index < 0 || index >= next.waypoints.length) return next;
   next.waypoints.splice(index, 1);
   return next;
+}
+
+function ensureTracksMutable(next) {
+  if (next.tracks.length === 0 && next.routes.length > 0) {
+    next.tracks = normalizedTracks(next);
+    next.routes = [];
+  }
+  const flatSegs = [];
+  for (const track of next.tracks) {
+    for (const seg of track.segments || []) flatSegs.push(seg);
+  }
+  return flatSegs;
+}
+
+/**
+ * Moves a single vertex in the flattened segment list.
+ * @param {import('./types.js').ParsedTrack} parsed
+ * @param {number} flatSegIndex
+ * @param {number} ptIndex
+ * @param {number} lat
+ * @param {number} lon
+ */
+export function moveTrackVertex(parsed, flatSegIndex, ptIndex, lat, lon) {
+  const next = cloneParsedTrack(parsed);
+  const seg = ensureTracksMutable(next)[flatSegIndex];
+  if (!seg || ptIndex < 0 || ptIndex >= seg.length) return next;
+  seg[ptIndex] = clonePoint({ ...seg[ptIndex], lat, lon });
+  return clearSummaryMetadata(next);
+}
+
+/**
+ * Inserts a vertex after afterIndex in the flattened segment list.
+ * @param {import('./types.js').ParsedTrack} parsed
+ * @param {number} flatSegIndex
+ * @param {number} afterIndex
+ * @param {number} lat
+ * @param {number} lon
+ * @param {number} [ele]
+ */
+export function insertTrackVertex(parsed, flatSegIndex, afterIndex, lat, lon, ele) {
+  const next = cloneParsedTrack(parsed);
+  const seg = ensureTracksMutable(next)[flatSegIndex];
+  if (!seg || afterIndex < 0 || afterIndex >= seg.length) return next;
+  const a = seg[afterIndex];
+  const b = seg[afterIndex + 1];
+  let pt;
+  if (b) {
+    const dTotal = distanceMeters(a, b);
+    const dPart = distanceMeters(a, { lat, lon });
+    const ratio = dTotal > 0 ? Math.min(1, Math.max(0, dPart / dTotal)) : 0.5;
+    pt = interpolatePoint(a, b, ratio);
+    pt.lat = lat;
+    pt.lon = lon;
+  } else {
+    pt = { lat, lon };
+  }
+  if (Number.isFinite(ele)) pt.ele = ele;
+  seg.splice(afterIndex + 1, 0, pt);
+  return clearSummaryMetadata(next);
+}
+
+/**
+ * Deletes a vertex in the flattened segment list (keeps at least 2 points).
+ * @param {import('./types.js').ParsedTrack} parsed
+ * @param {number} flatSegIndex
+ * @param {number} ptIndex
+ */
+export function deleteTrackVertex(parsed, flatSegIndex, ptIndex) {
+  const next = cloneParsedTrack(parsed);
+  const seg = ensureTracksMutable(next)[flatSegIndex];
+  if (!seg || seg.length <= 2 || ptIndex < 0 || ptIndex >= seg.length) return next;
+  seg.splice(ptIndex, 1);
+  return clearSummaryMetadata(next);
+}
+
+/**
+ * Removes track points inside lat/lon bounds while keeping at least one valid segment (>= 2 points).
+ * @param {import('./types.js').ParsedTrack} parsed
+ * @param {{ south: number, west: number, north: number, east: number }} bounds
+ */
+export function eraseTrackPointsInBounds(parsed, bounds) {
+  const next = cloneParsedTrack(parsed);
+  if (next.tracks.length === 0 && next.routes.length > 0) {
+    next.tracks = normalizedTracks(next);
+    next.routes = [];
+  }
+  const trackCandidates = next.tracks.map((track) => (track.segments || []).map((seg) => {
+    const kept = seg.filter((pt) => {
+      const inside = pt.lat >= bounds.south && pt.lat <= bounds.north
+        && pt.lon >= bounds.west && pt.lon <= bounds.east;
+      return !inside;
+    });
+    return { seg, kept };
+  }));
+  let validSegCount = 0;
+  for (const segs of trackCandidates) {
+    for (const item of segs) {
+      if (item.kept.length >= 2) validSegCount += 1;
+    }
+  }
+  if (validSegCount === 0) {
+    return { track: next, removedCount: 0, removedWaypointCount: 0 };
+  }
+  let removedCount = 0;
+  next.tracks.forEach((track, tIdx) => {
+    const nextSegs = [];
+    for (const { seg, kept } of trackCandidates[tIdx]) {
+      if (kept.length >= 2) {
+        removedCount += seg.length - kept.length;
+        nextSegs.push(kept);
+      } else {
+        removedCount += seg.length;
+      }
+    }
+    track.segments = nextSegs;
+  });
+  next.tracks = next.tracks.filter((track) => (track.segments || []).length > 0);
+  let removedWaypointCount = 0;
+  if (Array.isArray(next.waypoints) && next.waypoints.length > 0) {
+    const beforeWpts = next.waypoints.length;
+    next.waypoints = next.waypoints.filter((wpt) => {
+      const insideBox = wpt.lat >= bounds.south && wpt.lat <= bounds.north
+        && wpt.lon >= bounds.west && wpt.lon <= bounds.east;
+      return !insideBox;
+    });
+    removedWaypointCount = beforeWpts - next.waypoints.length;
+  }
+  if (removedCount > 0 || removedWaypointCount > 0) clearSummaryMetadata(next);
+  return { track: next, removedCount, removedWaypointCount };
+}
+
+/**
+ * Shifts all track and waypoint timestamps by offsetSeconds.
+ * @param {import('./types.js').ParsedTrack} parsed
+ * @param {number} offsetSeconds
+ */
+export function shiftTrackTimestamps(parsed, offsetSeconds) {
+  const next = cloneParsedTrack(parsed);
+  if (!Number.isFinite(offsetSeconds) || offsetSeconds === 0) {
+    return { track: next, shiftedCount: 0 };
+  }
+  const deltaMs = offsetSeconds * 1000;
+  let shiftedCount = 0;
+  const shiftPt = (pt) => {
+    if (pt.time instanceof Date && Number.isFinite(pt.time.getTime())) {
+      pt.time = new Date(pt.time.getTime() + deltaMs);
+      shiftedCount += 1;
+    }
+  };
+  for (const track of next.tracks) {
+    for (const seg of track.segments || []) seg.forEach(shiftPt);
+  }
+  for (const route of next.routes || []) {
+    (route.points || []).forEach(shiftPt);
+  }
+  (next.waypoints || []).forEach(shiftPt);
+  if (shiftedCount > 0) clearSummaryMetadata(next);
+  return { track: next, shiftedCount };
+}
+
+/**
+ * Generates monotonic virtual timestamps across all segments from startTimeMs at speedMps.
+ * @param {import('./types.js').ParsedTrack} parsed
+ * @param {number} startTimeMs
+ * @param {number} speedMps
+ */
+export function generateVirtualTimeline(parsed, startTimeMs, speedMps) {
+  const next = cloneParsedTrack(parsed);
+  if (!Number.isFinite(startTimeMs) || !Number.isFinite(speedMps) || speedMps <= 0) {
+    return { track: next, durationSeconds: 0, pointCount: 0 };
+  }
+  const segs = ensureTracksMutable(next);
+  let cursorMs = startTimeMs;
+  let pointCount = 0;
+  segs.forEach((seg, segIdx) => {
+    if (segIdx > 0 && seg.length > 0) {
+      cursorMs += 1000;
+    }
+    for (let i = 0; i < seg.length; i += 1) {
+      if (i > 0) {
+        const d = distanceMeters(seg[i - 1], seg[i]);
+        cursorMs += (d / speedMps) * 1000;
+      }
+      seg[i].time = new Date(Math.round(cursorMs));
+      pointCount += 1;
+    }
+  });
+  const durationSeconds = Math.max(0, Math.round((cursorMs - startTimeMs) / 1000));
+  if (pointCount > 0) clearSummaryMetadata(next);
+  return { track: next, durationSeconds, pointCount };
 }

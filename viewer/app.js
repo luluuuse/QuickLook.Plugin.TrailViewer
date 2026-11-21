@@ -345,6 +345,43 @@ async function ensureEditorLoaded() {
             if (!current) return;
             editorStore.apply('move-waypoint', opsMod.moveWaypoint(current, idx, lat, lon));
           },
+          onRotateLoopStart: (alongMeters) => {
+            const current = editorStore.getCurrent();
+            if (!current) return;
+            const { track, rotated, timestampsCleared } = opsMod.rotateLoopStart(current, alongMeters);
+            if (rotated) {
+              editorStore.apply('rotate-loop', track);
+              showToast?.(t(timestampsCleared ? 'editor.topology.loopStartCleared' : 'editor.topology.loopStartDone'));
+            }
+          },
+          onBoxErase: (bounds) => {
+            const current = editorStore.getCurrent();
+            if (!current) return;
+            const { track, removedCount, removedWaypointCount } = opsMod.eraseTrackPointsInBounds(current, bounds);
+            if (removedCount > 0 || removedWaypointCount > 0) {
+              editorStore.apply('box-erase', track);
+              if (removedCount > 0 && removedWaypointCount > 0) {
+                showToast?.(t('editor.clean.boxDoneWithWpts', { count: removedCount, wptCount: removedWaypointCount }));
+              } else if (removedCount > 0) {
+                showToast?.(t('editor.clean.boxDone', { count: removedCount }));
+              } else {
+                showToast?.(t('editor.clean.boxDoneWptsOnly', { wptCount: removedWaypointCount }));
+              }
+            } else {
+              showToast?.(t('editor.clean.boxNone'));
+            }
+          },
+          onMoveVertex: (flatSegIndex, ptIndex, lat, lon) => {
+            const current = editorStore.getCurrent();
+            if (!current) return;
+            editorStore.apply('move-vertex', opsMod.moveTrackVertex(current, flatSegIndex, ptIndex, lat, lon));
+          },
+          onInsertVertex: (flatSegIndex, afterIndex, lat, lon, ele) => {
+            const current = editorStore.getCurrent();
+            if (!current) return;
+            editorStore.apply('insert-vertex', opsMod.insertTrackVertex(current, flatSegIndex, afterIndex, lat, lon, ele));
+          },
+          onViewportChange: () => editorShell?.refreshVertexStatus?.(),
           onContextMenu: (info) => editorShell?.showContextMenu(info),
         });
         editorShell = shellMod.createEditorShell({
@@ -358,6 +395,11 @@ async function ensureEditorLoaded() {
           isGpxSource: () => /\.gpx$/i.test((ctx.fileName || ctx.src || '').split(/[?#]/)[0]),
           onSaveTrack: ({ id, fileName: outName, xml, overwrite }) =>
             hostBridge.saveTrackGpx({ id, fileName: outName, xml, overwrite }),
+          onToggleLayers: () => layerSwitch?.toggle?.(),
+          isLayersOpen: () => Boolean(layerSwitch?.isOpen?.()),
+          onTogglePins: () => waypointController?.toggle?.(),
+          onShowPins: () => waypointController?.show?.(),
+          isPinsVisible: () => Boolean(waypointController?.visible?.()),
           onExit: ({ overwroteOriginal = false, committed = null } = {}) => {
             if (overwroteOriginal && committed) {
               ctx.gpx = committed;

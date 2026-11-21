@@ -463,6 +463,8 @@ export function createLayerSwitcher({
   return {
     select,
     close: () => closeMenu(),
+    toggle: () => (menuOpen ? closeMenu() : openMenu({ focus: false })),
+    isOpen: () => menuOpen,
     resumeMap: () => select(noMapReturn || 'road.osm', true),
     setDirectKey,
     keyRejected() {
