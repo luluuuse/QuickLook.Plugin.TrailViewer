@@ -99,7 +99,7 @@ async function main() {
     '.layer-provider-option:not([hidden]) .layer-provider-label',
   )].map((node) => node.textContent));
   check('the layer menu shows only providers from the active map type',
-    visibleProviders.join('|') === 'OpenStreetMap HOT|Tianditu road',
+    visibleProviders.join('|') === 'OpenStreetMap HOT|Tianditu road|Esri Light Gray|Esri Dark Gray',
     visibleProviders.join('|'));
   const categoryIcons = await page.$$eval('.layer-category-button', (nodes) => nodes.map((node) => ({
     name: node.querySelector('svg')?.dataset.icon,

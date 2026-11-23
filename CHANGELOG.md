@@ -17,6 +17,52 @@ Added / Changed / Deprecated / Removed / Fixed / Security 分类；没有内容�
 
 None yet.
 
+## 1.28.1 — 2026-11-23
+
+### 中文
+
+#### 新增
+
+- **地图节点切换与按需测速**：在「地图设置」中为 OpenStreetMap（官方 CDN / HOT / 德国节点）、OpenTopoMap（官方 / OpenMaps 镜像）和 Esri 影像（Server / Services 节点）提供多节点切换与单节点实时连通性检测。
+- **内置底图扩展与透明户外叠加层**：新增 **Esri 浅灰 / 深灰底图**（路网）和 **Esri 世界地形图**（地形），并新增 3 套可自由叠放的透明户外叠加层（**Waymarked 徒步路线**、**Waymarked 骑行路线**、**OpenSnowMap 雪道**），全部接入本地瓦片缓存。
+- **11 套定制图源一键预设**：定制图源表单新增 7 套免费区域/全球预设（日本 GSI 地形、台湾鲁地图、美国 USGS 新版与经典镜像、瑞士 swisstopo 地形与航拍、Google 卫星）及 4 套专业户外 API Key 预设（Tracestrack、Thunderforest、Stadia Stamen 512px、MapTiler）。
+- **拆分与裁剪联动体验升级**：点击拆模式新增地图实时里程悬浮气泡、剖面图点击直接拆分、剖面虚线分割标记与分段色带；裁剪双柄靠近分割线自动磁吸对齐；多段着色跨全部编辑工具实时同步到地图。
+
+#### 变更
+
+- **OpenStreetMap 默认切换至官方 CDN 节点**：解决部分网络下 OSM France HOT 节点超时问题，同时仍可在地图设置中一键切回 HOT 或德国节点。
+- **拆分分段顺序重编号**：拆分并删段后自动按 `1, 2, 3…` 重新连续编号，避免出现跳号。
+- **测距返回与非 GPX 覆盖提示优化**：点击测距页返回按钮自动结束测距；非 GPX 文件进入编辑后，“覆盖原文件”明确置灰并标注「仅 GPX 格式支持」；航点图标下拉列表移除原始内部代码项，同时无损保留原文件中的自定义图标。
+
+#### 修复
+
+- **覆盖保存与编辑器稳定性**：修复覆盖保存退出编辑后顶部重复出现「航点 | 列表」控件的问题；修复跨模式切回与多段擦除时的着色同步与状态残留。
+- **顶部工具栏按钮态统一**：统一工具箱、图层、轨迹着彩、航点、列表及缩放/定位按钮的悬停底色与过渡效果，修复工具箱与图层按钮悬停发白的问题，并屏蔽禁用态按钮的悬停高亮。
+- **全量代码审计修复**：完成前端解析器、剖面计算、测距、地图视图、叠加图导出及 C# 宿主（KMZ 解压、附件导出、瓦片缓存、全局热键、安全边界与资源释放）共 40 余项边界缺陷与内存/句柄清理修复。
+- **图标系统测试对齐**：同步更新路网底图列表的端到端测试断言，覆盖新增的 Esri 浅灰与深灰底图。
+
+### English
+
+#### Added
+
+- **Map Source Node Switcher & On-Demand Probe**: Added multi-node switching and per-node live connectivity checks in Map Settings for OpenStreetMap (Official CDN / HOT / DE), OpenTopoMap (Official / OpenMaps mirror), and Esri Imagery (Server / Services).
+- **Expanded Built-in Basemaps & Transparent Outdoor Overlays**: Added **Esri Light Gray / Dark Gray** (Road) and **Esri World Topo** (Terrain), plus 3 toggleable transparent outdoor overlays (**Waymarked Hiking**, **Waymarked Cycling**, **OpenSnowMap Pistes**), all backed by the local tile cache.
+- **11 One-Click Custom Source Presets**: Added 7 free regional/global presets (Japan GSI, Taiwan RudyMap, US USGS New & Classic Esri mirror, Swiss swisstopo Topo & Imagery, Google Satellite) and 4 pro outdoor API-key presets (Tracestrack, Thunderforest, Stadia Stamen 512px, MapTiler).
+- **Split & Crop Editor Enhancements**: Added a live distance pill on the map in Click Split mode, click-to-split directly on the elevation profile, dashed split dividers and segment color bands on the profile, magnetic snap for crop handles near split dividers, and synchronized multi-segment coloring across all editor modes.
+
+#### Changed
+
+- **OpenStreetMap Defaults to Official CDN**: Switched the default OSM node to `tile.openstreetmap.org` to avoid regional timeouts on OSM France HOT, while keeping HOT and DE nodes one click away in Map Settings.
+- **Sequential Split Segment Renumbering**: Automatically renumbers split segments sequentially (`(1)`, `(2)`, `(3)…`) after splits and deletions.
+- **Measure Back-Button & Non-GPX Overwrite Clarity**: Navigating back from Measure now stops measuring cleanly; non-GPX tracks show a clearly disabled overwrite-original option (`GPX only`); removed raw `#MarkerStylePicture` codes from the waypoint symbol dropdown while preserving existing custom icons untouched.
+
+#### Fixed
+
+- **Overwrite Save & Editor Lifecycle**: Fixed duplicate Waypoints/Overview toolbar controls appearing after overwrite-saving and exiting the editor, plus cross-mode segment color synchronization.
+- **Unified Toolbar Button States**: Unified hover surfaces and transitions across Toolbox, Layer, Track Color, Waypoints, Overview, Zoom, and Locate buttons; fixed washed-out light hover on Toolbox/Layer toggles and suppressed hover highlights on disabled controls.
+- **Comprehensive Codebase Audit Fixes**: Resolved 40+ edge-case bugs and resource-cleanup issues across GPX/KML/FIT parsers, climb/profile analysis, measurement, map viewport, overlay export, and C# host services (KMZ extraction, attachment export, tile cache, global hotkeys, and validation guards).
+- **Icon Suite Assertion Sync**: Updated the road-provider assertion in the icon system E2E suite to include Esri Light Gray and Esri Dark Gray.
+
 ## 1.28.0 — 2026-11-23
 
 ### 中文
