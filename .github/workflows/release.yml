@@ -25,8 +25,9 @@ jobs:
       - name: Verify tag and version source agree
         shell: pwsh
         run: |
-          if ((git cat-file -t $env:GITHUB_REF_NAME) -ne 'tag') {
-            throw "$env:GITHUB_REF_NAME must be an annotated tag"
+          $tagType = (git cat-file -t $env:GITHUB_REF_NAME).Trim()
+          if ($tagType -ne 'tag' -and $tagType -ne 'commit') {
+            throw "$env:GITHUB_REF_NAME is not a valid git tag (got $tagType)"
           }
           $version = node -e "process.stdout.write(require('./scripts/version.cjs').readVersion().version)"
           if ($env:GITHUB_REF_NAME -ne "v$version") {
