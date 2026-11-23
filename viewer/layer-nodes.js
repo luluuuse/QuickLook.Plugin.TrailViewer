@@ -72,30 +72,64 @@ export function probeUrlFor(spec, directKey = '') {
     .replace('{y}', '404');
 }
 
+export const DEFAULT_PROBE_TIMEOUT_MS = 10000;
+export const PROBE_CONCURRENCY = 4;
+
 /**
- * Probes one tile endpoint by loading a single image tile with a bounded timeout.
- * Image loading avoids CORS rejections while verifying that the server actually returns a valid tile image.
- * @param {string} url
- * @param {{ timeoutMs?: number }} [options]
- * @returns {Promise<{ ok: boolean, ms: number }>}
+ * Runs async work over items with a bounded number of concurrent workers.
+ * @template T
+ * @param {T[]} items
+ * @param {number} concurrency
+ * @param {(item: T) => Promise<void>} worker
  */
-export function probeTileNode(url, { timeoutMs = 5000 } = {}) {
+export async function runWithConcurrency(items, concurrency, worker) {
+  if (!Array.isArray(items) || items.length === 0) return;
+  const limit = Math.max(1, Math.min(items.length, Math.floor(concurrency) || 1));
+  let cursor = 0;
+  const workers = Array.from({ length: limit }, async () => {
+    while (cursor < items.length) {
+      const index = cursor;
+      cursor += 1;
+      await worker(items[index]);
+    }
+  });
+  await Promise.all(workers);
+}
+
+/**
+ * Probes one tile endpoint. Uses the host direct prober when available (bypassing both browser and disk tile caches),
+ * and falls back to browser image loading in standalone web preview mode.
+ * @param {string} url
+ * @param {{ timeoutMs?: number, hostProbe?: ((url: string, timeoutMs: number) => Promise<{ ok: boolean, ms: number, reason?: string } | null>) | null }} [options]
+ * @returns {Promise<{ ok: boolean, ms: number, reason: string }>}
+ */
+export async function probeTileNode(url, { timeoutMs = DEFAULT_PROBE_TIMEOUT_MS, hostProbe = null } = {}) {
+  if (typeof hostProbe === 'function') {
+    const hosted = await hostProbe(url, timeoutMs);
+    if (hosted && typeof hosted === 'object') {
+      return {
+        ok: Boolean(hosted.ok),
+        ms: Math.max(0, Math.round(Number(hosted.ms) || 0)),
+        reason: hosted.reason || (hosted.ok ? 'ok' : 'error'),
+      };
+    }
+  }
   return new Promise((resolve) => {
     const started = performance.now();
     const img = new Image();
     let settled = false;
-    const finish = (ok) => {
+    const finish = (ok, reason) => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
       img.onload = null;
       img.onerror = null;
       img.src = '';
-      resolve({ ok, ms: Math.max(1, Math.round(performance.now() - started)) });
+      resolve({ ok, ms: Math.max(1, Math.round(performance.now() - started)), reason });
     };
-    const timer = setTimeout(() => finish(false), timeoutMs);
-    img.onload = () => finish(true);
-    img.onerror = () => finish(false);
+    const timer = setTimeout(() => finish(false, 'timeout'), timeoutMs);
+    img.onload = () => finish(true, 'ok');
+    img.onerror = () => finish(false, 'error');
     img.referrerPolicy = 'no-referrer';
     img.src = url;
   });

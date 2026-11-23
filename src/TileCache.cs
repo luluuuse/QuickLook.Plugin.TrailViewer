@@ -56,6 +56,10 @@ internal sealed class CustomHostMatcher
 
     internal string CanonicalHost { get; }
 
+    internal string FilterPattern => _exactHost != null
+        ? $"https://{_exactHost}/*"
+        : $"https://{_prefix}*{_suffix}/*";
+
     internal CustomHostMatcher(string exactHost, string canonicalHost)
     {
         _exactHost = exactHost;
@@ -114,15 +118,21 @@ internal sealed class TileCache
 
     internal static readonly TileCache Shared = new(DefaultDirectory);
 
-    internal static readonly HttpClient RefreshHttpClient = new(
-        new HttpClientHandler
-        {
-            AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate,
-            UseProxy = true,
-        })
+    internal static readonly HttpClient RefreshHttpClient = CreateRefreshHttpClient();
+
+    private static HttpClient CreateRefreshHttpClient()
     {
-        Timeout = TimeSpan.FromSeconds(4),
-    };
+        NodeProber.EnsureModernTls();
+        return new HttpClient(
+            new HttpClientHandler
+            {
+                AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate,
+                UseProxy = true,
+            })
+        {
+            Timeout = TimeSpan.FromSeconds(4),
+        };
+    }
 
     private readonly string _rootDirectory;
     private int _writeCount;
@@ -131,6 +141,39 @@ internal sealed class TileCache
     internal TileCache(string rootDirectory)
     {
         _rootDirectory = rootDirectory;
+    }
+
+    private static readonly string[] BuiltInTileFilterPatterns =
+    {
+        "https://tile.openstreetmap.org/*",
+        "https://*.tile.openstreetmap.org/*",
+        "https://tile.openstreetmap.de/*",
+        "https://*.tile.openstreetmap.de/*",
+        "https://tile.openstreetmap.fr/*",
+        "https://*.tile.openstreetmap.fr/*",
+        "https://tile-cyclosm.openstreetmap.fr/*",
+        "https://*.tile-cyclosm.openstreetmap.fr/*",
+        "https://tile.openmaps.fr/*",
+        "https://tile.opentopomap.org/*",
+        "https://*.tile.opentopomap.org/*",
+        "https://tile.waymarkedtrails.org/*",
+        "https://tiles.opensnowmap.org/*",
+        "https://server.arcgisonline.com/ArcGIS/rest/services/*",
+        "https://services.arcgisonline.com/ArcGIS/rest/services/*",
+        "https://tianditu.gov.cn/*",
+        "https://*.tianditu.gov.cn/*",
+    };
+
+    internal static IReadOnlyList<string> GetWebResourceFilterPatterns(
+        IReadOnlyList<CustomHostMatcher>? customMatchers)
+    {
+        var patterns = new List<string>(BuiltInTileFilterPatterns);
+        if (customMatchers != null)
+        {
+            foreach (var matcher in customMatchers)
+                patterns.Add(matcher.FilterPattern);
+        }
+        return patterns;
     }
 
     internal static IReadOnlyList<CustomHostMatcher> BuildCustomHostMatchers(string? customSourcesJson)

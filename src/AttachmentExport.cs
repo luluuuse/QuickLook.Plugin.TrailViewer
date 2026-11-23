@@ -649,6 +649,7 @@ internal sealed class AttachmentExport : IDisposable
 
     private static HttpClient CreateHttpClient()
     {
+        NodeProber.EnsureModernTls();
         var handler = new HttpClientHandler
         {
             AllowAutoRedirect = false,

@@ -35,6 +35,8 @@ internal sealed class ViewerMessageActions
     internal Action<string> RemoveTiandituKey { get; set; } = _ => { };
     internal Action RequestTileCacheStats { get; set; } = () => { };
     internal Action ClearTileCache { get; set; } = () => { };
+    internal Func<string, System.Threading.Tasks.Task> ProbeNode { get; set; } =
+        _ => System.Threading.Tasks.Task.CompletedTask;
 }
 
 internal sealed class ViewerMessageRouter
@@ -95,5 +97,7 @@ internal sealed class ViewerMessageRouter
             _actions.RequestTileCacheStats();
         else if (message == "tile-cache\tclear")
             _actions.ClearTileCache();
+        else if (message.StartsWith("probe-node\t", StringComparison.Ordinal))
+            _ = _actions.ProbeNode(message.Substring("probe-node\t".Length));
     }
 }

@@ -59,6 +59,7 @@ internal sealed partial class TrailViewerPanel : UserControl, IDisposable
     private volatile bool _editorDirty;
     private volatile TileCacheOptions _tileCacheOptions = ViewerPreferences.ReadTileCacheOptions();
     private volatile IReadOnlyList<CustomHostMatcher> _customHostMatchers = Array.Empty<CustomHostMatcher>();
+    private readonly HashSet<string> _registeredTileFilters = new(StringComparer.OrdinalIgnoreCase);
     private bool _finished;
     private volatile bool _disposed;
 
@@ -100,6 +101,7 @@ internal sealed partial class TrailViewerPanel : UserControl, IDisposable
             RemoveTiandituKey = value => RemoveTiandituKey(IsEnglishMessage(value)),
             RequestTileCacheStats = RequestTileCacheStats,
             ClearTileCache = ClearTileCache,
+            ProbeNode = ProbeNodeAsync,
         });
     }
 

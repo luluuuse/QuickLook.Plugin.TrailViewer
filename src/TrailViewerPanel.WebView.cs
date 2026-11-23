@@ -45,7 +45,6 @@ internal sealed partial class TrailViewerPanel
                 OpenInBrowser(args.Uri);
             };
             core.WebMessageReceived += OnWebMessage;
-            core.AddWebResourceRequestedFilter("https://*", CoreWebView2WebResourceContext.Image);
             core.WebResourceRequested += OnWebResourceRequested;
             core.WebResourceResponseReceived += OnWebResourceResponseReceived;
 
@@ -64,6 +63,7 @@ internal sealed partial class TrailViewerPanel
             }
             var customSources = CustomSourceStore.LoadJson();
             _customHostMatchers = TileCache.BuildCustomHostMatchers(customSources);
+            RegisterTileCacheFilters(core, _customHostMatchers);
             if (customSources != null)
                 runtimeConfig.Add("customSources: " + customSources);
             runtimeConfig.Add(string.Format(

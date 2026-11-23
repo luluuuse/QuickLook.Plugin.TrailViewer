@@ -35,5 +35,8 @@ internal static class ViewerMessages
     internal static string TrackSaveResult(string id, int statusCode, string path, string detail) =>
         $"trackSaveResult\t{id}\t{statusCode}\t{Encode(path)}\t{Encode(detail)}";
 
+    internal static string NodeProbeResult(string id, bool ok, int elapsedMs, string reason) =>
+        $"nodeProbeResult\t{id}\t{(ok ? 1 : 0)}\t{elapsedMs}\t{Encode(reason)}";
+
     private static string Encode(string value) => Uri.EscapeDataString(value ?? "");
 }

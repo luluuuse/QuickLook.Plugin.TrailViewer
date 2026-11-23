@@ -1,10 +1,12 @@
 /** WebView2 message and clipboard bridge. Keeps host calls serialized and independent of viewer state. */
 export function createHostBridge() {
   let clipboardSequence = 0;
+  let probeSequence = 0;
   let clipboardWriting = false;
   let queuedClipboardWrite = null;
   const pendingClipboard = new Map();
   const pendingTrackSaves = new Map();
+  const pendingNodeProbes = new Map();
   const hasHost = Boolean(
     window.chrome?.webview?.postMessage && window.chrome.webview.addEventListener,
   );
@@ -151,6 +153,37 @@ export function createHostBridge() {
     });
   }
 
+  function nodeProbeResult(id, ok, ms = 0, reason = '') {
+    const pending = pendingNodeProbes.get(id);
+    if (!pending) return;
+    pendingNodeProbes.delete(id);
+    clearTimeout(pending.timer);
+    pending.resolve({
+      ok: Boolean(ok),
+      ms: Math.max(0, Math.round(Number(ms) || 0)),
+      reason: decodeMessage(reason) || (ok ? 'ok' : 'error'),
+    });
+  }
+
+  function probeNode(url, timeoutMs = 10000) {
+    if (!hasHost) return Promise.resolve(null);
+    const id = `${Date.now().toString(36)}-${(probeSequence += 1).toString(36)}`;
+    const boundedTimeout = Math.max(1000, Math.min(30000, Math.round(Number(timeoutMs) || 10000)));
+    return new Promise((resolve) => {
+      const started = performance.now();
+      const timer = setTimeout(() => {
+        pendingNodeProbes.delete(id);
+        resolve({
+          ok: false,
+          ms: Math.max(1, Math.round(performance.now() - started)),
+          reason: 'timeout',
+        });
+      }, boundedTimeout + 2000);
+      pendingNodeProbes.set(id, { resolve, timer });
+      post(`probe-node\t${id}\t${boundedTimeout}\t${encodeURIComponent(url)}`);
+    });
+  }
+
   function installViewerMessages(api, clipboardResultHandler) {
     window.chrome?.webview?.addEventListener('message', (event) => {
       if (typeof event.data !== 'string') return;
@@ -183,6 +216,8 @@ export function createHostBridge() {
         api.tileCacheCleared?.(Number(parts[1]), Number(parts[2]));
       } else if (parts[0] === 'trackSaveResult') {
         trackSaveResult(parts[1], Number(parts[2]), parts[3], parts[4]);
+      } else if (parts[0] === 'nodeProbeResult') {
+        nodeProbeResult(parts[1], parts[2] === '1', Number(parts[3]), parts[4]);
       }
     });
   }
@@ -210,6 +245,7 @@ export function createHostBridge() {
     setEditorState,
     setEditorDirty,
     saveTrackGpx,
+    probeNode,
     installViewerMessages,
     installTextInputReporting,
   };

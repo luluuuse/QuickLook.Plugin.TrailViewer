@@ -18,10 +18,13 @@ import {
   unregisterCustomProvider,
 } from './layer-registry.js';
 import {
+  DEFAULT_PROBE_TIMEOUT_MS,
+  PROBE_CONCURRENCY,
   loadNodePreferences,
   loadOverlayPreferences,
   probeTileNode,
   probeUrlFor,
+  runWithConcurrency,
   saveNodePreferences,
   saveOverlayPreferences,
 } from './layer-nodes.js';
@@ -93,6 +96,7 @@ export function createLayerSwitcher({
   onOpen = () => {}, onCustomSave, customSources = null,
   hasHost = false, tileCacheConfig = null,
   onTileCacheChange = () => {}, onRequestTileCacheStats = () => {}, onClearTileCache = () => {},
+  onProbeNode = null,
 }) {
   const lifecycle = new AbortController();
   let directKey = tiandituDirectKey;
@@ -235,17 +239,12 @@ export function createLayerSwitcher({
     probingNodes = true;
     const token = ++probeToken;
     renderNodes();
-    const tasks = [];
+    const jobs = [];
     for (const [providerKey, nodes] of Object.entries(PROVIDER_NODES)) {
       for (const node of nodes) {
         const statusKey = `${providerKey}:${node.id}`;
         setNodeStatus(statusKey, 'testing', '…');
-        const url = probeUrlFor(node, directKey);
-        tasks.push((async () => {
-          const result = url ? await probeTileNode(url) : { ok: false, ms: 0 };
-          if (token !== probeToken) return;
-          setNodeStatus(statusKey, result.ok ? 'ok' : 'fail', result.ok ? `${result.ms} ms` : t('layer.node.failed'));
-        })());
+        jobs.push({ statusKey, url: probeUrlFor(node, directKey) });
       }
     }
     for (const src of SINGLE_NODE_SOURCES) {
@@ -255,14 +254,17 @@ export function createLayerSwitcher({
         continue;
       }
       setNodeStatus(statusKey, 'testing', '…');
-      const url = probeUrlFor(src, directKey);
-      tasks.push((async () => {
-        const result = url ? await probeTileNode(url) : { ok: false, ms: 0 };
-        if (token !== probeToken) return;
-        setNodeStatus(statusKey, result.ok ? 'ok' : 'fail', result.ok ? `${result.ms} ms` : t('layer.node.failed'));
-      })());
+      jobs.push({ statusKey, url: probeUrlFor(src, directKey) });
     }
-    await Promise.all(tasks);
+    await runWithConcurrency(jobs, PROBE_CONCURRENCY, async ({ statusKey, url }) => {
+      if (token !== probeToken) return;
+      const result = url
+        ? await probeTileNode(url, { timeoutMs: DEFAULT_PROBE_TIMEOUT_MS, hostProbe: onProbeNode })
+        : { ok: false, ms: 0, reason: 'error' };
+      if (token !== probeToken) return;
+      const failText = result.reason === 'timeout' ? t('layer.node.timeout') : t('layer.node.failed');
+      setNodeStatus(statusKey, result.ok ? 'ok' : 'fail', result.ok ? `${result.ms} ms` : failText);
+    });
     if (token !== probeToken) return;
     probingNodes = false;
     renderNodes();

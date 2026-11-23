@@ -157,3 +157,25 @@ test('copyText falls back to navigator.clipboard when host is absent', async () 
     globalThis.window = prevWindow;
   }
 });
+
+test('probeNode exchanges probe-node and nodeProbeResult messages with host', async () => {
+  posted.length = 0;
+  webviewListeners.clear();
+  const bridge = createHostBridge();
+  bridge.installViewerMessages({ attachments: { result() {} } }, () => {});
+
+  const okPromise = bridge.probeNode('https://tile.openstreetmap.org/10/832/404.png', 10000);
+  assert.equal(posted.length, 1);
+  const [cmd, id, timeoutStr, encodedUrl] = posted.shift().split('\t');
+  assert.equal(cmd, 'probe-node');
+  assert.equal(timeoutStr, '10000');
+  assert.equal(decodeURIComponent(encodedUrl), 'https://tile.openstreetmap.org/10/832/404.png');
+
+  emitWebMessage(`nodeProbeResult\t${id}\t1\t245\tok`);
+  assert.deepEqual(await okPromise, { ok: true, ms: 245, reason: 'ok' });
+
+  const timeoutPromise = bridge.probeNode('https://tile.openstreetmap.de/10/832/404.png', 10000);
+  const timeoutId = posted.shift().split('\t')[1];
+  emitWebMessage(`nodeProbeResult\t${timeoutId}\t0\t10002\ttimeout`);
+  assert.deepEqual(await timeoutPromise, { ok: false, ms: 10002, reason: 'timeout' });
+});

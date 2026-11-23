@@ -74,6 +74,8 @@ export function createWaypointContent({ el, src, photoViewer }) {
     const heroImage = el('img', 'photo-image-thumb');
     heroImage.alt = '';
     heroImage.decoding = 'async';
+    heroImage.fetchPriority = 'high';
+    heroImage.referrerPolicy = 'no-referrer';
     const heroError = iconElement('warning', { className: 'photo-error-icon' });
     heroImage.onerror = () => frame.classList.add('failed');
     heroImage.src = photos[0];

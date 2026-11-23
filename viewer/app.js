@@ -900,6 +900,7 @@ async function main() {
       if (hasQuickLookHost) post('tile-cache\tclear');
       else showToast(t('layer.cacheHostOnlyToast'), 4000);
     },
+    onProbeNode: hasQuickLookHost ? hostBridge.probeNode : null,
   }); // after the view is set: the grid needs the map bounds
   layerSwitch = switcher;
   // A file that draws no dots and has no waypoints gets no switch: there is nothing for it to show or hide.

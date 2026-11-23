@@ -38,6 +38,7 @@ export function createPhotoViewer({ el, formatters, formatCoord, t }) {
   let wheelReset = 0;
   let layoutFrame = 0;
   let resizeObserver = null;
+  let preloader = null;
 
   function build() {
     root = el('div', 'photo-viewer');
@@ -75,6 +76,8 @@ export function createPhotoViewer({ el, formatters, formatCoord, t }) {
     img = el('img', 'photo-image');
     img.alt = '';
     img.decoding = 'async';
+    img.fetchPriority = 'high';
+    img.referrerPolicy = 'no-referrer';
     img.addEventListener('click', (event) => event.stopPropagation());
     img.addEventListener('pointerdown', (event) => {
       if (event.button !== 0 || viewScale <= baseScale + SCALE_EPSILON) return;
@@ -284,6 +287,19 @@ export function createPhotoViewer({ el, formatters, formatCoord, t }) {
     paintZoom();
   }
 
+  function preloadNext() {
+    if (list.length < 2) return;
+    const nextUrl = list[(index + 1) % list.length];
+    if (!nextUrl || nextUrl === list[index]) return;
+    if (!preloader) {
+      preloader = new Image();
+      preloader.decoding = 'async';
+      preloader.fetchPriority = 'low';
+      preloader.referrerPolicy = 'no-referrer';
+    }
+    if (preloader.src !== nextUrl) preloader.src = nextUrl;
+  }
+
   function load() {
     const url = list[index];
     const mine = ++token;
@@ -304,6 +320,7 @@ export function createPhotoViewer({ el, formatters, formatCoord, t }) {
       img.hidden = false;
       zoomOutput.hidden = false;
       scheduleLayout();
+      preloadNext();
     };
     img.onerror = () => {
       if (mine !== token) return;
@@ -354,6 +371,7 @@ export function createPhotoViewer({ el, formatters, formatCoord, t }) {
     token += 1;
     img.hidden = true;
     img.removeAttribute('src');
+    if (preloader) preloader.removeAttribute('src');
     // The thumbnail may still be fading out inside a closed Leaflet popup; the map is the stable return point.
     trap.deactivate(true);
   }

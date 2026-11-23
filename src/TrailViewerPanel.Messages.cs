@@ -242,7 +242,22 @@ internal sealed partial class TrailViewerPanel
     private void SaveCustomSources(string json)
     {
         _ = CustomSourceStore.SaveJson(json);
-        _customHostMatchers = TileCache.BuildCustomHostMatchers(CustomSourceStore.LoadJson());
+        var matchers = TileCache.BuildCustomHostMatchers(CustomSourceStore.LoadJson());
+        _customHostMatchers = matchers;
+        var core = _webView?.CoreWebView2;
+        if (core != null && !_disposed)
+            RegisterTileCacheFilters(core, matchers);
+    }
+
+    private void RegisterTileCacheFilters(
+        CoreWebView2 core,
+        System.Collections.Generic.IReadOnlyList<CustomHostMatcher>? customMatchers)
+    {
+        foreach (var pattern in TileCache.GetWebResourceFilterPatterns(customMatchers))
+        {
+            if (_registeredTileFilters.Add(pattern))
+                core.AddWebResourceRequestedFilter(pattern, CoreWebView2WebResourceContext.Image);
+        }
     }
 
     private void RequestTileCacheStats()
@@ -271,6 +286,48 @@ internal sealed partial class TrailViewerPanel
                 }
             },
             TaskScheduler.Default);
+    }
+
+    private async Task ProbeNodeAsync(string body)
+    {
+        var parts = body.Split(new[] { '\t' }, 3);
+        if (parts.Length < 3)
+            return;
+
+        var id = parts[0];
+        if (string.IsNullOrEmpty(id) || id.Length > 80)
+            return;
+
+        var timeoutMs = int.TryParse(parts[1], out var parsedTimeout)
+            ? parsedTimeout
+            : NodeProber.DefaultTimeoutMs;
+
+        string url;
+        try
+        {
+            url = Uri.UnescapeDataString(parts[2]);
+        }
+        catch (UriFormatException)
+        {
+            if (!_disposed)
+                _ = PostToViewerMessageAsync(ViewerMessages.NodeProbeResult(id, false, 0, "invalid"));
+            return;
+        }
+
+        try
+        {
+            var result = await NodeProber.ProbeAsync(
+                url, timeoutMs, _customHostMatchers, _lifecycle.Token).ConfigureAwait(false);
+            if (!_disposed)
+            {
+                _ = PostToViewerMessageAsync(ViewerMessages.NodeProbeResult(
+                    id, result.Ok, result.ElapsedMs, result.Reason));
+            }
+        }
+        catch (OperationCanceledException) when (_disposed || _lifecycle.IsCancellationRequested)
+        {
+            // Preview closed while probe was in flight.
+        }
     }
 
     private void OnWebResourceRequested(
@@ -565,6 +622,8 @@ internal sealed partial class TrailViewerPanel
                 ? "clipboard ..."
             : message.StartsWith("custom-sources\t", StringComparison.Ordinal)
                 ? "custom-sources ..."
+            : message.StartsWith("probe-node\t", StringComparison.Ordinal)
+                ? "probe-node ..."
                 : message;
 
     // The overlay arrives as base64 in pieces, because a large PNG is close to the size where one
