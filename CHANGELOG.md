@@ -17,6 +17,26 @@ Added / Changed / Deprecated / Removed / Fixed / Security 分类；没有内容�
 
 None yet.
 
+## 1.28.2 — 2026-11-24
+
+### 中文
+
+#### 修复
+
+- **图源节点检测改为宿主直连真网络探测**：桌面端由宿主直接发起真实网络请求测速，彻底绕过浏览器 HTTP 缓存与本地磁盘瓦片缓存，修复重测命中缓存出现假 10 ms、断网仍显示可达以及 Esri 双节点串缓存的问题。
+- **修复 `.NET Framework 4.6.2` 宿主默认 TLS 握手失败**：在宿主网络请求初始化前显式启用 TLS 1.2 / 1.3 并将默认每域名并发连接上限提升至 16，同步覆盖节点探测、过期瓦片刷新与外链照片导出。
+- **节点检测限流并发与区分超时**：将检测并发收紧为 4 路排队、单节点超时放宽至 10 秒，避免慢网下与地图加载抢带宽导致集体误判，并明确区分「超时」与「不可达」。
+- **航点照片预览提速**：本地瓦片缓存拦截范围收窄至已注册的内置与定制地图图源域名，不再跨进程拦截本地 KMZ 照片与外部航点图片；航点缩略图和全屏大图设为最高加载优先级并去掉来源头，全屏看图后自动后台预载下一张。
+
+### English
+
+#### Fixed
+
+- **Direct Host Network Probing for Map Nodes**: Desktop node checks now probe tile endpoints directly from the host, bypassing both WebView2 HTTP cache and the local disk tile cache to eliminate false ~10 ms cached readings, offline false positives, and cross-cached Esri nodes.
+- **Explicit TLS 1.2 / 1.3 Enablement on .NET Framework 4.6.2**: Enabled TLS 1.2 / 1.3 and raised the default per-host connection limit to 16 before host HTTP calls, fixing TLS handshake failures for node probing, stale tile refresh, and external photo downloads.
+- **Bounded Probe Concurrency & Distinct Timeout Status**: Capped node probing to 4 concurrent requests with a 10-second timeout to prevent bandwidth contention on slow networks, and separated `Timeout` from `Offline` status labels.
+- **Faster Waypoint Photo Preview**: Narrowed WebView2 tile-cache request interception to registered built-in and custom map hosts so KMZ and external waypoint photos bypass cache IPC; set waypoint thumbnails and full-screen photos to high fetch priority with `no-referrer`, and added lightweight next-photo preloading in the photo viewer.
+
 ## 1.28.1 — 2026-11-23
 
 ### 中文

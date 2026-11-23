@@ -31,7 +31,7 @@ QuickLook
 | `viewer/map-view.js`, `viewer/map-focus.js` | 安全区域、取景、选中点避让和三态布局 |
 | `viewer/map-controls.js` | 底图类别、具体图源、图源菜单、地图设置页与署名 |
 | `viewer/layer-registry.js` | 内置图源注册表、透明叠加层定义、旧分类归一化和定制图源注册 |
-| `viewer/layer-nodes.js` | 图源多节点解析、偏好持久化与按需单节点连通性探测 |
+| `viewer/layer-nodes.js` | 图源多节点解析、偏好持久化、4 路限流并发与按需单节点连通性探测（桌面端优先走宿主直连） |
 | `viewer/layer-providers.js` | 普通、天地图和网格底图的 Leaflet 图层构造 |
 | `viewer/layer-custom-form.js` | 定制图源表单、字段归一化与实时模板校验 |
 | `viewer/layer-custom-manager.js` | 定制图源状态、列表、状态标记、保存和删除；新增表单只在定制页内展开 |
@@ -157,7 +157,8 @@ DNS 校验只缓存成功结果，瞬时失败会从缓存移除。下载完成�
 `ViewerPreferences.cs` 负责跨版本偏好文件；`CustomSourceStore.cs` 负责校验并原子保存定制图源；
 `KmzArchive.cs` 负责受限解包：保留 KML 的内部相对目录，
 并把 KML 引用的本地图片按同一目录结构写入临时文件夹，让虚拟文件主机可以直接响应照片 URL。
-`ViewerBridge.cs` 统一 Dispatcher 封送和字符串 WebMessage，`TiandituKeyDialog.cs` 独立管理天地图密钥窗口。
+`ViewerBridge.cs` 统一 Dispatcher 封送和字符串 WebMessage，`TiandituKeyDialog.cs` 独立管理天地图密钥窗口，
+`NodeProber.cs` 在显式启用 TLS 1.2 / 1.3 后直接向白名单图源发起无缓存探测；`TileCache.cs` 仅对已注册的内置与定制图源域名注册 WebView2 图片拦截，不干扰本地 KMZ 照片和外部航点图片加载。
 `ViewerMessageRouter.cs` 统一分发 18 路页面消息，`TrailViewerPanel` 的 WebView 生命周期和消息处理位于
 单独 partial 文件，主文件只保留加载、状态和清理编排。
 宿主保留原始输入路径用于导出定位，KMZ 解包路径只供页面预览；所有输入类型在创建 WebView 前统一检查
