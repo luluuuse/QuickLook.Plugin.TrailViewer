@@ -163,6 +163,8 @@ export function createPhotoViewer({ el, formatters, formatCoord, t }) {
   }
 
   function clearTransform() {
+    img.style.width = '';
+    img.style.height = '';
     img.style.transform = '';
     img.style.transformOrigin = 'center center';
     img.classList.remove('zoomed');
@@ -269,8 +271,9 @@ export function createPhotoViewer({ el, formatters, formatCoord, t }) {
       const rect = stage.getBoundingClientRect();
       const dx = originEvent.clientX - (rect.left + rect.width / 2);
       const dy = originEvent.clientY - (rect.top + rect.height / 2);
-      panX += dx * (1 - next / viewScale);
-      panY += dy * (1 - next / viewScale);
+      const ratio = next / viewScale;
+      panX = panX * ratio + dx * (1 - ratio);
+      panY = panY * ratio + dy * (1 - ratio);
     }
     viewScale = next;
     fitMode = false;

@@ -118,6 +118,7 @@ export function createKeyboardController({
     }
     const delta = STEP_KEYS[key];
     if (!delta) return;
+    if (getEditor?.()?.isActive?.()) return;
     event.preventDefault();
     waypointController.stepByKey(delta);
   }

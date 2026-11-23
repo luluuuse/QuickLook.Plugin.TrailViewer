@@ -28,6 +28,7 @@ export function createToolbox({
   weatherAvailable,
   weatherModes = [],
   weatherHasElevation = () => true,
+  editAvailable = () => true,
   onEdit,
   lang = () => 'zh',
   setLang = () => false,
@@ -66,6 +67,7 @@ export function createToolbox({
     if (next !== 'coordinate') coordinates.stop();
     view = next;
     render();
+    if (next === 'coordinate') coordinates.begin();
   }
 
   function toggleShortcuts() {
@@ -110,14 +112,17 @@ export function createToolbox({
     formatDistance,
     measurement,
     map,
-    // Back is navigation, not a mode change: the measured points and the measuring state stay as they are, so
-    // the user can look at another tool and return to the same measurement.
-    onBack: () => showView('main'),
+    // Returning to the main toolbox ends the active measurement session by default.
+    onBack: () => {
+      if (measurement.active()) measurement.stop();
+      showView('main');
+    },
   });
   const main = createToolboxMain({
     el,
     t,
     exportAvailable,
+    editAvailable,
     weatherAvailable,
     weatherHasElevation,
     weatherModes,
@@ -125,7 +130,6 @@ export function createToolbox({
     onCoordinates: () => {
       if (measurement.active()) measurement.stop();
       showView('coordinate');
-      coordinates.begin();
     },
     onExport: () => {
       if (measurement.active()) measurement.stop();
@@ -160,8 +164,12 @@ export function createToolbox({
 
     // Entering measurement switches to its page; leaving it closes that page. Both are the measuring mode's
     // own transitions, so a language switch or a layout refresh does not pull the page out from under the user.
-    if (active && !measureWasActive) view = 'measure';
-    else if (!active && measureWasActive && view === 'measure') view = 'main';
+    if (active && !measureWasActive) {
+      if (view === 'coordinate') coordinates.stop();
+      view = 'measure';
+    } else if (!active && measureWasActive && view === 'measure') {
+      view = 'main';
+    }
     measureWasActive = active;
     main.view.hidden = view !== 'main';
     measureTool.view.hidden = view !== 'measure';

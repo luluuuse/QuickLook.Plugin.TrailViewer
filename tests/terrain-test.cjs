@@ -104,9 +104,13 @@ async function main() {
   check('the expanded layer menu shows the Q / E category shortcut',
     await page.textContent('.layer-section-heading-row .control-key') === 'Q / E');
   await waitForLayout(page);
-  check('the road menu offers OSM and Tianditu',
+  check('the road menu offers OSM, Tianditu and Esri Gray Canvas',
     (await page.$$eval('.layer-source-menu button[data-provider]:not([hidden])',
-      (nodes) => nodes.map((node) => node.textContent))).join('/') === 'OpenStreetMap HOT/Tianditu road');
+      (nodes) => nodes.map((node) => node.textContent))).join('/')
+      === 'OpenStreetMap HOT/Tianditu road/Esri Light Gray/Esri Dark Gray');
+  check('the layer menu exposes all three transparent overlays',
+    (await page.$$eval('.layer-overlay-chip', (nodes) => nodes.map((node) => node.dataset.overlay))).join('/')
+      === 'hiking/cycling/pistes');
   check('Tianditu is marked as requiring a key before setup',
     await page.locator('.layer-source-menu button[data-provider="road.tianditu"]')
       .evaluate((node) => node.classList.contains('locked') && node.dataset.locked === 'true'));
@@ -149,9 +153,9 @@ async function main() {
   check('the layer panel is labelled',
     await page.locator('.layer-source-menu').evaluate((node) => !node.hidden
       && node.querySelector('.layer-source-heading').textContent === 'Map layers'));
-  check('the menu exposes all three terrain sources',
+  check('the menu exposes all four terrain sources',
     (await page.$$eval('.layer-provider-option:not([hidden])', (nodes) => nodes.map((node) => node.textContent)))
-      .join('/') === 'CyclOSM/OpenHikingMap/OpenTopoMap');
+      .join('/') === 'CyclOSM/OpenHikingMap/OpenTopoMap/Esri World Topo');
   check('the current provider is checked',
     await page.locator('.layer-source-menu button[data-provider="terrain.cyclosm"]')
       .getAttribute('aria-checked') === 'true');

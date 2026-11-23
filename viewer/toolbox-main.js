@@ -2,7 +2,7 @@ import { iconMarkup, weatherMarkMarkup } from './icons.js';
 
 /** Main toolbox menu: quick actions, keyboard hints and route weather card. */
 export function createToolboxMain({
-  el, t, exportAvailable, weatherAvailable, weatherHasElevation,
+  el, t, exportAvailable, editAvailable = () => true, weatherAvailable, weatherHasElevation,
   weatherModes, onMeasure, onCoordinates, onExport, onAttachments, onWeather, onEdit, onClose,
 }) {
   let weatherMode = weatherModes[0] || 'start';
@@ -60,7 +60,9 @@ export function createToolboxMain({
     editButton.querySelector('small').textContent = t('toolbox.editHint');
     editButton.title = t('toolbox.editHint');
     editButton.setAttribute('aria-label', editButton.title);
+    editButton.disabled = !editAvailable();
     editButton.addEventListener('click', () => {
+      if (editButton.disabled) return;
       onClose();
       onEdit?.();
     });
@@ -72,6 +74,8 @@ export function createToolboxMain({
       + '<span><strong></strong><small></small></span>';
     weatherButton.querySelector('strong').textContent = t('toolbox.weather');
     weatherButton.querySelector('small').textContent = t('toolbox.weatherHint');
+    weatherButton.title = weatherAvailable() ? t('toolbox.weatherHint') : t('weather.unavailable');
+    weatherButton.setAttribute('aria-label', weatherButton.title);
     weatherButton.addEventListener('click', () => {
       onClose();
       onWeather?.(weatherMode);
@@ -122,6 +126,7 @@ export function createToolboxMain({
     exportButton.disabled = !exportAvailable();
     exportButton.title = exportAvailable() ? t('toolbox.exportHint') : t('export.empty');
     exportButton.setAttribute('aria-label', exportButton.title);
+    editButton.disabled = !editAvailable();
     for (const option of weatherPicker.querySelectorAll('[data-weather-mode]')) {
       option.setAttribute('aria-pressed', String(option.dataset.weatherMode === weatherMode));
       option.disabled = Boolean(option.dataset.weatherMode === 'highest' && !weatherHasElevation());
@@ -140,6 +145,8 @@ export function createToolboxMain({
     editButton.setAttribute('aria-label', editButton.title);
     weatherButton.querySelector('strong').textContent = t('toolbox.weather');
     weatherButton.querySelector('small').textContent = t('toolbox.weatherHint');
+    weatherButton.title = weatherAvailable() ? t('toolbox.weatherHint') : t('weather.unavailable');
+    weatherButton.setAttribute('aria-label', weatherButton.title);
     weatherPicker.setAttribute('aria-label', t('toolbox.weatherTarget'));
     for (const option of weatherPicker.querySelectorAll('[data-weather-mode]')) {
       option.querySelector('.toolbox-weather-mode-label').textContent =

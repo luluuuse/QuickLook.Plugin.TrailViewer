@@ -1,5 +1,12 @@
 import { iconElement, iconMarkup, setIcon } from './icons.js';
 import { createCustomSourceForm } from './layer-custom-form.js';
+import { MAP_OVERLAYS, PROVIDER_NODES, SINGLE_NODE_SOURCES } from './layer-registry.js';
+
+const MULTI_NODE_PROVIDERS = [
+  { key: 'road.osm', labelKey: 'layer.osm' },
+  { key: 'terrain.openTopo', labelKey: 'layer.openTopo' },
+  { key: 'satellite.esri', labelKey: 'layer.esri' },
+];
 
 /** Owns the layer menu DOM and returns the controls that the switcher updates. */
 export function createLayerSettingsView({
@@ -8,6 +15,7 @@ export function createLayerSettingsView({
   onCustomManage, onCustomAdd, onClearCustom, onSubmitCustom,
   onConfigureTianditu, onRemoveTianditu,
   onToggleTileCache, onSelectTileCacheMaxMb, onSelectTileCacheDays, onClearTileCache,
+  onSelectProviderNode, onCheckProviderNodes, onToggleOverlay,
 }) {
   const bar = el('div', 'layer-switch leaflet-bar');
   const menuToggle = el('button', 'layer-menu-toggle');
@@ -125,6 +133,26 @@ export function createLayerSettingsView({
   sourceEmpty.hidden = true;
   sourceSection.append(providerList, sourceEmpty);
   mainView.append(sourceSection);
+
+  const overlaysSection = el('section', 'layer-menu-section layer-overlays-section');
+  const overlaysHeading = el('span', 'layer-section-label', t('layer.overlaysHeading'));
+  overlaysHeading.dataset.labelKey = 'layer.overlaysHeading';
+  const overlayList = el('div', 'layer-overlay-list');
+  overlayList.setAttribute('role', 'group');
+  overlayList.setAttribute('aria-label', t('layer.overlaysHeading'));
+  const overlayButtons = {};
+  for (const overlay of MAP_OVERLAYS) {
+    const btn = el('button', 'layer-overlay-chip', t(overlay.labelKey));
+    btn.type = 'button';
+    btn.dataset.overlay = overlay.id;
+    btn.dataset.labelKey = overlay.labelKey;
+    btn.setAttribute('aria-pressed', 'false');
+    btn.addEventListener('click', () => onToggleOverlay?.(overlay.id));
+    overlayButtons[overlay.id] = btn;
+    overlayList.append(btn);
+  }
+  overlaysSection.append(overlaysHeading, overlayList);
+  mainView.append(overlaysSection);
   menu.append(mainView);
 
   const settingsView = el('section', 'layer-settings-view');
@@ -223,7 +251,71 @@ export function createLayerSettingsView({
   cacheFooter.append(tileCacheStatus, tileCacheClearButton);
 
   cacheSection.append(cacheHeader, tileCacheOptions, cacheFooter);
-  settingsView.append(keySection, cacheSection);
+
+  const nodesSection = el('section', 'layer-settings-section layer-nodes-section');
+  const nodesHeader = el('div', 'layer-nodes-header');
+  const nodesHeading = el('span', 'layer-cache-heading', t('layer.nodesHeading'));
+  nodesHeading.dataset.labelKey = 'layer.nodesHeading';
+  const nodesCheckButton = el('button', 'layer-nodes-check', t('layer.nodesCheck'));
+  nodesCheckButton.type = 'button';
+  nodesCheckButton.dataset.nodesCheck = '1';
+  nodesCheckButton.title = t('layer.nodesCheckTitle');
+  nodesCheckButton.setAttribute('aria-label', nodesCheckButton.title);
+  nodesCheckButton.addEventListener('click', () => onCheckProviderNodes?.());
+  nodesHeader.append(nodesHeading, nodesCheckButton);
+
+  const nodesBody = el('div', 'layer-nodes-body');
+  const nodeButtons = {};
+  const nodeStatuses = {};
+  for (const group of MULTI_NODE_PROVIDERS) {
+    const row = el('div', 'layer-node-group');
+    const title = el('span', 'layer-node-group-label', t(group.labelKey));
+    title.dataset.labelKey = group.labelKey;
+    const choices = el('div', 'layer-node-choices');
+    choices.setAttribute('role', 'radiogroup');
+    nodeButtons[group.key] = {};
+    for (const node of PROVIDER_NODES[group.key] || []) {
+      const btn = el('button', 'layer-node-choice');
+      btn.type = 'button';
+      btn.setAttribute('role', 'radio');
+      btn.setAttribute('aria-checked', 'false');
+      btn.dataset.nodeProvider = group.key;
+      btn.dataset.nodeId = node.id;
+      const dot = el('span', 'layer-node-dot');
+      dot.dataset.state = 'idle';
+      const label = el('span', 'layer-node-label', t(node.labelKey));
+      label.dataset.labelKey = node.labelKey;
+      const metric = el('span', 'layer-node-metric');
+      btn.append(dot, label, metric);
+      btn.addEventListener('click', () => onSelectProviderNode?.(group.key, node.id));
+      nodeButtons[group.key][node.id] = btn;
+      nodeStatuses[`${group.key}:${node.id}`] = { dot, metric };
+      choices.append(btn);
+    }
+    row.append(title, choices);
+    nodesBody.append(row);
+  }
+
+  const singleRow = el('div', 'layer-node-single-row');
+  const singleHeading = el('span', 'layer-node-group-label', t('layer.nodesSingleHeading'));
+  singleHeading.dataset.labelKey = 'layer.nodesSingleHeading';
+  const singleList = el('div', 'layer-node-single-list');
+  for (const src of SINGLE_NODE_SOURCES) {
+    const pill = el('span', 'layer-node-single-pill');
+    const dot = el('span', 'layer-node-dot');
+    dot.dataset.state = 'idle';
+    const label = el('span', 'layer-node-label', t(src.labelKey));
+    label.dataset.labelKey = src.labelKey;
+    const metric = el('span', 'layer-node-metric');
+    pill.append(dot, label, metric);
+    nodeStatuses[`single:${src.id}`] = { dot, metric };
+    singleList.append(pill);
+  }
+  singleRow.append(singleHeading, singleList);
+  nodesBody.append(singleRow);
+  nodesSection.append(nodesHeader, nodesBody);
+
+  settingsView.append(keySection, cacheSection, nodesSection);
 
   const customView = el('section', 'layer-custom-view');
   customView.hidden = true;
@@ -270,5 +362,6 @@ export function createLayerSettingsView({
     customFormView: customForm,
     tileCacheToggle, tileCacheOptions, tileCacheLimitButtons, tileCacheDaysButtons,
     tileCacheStatus, tileCacheClearButton, tileCacheClearLabel,
+    nodesCheckButton, nodeButtons, nodeStatuses, overlayButtons,
   };
 }

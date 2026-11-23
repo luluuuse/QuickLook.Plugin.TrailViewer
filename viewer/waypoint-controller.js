@@ -481,7 +481,9 @@ export function createWaypointController({
         return bar;
       },
     });
-    targetMap.addControl(new Control());
+    const leafletControl = new Control();
+    targetMap.addControl(leafletControl);
+    control.remove = () => leafletControl.remove();
     pinControl = control;
     createOverviewControl(targetMap);
     return control;
@@ -519,7 +521,9 @@ export function createWaypointController({
         return bar;
       },
     });
-    targetMap.addControl(new Control());
+    const leafletControl = new Control();
+    targetMap.addControl(leafletControl);
+    control.remove = () => leafletControl.remove();
     listControl = control;
   }
 
@@ -651,11 +655,21 @@ export function createWaypointController({
     },
     relabel,
     destroy() {
-      map.off('move', onMapMove);
-      map.off('zoomend', scheduleWaypointPins);
-      map.off('moveend', scheduleWaypointPins);
-      map.off('resize', scheduleWaypointPins);
-      pinLayer.remove();
+      if (pendingPinRender) {
+        cancelAnimationFrame(pendingPinRender);
+        pendingPinRender = 0;
+      }
+      clearSelectionReticle();
+      map?.off('move', onMapMove);
+      map?.off('zoomend', scheduleWaypointPins);
+      map?.off('moveend', scheduleWaypointPins);
+      map?.off('resize', scheduleWaypointPins);
+      pinLayer?.remove();
+      pinControl?.remove?.();
+      pinControl = null;
+      pinBar = null;
+      listControl?.remove?.();
+      listControl = null;
       overview.destroy();
     },
     openStop() {

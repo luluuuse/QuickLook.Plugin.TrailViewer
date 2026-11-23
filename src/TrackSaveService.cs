@@ -56,7 +56,11 @@ internal sealed class TrackSaveService : IDisposable
         string name;
         try
         {
-            name = OverlayTransfer.SanitiseFileName(Uri.UnescapeDataString(parts[3]));
+            var rawName = Uri.UnescapeDataString(parts[3]);
+            var sanitised = OverlayTransfer.SanitiseFileName(rawName);
+            name = string.IsNullOrWhiteSpace(rawName) || string.IsNullOrWhiteSpace(rawName.Trim('.'))
+                ? "track.gpx"
+                : sanitised;
         }
         catch (UriFormatException)
         {

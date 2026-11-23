@@ -150,10 +150,10 @@ export function createTrackEditorStore({
     return apply('reset', original);
   }
 
-  function markSaved() {
+  function markSaved(versionId = currentVersionId) {
     if (!active || !current) return;
-    savedVersionId = currentVersionId;
-    dirty = false;
+    savedVersionId = versionId;
+    dirty = currentVersionId !== savedVersionId;
     notify('saved');
   }
 
@@ -184,6 +184,7 @@ export function createTrackEditorStore({
     snapshot,
     isActive: () => active,
     isDirty: () => dirty,
+    getVersion: () => currentVersionId,
     getCurrent: () => current,
     getOriginal: () => original,
   };

@@ -69,6 +69,7 @@ const UI_ICONS = Object.freeze({
   filter: '<path d="M4 5h16l-6 7v6l-4 2v-8Z"/>',
   edit: '<path d="m4 20 4.5-1 10-10a2.1 2.1 0 0 0-3-3l-10 10Z"/>'
     + '<path d="m13.5 8 3 3"/>',
+  'text-title': '<path d="M5 7V5h14v2M12 5v14M9 19h6"/>',
   'arrow-left': '<path d="M19 12H5"/><path d="m11 18-6-6 6-6"/>',
   'arrow-right': '<path d="M5 12h14"/><path d="m13 6 6 6-6 6"/>',
   // A two-way arrow: the language switch is a toggle, not a menu, so it says "this flips" rather than

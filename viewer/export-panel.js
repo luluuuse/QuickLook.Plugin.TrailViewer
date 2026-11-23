@@ -119,7 +119,7 @@ export function createExportPanel({
       preview.dataset.profile = profileAvailable ? settings.profile : 'off';
       preview.dataset.state = 'ready';
     } catch {
-      preview.dataset.state = 'failed';
+      if (version === previewVersion) preview.dataset.state = 'failed';
     }
   }
   requestAnimationFrame(() => void refreshPreview());

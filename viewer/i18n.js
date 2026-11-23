@@ -231,6 +231,7 @@ const DICT = {
     'editor.wpt.sym.junction': 'Junction',
     'editor.save.watchFriendly': 'Watch-friendly (dedup & Garmin check)',
     'editor.save.overwrite': 'Overwrite original (.bak backup)',
+    'editor.save.overwriteGpxOnly': 'Overwrite original (GPX files only)',
     'editor.save.garminWarn': (v) => `${v.count} waypoint name(s) > 15 chars for Garmin.`,
     'editor.save.ok': (v) => `Saved: ${v.path}`,
     'editor.save.fail': (v) => `Save failed: ${v.detail}`,
@@ -267,8 +268,8 @@ const DICT = {
     'measure.summary': (v) => `${v.sections} section${v.sections === 1 ? '' : 's'} \u00b7 ${v.points} point${v.points === 1 ? '' : 's'}`,
     'measure.sections': 'Distance sections',
     'measure.sectionRow': (v) => `Section ${v.index}: ${v.distance} \u00b7 ${v.points} point${v.points === 1 ? '' : 's'}`,
-    'measure.empty': 'Right-click the map to add the first point.',
-    'measure.instruction': 'Right-click adds a point. Left-drag pans; scroll zooms. Ctrl+Z undoes and Ctrl+Shift+Z redoes.',
+    'measure.empty': 'Left-click the map to add the first point.',
+    'measure.instruction': 'Left-click adds a point. Right-drag pans; scroll zooms. Ctrl+Z undoes and Ctrl+Shift+Z redoes.',
     'measure.finishSection': 'End section',
     'measure.centerPoint': 'Add at map centre',
     'measure.undo': 'Undo',
@@ -416,6 +417,13 @@ const DICT = {
     'layer.openHiking': 'OpenHikingMap',
     'layer.openTopo': 'OpenTopoMap',
     'layer.esri': 'Esri World Imagery',
+    'layer.esriTopo': 'Esri World Topo',
+    'layer.esriLight': 'Esri Light Gray',
+    'layer.esriDark': 'Esri Dark Gray',
+    'layer.overlaysHeading': 'Overlays',
+    'layer.overlay.hiking': 'Hiking trails',
+    'layer.overlay.cycling': 'Cycling routes',
+    'layer.overlay.pistes': 'Ski pistes',
     'layer.tiandituRoad': 'Tianditu road',
     'layer.tiandituSatellite': 'Tianditu satellite',
     'layer.configureTiandituKey': 'Configure Tianditu key…',
@@ -451,6 +459,20 @@ const DICT = {
     'layer.cacheClear': 'Clear',
     'layer.cacheClearConfirm': 'Confirm',
     'layer.cacheClearTitle': 'Clear local tile cache',
+    'layer.nodesHeading': 'Map nodes',
+    'layer.nodesCheck': 'Test',
+    'layer.nodesChecking': 'Testing…',
+    'layer.nodesCheckTitle': 'Test tile server reachability and latency',
+    'layer.nodesSingleHeading': 'Other sources',
+    'layer.node.osmOfficial': 'Official CDN',
+    'layer.node.osmHot': 'OSM France HOT',
+    'layer.node.osmDe': 'Germany',
+    'layer.node.openTopoOfficial': 'Official',
+    'layer.node.openMapsMirror': 'OpenMaps.fr',
+    'layer.node.esriServer': 'Server',
+    'layer.node.esriServices': 'Services',
+    'layer.node.noKey': 'No key',
+    'layer.node.failed': 'Offline',
     'layer.cacheCleared': 'Tile cache cleared',
     'layer.cacheHostOnlyToast': 'Local tile cache is available in QuickLook preview.',
     'layer.typeHeading': 'Map type',
@@ -475,6 +497,19 @@ const DICT = {
     'layer.customSave': 'Save and apply',
     'layer.customCancel': 'Cancel',
     'layer.customName': 'Name',
+    'layer.customPresets': 'Regional presets',
+    'layer.preset.gsi': 'Japan GSI',
+    'layer.preset.rudy': 'Taiwan RudyMap',
+    'layer.preset.usgs': 'US USGS Topo',
+    'layer.preset.usgsClassic': 'US USGS Classic (Esri)',
+    'layer.preset.swisstopo': 'Swiss swisstopo Topo',
+    'layer.preset.swissimage': 'Swiss swisstopo Imagery',
+    'layer.preset.googleSat': 'Google Satellite',
+    'layer.customKeyPresets': 'Pro outdoor presets (API key required)',
+    'layer.preset.tracestrack': 'Tracestrack Topo',
+    'layer.preset.thunderforest': 'Thunderforest Outdoors',
+    'layer.preset.stadia': 'Stadia Stamen Terrain',
+    'layer.preset.maptiler': 'MapTiler Outdoor',
     'layer.customUrl': 'Tile URL',
     'layer.customUrlHint': 'Use {z}, {x} and {y}; {s} is optional. Only HTTPS addresses are accepted.',
     'layer.customTileSize': 'Tile size',
@@ -762,6 +797,7 @@ const DICT = {
     'editor.wpt.sym.junction': '岔路口',
     'editor.save.watchFriendly': '手表友好（自动去重与佳明重名检查）',
     'editor.save.overwrite': '覆盖原文件（自动先留 .bak 备份）',
+    'editor.save.overwriteGpxOnly': '覆盖原文件（仅 GPX 格式支持）',
     'editor.save.garminWarn': (v) => `有 ${v.count} 个航点名称超过 15 字符（佳明手表可能截断）。`,
     'editor.save.ok': (v) => `已保存：${v.path}`,
     'editor.save.fail': (v) => `保存失败：${v.detail}`,
@@ -798,8 +834,8 @@ const DICT = {
     'measure.summary': (v) => `${v.sections} 段 · ${v.points} 个点`,
     'measure.sections': '各段距离',
     'measure.sectionRow': (v) => `第 ${v.index} 段：${v.distance} · ${v.points} 个点`,
-    'measure.empty': '在地图上右键添加第一个点。',
-    'measure.instruction': '右键添加测距点，左键拖动地图，滚轮缩放；Ctrl+Z 撤回，Ctrl+Shift+Z 重做。',
+    'measure.empty': '在地图上左键添加第一个点。',
+    'measure.instruction': '左键添加测距点，右键拖动地图，滚轮缩放；Ctrl+Z 撤回，Ctrl+Shift+Z 重做。',
     'measure.finishSection': '结束本段',
     'measure.centerPoint': '在地图中心打点',
     'measure.undo': '撤回',
@@ -941,6 +977,13 @@ const DICT = {
     'layer.openHiking': 'OpenHikingMap',
     'layer.openTopo': 'OpenTopoMap',
     'layer.esri': 'Esri World Imagery',
+    'layer.esriTopo': 'Esri 地形图',
+    'layer.esriLight': 'Esri 极简浅灰',
+    'layer.esriDark': 'Esri 极简深灰',
+    'layer.overlaysHeading': '专题叠加',
+    'layer.overlay.hiking': '徒步路网',
+    'layer.overlay.cycling': '骑行路网',
+    'layer.overlay.pistes': '滑雪雪道',
     'layer.tiandituRoad': '天地图路网图',
     'layer.tiandituSatellite': '天地图卫星图',
     'layer.configureTiandituKey': '配置天地图密钥…',
@@ -976,6 +1019,20 @@ const DICT = {
     'layer.cacheClear': '清空',
     'layer.cacheClearConfirm': '确认清空',
     'layer.cacheClearTitle': '清空本地瓦片缓存',
+    'layer.nodesHeading': '图源节点',
+    'layer.nodesCheck': '检测节点',
+    'layer.nodesChecking': '检测中…',
+    'layer.nodesCheckTitle': '检测各图源节点连通性与延迟',
+    'layer.nodesSingleHeading': '单节点状态',
+    'layer.node.osmOfficial': '官方主站',
+    'layer.node.osmHot': 'OSM France HOT',
+    'layer.node.osmDe': '德国镜像',
+    'layer.node.openTopoOfficial': '官方主站',
+    'layer.node.openMapsMirror': 'OpenMaps 镜像',
+    'layer.node.esriServer': 'Server 主站',
+    'layer.node.esriServices': 'Services 备用',
+    'layer.node.noKey': '未配密钥',
+    'layer.node.failed': '不可达',
     'layer.cacheCleared': '本地瓦片缓存已清空',
     'layer.cacheHostOnlyToast': '本地瓦片缓存仅在 QuickLook 预览中可用。',
     'layer.typeHeading': '地图类型',
@@ -1000,6 +1057,19 @@ const DICT = {
     'layer.customSave': '保存并应用',
     'layer.customCancel': '取消',
     'layer.customName': '名称',
+    'layer.customPresets': '区域图源一键预设',
+    'layer.preset.gsi': '日本 GSI 地形',
+    'layer.preset.rudy': '台湾鲁地图',
+    'layer.preset.usgs': '美国 USGS 新版',
+    'layer.preset.usgsClassic': '美国 USGS 经典 (镜像)',
+    'layer.preset.swisstopo': '瑞士 swisstopo 地形',
+    'layer.preset.swissimage': '瑞士 swisstopo 航拍',
+    'layer.preset.googleSat': 'Google 卫星',
+    'layer.customKeyPresets': '专业户外预设（需替换 YOUR_KEY）',
+    'layer.preset.tracestrack': 'Tracestrack Topo',
+    'layer.preset.thunderforest': 'Thunderforest Outdoors',
+    'layer.preset.stadia': 'Stadia Stamen Terrain',
+    'layer.preset.maptiler': 'MapTiler Outdoor',
     'layer.customUrl': '瓦片地址',
     'layer.customUrlHint': '使用 {z}、{x}、{y} 占位符，{s} 可选；只接受 HTTPS 地址。',
     'layer.customTileSize': '瓦片大小',
@@ -1134,15 +1204,20 @@ export function setLang(next) {
 /** Looks the text up; a function value gets the values, a string has {placeholders} filled in. */
 export function t(key, values) {
   const table = DICT[lang] || DICT.en;
-  const entry = table[key] ?? DICT.en[key];
+  const entry = Object.hasOwn(table, key)
+    ? table[key]
+    : (Object.hasOwn(DICT.en, key) ? DICT.en[key] : undefined);
   if (entry === undefined) return key;
   if (typeof entry === 'function') return entry(values || {});
   if (!values) return entry;
-  return entry.replace(/\{(\w+)\}/g, (whole, name) => (name in values ? String(values[name]) : whole));
+  return entry.replace(/\{(\w+)\}/g, (whole, name) => (Object.hasOwn(values, name) ? String(values[name]) : whole));
 }
 
 /** "3 photos" / "3 张照片" - the plural lives in the dictionary, not in a suffix rule. */
 export function units(n, kind) {
-  const pair = (COUNTS[lang] || COUNTS.en)[kind] || COUNTS.en[kind] || [kind, kind];
+  const langCounts = COUNTS[lang] || COUNTS.en;
+  const pair = (Object.hasOwn(langCounts, kind) ? langCounts[kind] : null)
+    || (Object.hasOwn(COUNTS.en, kind) ? COUNTS.en[kind] : null)
+    || [kind, kind];
   return `${n.toLocaleString()} ${pair[n === 1 ? 0 : 1]}`;
 }

@@ -21,7 +21,7 @@ function loadOverrides() {
  * order, then click the camp, pass or photo stop they need.
  */
 export function createWaypointOverview({ el, onSelect, onLayoutChange, onOpen }) {
-  const lifecycle = new AbortController();
+  let lifecycle = null;
   let panel = null;
   let filterTrigger = null;
   let filterMenu = null;
@@ -33,7 +33,7 @@ export function createWaypointOverview({ el, onSelect, onLayoutChange, onOpen })
   let activeFilter = 'all';
   let openPopover = null;
   let currentRow = null;
-  const insights = new WeakMap();
+  let insights = new WeakMap();
   const overrides = loadOverrides();
 
   function pointKey(point) {
@@ -139,6 +139,7 @@ export function createWaypointOverview({ el, onSelect, onLayoutChange, onOpen })
   }
 
   function build() {
+    if (!lifecycle) lifecycle = new AbortController();
     panel = el('aside', 'waypoint-overview');
     panel.hidden = true;
     panel.setAttribute('role', 'dialog');
@@ -190,7 +191,7 @@ export function createWaypointOverview({ el, onSelect, onLayoutChange, onOpen })
       event.preventDefault();
       event.stopPropagation();
       closePopover(true);
-    }, { signal: lifecycle.signal });
+    }, { signal: lifecycle.signal, capture: true });
     window.addEventListener('resize', () => closePopover(), { signal: lifecycle.signal });
     document.body.append(panel);
   }
@@ -405,6 +406,7 @@ export function createWaypointOverview({ el, onSelect, onLayoutChange, onOpen })
       if (panel && !panel.hidden) render();
     },
     relabel(items, index) {
+      insights = new WeakMap();
       currentItems = items;
       selectedIndex = index;
       if (panel) render();
@@ -413,8 +415,16 @@ export function createWaypointOverview({ el, onSelect, onLayoutChange, onOpen })
     open,
     isOpen: () => Boolean(panel) && !panel.hidden,
     destroy() {
-      lifecycle.abort();
+      lifecycle?.abort();
+      lifecycle = null;
+      closePopover();
       panel?.remove();
+      panel = null;
+      filterTrigger = null;
+      filterMenu = null;
+      list = null;
+      closeButton = null;
+      currentRow = null;
     },
   };
 }

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Threading;
@@ -89,6 +90,8 @@ internal sealed class GlobalKeys : IDisposable
     /// <summary>Test harness only: keys seen by the hook, whoever they were for.</summary>
     internal int Calls => _calls;
 
+    private readonly object _stateGate = new();
+
     public void Start()
     {
         // Its own thread on purpose: the hook callback runs wherever the hook was installed, and the UI thread
@@ -100,9 +103,17 @@ internal sealed class GlobalKeys : IDisposable
 
     private void Pump()
     {
-        _dispatcher = Dispatcher.CurrentDispatcher;
-        _hook = SetWindowsHookEx(WhKeyboardLl, _callback, GetModuleHandle(null), 0);
-        Installed = _hook != IntPtr.Zero;
+        lock (_stateGate)
+        {
+            if (_disposed)
+            {
+                _ready.Set();
+                return;
+            }
+            _dispatcher = Dispatcher.CurrentDispatcher;
+            _hook = SetWindowsHookEx(WhKeyboardLl, _callback, GetModuleHandle(null), 0);
+            Installed = _hook != IntPtr.Zero;
+        }
         _ready.Set();
         if (!Installed)
         {
@@ -119,64 +130,65 @@ internal sealed class GlobalKeys : IDisposable
         if (code < 0)
             return Next(code, wParam, lParam);
 
-        _calls++;
-        var info = Marshal.PtrToStructure<KbdHook>(lParam);
-        var name = NameOf((int)info.vkCode);
-        if (name == null) // the common case: one comparison and back out
-            return Next(code, wParam, lParam);
-
-        var message = (int)wParam;
-        if (message == WmKeyUp || message == WmSysKeyUp)
-        {
-            _held.Remove((int)info.vkCode);
-            return Next(code, wParam, lParam);
-        }
-        if (message != WmKeyDown && message != WmSysKeyDown)
-            return Next(code, wParam, lParam);
-
-        var control = Down(VkControl);
-        var shift = Down(VkShift);
-        var alt = Down(VkMenu);
-        var win = Down(VkLWin) || Down(VkRWin);
-        var plain = !control && !shift && !alt && !win;
-        var plainAction = plain && name != "z";
-        var measureHistory = control && !alt && !win && name == "z";
-        var editorSave = control && !shift && !alt && !win && name == "s";
-
-        if ((!plainAction && !measureHistory && !editorSave) || !SafeOnScreen() || !HostIsForeground())
-        {
-            Reason = !plainAction && !measureHistory && !editorSave ? "modifier"
-                : TextInputActive() ? "text-input"
-                : !SafeOnScreen() ? "off-screen" : "foreground=" + ForegroundName();
-            return Next(code, wParam, lParam);
-        }
-        if (measureHistory && !_measureActive() && !_editorActive())
-        {
-            Reason = "measure-inactive";
-            return Next(code, wParam, lParam);
-        }
-        if (editorSave && !_editorActive())
-        {
-            Reason = "editor-inactive";
-            return Next(code, wParam, lParam);
-        }
-
-        // A held key repeats ~30 times a second; the page should see one press, not a flicker.
-        if (!_held.Add((int)info.vkCode))
-            return (IntPtr)1; // a held key: swallowed, but it already did its job
-
         try
         {
+            _calls++;
+            var info = Marshal.PtrToStructure<KbdHook>(lParam);
+            var name = NameOf((int)info.vkCode);
+            if (name == null) // the common case: one comparison and back out
+                return Next(code, wParam, lParam);
+
+            var message = (int)wParam;
+            if (message == WmKeyUp || message == WmSysKeyUp)
+            {
+                _held.Remove((int)info.vkCode);
+                return Next(code, wParam, lParam);
+            }
+            if (message != WmKeyDown && message != WmSysKeyDown)
+                return Next(code, wParam, lParam);
+
+            var control = Down(VkControl);
+            var shift = Down(VkShift);
+            var alt = Down(VkMenu);
+            var win = Down(VkLWin) || Down(VkRWin);
+            var plain = !control && !shift && !alt && !win;
+            var plainAction = plain && name != "z";
+            var measureHistory = control && !alt && !win && name == "z";
+            var editorSave = control && !shift && !alt && !win && name == "s";
+
+            if ((!plainAction && !measureHistory && !editorSave) || !SafeOnScreen() || !HostIsForeground())
+            {
+                Reason = !plainAction && !measureHistory && !editorSave ? "modifier"
+                    : TextInputActive() ? "text-input"
+                    : !SafeOnScreen() ? "off-screen" : "foreground=" + ForegroundName();
+                return Next(code, wParam, lParam);
+            }
+            if (measureHistory && !_measureActive() && !_editorActive())
+            {
+                Reason = "measure-inactive";
+                return Next(code, wParam, lParam);
+            }
+            if (editorSave && !_editorActive())
+            {
+                Reason = "editor-inactive";
+                return Next(code, wParam, lParam);
+            }
+
+            // A held key repeats ~30 times a second; the page should see one press, not a flicker.
+            if (!_held.Add((int)info.vkCode))
+                return (IntPtr)1; // a held key: swallowed, but it already did its job
+
             var payload = editorSave ? "ctrl+s" : (measureHistory && shift ? "Z" : name);
             _onKey(payload);
+
+            Reason = "swallowed";
+            return (IntPtr)1; // no file switch, no typing into the file manager's list
         }
         catch (Exception ex)
         {
-            Trace("key handler failed: " + ex.Message);
+            Trace("key filter failed: " + ex.Message);
+            return Next(code, wParam, lParam);
         }
-
-        Reason = "swallowed";
-        return (IntPtr)1; // no file switch, no typing into the file manager's list
     }
 
     private bool SafeOnScreen()
@@ -233,7 +245,7 @@ internal sealed class GlobalKeys : IDisposable
             _foregroundNames[pid] = process.ProcessName;
             return process.ProcessName;
         }
-        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or Win32Exception)
         {
             var fallback = "pid" + pid;
             _foregroundNames[pid] = fallback;
@@ -252,7 +264,7 @@ internal sealed class GlobalKeys : IDisposable
             using var process = Process.GetProcessById((int)pid);
             host = HostProcesses.Contains(process.ProcessName);
         }
-        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or Win32Exception)
         {
             // The window outlived its process for a moment; treat it as a stranger.
         }
@@ -309,18 +321,23 @@ internal sealed class GlobalKeys : IDisposable
 
     public void Dispose()
     {
-        if (_disposed)
-            return;
-        _disposed = true;
+        Dispatcher? dispatcher;
+        lock (_stateGate)
+        {
+            if (_disposed)
+                return;
+            _disposed = true;
+            dispatcher = _dispatcher;
+        }
         try
         {
             // Unhook on the thread that installed the hook, before its dispatcher stops. Clearing the handle
             // from the UI thread after a short timeout could otherwise lose the only reference to a live global
             // hook while the callback thread was still winding down.
-            _dispatcher?.BeginInvoke(new Action(() =>
+            dispatcher?.BeginInvoke(new Action(() =>
             {
                 ReleaseHook();
-                _dispatcher.InvokeShutdown();
+                dispatcher.InvokeShutdown();
             }));
         }
         catch (Exception ex) when (ex is InvalidOperationException or ObjectDisposedException

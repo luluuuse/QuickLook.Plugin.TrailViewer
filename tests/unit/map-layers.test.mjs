@@ -10,10 +10,11 @@ test('legacy layer categories map to the new grouped providers', () => {
   assert.equal(normalizeLayer('none'), 'none');
 });
 
-test('terrain offers CyclOSM, OpenHikingMap and OpenTopoMap', () => {
-  assert.deepEqual(Object.keys(LAYERS.terrain.providers), ['cyclosm', 'openHiking', 'openTopo']);
+test('terrain offers CyclOSM, OpenHikingMap, OpenTopoMap and Esri Topo', () => {
+  assert.deepEqual(Object.keys(LAYERS.terrain.providers), ['cyclosm', 'openHiking', 'openTopo', 'esriTopo']);
   assert.equal(normalizeLayer('terrain.openHiking'), 'terrain.openHiking');
   assert.equal(normalizeLayer('terrain.openTopo'), 'terrain.openTopo');
+  assert.equal(normalizeLayer('terrain.esriTopo'), 'terrain.esriTopo');
   assert.equal(
     LAYERS.terrain.providers.openHiking.url,
     'https://tile.openmaps.fr/openhikingmap/{z}/{x}/{y}.png',
@@ -23,11 +24,11 @@ test('terrain offers CyclOSM, OpenHikingMap and OpenTopoMap', () => {
 
 test('the former map category now belongs to the road group', () => {
   assert.equal(LAYERS.road.providers.osm.key, 'road.osm');
-  assert.equal(LAYERS.road.providers.osm.url, 'https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png');
+  assert.equal(LAYERS.road.providers.osm.url, 'https://tile.openstreetmap.org/{z}/{x}/{y}.png');
 });
 
 test('Tianditu sources describe official WMTS layer pairs without embedded keys', () => {
-  assert.deepEqual(Object.keys(LAYERS.road.providers), ['osm', 'tianditu']);
+  assert.deepEqual(Object.keys(LAYERS.road.providers), ['osm', 'tianditu', 'esriLight', 'esriDark']);
   assert.deepEqual(Object.keys(LAYERS.satellite.providers), ['esri', 'tianditu']);
   assert.deepEqual(LAYERS.road.providers.tianditu.layers.map((layer) => layer.layer), ['vec', 'cva']);
   assert.deepEqual(LAYERS.satellite.providers.tianditu.layers.map((layer) => layer.layer), ['img', 'cia']);

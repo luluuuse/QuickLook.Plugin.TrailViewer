@@ -148,11 +148,13 @@ internal static class KmzArchive
         {
             var count = 0;
             long totalBytes = 0;
+            var seenResources = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (var reference in references)
             {
                 cancel.ThrowIfCancellationRequested();
                 if (!TryResolveArchivePath(reference, documentDirectory, out var resourcePath)
-                    || !ImageExtensions.Contains(Path.GetExtension(resourcePath)))
+                    || !ImageExtensions.Contains(Path.GetExtension(resourcePath))
+                    || !seenResources.Add(resourcePath!))
                     continue;
 
                 var entry = FindEntry(archive, resourcePath!);
@@ -203,8 +205,10 @@ internal static class KmzArchive
         try
         {
             using var reader = XmlReader.Create(path, ResourceReaderSettings);
-            while (reader.Read())
+            var advance = true;
+            while (!advance || reader.Read())
             {
+                advance = true;
                 cancel.ThrowIfCancellationRequested();
                 if (reader.NodeType == XmlNodeType.Element)
                 {
@@ -229,6 +233,7 @@ internal static class KmzArchive
                         if (!string.IsNullOrWhiteSpace(value))
                             references.Add(WebUtility.HtmlDecode(value));
                         AddAttributeReferences(references, value);
+                        advance = false;
                     }
                 }
                 else if (reader.NodeType == XmlNodeType.Text || reader.NodeType == XmlNodeType.CDATA)
@@ -264,7 +269,8 @@ internal static class KmzArchive
         ZipArchiveEntry? match = null;
         foreach (var entry in archive.Entries)
         {
-            if (!string.Equals(entry.FullName, path, StringComparison.OrdinalIgnoreCase))
+            var normalised = entry.FullName.Replace('\\', '/');
+            if (!string.Equals(normalised, path, StringComparison.OrdinalIgnoreCase))
                 continue;
             if (match != null)
                 return null; // Ambiguous case-only duplicates are safer to leave unresolved.

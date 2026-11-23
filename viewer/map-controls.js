@@ -7,12 +7,24 @@ import {
   CATEGORY_ICONS,
   LAYERS,
   LAYER_KEY,
+  MAP_OVERLAYS,
   PROVIDERS,
+  PROVIDER_NODES,
+  SINGLE_NODE_SOURCES,
   defaultProvider,
   normalizeLayer,
   registerCustomProvider,
+  resolveProvider,
   unregisterCustomProvider,
 } from './layer-registry.js';
+import {
+  loadNodePreferences,
+  loadOverlayPreferences,
+  probeTileNode,
+  probeUrlFor,
+  saveNodePreferences,
+  saveOverlayPreferences,
+} from './layer-nodes.js';
 import { createProviderLayer } from './layer-providers.js';
 import { createLayerSettingsView } from './layer-settings-view.js';
 import { createCustomSourceManager } from './layer-custom-manager.js';
@@ -85,6 +97,13 @@ export function createLayerSwitcher({
   const lifecycle = new AbortController();
   let directKey = tiandituDirectKey;
   let keyReady = Boolean(directKey);
+  const nodePrefs = loadNodePreferences(readStored);
+  const activeOverlays = loadOverlayPreferences(readStored);
+  const overlayLayers = {};
+  for (const overlay of MAP_OVERLAYS) {
+    overlayLayers[overlay.id] = L.tileLayer(overlay.url, overlay.options);
+    if (activeOverlays.has(overlay.id)) overlayLayers[overlay.id].addTo(map);
+  }
   const layers = {};
   const keyedProviders = Object.entries(PROVIDERS)
     .filter(([, entry]) => entry.provider.requiresKey === 'tianditu');
@@ -92,7 +111,7 @@ export function createLayerSwitcher({
     for (const provider of Object.values(definition.providers)) {
       if (provider.custom) continue;
       layers[provider.key] = createProviderLayer(
-        L, map, provider, directKey, onTiandituDirectError,
+        L, map, resolveProvider(provider, nodePrefs), directKey, onTiandituDirectError,
       );
     }
   }
@@ -126,6 +145,10 @@ export function createLayerSwitcher({
   let configureButton;
   let removeButton;
   let tileCacheUi = null;
+  let nodesUi = null;
+  let overlayButtons = null;
+  let probingNodes = false;
+  let probeToken = 0;
   let settingsViewOpen = false;
   let customView;
   let customViewOpen = false;
@@ -141,6 +164,108 @@ export function createLayerSwitcher({
   function renderTileCache() {
     if (!tileCacheUi) return;
     renderTileCacheSettings({ ...tileCacheUi, state: tileCacheState, hasHost, t });
+  }
+  function renderNodes() {
+    if (!nodesUi) return;
+    for (const [providerKey, buttons] of Object.entries(nodesUi.nodeButtons)) {
+      const nodes = PROVIDER_NODES[providerKey] || [];
+      const activeId = nodePrefs[providerKey] || nodes[0]?.id;
+      for (const [nodeId, btn] of Object.entries(buttons)) {
+        const active = nodeId === activeId;
+        btn.classList.toggle('active', active);
+        btn.setAttribute('aria-checked', String(active));
+      }
+    }
+    if (nodesUi.nodesCheckButton) {
+      nodesUi.nodesCheckButton.disabled = probingNodes;
+      nodesUi.nodesCheckButton.textContent = t(probingNodes ? 'layer.nodesChecking' : 'layer.nodesCheck');
+      nodesUi.nodesCheckButton.title = t('layer.nodesCheckTitle');
+      nodesUi.nodesCheckButton.setAttribute('aria-label', nodesUi.nodesCheckButton.title);
+    }
+  }
+  function setNodeStatus(statusKey, state, text = '') {
+    const slot = nodesUi?.nodeStatuses?.[statusKey];
+    if (!slot) return;
+    slot.dot.dataset.state = state;
+    slot.metric.textContent = text;
+  }
+  function renderOverlays() {
+    if (!overlayButtons) return;
+    for (const [id, btn] of Object.entries(overlayButtons)) {
+      const on = activeOverlays.has(id);
+      btn.classList.toggle('active', on);
+      btn.setAttribute('aria-pressed', String(on));
+    }
+  }
+  function toggleOverlay(id) {
+    const layer = overlayLayers[id];
+    if (!layer) return;
+    if (activeOverlays.has(id)) {
+      activeOverlays.delete(id);
+      map.removeLayer(layer);
+    } else {
+      activeOverlays.add(id);
+      layer.addTo(map);
+    }
+    saveOverlayPreferences(writeStored, activeOverlays);
+    renderOverlays();
+  }
+  function selectProviderNode(providerKey, nodeId) {
+    const nodes = PROVIDER_NODES[providerKey];
+    if (!nodes || !nodes.some((node) => node.id === nodeId)) return;
+    const activeId = nodePrefs[providerKey] || nodes[0].id;
+    if (activeId === nodeId) return;
+    nodePrefs[providerKey] = nodeId;
+    saveNodePreferences(writeStored, nodePrefs);
+    for (const [key, entry] of Object.entries(PROVIDERS)) {
+      const provider = entry?.provider;
+      if (!provider || provider.custom) continue;
+      if ((provider.nodeGroup || provider.key) !== providerKey) continue;
+      const wasActive = current === key;
+      if (wasActive && layers[key]) map.removeLayer(layers[key]);
+      layers[key] = createProviderLayer(
+        L, map, resolveProvider(provider, nodePrefs), directKey, onTiandituDirectError,
+      );
+      if (wasActive) layers[key].addTo(map);
+    }
+    renderNodes();
+  }
+  async function checkAllProviderNodes() {
+    if (probingNodes || !nodesUi) return;
+    probingNodes = true;
+    const token = ++probeToken;
+    renderNodes();
+    const tasks = [];
+    for (const [providerKey, nodes] of Object.entries(PROVIDER_NODES)) {
+      for (const node of nodes) {
+        const statusKey = `${providerKey}:${node.id}`;
+        setNodeStatus(statusKey, 'testing', '…');
+        const url = probeUrlFor(node, directKey);
+        tasks.push((async () => {
+          const result = url ? await probeTileNode(url) : { ok: false, ms: 0 };
+          if (token !== probeToken) return;
+          setNodeStatus(statusKey, result.ok ? 'ok' : 'fail', result.ok ? `${result.ms} ms` : t('layer.node.failed'));
+        })());
+      }
+    }
+    for (const src of SINGLE_NODE_SOURCES) {
+      const statusKey = `single:${src.id}`;
+      if (src.requiresKey === 'tianditu' && !directKey) {
+        setNodeStatus(statusKey, 'idle', t('layer.node.noKey'));
+        continue;
+      }
+      setNodeStatus(statusKey, 'testing', '…');
+      const url = probeUrlFor(src, directKey);
+      tasks.push((async () => {
+        const result = url ? await probeTileNode(url) : { ok: false, ms: 0 };
+        if (token !== probeToken) return;
+        setNodeStatus(statusKey, result.ok ? 'ok' : 'fail', result.ok ? `${result.ms} ms` : t('layer.node.failed'));
+      })());
+    }
+    await Promise.all(tasks);
+    if (token !== probeToken) return;
+    probingNodes = false;
+    renderNodes();
   }
   function persistTileCacheSettings() {
     writeStored('tileCache', tileCacheState.enabled ? '1' : '0');
@@ -391,6 +516,9 @@ export function createLayerSwitcher({
           renderTileCache();
           onClearTileCache?.();
         },
+        onSelectProviderNode: selectProviderNode,
+        onCheckProviderNodes: () => { void checkAllProviderNodes(); },
+        onToggleOverlay: toggleOverlay,
       });
       const bar = view.bar;
       menuToggle = view.menuToggle;
@@ -424,6 +552,14 @@ export function createLayerSwitcher({
         tileCacheClearLabel: view.tileCacheClearLabel,
       };
       renderTileCache();
+      nodesUi = {
+        nodesCheckButton: view.nodesCheckButton,
+        nodeButtons: view.nodeButtons,
+        nodeStatuses: view.nodeStatuses,
+      };
+      renderNodes();
+      overlayButtons = view.overlayButtons;
+      renderOverlays();
       customManager.bind({
         formView: view.customFormView,
         form: view.customForm.form,
@@ -441,6 +577,7 @@ export function createLayerSwitcher({
       bar.addEventListener('keydown', (event) => {
         if (event.key !== 'Escape' || !menuOpen) return;
         event.preventDefault();
+        event.stopPropagation();
         if (settingsViewOpen || customViewOpen) backFromCurrentView();
         else closeMenu({ restoreFocus: true });
       }, { signal: lifecycle.signal });
@@ -510,6 +647,8 @@ export function createLayerSwitcher({
         updateNoMapButton: () => renderNoMapButton({ noMapButton, current, t }),
         updateMenuButton, relabelKeyActions, renderTileCache, renderMenu,
       });
+      renderNodes();
+      renderOverlays();
     },
   };
 }

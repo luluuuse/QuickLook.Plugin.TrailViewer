@@ -27,7 +27,9 @@ function extensionHeartRate(extensions) {
     for (const node of extension.getElementsByTagName('*')) {
       const name = node.localName.toLowerCase();
       if (name !== 'hr' && name !== 'heartrate' && name !== 'heartratebpm') continue;
-      const raw = name === 'heartratebpm' ? childText(node, 'value') : node.textContent.trim();
+      const raw = name === 'heartratebpm'
+        ? Array.from(node.children).find((el) => el.localName.toLowerCase() === 'value')?.textContent.trim() || null
+        : node.textContent.trim();
       const value = Number(raw);
       if (Number.isFinite(value) && value > 0 && value < 255) return value;
     }

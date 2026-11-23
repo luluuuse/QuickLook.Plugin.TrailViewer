@@ -177,7 +177,7 @@ function signedValue(view, offset, size, maximum, littleEndian, zeroInvalid = fa
       : size === 4
         ? view.getInt32(offset, littleEndian)
         : null;
-  if (value === null || value === maximum || (zeroInvalid && value === 0)) return null;
+  if (value === null || (zeroInvalid ? value === 0 : value === maximum)) return null;
   return value;
 }
 
@@ -189,7 +189,7 @@ function unsignedValue(view, offset, size, maximum, littleEndian, zeroInvalid = 
       : size === 4
         ? view.getUint32(offset, littleEndian)
         : null;
-  if (value === null || value === maximum || (zeroInvalid && value === 0)) return null;
+  if (value === null || (zeroInvalid ? value === 0 : value === maximum)) return null;
   return value;
 }
 
@@ -345,8 +345,8 @@ export function parseFit(source) {
       const timestamp = compressedTimestamp(lastTimestamp, header & 0x1f);
       values[253] = timestamp;
       lastTimestamp = timestamp;
-    } else if (sawTimestampField) {
-      lastTimestamp = Number.isFinite(values[253]) ? values[253] : null;
+    } else if (sawTimestampField && Number.isFinite(values[253])) {
+      lastTimestamp = values[253];
     }
 
     if (definition.globalMessage === FILE_ID_MESSAGE) {

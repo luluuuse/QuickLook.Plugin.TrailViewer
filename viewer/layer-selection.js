@@ -7,9 +7,12 @@ export function applyLayerSelection({
   normalizeLayer, defaultProvider, activeKey, map, ensureCustomLayer, menuOpen,
   openMenu, showSettings, closeMenu, setPendingKeyProvider, setNoMapReturn,
 }) {
-  const category = typeof value === 'string' && value in allLayers ? value : null;
-  const key = category ? (lastProvider[category] || defaultProvider(category)) : normalizeLayer(value);
-  if (!key) return null;
+  const category = typeof value === 'string' && Object.hasOwn(allLayers, value) ? value : null;
+  const cachedKey = category ? lastProvider[category] : null;
+  const key = category
+    ? (cachedKey && Object.hasOwn(providers, cachedKey) ? cachedKey : defaultProvider(category))
+    : normalizeLayer(value);
+  if (!key || !Object.hasOwn(providers, key)) return null;
   const target = providers[key];
   if (!target) return null;
   if (target.provider.requiresKey && !keyReady) {
@@ -20,9 +23,9 @@ export function applyLayerSelection({
   }
   const changed = key !== current;
   if (changed) {
-    if (current) map.removeLayer(layers[current]);
     if (target.category === 'custom') ensureCustomLayer(key);
     if (!layers[key]) return null;
+    if (current && layers[current]) map.removeLayer(layers[current]);
     layers[key].addTo(map);
     document.body.classList.toggle('no-map', key === 'none');
     if (key !== 'none') setNoMapReturn(key);

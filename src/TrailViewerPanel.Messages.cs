@@ -331,7 +331,7 @@ internal sealed partial class TrailViewerPanel
             }
 
             using var response = await TileCache.RefreshHttpClient.SendAsync(
-                request, HttpCompletionOption.ResponseContentRead, _lifecycle.Token);
+                request, HttpCompletionOption.ResponseHeadersRead, _lifecycle.Token);
             if (_disposed) return;
 
             if (response.StatusCode == HttpStatusCode.OK)
@@ -529,14 +529,22 @@ internal sealed partial class TrailViewerPanel
 
     private void ConfigureTiandituKey(bool english)
     {
-        if (TiandituKeyDialog.Show(Window.GetWindow(this), english))
-            NotifyTiandituKeyState();
+        _ = Dispatcher.BeginInvoke(new Action(() =>
+        {
+            if (_disposed) return;
+            if (TiandituKeyDialog.Show(Window.GetWindow(this), english))
+                NotifyTiandituKeyState();
+        }));
     }
 
     private void RemoveTiandituKey(bool english)
     {
-        if (TiandituKeyDialog.Remove(Window.GetWindow(this), english))
-            NotifyTiandituKeyState();
+        _ = Dispatcher.BeginInvoke(new Action(() =>
+        {
+            if (_disposed) return;
+            if (TiandituKeyDialog.Remove(Window.GetWindow(this), english))
+                NotifyTiandituKeyState();
+        }));
     }
 
     private void NotifyTiandituKeyState()
@@ -549,6 +557,8 @@ internal sealed partial class TrailViewerPanel
     private static string Summarise(string message) =>
         message.StartsWith("exportchunk\t", StringComparison.Ordinal)
             ? "exportchunk ..."
+            : message.StartsWith("trackchunk\t", StringComparison.Ordinal)
+                ? "trackchunk ..."
             : message.StartsWith("attachmentchunk\t", StringComparison.Ordinal)
                 ? "attachmentchunk ..."
             : message.StartsWith("clipboard\t", StringComparison.Ordinal)
@@ -657,7 +667,10 @@ internal sealed partial class TrailViewerPanel
         }
         catch (InvalidDataException ex)
         {
-            var id = _trackSave.CurrentId;
+            var tab = body.IndexOf('\t');
+            var id = !string.IsNullOrEmpty(_trackSave.CurrentId)
+                ? _trackSave.CurrentId
+                : (tab > 0 ? body.Substring(0, tab) : string.Empty);
             _trackSave.Reset();
             _ = PostToViewerMessageAsync(ViewerMessages.TrackSaveResult(id, 1, "", ex.Message));
         }
@@ -690,6 +703,11 @@ internal sealed partial class TrailViewerPanel
             return;
         }
         if (payload == null)
+            return;
+
+        // Yield off CoreWebView2.WebMessageReceived before pumping a modal SaveFileDialog.
+        await System.Windows.Threading.Dispatcher.Yield(System.Windows.Threading.DispatcherPriority.Normal);
+        if (_disposed)
             return;
 
         string? targetPath = null;
@@ -735,9 +753,10 @@ internal sealed partial class TrailViewerPanel
             var resolvedPath = targetPath!;
             await System.Threading.Tasks.Task.Run(
                 () => TrackSaveService.WriteWithBackup(resolvedPath, payload.Bytes, createBackup),
-                _lifecycle.Token);
+                System.Threading.CancellationToken.None);
             _editorDirty = false;
-            _ = PostToViewerMessageAsync(ViewerMessages.TrackSaveResult(payload.Id, 0, resolvedPath, ""));
+            _ = PostToViewerMessageAsync(ViewerMessages.TrackSaveResult(
+                payload.Id, 0, resolvedPath, (payload.Overwrite || createBackup) ? "overwrote" : ""));
         }
         catch (OperationCanceledException) when (_finished)
         {

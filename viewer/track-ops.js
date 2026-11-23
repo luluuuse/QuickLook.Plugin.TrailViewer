@@ -74,7 +74,9 @@ function interpolatePoint(a, b, ratio) {
 }
 
 export function normalizedTracks(parsed) {
-  if (Array.isArray(parsed?.tracks) && parsed.tracks.length > 0) {
+  const hasTrackPoints = Array.isArray(parsed?.tracks)
+    && parsed.tracks.some((trk) => Array.isArray(trk?.segments) && trk.segments.some((seg) => seg.length > 0));
+  if (hasTrackPoints) {
     return parsed.tracks;
   }
   if (Array.isArray(parsed?.routes) && parsed.routes.length > 0) {
@@ -154,6 +156,99 @@ function nearestProjectionOnSegments(pt, segments) {
     }
   }
   return { dist: bestDist, along: bestAlong };
+}
+
+const routeSortCache = new WeakMap();
+
+/**
+ * Returns waypoints sorted by their projected distance along the track, keeping original indices.
+ * Uses a WeakMap cache and segment bounding-box pruning for fast first-open on large tracks.
+ * @param {import('./types.js').ParsedTrack} parsed
+ */
+export function sortWaypointsByRoute(parsed) {
+  if (parsed && routeSortCache.has(parsed)) {
+    return routeSortCache.get(parsed);
+  }
+  const wpts = parsed?.waypoints || [];
+  if (wpts.length === 0) return [];
+  const segs = [];
+  for (const track of normalizedTracks(parsed)) {
+    for (const seg of track.segments || []) {
+      if (seg.length > 0) segs.push(seg);
+    }
+  }
+  const hasSegs = segs.length > 0;
+  let total = 0;
+  const indexedSegs = [];
+  if (hasSegs) {
+    for (const seg of segs) {
+      for (let i = 1; i < seg.length; i += 1) {
+        const a = seg[i - 1];
+        const b = seg[i];
+        const step = distanceMeters(a, b);
+        const segLonScale = 111320 * Math.cos(((a.lat + b.lat) * 0.5) * (Math.PI / 180));
+        const dx = (b.lon - a.lon) * segLonScale;
+        const dy = (b.lat - a.lat) * 111320;
+        indexedSegs.push({
+          a,
+          alongA: total,
+          step,
+          lonScale: segLonScale,
+          dx,
+          dy,
+          lenSq: dx * dx + dy * dy,
+          minLat: Math.min(a.lat, b.lat),
+          maxLat: Math.max(a.lat, b.lat),
+          minLon: Math.min(a.lon, b.lon),
+          maxLon: Math.max(a.lon, b.lon),
+        });
+        total += step;
+      }
+    }
+  }
+  const closed = hasSegs && isTrackClosedLoop(parsed, 50);
+  const result = wpts
+    .map((wpt, index) => {
+      let along = index;
+      if (indexedSegs.length > 0) {
+        const lonScale = 111320 * Math.max(0.1, Math.cos(wpt.lat * (Math.PI / 180)));
+        let bestDistSq = Infinity;
+        let bestAlong = 0;
+        for (let i = 0; i < indexedSegs.length; i += 1) {
+          const entry = indexedSegs[i];
+          const dLat = wpt.lat < entry.minLat
+            ? entry.minLat - wpt.lat
+            : (wpt.lat > entry.maxLat ? wpt.lat - entry.maxLat : 0);
+          const dLon = wpt.lon < entry.minLon
+            ? entry.minLon - wpt.lon
+            : (wpt.lon > entry.maxLon ? wpt.lon - entry.maxLon : 0);
+          const minPossibleSq = (dLat * 111320) ** 2 + (dLon * lonScale) ** 2;
+          if (minPossibleSq >= bestDistSq) continue;
+          const px = (wpt.lon - entry.a.lon) * entry.lonScale;
+          const py = (wpt.lat - entry.a.lat) * 111320;
+          const t = entry.lenSq > 0
+            ? Math.max(0, Math.min(1, (px * entry.dx + py * entry.dy) / entry.lenSq))
+            : 0;
+          const ex = px - entry.dx * t;
+          const ey = py - entry.dy * t;
+          const distSq = ex * ex + ey * ey;
+          if (distSq < bestDistSq) {
+            bestDistSq = distSq;
+            bestAlong = entry.alongA + entry.step * t;
+          }
+        }
+        along = bestAlong;
+        if (closed && along <= 50 && /终点|finish|end/i.test(wpt.name || '')) {
+          along = total;
+        }
+      } else if (hasSegs) {
+        along = 0;
+      }
+      return { wpt, index, along };
+    })
+    .sort((a, b) => (a.along - b.along) || (a.index - b.index));
+  if (parsed) routeSortCache.set(parsed, result);
+  return result;
 }
 
 function pruneWaypointsByCrop(waypoints, originalSegments, keptSegments, fromMeters, toMeters) {
@@ -244,8 +339,30 @@ export function cropTrack(parsed, fromMeters, toMeters) {
   return clearSummaryMetadata(next);
 }
 
+function stripSplitSuffix(name) {
+  return String(name || '').replace(/(?:\s*\(\d+\))+$/g, '').trim();
+}
+
+function renumberSplitTracks(tracks, fallbackBaseName) {
+  const bases = tracks.map((trk) => stripSplitSuffix(trk.name) || fallbackBaseName);
+  const counts = new Map();
+  for (const base of bases) counts.set(base, (counts.get(base) || 0) + 1);
+  const seen = new Map();
+  return tracks.map((trk, idx) => {
+    const base = bases[idx];
+    const total = counts.get(base) || 0;
+    if (total <= 1) {
+      const cleaned = stripSplitSuffix(trk.name);
+      return { ...trk, name: cleaned || trk.name || null };
+    }
+    const seq = (seen.get(base) || 0) + 1;
+    seen.set(base, seq);
+    return { ...trk, name: `${base} (${seq})` };
+  });
+}
+
 /**
- * Splits a ParsedTrack at cumulative distance splitMeters into two separate tracks.
+ * Splits a ParsedTrack at cumulative distance splitMeters into separate tracks.
  * @param {import('./types.js').ParsedTrack} parsed
  * @param {number} splitMeters
  */
@@ -257,10 +374,12 @@ export function splitTrackAt(parsed, splitMeters) {
   if (!(cut > 0 && cut < total)) return next;
 
   let along = 0;
-  const firstSegs = [];
-  const secondSegs = [];
+  const fallbackBaseName = next.name || sourceTracks[0]?.name || 'Track';
+  const resultTracks = [];
 
   for (const track of sourceTracks) {
+    const beforeSegs = [];
+    const afterSegs = [];
     for (const seg of track.segments || []) {
       if (seg.length < 2) continue;
       const partA = [];
@@ -287,17 +406,22 @@ export function splitTrackAt(parsed, splitMeters) {
           partB.push(clonePoint(b));
         }
       }
-      if (partA.length >= 2) firstSegs.push(partA);
-      if (partB.length >= 2) secondSegs.push(partB);
+      if (partA.length >= 2) beforeSegs.push(partA);
+      if (partB.length >= 2) afterSegs.push(partB);
+    }
+    if (beforeSegs.length > 0 && afterSegs.length > 0) {
+      const base = stripSplitSuffix(track.name) || stripSplitSuffix(fallbackBaseName) || 'Track';
+      resultTracks.push({ name: base, segments: beforeSegs });
+      resultTracks.push({ name: base, segments: afterSegs });
+    } else if (beforeSegs.length > 0) {
+      resultTracks.push({ name: track.name ?? null, segments: beforeSegs });
+    } else if (afterSegs.length > 0) {
+      resultTracks.push({ name: track.name ?? null, segments: afterSegs });
     }
   }
 
-  const baseName = next.name || sourceTracks[0]?.name || 'Track';
-  const resultTracks = [];
-  if (firstSegs.length > 0) resultTracks.push({ name: `${baseName} (1)`, segments: firstSegs });
-  if (secondSegs.length > 0) resultTracks.push({ name: `${baseName} (2)`, segments: secondSegs });
   if (resultTracks.length > 0) {
-    next.tracks = resultTracks;
+    next.tracks = renumberSplitTracks(resultTracks, stripSplitSuffix(fallbackBaseName) || 'Track');
     next.routes = [];
   }
   return clearSummaryMetadata(next);
@@ -318,6 +442,7 @@ export function deleteTrackSegment(parsed, trackIndex) {
   if (trackIndex < 0 || trackIndex >= next.tracks.length) return next;
   const removedSegments = next.tracks[trackIndex]?.segments || [];
   next.tracks.splice(trackIndex, 1);
+  next.tracks = renumberSplitTracks(next.tracks, stripSplitSuffix(next.name) || 'Track');
   const keptSegments = next.tracks.flatMap((t) => t.segments || []);
   next.waypoints = pruneWaypointsBySegments(next.waypoints, removedSegments, keptSegments);
   return clearSummaryMetadata(next);
@@ -329,7 +454,18 @@ export function deleteTrackSegment(parsed, trackIndex) {
  * @param {import('./types.js').ParsedTrack} parsed
  */
 export function detectAnomalyPoints(parsed) {
-  const gaps = findTrackGaps(normalizedTracks(parsed));
+  const sourceTracks = normalizedTracks(parsed);
+  const pointIndexMap = new WeakMap();
+  for (let ti = 0; ti < sourceTracks.length; ti += 1) {
+    const segs = sourceTracks[ti]?.segments || [];
+    for (let si = 0; si < segs.length; si += 1) {
+      const seg = segs[si];
+      for (let pi = 0; pi < seg.length; pi += 1) {
+        pointIndexMap.set(seg[pi], `${ti}:${si}:${pi}`);
+      }
+    }
+  }
+  const gaps = findTrackGaps(sourceTracks);
   const jumpItems = (gaps.items || []).filter((item) => item.kind === 'jump');
   const anomalies = [];
   const seen = new Set();
@@ -337,7 +473,7 @@ export function detectAnomalyPoints(parsed) {
     const item = jumpItems[i];
     const pt = item.to;
     if (!pt) continue;
-    const key = `${Number(pt.lat).toFixed(6)},${Number(pt.lon).toFixed(6)}`;
+    const key = pointIndexMap.get(pt) || `${Number(pt.lat).toFixed(6)},${Number(pt.lon).toFixed(6)}`;
     if (!seen.has(key)) {
       seen.add(key);
       const speedMps = item.timeSeconds && item.timeSeconds > 0
@@ -373,25 +509,26 @@ export function detectAnomalyPoints(parsed) {
  */
 export function cleanAnomalies(parsed, excludedKeys = new Set()) {
   const next = cloneParsedTrack(parsed);
+  if (!next.tracks.some((trk) => (trk.segments || []).some((seg) => seg.length > 0)) && next.routes.length > 0) {
+    next.tracks = normalizedTracks(next);
+    next.routes = [];
+  }
   const anomalies = detectAnomalyPoints(next);
   const removeKeys = new Set(
     anomalies.map((a) => a.key).filter((key) => !excludedKeys.has(key)),
   );
   if (removeKeys.size === 0) return { track: next, removedCount: 0 };
 
-  if (next.tracks.length === 0 && next.routes.length > 0) {
-    next.tracks = normalizedTracks(next);
-    next.routes = [];
-  }
-
   let removedCount = 0;
-  for (const track of next.tracks) {
+  for (let ti = 0; ti < next.tracks.length; ti += 1) {
+    const track = next.tracks[ti];
     track.segments = track.segments
-      .map((seg) => {
+      .map((seg, si) => {
         if (seg.length <= 2) return seg;
-        const kept = seg.filter((pt) => {
-          const key = `${Number(pt.lat).toFixed(6)},${Number(pt.lon).toFixed(6)}`;
-          return !removeKeys.has(key);
+        const kept = seg.filter((pt, pi) => {
+          const idxKey = `${ti}:${si}:${pi}`;
+          const coordKey = `${Number(pt.lat).toFixed(6)},${Number(pt.lon).toFixed(6)}`;
+          return !removeKeys.has(idxKey) && !removeKeys.has(coordKey);
         });
         if (kept.length >= 2 && kept.length < seg.length) {
           removedCount += seg.length - kept.length;
@@ -465,18 +602,31 @@ export function makeOutAndBack(parsed) {
   return { track: clearSummaryMetadata(next), clearedTimestamps };
 }
 
+function endpointSegments(sourceTracks) {
+  let firstSeg = null;
+  let lastSeg = null;
+  let totalPoints = 0;
+  for (const track of sourceTracks) {
+    for (const seg of track?.segments || []) {
+      if (!Array.isArray(seg) || seg.length === 0) continue;
+      if (!firstSeg) firstSeg = seg;
+      lastSeg = seg;
+      totalPoints += seg.length;
+    }
+  }
+  return { firstSeg, lastSeg, totalPoints };
+}
+
 /**
- * Returns true if the track's start and end points are already within thresholdMeters (or < 2 points).
+ * Returns true if the track has at least 2 points and its start and end points are within thresholdMeters.
  * @param {import('./types.js').ParsedTrack} parsed
  * @param {number} [thresholdMeters]
  */
 export function isTrackClosedLoop(parsed, thresholdMeters = 50) {
   const sourceTracks = normalizedTracks(parsed);
-  const firstSeg = sourceTracks[0]?.segments?.[0];
-  const lastTrack = sourceTracks[sourceTracks.length - 1];
-  const lastSeg = lastTrack?.segments?.[lastTrack.segments.length - 1];
-  if (!firstSeg || firstSeg.length === 0 || !lastSeg || lastSeg.length === 0) {
-    return true;
+  const { firstSeg, lastSeg, totalPoints } = endpointSegments(sourceTracks);
+  if (totalPoints < 2 || !firstSeg || !lastSeg) {
+    return false;
   }
   const first = firstSeg[0];
   const last = lastSeg[lastSeg.length - 1];
@@ -490,10 +640,8 @@ export function isTrackClosedLoop(parsed, thresholdMeters = 50) {
 export function closeLoop(parsed) {
   const next = cloneParsedTrack(parsed);
   const sourceTracks = normalizedTracks(next);
-  const firstSeg = sourceTracks[0]?.segments?.[0];
-  const lastTrack = sourceTracks[sourceTracks.length - 1];
-  const lastSeg = lastTrack?.segments?.[lastTrack.segments.length - 1];
-  if (!firstSeg || firstSeg.length === 0 || !lastSeg || lastSeg.length === 0) {
+  const { firstSeg, lastSeg, totalPoints } = endpointSegments(sourceTracks);
+  if (totalPoints < 2 || !firstSeg || !lastSeg) {
     return { track: next, closureMeters: 0 };
   }
   const first = firstSeg[0];
@@ -504,7 +652,7 @@ export function closeLoop(parsed) {
     delete closingPt.time;
     lastSeg.push(closingPt);
   }
-  if (next.tracks.length === 0 && sourceTracks.length > 0) {
+  if (!next.tracks.some((trk) => (trk.segments || []).some((seg) => seg.length > 0)) && sourceTracks.length > 0) {
     next.tracks = sourceTracks;
     next.routes = [];
   }
@@ -604,18 +752,22 @@ export function rotateLoopStart(parsed, alongMeters) {
   if (!isTrackClosedLoop(next)) return { track: next, rotated: false, timestampsCleared: false };
   const sourceTracks = normalizedTracks(next);
   const flat = [];
+  const flatAlong = [];
+  let acc = 0;
   for (const track of sourceTracks) {
     for (const seg of track.segments || []) {
-      for (const pt of seg) flat.push(clonePoint(pt));
+      for (let i = 0; i < seg.length; i += 1) {
+        if (i > 0) acc += distanceMeters(seg[i - 1], seg[i]);
+        flat.push(clonePoint(seg[i]));
+        flatAlong.push(acc);
+      }
     }
   }
   if (flat.length < 4) return { track: next, rotated: false, timestampsCleared: false };
-  let acc = 0;
   let bestIdx = 0;
   let bestDiff = Infinity;
   for (let i = 0; i < flat.length; i += 1) {
-    if (i > 0) acc += distanceMeters(flat[i - 1], flat[i]);
-    const diff = Math.abs(acc - alongMeters);
+    const diff = Math.abs(flatAlong[i] - alongMeters);
     if (diff < bestDiff) {
       bestDiff = diff;
       bestIdx = i;
@@ -729,7 +881,11 @@ export function addWaypoint(parsed, waypoint) {
 export function updateWaypoint(parsed, index, patch) {
   const next = cloneParsedTrack(parsed);
   if (index < 0 || index >= next.waypoints.length) return next;
-  next.waypoints[index] = clonePoint({ ...next.waypoints[index], ...patch });
+  const merged = { ...next.waypoints[index], ...patch };
+  if (('description' in patch || 'desc' in patch || 'comment' in patch) && !('insightText' in patch)) {
+    delete merged.insightText;
+  }
+  next.waypoints[index] = clonePoint(merged);
   return next;
 }
 

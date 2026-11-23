@@ -24,6 +24,27 @@ function allPathEntries(parsed) {
   return entries;
 }
 
+function pointAtDistance(paths, targetMeters) {
+  let along = 0;
+  for (const pts of paths) {
+    if (!pts || pts.length < 2) continue;
+    for (let i = 1; i < pts.length; i += 1) {
+      const a = pts[i - 1];
+      const b = pts[i];
+      const segLen = distanceMeters(a, b);
+      if (along + segLen >= targetMeters || (i === pts.length - 1 && paths[paths.length - 1] === pts)) {
+        const ratio = segLen > 0 ? Math.max(0, Math.min(1, (targetMeters - along) / segLen)) : 0;
+        return {
+          lat: a.lat + (b.lat - a.lat) * ratio,
+          lon: a.lon + (b.lon - a.lon) * ratio,
+        };
+      }
+      along += segLen;
+    }
+  }
+  return null;
+}
+
 function buildScreenCache(map, paths) {
   const segments = [];
   let along = 0;
@@ -82,7 +103,9 @@ function nearestOnTrack(map, cachedSegments, latlng) {
  *   map: any,
  *   el?: Function,
  *   t?: Function,
+ *   formatDistance?: (meters: number) => string,
  *   onSplitAt?: (meters: number) => void,
+ *   onSplitHover?: (meters: number | null) => void,
  *   onPickWaypointLocation?: (loc: { lat: number, lon: number, ele?: number, snapped: boolean }) => void,
  *   onSelectWaypoint?: (index: number) => void,
  *   onMoveWaypoint?: (index: number, lat: number, lon: number) => void,
@@ -99,7 +122,9 @@ export function createEditorOverlay({
   map,
   el = null,
   t = (key) => key,
+  formatDistance = (meters) => (meters >= 1000 ? `${(meters / 1000).toFixed(2)} km` : `${Math.round(meters)} m`),
   onSplitAt = () => {},
+  onSplitHover = () => {},
   onPickWaypointLocation = () => {},
   onSelectWaypoint = () => {},
   onMoveWaypoint = () => {},
@@ -112,6 +137,8 @@ export function createEditorOverlay({
 }) {
   /** @type {(meters: number) => void} */
   const handleSplitAt = onSplitAt;
+  /** @type {(meters: number | null) => void} */
+  const handleSplitHover = onSplitHover;
   /** @type {(loc: { lat: number, lon: number, ele?: number, snapped: boolean }) => void} */
   const handlePickWaypointLocation = onPickWaypointLocation;
   /** @type {(index: number) => void} */
@@ -142,6 +169,7 @@ export function createEditorOverlay({
   let hiddenMidpoints = false;
   let excludedAnomalyKeys = new Set();
   let splitCursor = null;
+  let splitDistMarker = null;
   let lifecycle = null;
   let currentParsed = null;
   let cachedPathEntries = [];
@@ -155,6 +183,9 @@ export function createEditorOverlay({
   let cropRange = [0, 0];
   let selectedWptIndex = -1;
   let waypointsVisible = true;
+  const wptMarkers = new Map();
+  let wptSelectionReticle = null;
+  let focusFrame = 0;
 
   function clearBox() {
     if (boxEl) {
@@ -277,35 +308,62 @@ export function createEditorOverlay({
           }).addTo(trackGroup);
         }
       }
-      for (const seg of sliceRouteByDistance(paths, { from, to })) {
-        L.polyline(seg.map((p) => [p.lat, p.lon]), {
-          color: KEEP_COLOR,
-          weight: 5,
-          opacity: 0.96,
-          interactive: false,
-        }).addTo(trackGroup);
-      }
-    } else if (activeTool === 'crop' && activeSubMode === 'split') {
-      normalizedTracks(currentParsed).forEach((track, idx) => {
-        const color = SPLIT_COLORS[idx % SPLIT_COLORS.length];
-        for (const seg of track.segments || []) {
-          if (seg.length < 2) continue;
+      const tracks = normalizedTracks(currentParsed);
+      if (tracks.length > 1) {
+        let trackOffset = 0;
+        tracks.forEach((track, idx) => {
+          const trackSegs = (track.segments || []).filter((s) => s.length >= 2);
+          const trackLen = trackTotalDistance({ name: '', tracks: [track], routes: [], waypoints: [] });
+          const overlapFrom = Math.max(from, trackOffset) - trackOffset;
+          const overlapTo = Math.min(to, trackOffset + trackLen) - trackOffset;
+          if (overlapTo > overlapFrom && trackSegs.length > 0) {
+            const color = SPLIT_COLORS[idx % SPLIT_COLORS.length];
+            for (const seg of sliceRouteByDistance(trackSegs, { from: overlapFrom, to: overlapTo })) {
+              L.polyline(seg.map((p) => [p.lat, p.lon]), {
+                color,
+                weight: 5,
+                opacity: 0.96,
+                interactive: false,
+              }).addTo(trackGroup);
+            }
+          }
+          trackOffset += trackLen;
+        });
+      } else {
+        for (const seg of sliceRouteByDistance(paths, { from, to })) {
           L.polyline(seg.map((p) => [p.lat, p.lon]), {
-            color,
+            color: KEEP_COLOR,
             weight: 5,
+            opacity: 0.96,
+            interactive: false,
+          }).addTo(trackGroup);
+        }
+      }
+    } else {
+      const tracks = normalizedTracks(currentParsed);
+      const weight = activeTool === 'crop' && activeSubMode === 'split' ? 5 : 4.5;
+      if (tracks.length > 1) {
+        tracks.forEach((track, idx) => {
+          const color = SPLIT_COLORS[idx % SPLIT_COLORS.length];
+          for (const seg of track.segments || []) {
+            if (seg.length < 2) continue;
+            L.polyline(seg.map((p) => [p.lat, p.lon]), {
+              color,
+              weight,
+              opacity: 0.92,
+              interactive: false,
+            }).addTo(trackGroup);
+          }
+        });
+      } else {
+        for (const seg of paths) {
+          L.polyline(seg.map((p) => [p.lat, p.lon]), {
+            color: KEEP_COLOR,
+            weight,
             opacity: 0.92,
             interactive: false,
           }).addTo(trackGroup);
         }
-      });
-    } else {
-      for (const seg of paths) {
-        L.polyline(seg.map((p) => [p.lat, p.lon]), {
-          color: KEEP_COLOR,
-          weight: 4.5,
-          opacity: 0.92,
-          interactive: false,
-        }).addTo(trackGroup);
       }
     }
 
@@ -351,9 +409,45 @@ export function createEditorOverlay({
     }
   }
 
+  function updateWaypointSelection(nextIndex) {
+    const prevIndex = selectedWptIndex;
+    selectedWptIndex = nextIndex;
+    if (!waypointGroup || !currentParsed || !waypointsVisible) return;
+    if (prevIndex !== nextIndex) {
+      const prevMarker = wptMarkers.get(prevIndex);
+      if (prevMarker) {
+        prevMarker.getElement()?.classList.remove('is-selected');
+        prevMarker.setZIndexOffset(200);
+      }
+      const nextMarker = wptMarkers.get(nextIndex);
+      if (nextMarker) {
+        nextMarker.getElement()?.classList.add('is-selected');
+        nextMarker.setZIndexOffset(400);
+      }
+    }
+    const wpt = nextIndex >= 0 ? currentParsed.waypoints?.[nextIndex] : null;
+    if (wpt && Number.isFinite(wpt.lat) && Number.isFinite(wpt.lon)) {
+      if (wptSelectionReticle) {
+        wptSelectionReticle.setLatLng([wpt.lat, wpt.lon]);
+      } else {
+        wptSelectionReticle = createSnapReticleMarker(L, { lat: wpt.lat, lon: wpt.lon }, {
+          kind: 'marker',
+          className: 'pin-selection-reticle',
+          animate: false,
+          zIndexOffset: 390,
+        })?.addTo(waypointGroup) || null;
+      }
+    } else if (wptSelectionReticle) {
+      wptSelectionReticle.remove();
+      wptSelectionReticle = null;
+    }
+  }
+
   function renderWaypoints() {
     if (!waypointGroup || !currentParsed) return;
     waypointGroup.clearLayers();
+    wptMarkers.clear();
+    wptSelectionReticle = null;
     if (!waypointsVisible) return;
 
     const canDrag = activeTool === 'waypoint';
@@ -361,12 +455,12 @@ export function createEditorOverlay({
       if (!Number.isFinite(wpt.lat) || !Number.isFinite(wpt.lon)) return;
       const isSelected = index === selectedWptIndex;
       if (isSelected) {
-        createSnapReticleMarker(L, { lat: wpt.lat, lon: wpt.lon }, {
+        wptSelectionReticle = createSnapReticleMarker(L, { lat: wpt.lat, lon: wpt.lon }, {
           kind: 'marker',
           className: 'pin-selection-reticle',
           animate: false,
           zIndexOffset: 390,
-        })?.addTo(waypointGroup);
+        })?.addTo(waypointGroup) || null;
       }
       const hasPhoto = Array.isArray(wpt.images) && wpt.images.length > 0;
       const icon = L.divIcon({
@@ -383,6 +477,7 @@ export function createEditorOverlay({
         draggable: canDrag,
         zIndexOffset: isSelected ? 400 : 200,
       }).addTo(waypointGroup);
+      wptMarkers.set(index, marker);
       marker.bindTooltip(() => buildWptTooltip(wpt, index), {
         direction: 'top',
         offset: [0, -24],
@@ -390,16 +485,18 @@ export function createEditorOverlay({
       });
       marker.on('click', (event) => {
         L.DomEvent.stopPropagation(event);
-        selectedWptIndex = index;
+        updateWaypointSelection(index);
         handleSelectWaypoint(index);
-        renderWaypoints();
       });
       marker.on('contextmenu', (event) => {
         L.DomEvent.stopPropagation(event);
         event.originalEvent?.preventDefault?.();
-        selectedWptIndex = index;
+        if (suppressNextContextMenu) {
+          suppressNextContextMenu = false;
+          return;
+        }
+        updateWaypointSelection(index);
         handleSelectWaypoint(index);
-        renderWaypoints();
         const hit = nearestOnTrack(map, getScreenSegments(), event.latlng);
         handleContextMenu({
           clientX: event.originalEvent?.clientX ?? 200,
@@ -460,6 +557,10 @@ export function createEditorOverlay({
       marker.on('contextmenu', (event) => {
         L.DomEvent.stopPropagation(event);
         event.originalEvent?.preventDefault?.();
+        if (suppressNextContextMenu) {
+          suppressNextContextMenu = false;
+          return;
+        }
         handleContextMenu({
           clientX: event.originalEvent?.clientX ?? 200,
           clientY: event.originalEvent?.clientY ?? 200,
@@ -505,6 +606,56 @@ export function createEditorOverlay({
     updateCursorClass();
   }
 
+  function clearSplitPreview() {
+    if (splitCursor) {
+      splitCursor.remove();
+      splitCursor = null;
+    }
+    if (splitDistMarker) {
+      splitDistMarker.remove();
+      splitDistMarker = null;
+    }
+  }
+
+  function paintSplitPreview(lat, lon, alongMeters, fillColor) {
+    if (!trackGroup) return;
+    if (!splitCursor) {
+      splitCursor = L.circleMarker([lat, lon], {
+        radius: 7,
+        color: '#ffffff',
+        weight: 2,
+        fillColor,
+        fillOpacity: 1,
+        interactive: false,
+      }).addTo(trackGroup);
+    } else {
+      splitCursor.setStyle({ fillColor });
+      splitCursor.setLatLng([lat, lon]);
+    }
+    if (alongMeters != null && Number.isFinite(alongMeters)) {
+      const labelText = formatDistance(alongMeters);
+      const icon = L.divIcon({
+        className: 'editor-split-dist-badge',
+        html: `<span class="editor-split-dist-pill">${labelText}</span>`,
+        iconSize: [0, 0],
+        iconAnchor: [0, 26],
+      });
+      if (!splitDistMarker) {
+        splitDistMarker = L.marker([lat, lon], {
+          icon,
+          interactive: false,
+          zIndexOffset: 600,
+        }).addTo(trackGroup);
+      } else {
+        splitDistMarker.setLatLng([lat, lon]);
+        splitDistMarker.setIcon(icon);
+      }
+    } else if (splitDistMarker) {
+      splitDistMarker.remove();
+      splitDistMarker = null;
+    }
+  }
+
   function updateHoverAt(latlng) {
     if (!group || !currentParsed || !latlng) return;
     const isLoopStart = activeTool === 'topology' && activeSubMode === 'loop-start';
@@ -516,26 +667,14 @@ export function createEditorOverlay({
       const hit = nearestOnTrack(map, getScreenSegments(), latlng);
       if (hit && hit.distPx <= maxPx) {
         const fillColor = isLoopStart ? '#38bdf8' : isSplit ? '#ef4444' : '#22c55e';
-        if (!splitCursor) {
-          splitCursor = L.circleMarker([hit.lat, hit.lon], {
-            radius: 7,
-            color: '#ffffff',
-            weight: 2,
-            fillColor,
-            fillOpacity: 1,
-            interactive: false,
-          }).addTo(trackGroup);
-        } else {
-          splitCursor.setStyle({ fillColor });
-          splitCursor.setLatLng([hit.lat, hit.lon]);
-        }
-      } else if (splitCursor) {
-        splitCursor.remove();
-        splitCursor = null;
+        paintSplitPreview(hit.lat, hit.lon, isTrackSnap ? hit.alongMeters : null, fillColor);
+        if (isSplit) handleSplitHover(hit.alongMeters);
+      } else {
+        clearSplitPreview();
+        if (isSplit) handleSplitHover(null);
       }
-    } else if (splitCursor) {
-      splitCursor.remove();
-      splitCursor = null;
+    } else {
+      clearSplitPreview();
     }
   }
 
@@ -642,13 +781,21 @@ export function createEditorOverlay({
       }
       if (event.button === 2 || event.button === 1) {
         event.preventDefault();
-        panState = { x: event.clientX, y: event.clientY, button: event.button, moved: false };
+        clearBox();
+        panState = {
+          x: event.clientX,
+          y: event.clientY,
+          button: event.button,
+          pointerId: event.pointerId,
+          moved: false,
+        };
         container.classList.add('editor-cursor-grabbing');
         return;
       }
-      if (event.button !== 0) return;
+      if (event.button !== 0 || panState) return;
+      clearBox();
       const rect = container.getBoundingClientRect();
-      boxStartPt = { x: event.clientX - rect.left, y: event.clientY - rect.top };
+      boxStartPt = { x: event.clientX - rect.left, y: event.clientY - rect.top, pointerId: event.pointerId };
       boxEl = document.createElement('div');
       boxEl.className = 'editor-box-select';
       boxEl.style.left = `${boxStartPt.x}px`;
@@ -657,6 +804,7 @@ export function createEditorOverlay({
     }, { signal: lifecycle.signal });
     window.addEventListener('pointermove', (event) => {
       if (panState) {
+        if (event.pointerId !== panState.pointerId) return;
         const dx = panState.x - event.clientX;
         const dy = panState.y - event.clientY;
         if (Math.abs(dx) > 2 || Math.abs(dy) > 2) panState.moved = true;
@@ -665,7 +813,7 @@ export function createEditorOverlay({
         map.panBy([dx, dy], { animate: false });
         return;
       }
-      if (!boxStartPt || !boxEl) return;
+      if (!boxStartPt || !boxEl || event.pointerId !== boxStartPt.pointerId) return;
       const rect = container.getBoundingClientRect();
       const cx = event.clientX - rect.left;
       const cy = event.clientY - rect.top;
@@ -680,10 +828,10 @@ export function createEditorOverlay({
     }, { signal: lifecycle.signal });
     window.addEventListener('pointerup', (event) => {
       if (panState) {
-        clearPan();
+        if (event.pointerId === panState.pointerId) clearPan();
         return;
       }
-      if (!boxStartPt || !boxEl) return;
+      if (!boxStartPt || !boxEl || event.pointerId !== boxStartPt.pointerId) return;
       const rect = container.getBoundingClientRect();
       const cx = event.clientX - rect.left;
       const cy = event.clientY - rect.top;
@@ -714,6 +862,13 @@ export function createEditorOverlay({
       cancelAnimationFrame(hoverFrame);
       hoverFrame = 0;
     }
+    if (focusFrame) {
+      cancelAnimationFrame(focusFrame);
+      focusFrame = 0;
+    }
+    wptMarkers.clear();
+    selectedWptIndex = -1;
+    wptSelectionReticle = null;
     pendingHoverLatLng = null;
     clearBox();
     clearPan();
@@ -740,7 +895,7 @@ export function createEditorOverlay({
     cachedPaths = [];
     cachedTotalMeters = 0;
     cachedScreenSegments = null;
-    splitCursor = null;
+    clearSplitPreview();
     hiddenMidpoints = false;
     excludedAnomalyKeys.clear();
     map.getContainer().classList.remove('editor-cursor-crosshair', 'editor-cursor-grab', 'editor-cursor-grabbing');
@@ -762,17 +917,34 @@ export function createEditorOverlay({
     setTool(tool, subMode = tool) {
       clearBox();
       clearPan();
+      clearSplitPreview();
+      handleSplitHover(null);
       activeTool = tool;
       activeSubMode = subMode;
       render();
+    },
+    showSplitPreviewAt(alongMeters) {
+      if (!group || !currentParsed || alongMeters == null || !Number.isFinite(alongMeters)) {
+        clearSplitPreview();
+        return;
+      }
+      const pt = pointAtDistance(cachedPaths, alongMeters);
+      if (!pt) {
+        clearSplitPreview();
+        return;
+      }
+      paintSplitPreview(pt.lat, pt.lon, alongMeters, '#ef4444');
     },
     setCropRange(fromMeters, toMeters) {
       cropRange = [fromMeters, toMeters];
       renderTrackLayer();
     },
     setSelectedWaypoint(index) {
-      selectedWptIndex = index;
-      renderWaypoints();
+      if (wptMarkers.size > 0 && waypointsVisible) {
+        updateWaypointSelection(index);
+      } else {
+        selectedWptIndex = index;
+      }
     },
     setWaypointsVisible(visible) {
       waypointsVisible = Boolean(visible);
@@ -781,7 +953,11 @@ export function createEditorOverlay({
     focusWaypoint(index) {
       const wpt = currentParsed?.waypoints?.[index];
       if (!wpt || !Number.isFinite(wpt.lat) || !Number.isFinite(wpt.lon)) return;
-      map.panInside([wpt.lat, wpt.lon], { padding: [80, 80], animate: true });
+      if (focusFrame) cancelAnimationFrame(focusFrame);
+      focusFrame = requestAnimationFrame(() => {
+        focusFrame = 0;
+        map.panTo([wpt.lat, wpt.lon], { animate: true, duration: 0.28, easeLinearity: 0.25 });
+      });
     },
     focusLatLon(lat, lon) {
       if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;

@@ -1,9 +1,165 @@
 import { CUSTOM_LIMITS, validateTemplate } from './custom-layers.js';
 
+export const REGIONAL_PRESETS = Object.freeze([
+  {
+    id: 'gsi',
+    labelKey: 'layer.preset.gsi',
+    url: 'https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png',
+    tileSize: 256,
+    minZoom: 4,
+    maxZoom: 18,
+    subdomains: '',
+    attribution: '国土地理院 (GSI Japan)',
+    tms: false,
+  },
+  {
+    id: 'rudy',
+    labelKey: 'layer.preset.rudy',
+    url: 'https://tile.happyman.idv.tw/map/moi_osm/{z}/{x}/{y}.png',
+    tileSize: 256,
+    minZoom: 6,
+    maxZoom: 18,
+    subdomains: '',
+    attribution: 'Taiwan TOPO / OpenStreetMap',
+    tms: false,
+  },
+  {
+    id: 'usgs',
+    labelKey: 'layer.preset.usgs',
+    url: 'https://basemap.nationalmap.gov/arcgis/rest/services/USGSTopo/MapServer/tile/{z}/{y}/{x}',
+    tileSize: 256,
+    minZoom: 1,
+    maxZoom: 16,
+    subdomains: '',
+    attribution: 'USGS The National Map',
+    tms: false,
+  },
+  {
+    id: 'usgs-classic',
+    labelKey: 'layer.preset.usgsClassic',
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/USA_Topo_Maps/MapServer/tile/{z}/{y}/{x}',
+    tileSize: 256,
+    minZoom: 1,
+    maxZoom: 15,
+    subdomains: '',
+    attribution: 'USGS / National Geographic / Esri',
+    tms: false,
+  },
+  {
+    id: 'swisstopo',
+    labelKey: 'layer.preset.swisstopo',
+    url: 'https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.pixelkarte-farbe/default/current/3857/{z}/{x}/{y}.jpeg',
+    tileSize: 256,
+    minZoom: 2,
+    maxZoom: 18,
+    subdomains: '',
+    attribution: 'swisstopo',
+    tms: false,
+  },
+  {
+    id: 'swissimage',
+    labelKey: 'layer.preset.swissimage',
+    url: 'https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.swissimage/default/current/3857/{z}/{x}/{y}.jpeg',
+    tileSize: 256,
+    minZoom: 2,
+    maxZoom: 19,
+    subdomains: '',
+    attribution: 'swisstopo',
+    tms: false,
+  },
+  {
+    id: 'google-sat',
+    labelKey: 'layer.preset.googleSat',
+    url: 'https://mt{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
+    tileSize: 256,
+    minZoom: 1,
+    maxZoom: 20,
+    subdomains: '0123',
+    attribution: 'Google',
+    tms: false,
+  },
+]);
+
+export const KEYED_PRESETS = Object.freeze([
+  {
+    id: 'tracestrack',
+    labelKey: 'layer.preset.tracestrack',
+    url: 'https://tile.tracestrack.com/topo__/{z}/{x}/{y}.png?key=YOUR_KEY',
+    tileSize: 256,
+    minZoom: 1,
+    maxZoom: 18,
+    subdomains: '',
+    attribution: 'Tracestrack / OpenStreetMap',
+    tms: false,
+  },
+  {
+    id: 'thunderforest',
+    labelKey: 'layer.preset.thunderforest',
+    url: 'https://api.thunderforest.com/outdoors/{z}/{x}/{y}.png?apikey=YOUR_KEY',
+    tileSize: 256,
+    minZoom: 1,
+    maxZoom: 19,
+    subdomains: '',
+    attribution: 'Thunderforest / OpenStreetMap',
+    tms: false,
+  },
+  {
+    id: 'stadia',
+    labelKey: 'layer.preset.stadia',
+    url: 'https://tiles.stadiamaps.com/tiles/stamen_terrain/{z}/{x}/{y}@2x.png?api_key=YOUR_KEY',
+    tileSize: 512,
+    minZoom: 1,
+    maxZoom: 20,
+    subdomains: '',
+    attribution: 'Stadia Maps / Stamen / OpenStreetMap',
+    tms: false,
+  },
+  {
+    id: 'maptiler',
+    labelKey: 'layer.preset.maptiler',
+    url: 'https://api.maptiler.com/maps/outdoor/{z}/{x}/{y}.png?key=YOUR_KEY',
+    tileSize: 256,
+    minZoom: 1,
+    maxZoom: 19,
+    subdomains: '',
+    attribution: 'MapTiler / OpenStreetMap',
+    tms: false,
+  },
+]);
+
 /** Custom tile-source form. Keeps field normalisation and validation separate from layer selection state. */
 export function createCustomSourceForm({ el, t, onCancel, onSubmit }) {
   const form = el('form', 'layer-custom-form');
   form.hidden = true;
+
+  const presetsWrap = el('div', 'layer-custom-presets');
+  const buildPresetGroup = (labelKey, list, selectKeyPlaceholder = false) => {
+    const heading = el('span', 'layer-custom-presets-label', t(labelKey));
+    heading.dataset.labelKey = labelKey;
+    const chipRow = el('div', 'layer-custom-preset-list');
+    for (const preset of list) {
+      const chip = el('button', 'layer-custom-preset-chip', t(preset.labelKey));
+      chip.type = 'button';
+      chip.dataset.customPreset = preset.id;
+      chip.dataset.labelKey = preset.labelKey;
+      chip.addEventListener('click', () => {
+        fillEntry({ ...preset, name: t(preset.labelKey) });
+        error.hidden = true;
+        if (selectKeyPlaceholder) {
+          const idx = urlField.input.value.indexOf('YOUR_KEY');
+          if (idx >= 0) {
+            urlField.input.focus();
+            urlField.input.setSelectionRange(idx, idx + 'YOUR_KEY'.length);
+          }
+        }
+      });
+      chipRow.append(chip);
+    }
+    presetsWrap.append(heading, chipRow);
+  };
+  buildPresetGroup('layer.customPresets', REGIONAL_PRESETS, false);
+  buildPresetGroup('layer.customKeyPresets', KEYED_PRESETS, true);
+  form.append(presetsWrap);
   const buildField = (name, labelKey, type = 'text', extra = {}) => {
     const wrap = el('label', 'layer-custom-field');
     const label = el('span', null, t(labelKey));
@@ -37,7 +193,7 @@ export function createCustomSourceForm({ el, t, onCancel, onSubmit }) {
   error.hidden = true;
   error.dataset.customError = '';
 
-  function checkUrl() {
+  function checkUrl({ autoTileSize = true } = {}) {
     const raw = urlField.input.value.trim();
     if (!raw) {
       urlStatus.hidden = true;
@@ -49,7 +205,7 @@ export function createCustomSourceForm({ el, t, onCancel, onSubmit }) {
       urlStatus.hidden = true;
       urlField.input.removeAttribute('data-invalid');
       if (result.url !== raw) urlField.input.value = result.url;
-      if (/(?:%40|@)2x/i.test(result.url)) {
+      if (autoTileSize && /(?:%40|@)2x/i.test(result.url)) {
         form.querySelector('[name="tileSize"][value="512"]').checked = true;
       }
       return result;
@@ -69,7 +225,9 @@ export function createCustomSourceForm({ el, t, onCancel, onSubmit }) {
   urlField.input.addEventListener('blur', checkUrl);
 
   const sizeWrap = el('div', 'layer-custom-field');
-  sizeWrap.append(el('span', null, t('layer.customTileSize')));
+  const sizeLabel = el('span', null, t('layer.customTileSize'));
+  sizeLabel.dataset.labelKey = 'layer.customTileSize';
+  sizeWrap.append(sizeLabel);
   const sizeGroup = el('div', 'layer-custom-inline');
   for (const size of CUSTOM_LIMITS.tileSizes) {
     const option = el('label', 'layer-custom-radio');
@@ -84,7 +242,9 @@ export function createCustomSourceForm({ el, t, onCancel, onSubmit }) {
   sizeWrap.append(sizeGroup);
 
   const zoomWrap = el('div', 'layer-custom-field');
-  zoomWrap.append(el('span', null, t('layer.customZoom')));
+  const zoomLabel = el('span', null, t('layer.customZoom'));
+  zoomLabel.dataset.labelKey = 'layer.customZoom';
+  zoomWrap.append(zoomLabel);
   const zoomInline = el('div', 'layer-custom-inline');
   const minZoom = el('input');
   minZoom.type = 'number';
@@ -116,7 +276,9 @@ export function createCustomSourceForm({ el, t, onCancel, onSubmit }) {
   const tmsBox = el('input');
   tmsBox.type = 'checkbox';
   tmsBox.name = 'tms';
-  tmsWrap.append(tmsBox, el('span', null, t('layer.customTms')));
+  const tmsLabel = el('span', null, t('layer.customTms'));
+  tmsLabel.dataset.labelKey = 'layer.customTms';
+  tmsWrap.append(tmsBox, tmsLabel);
   advancedBody.append(tmsWrap);
   advanced.append(advancedSummary, advancedBody);
 
@@ -155,9 +317,10 @@ export function createCustomSourceForm({ el, t, onCancel, onSubmit }) {
     urlStatus.hidden = true;
     urlField.input.removeAttribute('data-invalid');
     error.hidden = true;
+    presetsWrap.hidden = false;
   }
 
-  function setEntry(entry) {
+  function fillEntry(entry) {
     const set = (name, next) => {
       const field = form.querySelector(`[name="${name}"]`);
       if (field) field.value = next;
@@ -172,7 +335,12 @@ export function createCustomSourceForm({ el, t, onCancel, onSubmit }) {
     if (size) size.checked = true;
     const tms = form.querySelector('[name="tms"]');
     if (tms) tms.checked = entry.tms;
-    checkUrl();
+    checkUrl({ autoTileSize: false });
+  }
+
+  function setEntry(entry) {
+    presetsWrap.hidden = true;
+    fillEntry(entry);
   }
 
   function read(editingId) {
@@ -199,6 +367,7 @@ export function createCustomSourceForm({ el, t, onCancel, onSubmit }) {
       subdomain: 'layer.customSubdomainRequired',
       duplicate: 'layer.customDuplicate',
       name: 'layer.customInvalidName',
+      limit: 'layer.customLimit',
     }[code] || 'layer.customInvalidToken';
     error.textContent = t(key);
     error.hidden = false;

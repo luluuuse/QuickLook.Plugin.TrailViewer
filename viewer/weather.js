@@ -40,7 +40,7 @@ function valid(point) {
 export function weatherTarget(gpx, mode = 'start') {
   const all = trackPoints(gpx);
   const first = all[0] || gpx?.waypoints?.[0] || null;
-  const last = all[all.length - 1] || gpx?.waypoints?.[0] || null;
+  const last = all[all.length - 1] || gpx?.waypoints?.[gpx.waypoints.length - 1] || null;
   if (mode === 'end') return valid(last);
   if (mode === 'highest') return valid(highestPoint(gpx));
   return valid(first);

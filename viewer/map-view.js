@@ -23,8 +23,10 @@ function sameNumber(a, b) {
 }
 
 function sameView(a, b) {
-  return Boolean(a && b) && sameNumber(a.lat, b.lat) && sameNumber(a.lng, b.lng)
-    && sameNumber(a.zoom, b.zoom);
+  return Boolean(a && b)
+    && Math.abs(a.lat - b.lat) < 1e-4
+    && Math.abs(a.lng - b.lng) < 1e-4
+    && Math.abs(a.zoom - b.zoom) < 0.05;
 }
 
 function cssPixels(value) {
@@ -497,7 +499,9 @@ export function createMapView({ map, isChromeHidden }) {
     const focus = unionRects([pointRect(at.x, at.y, 34), options.popup ? popupRect(true) : null]);
     const offset = revealOffset(focus, safeRect);
     if (offset.needed) map.panBy([-offset.x, -offset.y], { animate: options.animate ?? false });
-    lastFocus = { latlng: storedLatLng(latlng), options: { popup: Boolean(options.popup), animate: false } };
+    if (options.remember !== false) {
+      lastFocus = { latlng: storedLatLng(latlng), options: { popup: Boolean(options.popup), animate: false } };
+    }
   }
 
   function focusSelection(latlng, options = {}) {

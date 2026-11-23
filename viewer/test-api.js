@@ -122,7 +122,7 @@ export function createTestApi({
     attachmentResult: (batch, index, ok, path, detail) =>
       attachmentExporter.result(batch, index, ok, decodeMessage(path), decodeMessage(detail)),
     attachmentResume: (batch, indices, folder) =>
-      attachmentExporter.resumeResult(batch, indices, decodeMessage(folder)),
+      attachmentExporter.resumeResult(batch, indices, folder),
     measure: {
       active: measurement.active,
       start: measurement.start,

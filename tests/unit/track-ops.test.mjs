@@ -20,6 +20,7 @@ import {
   rotateLoopStart,
   shiftTrackTimestamps,
   simplifyTrack,
+  sortWaypointsByRoute,
   splitTrackAt,
   trackTotalDistance,
   updateWaypoint,
@@ -433,4 +434,16 @@ test('mergeTrackSegments clears timestamps when segments have overlapping time r
   const { track, timestampsCleared } = mergeTrackSegments(overlapping);
   assert.equal(timestampsCleared, true);
   assert.equal(track.tracks[0].segments[0][0].time, undefined);
+});
+
+test('sortWaypointsByRoute orders waypoints along route distance including loop ends', () => {
+  const base = closeLoop(sampleTrack()).track;
+  base.waypoints = [
+    { lat: 39.900, lon: 116.300, name: '终点' },
+    { lat: 39.900, lon: 116.300, name: '起点' },
+    { lat: 39.909, lon: 116.300, name: '中途垭口' },
+  ];
+  const ordered = sortWaypointsByRoute(base);
+  assert.deepEqual(ordered.map((item) => item.wpt.name), ['起点', '中途垭口', '终点']);
+  assert.deepEqual(ordered.map((item) => item.index), [1, 2, 0]);
 });

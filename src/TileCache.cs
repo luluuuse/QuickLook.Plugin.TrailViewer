@@ -221,7 +221,11 @@ internal sealed class TileCache
         var isTianditu = false;
         string? canonicalHost = null;
 
-        if (MatchesSuffixHost(host, "tile.openstreetmap.fr"))
+        if (MatchesSuffixHost(host, "tile.openstreetmap.org"))
+            canonicalHost = "tile.openstreetmap.org";
+        else if (MatchesSuffixHost(host, "tile.openstreetmap.de"))
+            canonicalHost = "tile.openstreetmap.de";
+        else if (MatchesSuffixHost(host, "tile.openstreetmap.fr"))
             canonicalHost = "tile.openstreetmap.fr";
         else if (MatchesSuffixHost(host, "tile-cyclosm.openstreetmap.fr"))
             canonicalHost = "tile-cyclosm.openstreetmap.fr";
@@ -229,10 +233,24 @@ internal sealed class TileCache
             canonicalHost = "tile.openmaps.fr";
         else if (MatchesSuffixHost(host, "tile.opentopomap.org"))
             canonicalHost = "tile.opentopomap.org";
-        else if (string.Equals(host, "server.arcgisonline.com", StringComparison.OrdinalIgnoreCase)
-            && uri.AbsolutePath.StartsWith(
-                "/ArcGIS/rest/services/World_Imagery/MapServer/tile/",
-                StringComparison.OrdinalIgnoreCase))
+        else if (string.Equals(host, "tile.waymarkedtrails.org", StringComparison.OrdinalIgnoreCase))
+            canonicalHost = "tile.waymarkedtrails.org";
+        else if (string.Equals(host, "tiles.opensnowmap.org", StringComparison.OrdinalIgnoreCase))
+            canonicalHost = "tiles.opensnowmap.org";
+        else if ((string.Equals(host, "server.arcgisonline.com", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(host, "services.arcgisonline.com", StringComparison.OrdinalIgnoreCase))
+            && (uri.AbsolutePath.StartsWith(
+                    "/ArcGIS/rest/services/World_Imagery/MapServer/tile/",
+                    StringComparison.OrdinalIgnoreCase)
+                || uri.AbsolutePath.StartsWith(
+                    "/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/",
+                    StringComparison.OrdinalIgnoreCase)
+                || uri.AbsolutePath.StartsWith(
+                    "/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/",
+                    StringComparison.OrdinalIgnoreCase)
+                || uri.AbsolutePath.StartsWith(
+                    "/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/",
+                    StringComparison.OrdinalIgnoreCase)))
             canonicalHost = "server.arcgisonline.com";
         else if (MatchesSuffixHost(host, "tianditu.gov.cn"))
         {
@@ -413,13 +431,18 @@ internal sealed class TileCache
         return true;
     }
 
+    private int _prunePending;
+
     internal void SchedulePrune(
         TileCacheOptions options,
         bool removeExpired,
         Action<TileCacheStats>? onComplete = null)
     {
         if (Interlocked.CompareExchange(ref _pruning, 1, 0) != 0)
+        {
+            Interlocked.Exchange(ref _prunePending, 1);
             return;
+        }
 
         _ = Task.Run(() =>
         {
@@ -431,6 +454,8 @@ internal sealed class TileCache
             finally
             {
                 Interlocked.Exchange(ref _pruning, 0);
+                if (Interlocked.Exchange(ref _prunePending, 0) != 0)
+                    SchedulePrune(options, removeExpired);
             }
         });
     }

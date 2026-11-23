@@ -109,15 +109,14 @@ internal static class TiandituKeyDialog
         return dialog.ShowDialog() == true;
     }
 
-    internal static bool Remove(Window owner, bool english)
+    internal static bool Remove(Window? owner, bool english)
     {
-        var answer = MessageBox.Show(owner,
-            english
-                ? "Remove the Tianditu key saved for the current Windows user?"
-                : "移除当前 Windows 用户保存的天地图密钥？",
-            "TrailViewer",
-            MessageBoxButton.YesNo,
-            MessageBoxImage.Question);
+        var prompt = english
+            ? "Remove the Tianditu key saved for the current Windows user?"
+            : "移除当前 Windows 用户保存的天地图密钥？";
+        var answer = owner != null
+            ? MessageBox.Show(owner, prompt, "TrailViewer", MessageBoxButton.YesNo, MessageBoxImage.Question)
+            : MessageBox.Show(prompt, "TrailViewer", MessageBoxButton.YesNo, MessageBoxImage.Question);
         if (answer != MessageBoxResult.Yes) return false;
         return TiandituKeyStore.Delete();
     }

@@ -106,6 +106,9 @@ function resample(samples, step) {
     const t = span > 0 ? Math.min(1, Math.max(0, (distance - a.along) / span)) : 0;
     out.push({ along: distance, ele: a.ele + (b.ele - a.ele) * t });
   }
+  if (out.length > 0 && out[out.length - 1].along < total) {
+    out.push({ along: total, ele: samples[samples.length - 1].ele });
+  }
   return out;
 }
 
@@ -248,7 +251,7 @@ function runsFrom(cells, minRun = MIN_RUN) {
     else {
       // The new stretch starts exactly where the old one stopped: a gap of one sample would show up as a
       // strip of whatever is behind the profile.
-      if (last) last.to = cell.to;
+      if (last) last.to = cell.from;
       raw.push({ grade: cell.grade, from: cell.from, to: cell.to });
     }
   }

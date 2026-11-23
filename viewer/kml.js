@@ -297,9 +297,10 @@ export function parseKmlDocument(doc) {
   const waypoints = [];
   const seen = new Map();
   const styles = new Map();
-  for (const style of Array.from(doc.getElementsByTagName('Style'))) {
-    if (!style.id) continue;
-    const icon = child(style, 'Icon');
+  for (const style of Array.from(doc.getElementsByTagName('*'))) {
+    if (style.localName !== 'Style' || !style.id) continue;
+    const iconStyle = child(style, 'IconStyle');
+    const icon = (iconStyle && child(iconStyle, 'Icon')) || child(style, 'Icon');
     const href = icon && child(icon, 'href');
     if (href) styles.set(style.id, textOf(href));
   }

@@ -156,10 +156,11 @@ export function summariseRange(points, samples, fromMeters, toMeters) {
     ? sliceCurveByDistance(samples, from, to)
     : [];
   if (sliced.length >= 2) {
-    const gain = elevationGain(sliced.map((point) => point.ele));
-    ascent = Math.round(gain.ascent);
-    descent = Math.round(gain.descent);
-    avgGrade = (sliced[sliced.length - 1].ele - sliced[0].ele) / distanceMeters;
+    const gain = elevationGain(smooth(sliced.map((point) => point.ele)));
+    const netChange = sliced[sliced.length - 1].ele - sliced[0].ele;
+    ascent = Math.round(Math.max(gain.ascent, Math.max(0, netChange)));
+    descent = Math.round(Math.max(gain.descent, Math.max(0, -netChange)));
+    avgGrade = netChange / distanceMeters;
   }
 
   let totalMs = 0;

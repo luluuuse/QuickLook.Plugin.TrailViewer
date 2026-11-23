@@ -11,6 +11,14 @@ function escapeXml(value) {
     .replaceAll("'", '&apos;');
 }
 
+function normalizeLon(value) {
+  let lon = Number(value);
+  if (!Number.isFinite(lon)) return lon;
+  while (lon > 180) lon -= 360;
+  while (lon < -180) lon += 360;
+  return lon;
+}
+
 function formatCoord(value) {
   return Number(value).toFixed(7).replace(/\.?0+$/, '');
 }
@@ -83,7 +91,7 @@ export function serializeGpx(parsed, {
 
   for (const wpt of parsed?.waypoints || []) {
     if (!Number.isFinite(wpt?.lat) || !Number.isFinite(wpt?.lon)) continue;
-    lines.push(`  <wpt lat="${formatCoord(wpt.lat)}" lon="${formatCoord(wpt.lon)}">`);
+    lines.push(`  <wpt lat="${formatCoord(wpt.lat)}" lon="${formatCoord(normalizeLon(wpt.lon))}">`);
     if (Number.isFinite(wpt.ele)) lines.push(`    <ele>${formatEle(wpt.ele)}</ele>`);
     const iso = formatTime(wpt.time);
     if (iso) lines.push(`    <time>${iso}</time>`);
@@ -93,7 +101,9 @@ export function serializeGpx(parsed, {
     lines.push('  </wpt>');
   }
 
-  const tracks = Array.isArray(parsed?.tracks) && parsed.tracks.length > 0
+  const hasTrackPoints = Array.isArray(parsed?.tracks)
+    && parsed.tracks.some((trk) => Array.isArray(trk?.segments) && trk.segments.some((seg) => seg.length > 0));
+  const tracks = hasTrackPoints
     ? parsed.tracks
     : (parsed?.routes || []).map((r) => ({ name: r.name ?? null, segments: [r.points || []] }));
 
@@ -110,11 +120,12 @@ export function serializeGpx(parsed, {
         const hasEle = Number.isFinite(pt.ele);
         const iso = formatTime(pt.time);
         const hasHr = isValidHeartRate(pt.heartRate);
+        const lonStr = formatCoord(normalizeLon(pt.lon));
         if (!hasEle && !iso && !hasHr) {
-          lines.push(`      <trkpt lat="${formatCoord(pt.lat)}" lon="${formatCoord(pt.lon)}"/>`);
+          lines.push(`      <trkpt lat="${formatCoord(pt.lat)}" lon="${lonStr}"/>`);
           continue;
         }
-        lines.push(`      <trkpt lat="${formatCoord(pt.lat)}" lon="${formatCoord(pt.lon)}">`);
+        lines.push(`      <trkpt lat="${formatCoord(pt.lat)}" lon="${lonStr}">`);
         if (hasEle) lines.push(`        <ele>${formatEle(pt.ele)}</ele>`);
         if (iso) lines.push(`        <time>${iso}</time>`);
         if (hasHr) {
@@ -127,6 +138,30 @@ export function serializeGpx(parsed, {
       lines.push('    </trkseg>');
     }
     lines.push('  </trk>');
+  }
+
+  if (hasTrackPoints && Array.isArray(parsed?.routes) && parsed.routes.length > 0) {
+    for (const route of parsed.routes) {
+      const pts = cleanSegmentPoints(route.points || [], watchFriendly);
+      if (pts.length === 0) continue;
+      lines.push('  <rte>');
+      if (route.name) lines.push(`    <name>${escapeXml(route.name)}</name>`);
+      for (const pt of pts) {
+        const hasEle = Number.isFinite(pt.ele);
+        const iso = formatTime(pt.time);
+        const lonStr = formatCoord(normalizeLon(pt.lon));
+        if (!hasEle && !iso && !pt.name) {
+          lines.push(`    <rtept lat="${formatCoord(pt.lat)}" lon="${lonStr}"/>`);
+          continue;
+        }
+        lines.push(`    <rtept lat="${formatCoord(pt.lat)}" lon="${lonStr}">`);
+        if (hasEle) lines.push(`      <ele>${formatEle(pt.ele)}</ele>`);
+        if (iso) lines.push(`      <time>${iso}</time>`);
+        if (pt.name) lines.push(`      <name>${escapeXml(pt.name)}</name>`);
+        lines.push('    </rtept>');
+      }
+      lines.push('  </rte>');
+    }
   }
 
   lines.push('</gpx>');

@@ -30,7 +30,8 @@ QuickLook
 | `viewer/profile-*.js` | 剖面数据、坡度着色、可选心率双轴、SVG 和地图光标 |
 | `viewer/map-view.js`, `viewer/map-focus.js` | 安全区域、取景、选中点避让和三态布局 |
 | `viewer/map-controls.js` | 底图类别、具体图源、图源菜单、地图设置页与署名 |
-| `viewer/layer-registry.js` | 内置图源注册表、旧分类归一化和定制图源注册 |
+| `viewer/layer-registry.js` | 内置图源注册表、透明叠加层定义、旧分类归一化和定制图源注册 |
+| `viewer/layer-nodes.js` | 图源多节点解析、偏好持久化与按需单节点连通性探测 |
 | `viewer/layer-providers.js` | 普通、天地图和网格底图的 Leaflet 图层构造 |
 | `viewer/layer-custom-form.js` | 定制图源表单、字段归一化与实时模板校验 |
 | `viewer/layer-custom-manager.js` | 定制图源状态、列表、状态标记、保存和删除；新增表单只在定制页内展开 |

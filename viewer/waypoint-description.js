@@ -19,7 +19,7 @@ const TELEMETRY_TOKEN_RE = new RegExp(
   'gi',
 );
 
-const DATE_PARTS_RE = /^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})(?:[Tt ](\d{1,2}):(\d{2})(?::(\d{2})(?:\.(\d+))?)?(Z|[+-]\d{2}:?\d{2})?)?$/;
+const DATE_PARTS_RE = /^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})(?:[Tt ](\d{1,2}):(\d{2})(?::(\d{2})(?:\.(\d+))?)?([Zz]|[+-]\d{2}:?\d{2})?)?$/;
 
 /** @returns {{ valid: boolean, date: Date | undefined }} */
 function parseTelemetryDate(raw) {

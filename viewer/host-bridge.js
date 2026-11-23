@@ -107,7 +107,14 @@ export function createHostBridge() {
     pendingTrackSaves.delete(id);
     clearTimeout(pending.timer);
     if (statusCode === 0) {
-      pending.resolve({ ok: true, cancelled: false, path: decodeMessage(path), detail: decodeMessage(detail) });
+      const decodedDetail = decodeMessage(detail);
+      pending.resolve({
+        ok: true,
+        cancelled: false,
+        path: decodeMessage(path),
+        detail: decodedDetail,
+        overwrote: decodedDetail === 'overwrote',
+      });
     } else if (statusCode === 2) {
       pending.resolve({ ok: false, cancelled: true, path: '', detail: '' });
     } else {
@@ -133,7 +140,7 @@ export function createHostBridge() {
       const timer = setTimeout(() => {
         pendingTrackSaves.delete(id);
         resolve({ ok: false, cancelled: false, path: '', detail: 'save timed out' });
-      }, 30000);
+      }, overwrite ? 30000 : 300000);
       pendingTrackSaves.set(id, { resolve, timer });
       post(`trackbegin\t${id}\t${totalChunks}\t${overwrite ? '1' : '0'}\t${encodeURIComponent(fileName)}`);
       for (let i = 0; i < totalChunks; i += 1) {

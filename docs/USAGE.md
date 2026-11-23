@@ -25,11 +25,12 @@ FIT 读取活动和路线中的 GPS 记录、时间、海拔、心率、会话�
   蓝色激活态。
 - 图层面板使用与工具箱一致的半透明背景和背景模糊，不完全遮断下方地图。
 - 工具箱、图层面板和航点列表使用相同的顶部位置与标题栏高度；三者互斥，打开一个会自动关闭另外两个。
-- 路网使用 OpenStreetMap HOT。地形菜单提供 CyclOSM、OpenHikingMap 和 OpenTopoMap；再次进入某一类别时
-  会恢复该类别上次选择的图源。
+- 路网内置 OpenStreetMap、Esri 浅灰底图、Esri 深灰底图与天地图；地形内置 CyclOSM、OpenHikingMap、OpenTopoMap 与 Esri 世界地形图；卫星内置 Esri 世界影像与天地图。再次进入某一类别时会恢复该类别上次选择的图源。
+- **户外路线叠加层**：图层面板底部可自由开关 3 套透明叠加层（Waymarked 徒步路线、Waymarked 骑行路线、OpenSnowMap 雪道），可与任意底图组合使用并走本地瓦片缓存。
+- **节点切换与测速**：在图层面板右上角齿轮打开的 **地图设置** 页中，可为 OpenStreetMap（官方 CDN / HOT / 德国节点）、OpenTopoMap（官方 / OpenMaps 镜像）和 Esri 影像（Server / Services）切换节点并按需发起单节点连通性检测。
 - 路网和卫星菜单提供天地图。首次选择时按提示配置天地图开发者密钥；密钥由当前 Windows 用户凭据加密，
   后续打开无需再次输入。
-- 天地图密钥管理位于图层面板右上角齿轮打开的 **地图设置** 页；已配置时提供 **更换密钥** 和
+- 天地图密钥管理位于 **地图设置** 页；已配置时提供 **更换密钥** 和
   **移除密钥** 图标操作，主图层列表只显示地图类型和图源。密钥状态压缩为“尚未配置 / 已配置”，不再展示
   技术加密说明。
 
@@ -40,7 +41,10 @@ FIT 读取活动和路线中的 GPS 记录、时间、海拔、心率、会话�
 删除时，点击“地图图源”标题旁的 **管理图源** 进入管理页。
 
 管理页标题栏右侧的 **+** 用于添加；点击列表行切换图源，右侧铅笔和删除按钮分别编辑、删除。删除需要再次
-点击确认，避免误操作。编辑与添加使用独立子页，保存后回到管理列表并立即应用当前图源。
+点击确认，避免误操作。编辑与添加使用独立子页，保存后回到管理列表并立即应用当前图源。新增表单顶部提供
+11 套一键预设：7 套免费区域/全球图源（日本 GSI 地形、台湾鲁地图、美国 USGS 新版与经典镜像、瑞士
+swisstopo 地形与航拍、Google 卫星）及 4 套专业户外预设（Tracestrack、Thunderforest、Stadia Stamen
+512 px、MapTiler，填入个人 API Key 即可使用）。
 
 - **名称**：显示在图源列表和顶部入口的悬停提示中。
 - **瓦片地址**：必须包含 `{z}`、`{x}`、`{y}` 占位符，可选 `{s}`；只接受 HTTPS 地址。
@@ -266,8 +270,14 @@ so malformed or padded files cannot exhaust memory.
   blurred tool surface.
 - The toolbox, layer panel and waypoint list share one top position and header height. They are mutually
   exclusive: opening one closes the other two.
-- Road uses OpenStreetMap HOT. The Terrain menu offers CyclOSM, OpenHikingMap and OpenTopoMap, and remembers
-  the source last selected in that category.
+- Road includes OpenStreetMap, Esri Light Gray, Esri Dark Gray and Tianditu; Terrain includes CyclOSM,
+  OpenHikingMap, OpenTopoMap and Esri World Topo; Satellite includes Esri World Imagery and Tianditu. Returning
+  to a category restores the source last selected there.
+- **Outdoor overlays:** toggle 3 transparent overlays at the bottom of the layer panel (Waymarked Hiking,
+  Waymarked Cycling and OpenSnowMap Pistes) on top of any basemap, backed by the local tile cache.
+- **Node switcher & connectivity probe:** open **Map settings** from the gear icon to switch nodes and run
+  on-demand per-node connectivity checks for OpenStreetMap (Official CDN / HOT / DE), OpenTopoMap (Official /
+  OpenMaps mirror) and Esri Imagery (Server / Services).
 - The Road and Satellite menus offer Tianditu. Enter a user-owned developer key when first prompted; it is
   encrypted for the current Windows user and does not need to be entered for later previews.
 - With a key configured, **Map settings** offers **Change key** and **Remove key** icon actions. The status reads
@@ -282,7 +292,10 @@ entries.
 
 In the manager, use **+** in the title bar to add a source; click a row to select it, and use the pencil or delete
 buttons to edit or remove it. Deletion needs a second confirmation click. Adding and editing use a separate page,
-and saving returns to the manager list and applies the source immediately.
+and saving returns to the manager list and applies the source immediately. The add form provides 11 one-click
+presets at the top: 7 free regional/global sources (Japan GSI, Taiwan RudyMap, US USGS New & Classic Esri mirror,
+Swiss swisstopo Topo & Imagery, Google Satellite) and 4 pro outdoor presets (Tracestrack, Thunderforest, Stadia
+Stamen 512 px and MapTiler, requiring your own API key).
 
 - **Name** — shown in the source list and the top-entry tooltip.
 - **Tile URL** — must contain `{z}`, `{x}` and `{y}`; `{s}` is optional. Only HTTPS addresses are

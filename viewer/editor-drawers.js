@@ -1,4 +1,5 @@
 import { formatDuration } from './format.js';
+import { iconElement } from './icons.js';
 import {
   addWaypoint,
   cleanAnomalies,
@@ -15,6 +16,7 @@ import {
   reverseTrack,
   shiftTrackTimestamps,
   simplifyTrack,
+  sortWaypointsByRoute,
   trackTotalDistance,
   updateWaypoint,
 } from './track-ops.js';
@@ -26,6 +28,11 @@ function formatLocalDatetimeInput(ms) {
   const d = new Date(ms);
   const pad = (n) => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function isDefaultWaypointName(name) {
+  const trimmed = (name || '').trim();
+  return !trimmed || /^(?:航点|Waypoint)\s*#?\d+$/i.test(trimmed);
 }
 
 /**
@@ -44,11 +51,24 @@ export function createEditorDrawers(ctx) {
     getDrawerBody,
     state,
     mountCropOverlay,
+    hasProfileChart,
     updateCropOverlayPositions,
     updateCropStatTexts,
     renderDrawer,
     setCropStatEls,
   } = ctx;
+
+  let cachedWptOrderTrack = null;
+  let cachedWptOrder = [];
+  let listChunkFrame = 0;
+
+  function getOrderedWaypoints(current) {
+    if (cachedWptOrderTrack !== current) {
+      cachedWptOrderTrack = current;
+      cachedWptOrder = sortWaypointsByRoute(current);
+    }
+    return cachedWptOrder;
+  }
 
   function renderCropDrawer() {
     const drawerBody = getDrawerBody();
@@ -91,10 +111,52 @@ export function createEditorDrawers(ctx) {
       setCropStatEls(rangeLabelEl, ascentLabelEl);
       updateCropStatTexts();
 
+      if (!hasProfileChart?.()) {
+        const totalDist = Math.max(0, trackTotalDistance(current));
+        if (totalDist > 0) {
+          const { from, to } = state.getCropRange();
+          const minSpan = Math.min(totalDist * 0.02, 50);
+          const sliderWrap = el('div', 'editor-crop-sliders');
+          const startSlider = el('input');
+          startSlider.type = 'range';
+          startSlider.min = '0';
+          startSlider.max = String(Math.round(totalDist));
+          startSlider.step = '1';
+          startSlider.value = String(Math.round(from));
+          const endSlider = el('input');
+          endSlider.type = 'range';
+          endSlider.min = '0';
+          endSlider.max = String(Math.round(totalDist));
+          endSlider.step = '1';
+          endSlider.value = String(Math.round(to));
+          const syncSliders = (isStart) => {
+            let nextFrom = Number(startSlider.value);
+            let nextTo = Number(endSlider.value);
+            if (isStart) {
+              nextFrom = Math.min(nextFrom, nextTo - minSpan);
+              startSlider.value = String(Math.round(nextFrom));
+            } else {
+              nextTo = Math.max(nextTo, nextFrom + minSpan);
+              endSlider.value = String(Math.round(nextTo));
+            }
+            state.setCropRange(nextFrom, nextTo);
+            overlay.setCropRange(nextFrom, nextTo);
+            updateCropStatTexts();
+          };
+          startSlider.addEventListener('input', () => syncSliders(true));
+          endSlider.addEventListener('input', () => syncSliders(false));
+          sliderWrap.append(startSlider, endSlider);
+          statsBox.append(sliderWrap);
+        }
+      }
+
       const actions = el('div', 'editor-drawer-actions');
       const applyBtn = makeBtn('editor-btn editor-btn-success', null, t('editor.crop.apply'), () => {
         const { from, to } = state.getCropRange();
-        const next = cropTrack(store.getCurrent(), from, to);
+        const curTrack = store.getCurrent();
+        const curTotal = trackTotalDistance(curTrack);
+        if (curTotal <= 0 || (from <= 0.5 && to >= curTotal - 0.5)) return;
+        const next = cropTrack(curTrack, from, to);
         store.apply('crop', next);
         const total = trackTotalDistance(next);
         state.setCropRange(0, total);
@@ -363,12 +425,18 @@ export function createEditorDrawers(ctx) {
 
     const symSelect = el('select');
     symSelect.setAttribute('aria-label', t('editor.wpt.sym'));
+    let symDirty = false;
+    symSelect.addEventListener('change', () => { symDirty = true; });
+    const setSymDisplay = (value) => {
+      symSelect.value = WAYPOINT_SYMS.includes(value) ? value : 'pin';
+      symDirty = false;
+    };
     for (const sym of WAYPOINT_SYMS) {
       const opt = el('option', '', t(`editor.wpt.sym.${sym}`));
       opt.value = sym;
-      if ((editingWpt?.icon || 'pin') === sym) opt.selected = true;
       symSelect.append(opt);
     }
+    setSymDisplay(editingWpt?.icon || 'pin');
     symSelect.disabled = !hasActiveForm;
     topRow.append(nameInput, symSelect);
 
@@ -400,15 +468,21 @@ export function createEditorDrawers(ctx) {
 
     if (editingWpt) {
       actions.append(makeBtn('editor-btn editor-btn-primary', null, t('editor.wpt.update'), () => {
-        const next = updateWaypoint(store.getCurrent(), selectedWptIndex, {
+        const activeIdx = state.getSelectedWptIndex();
+        const existingWpt = store.getCurrent()?.waypoints?.[activeIdx];
+        const nextIcon = (!symDirty && existingWpt?.icon && !WAYPOINT_SYMS.includes(existingWpt.icon))
+          ? existingWpt.icon
+          : symSelect.value;
+        const next = updateWaypoint(store.getCurrent(), activeIdx, {
           name: nameInput.value.trim(),
-          icon: symSelect.value,
+          icon: nextIcon,
           description: descInput.value.trim(),
         });
         store.apply('update-waypoint', next);
       }));
       actions.append(makeBtn('editor-btn editor-btn-danger', null, t('editor.wpt.delete'), () => {
-        const next = deleteWaypoint(store.getCurrent(), selectedWptIndex);
+        const activeIdx = state.getSelectedWptIndex();
+        const next = deleteWaypoint(store.getCurrent(), activeIdx);
         state.setSelectedWptIndex(-1);
         overlay.setSelectedWaypoint(-1);
         store.apply('delete-waypoint', next);
@@ -441,37 +515,122 @@ export function createEditorDrawers(ctx) {
     form.append(topRow, actions, noteBox);
     drawerBody.append(form);
 
+    if (listChunkFrame) {
+      cancelAnimationFrame(listChunkFrame);
+      listChunkFrame = 0;
+    }
     if (wpts.length > 0) {
       const list = el('div', 'editor-wpt-list');
       /** @type {HTMLElement | null} */
       let selectedRow = null;
-      wpts.forEach((wpt, idx) => {
+      const ordered = getOrderedWaypoints(current);
+      const buildRow = ({ wpt, index: idx }, displayIdx) => {
         const isSelected = idx === selectedWptIndex;
-        const row = el('div', `editor-list-row${isSelected ? ' is-selected' : ''}`);
-        const indexEl = el('span', 'editor-list-row-index', String(idx + 1));
-        const label = el('span', 'editor-list-row-main', wpt.name || t('editor.wpt.defaultName', { index: idx + 1 }));
+        const photoCount = Array.isArray(wpt.images) ? wpt.images.length : 0;
+        const hasNote = Boolean(wpt.description && wpt.description.trim());
+        const isCustom = !isDefaultWaypointName(wpt.name);
+        const kindClass = photoCount > 0
+          ? 'is-wpt-photo'
+          : hasNote
+            ? 'is-wpt-note'
+            : isCustom
+              ? 'is-wpt-custom'
+              : 'is-wpt-default';
+        const row = el('div', `editor-list-row ${kindClass}${isSelected ? ' is-selected' : ''}`);
+        const left = el('span', 'editor-wpt-row-left');
+        const indexEl = el('span', 'editor-list-row-index', String(displayIdx + 1));
+        const label = el('span', 'editor-list-row-main', wpt.name || t('editor.wpt.defaultName', { index: displayIdx + 1 }));
+        left.append(indexEl, label);
         row.addEventListener('click', () => {
+          const hadPending = Boolean(state.getPendingWptCoords());
           state.setPendingWptCoords(null);
           state.setSelectedWptIndex(idx);
           overlay.setSelectedWaypoint(idx);
           overlay.focusWaypoint?.(idx);
-          renderDrawer();
+          if (editingWpt && !hadPending) {
+            if (selectedRow && selectedRow !== row) selectedRow.classList.remove('is-selected');
+            row.classList.add('is-selected');
+            selectedRow = row;
+            nameInput.value = wpt.name || '';
+            setSymDisplay(wpt.icon || 'pin');
+            descInput.value = wpt.description || '';
+          } else {
+            renderDrawer({ preserveWptScroll: true });
+          }
         });
-        row.append(indexEl, label);
-        row.append(makeBtn('editor-btn editor-btn-danger', 'close', null, (event) => {
+        const right = el('span', 'editor-wpt-row-actions');
+        if (photoCount > 0 || hasNote || isCustom) {
+          const meta = el('span', 'editor-wpt-row-meta');
+          if (photoCount > 0) {
+            const photoTag = el('span', 'editor-wpt-meta-tag is-photo');
+            photoTag.append(iconElement('photo-export', { size: 12 }), document.createTextNode(String(photoCount)));
+            meta.append(photoTag);
+          }
+          if (hasNote) {
+            const noteTag = el('span', 'editor-wpt-meta-tag is-note');
+            noteTag.append(iconElement('edit', { size: 11 }));
+            meta.append(noteTag);
+          }
+          if (isCustom) {
+            const customTag = el('span', 'editor-wpt-meta-tag is-custom');
+            customTag.append(iconElement('text-title', { size: 11 }));
+            meta.append(customTag);
+          }
+          right.append(meta);
+        }
+        right.append(makeBtn('editor-btn editor-btn-danger', 'close', null, (event) => {
           event?.stopPropagation?.();
+          const curSel = state.getSelectedWptIndex();
           const next = deleteWaypoint(store.getCurrent(), idx);
-          if (selectedWptIndex === idx) state.setSelectedWptIndex(-1);
-          else if (selectedWptIndex > idx) state.setSelectedWptIndex(selectedWptIndex - 1);
+          if (curSel === idx) state.setSelectedWptIndex(-1);
+          else if (curSel > idx) state.setSelectedWptIndex(curSel - 1);
           overlay.setSelectedWaypoint(state.getSelectedWptIndex());
           store.apply('delete-waypoint', next);
         }));
+        row.append(left, right);
         if (isSelected) selectedRow = row;
-        list.append(row);
-      });
+        return row;
+      };
+
+      const selectedDisplayIdx = ordered.findIndex((item) => item.index === selectedWptIndex);
+      const initialLimit = Math.min(ordered.length, Math.max(30, selectedDisplayIdx >= 0 ? selectedDisplayIdx + 8 : 30));
+      const initialFrag = document.createDocumentFragment();
+      for (let i = 0; i < initialLimit; i += 1) {
+        initialFrag.append(buildRow(ordered[i], i));
+      }
+      list.append(initialFrag);
       drawerBody.append(list);
-      if (selectedRow) {
+      let pendingScrollTop = state.getWptScrollTop();
+      if (pendingScrollTop > 0) {
+        list.scrollTop = pendingScrollTop;
+        if (list.scrollTop >= pendingScrollTop - 1) pendingScrollTop = 0;
+      }
+      if (selectedRow && state.consumeScrollWptIntoView()) {
+        pendingScrollTop = 0;
         requestAnimationFrame(() => selectedRow?.scrollIntoView({ block: 'nearest' }));
+      }
+
+      if (initialLimit < ordered.length) {
+        let cursor = initialLimit;
+        const appendNextChunk = () => {
+          listChunkFrame = 0;
+          if (!list.isConnected) return;
+          const end = Math.min(ordered.length, cursor + 45);
+          const frag = document.createDocumentFragment();
+          for (let i = cursor; i < end; i += 1) {
+            frag.append(buildRow(ordered[i], i));
+          }
+          list.append(frag);
+          if (pendingScrollTop > 0) {
+            list.scrollTop = pendingScrollTop;
+            if (list.scrollTop >= pendingScrollTop - 1) pendingScrollTop = 0;
+          }
+          cursor = end;
+          if (cursor < ordered.length) {
+            listChunkFrame = requestAnimationFrame(appendNextChunk);
+          }
+        };
+        listChunkFrame = requestAnimationFrame(appendNextChunk);
       }
     }
   }

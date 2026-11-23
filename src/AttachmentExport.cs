@@ -72,6 +72,23 @@ internal sealed class AttachmentExport : IDisposable
 
     internal AttachmentResult CompleteUpload(string body)
     {
+        var upload = ExtractUpload(body);
+        using var stream = new MemoryStream(upload.Bytes, writable: false);
+        return Save(upload.Batch, upload.Index, upload.Name, stream);
+    }
+
+    internal Task<AttachmentResult> CompleteUploadAsync(string body)
+    {
+        var upload = ExtractUpload(body);
+        return Task.Run(() =>
+        {
+            using var stream = new MemoryStream(upload.Bytes, writable: false);
+            return Save(upload.Batch, upload.Index, upload.Name, stream);
+        }, _cancel.Token);
+    }
+
+    private ExtractedUpload ExtractUpload(string body)
+    {
         var parts = body.Split(new[] { '\t' }, 4);
         if (parts.Length != 4 || parts[0] != CurrentBatch
             || !int.TryParse(parts[1], out var index) || index != CurrentIndex
@@ -81,11 +98,26 @@ internal sealed class AttachmentExport : IDisposable
         }
         using var image = _upload.Complete($"{parts[2]}\t{count}");
         if (image == null) throw new InvalidDataException("the attachment upload was empty");
-        return Save(CurrentBatch, CurrentIndex, image.Name, image.Picture);
+        image.Picture.Position = 0;
+        var bytes = image.Picture.ToArray();
+        return new ExtractedUpload(CurrentBatch, CurrentIndex, image.Name, bytes);
     }
 
-    internal Task<AttachmentResult> CompleteUploadAsync(string body) =>
-        Task.Run(() => CompleteUpload(body), _cancel.Token);
+    private sealed class ExtractedUpload
+    {
+        internal ExtractedUpload(string batch, int index, string name, byte[] bytes)
+        {
+            Batch = batch;
+            Index = index;
+            Name = name;
+            Bytes = bytes;
+        }
+
+        internal string Batch { get; }
+        internal int Index { get; }
+        internal string Name { get; }
+        internal byte[] Bytes { get; }
+    }
 
     internal AttachmentResult CopyLocal(string body)
     {
@@ -115,7 +147,7 @@ internal sealed class AttachmentExport : IDisposable
             return Save(parts[0], index, name, input);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException
-            or NotSupportedException or InvalidDataException)
+            or NotSupportedException or InvalidDataException or ArgumentException)
         {
             return new AttachmentResult(parts[0], index, false, "", ex.Message);
         }
@@ -159,7 +191,7 @@ internal sealed class AttachmentExport : IDisposable
             return Save(parts[0], index, ExtendName(name, image.Extension), image.Bytes);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException
-            or HttpRequestException or TaskCanceledException or InvalidDataException)
+            or HttpRequestException or OperationCanceledException or InvalidDataException or ArgumentException)
         {
             return new AttachmentResult(parts[0], index, false, "", ex.Message);
         }
@@ -527,7 +559,8 @@ internal sealed class AttachmentExport : IDisposable
                 .ConfigureAwait(false);
             return addresses.Length > 0 && !addresses.Any(IsBlockedResolved);
         }
-        catch (Exception ex) when (ex is System.Net.Sockets.SocketException or OperationCanceledException)
+        catch (Exception ex) when (ex is System.Net.Sockets.SocketException
+            or OperationCanceledException or ArgumentException)
         {
             return false;
         }

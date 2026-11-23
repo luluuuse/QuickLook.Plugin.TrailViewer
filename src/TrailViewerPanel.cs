@@ -177,7 +177,11 @@ internal sealed partial class TrailViewerPanel : UserControl, IDisposable
                     return;
                 }
             }
-            if (_finished) return;
+            if (_finished)
+            {
+                DropUnpackedFolder();
+                return;
+            }
             _attachments = new AttachmentExport(_sourcePath, _fileRoot);
 
             _webView = new WebView2
@@ -237,6 +241,8 @@ internal sealed partial class TrailViewerPanel : UserControl, IDisposable
     {
         lock (EnvironmentGate)
         {
+            if (_environmentTask != null && (_environmentTask.IsFaulted || _environmentTask.IsCanceled))
+                _environmentTask = null;
             return _environmentTask ??= CoreWebView2Environment.CreateAsync(null, UserDataFolder);
         }
     }
@@ -316,6 +322,8 @@ internal sealed partial class TrailViewerPanel : UserControl, IDisposable
     {
         if (_finished)
             return;
+        _keys?.Dispose();
+        _keys = null;
         ShowMessage(error);
         Finish(error, "");
     }
@@ -411,6 +419,7 @@ internal sealed partial class TrailViewerPanel : UserControl, IDisposable
         _keys?.Dispose();
         _keys = null;
         _overlay.Dispose();
+        _trackSave.Dispose();
         _attachments?.Dispose();
         _attachments = null;
         if (_webView != null)

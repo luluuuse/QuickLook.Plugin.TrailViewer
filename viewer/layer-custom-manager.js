@@ -77,9 +77,12 @@ export function createCustomSourceManager({
   function persist(previousId = null) {
     const current = getCurrent();
     const wasCurrent = Boolean(previousId && current === previousId);
-    if (wasCurrent) map.removeLayer(layers[previousId]);
-    errors.delete(previousId);
-    states.delete(previousId);
+    if (wasCurrent && layers[previousId]) map.removeLayer(layers[previousId]);
+    if (previousId) {
+      delete layers[previousId];
+      errors.delete(previousId);
+      states.delete(previousId);
+    }
     entries = saveCustomLayers(writeStored, entries);
     onCustomSave?.(entries);
     refreshProviders();
@@ -108,9 +111,13 @@ export function createCustomSourceManager({
     const draft = ui.formView.read(editingId);
     if (!draft.name) { ui.formView.showError('name'); return; }
     const checked = ui.formView.check();
-    if (!checked.ok) { ui.formView.showError(checked.code); return; }
+    if (!checked || !checked.ok) { ui.formView.showError(checked?.code || 'empty'); return; }
     if (checked.url.includes('{s}') && !draft.subdomains) {
       ui.formView.showError('subdomain');
+      return;
+    }
+    if (!editingId && entries.length >= CUSTOM_LIMITS.maxEntries) {
+      ui.formView.showError('limit');
       return;
     }
     const duplicate = entries.some((entry) => entry.id !== editingId
@@ -145,8 +152,8 @@ export function createCustomSourceManager({
     const current = getCurrent();
     const wasCurrent = current === id;
     const remaining = entries.filter((entry) => entry.id !== id);
+    if (getNoMapReturn() === id) setNoMapReturn(remaining[0]?.id || 'road.osm');
     if (wasCurrent) {
-      if (getNoMapReturn() === id) setNoMapReturn(remaining[0]?.id || 'road.osm');
       select(remaining[0]?.id || 'road.osm', true);
     }
     delete layers[id];
@@ -176,7 +183,7 @@ export function createCustomSourceManager({
         const check = el('span', 'layer-selected-icon');
         check.hidden = true;
         check.append(iconElement('check', { size: 12 }));
-        const label = el('span', 'layer-provider-label', t(provider.label));
+        const label = el('span', 'layer-provider-label', provider.custom ? provider.label : t(provider.label));
         button.append(check, label);
         button.addEventListener('click', () => select(provider.key, true, { restoreFocus: true }));
         ui.providerButtons[provider.key] = button;

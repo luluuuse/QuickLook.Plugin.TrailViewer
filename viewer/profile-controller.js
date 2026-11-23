@@ -199,7 +199,7 @@ function attachScrub({
       marker.addTo(map);
       onMap = true;
     }
-    revealPoint?.(latlng);
+    revealPoint?.(latlng, { remember: pinned });
   }
 
   function clear() {
@@ -365,6 +365,16 @@ function attachScrub({
       if (current) place(current.along);
     },
     destroy: () => {
+      if (frame) {
+        cancelAnimationFrame(frame);
+        frame = 0;
+      }
+      queued = null;
+      clear();
+      if (onMap) {
+        marker.remove();
+        onMap = false;
+      }
       chartResize?.disconnect();
       removeEventListener('resize', measureChart);
       removeEventListener('pointermove', onWindowPointerMove);

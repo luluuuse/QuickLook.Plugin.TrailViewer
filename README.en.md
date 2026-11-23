@@ -52,9 +52,7 @@ Common controls:
   the start, end, peak, map centre or any picked point (with nearby marker snapping and elevation notes), and
   export embedded, Data URI and HTTPS-linked photos beside the source track—either embedded-only or all images
   concurrently with automatic resume.
-- **Map sources:** OpenStreetMap HOT (Road), CyclOSM / OpenHikingMap / OpenTopoMap (Terrain), Tianditu road
-  and satellite imagery with a user-owned key, an offline Grid (no-map) mode, and persistent HTTPS Custom
-  sources (including two-step placeholders and 512 px tiles).
+- **Map sources & outdoor overlays:** 10 built-in basemaps across Road (OpenStreetMap, Esri Light/Dark Gray, Tianditu), Terrain (CyclOSM, OpenHikingMap, OpenTopoMap, Esri World Topo) and Satellite (Esri Imagery, Tianditu), with multi-node switching and live connectivity checks, 3 toggleable transparent outdoor overlays (Waymarked Hiking/Cycling and OpenSnowMap Pistes), local tile caching, offline Grid (no-map) mode, and persistent HTTPS custom sources with 11 one-click presets (Japan GSI, Taiwan RudyMap, US USGS, Swiss swisstopo, Google Satellite, and 4 pro outdoor API-key presets).
 - **Overlay export:** export transparent square, portrait and landscape PNG route overlays with a live preview,
   selectable ink and backing, route name, date and trip statistics (or route-network length and segment counts).
 - **Route weather:** opens Windy in your browser on the cloud layer with hourly forecasts expanded for the

@@ -210,10 +210,12 @@ export function createTrackLayer({ L, el, localized, t, pointPopup, onFocusBound
       const gapLineLayer = L.layerGroup().addTo(map);
       const gapMarkerLayer = L.layerGroup();
       const splitHighlightLayer = L.layerGroup().addTo(map);
+      const singleLineLayer = L.layerGroup().addTo(map);
       const colorOverlayGroup = L.layerGroup();
       const colorRenderer = L.canvas({ padding: 0.5 });
       const singleTrackEntries = [];
       let colorMode = 'single';
+      let baseVisible = true;
       let anomalyEpisodes = [];
       let gapEpisodes = [];
       let colorIndex = 0;
@@ -291,6 +293,14 @@ export function createTrackLayer({ L, el, localized, t, pointPopup, onFocusBound
 
         map.on('move zoomend resize', schedule);
         refresh();
+        layer.destroy = () => {
+          if (pending) {
+            cancelAnimationFrame(pending);
+            pending = 0;
+          }
+          map.off('move zoomend resize', schedule);
+          layer.remove();
+        };
         return layer;
       }
 
@@ -478,7 +488,7 @@ export function createTrackLayer({ L, el, localized, t, pointPopup, onFocusBound
           renderAnnotationMarks();
         });
       };
-      map.on('move', () => {
+      const onMapMove = () => {
         if (network || map._animatingZoom) return;
         const origin = map.containerPointToLayerPoint([0, 0]);
         if (distancePaths.length > 0 && (!lastDistanceOrigin
@@ -489,19 +499,15 @@ export function createTrackLayer({ L, el, localized, t, pointPopup, onFocusBound
           || Math.hypot(origin.x - lastAnnotationOrigin.x, origin.y - lastAnnotationOrigin.y) >= 120)) {
           scheduleAnnotationMarks();
         }
-      });
-      map.on('zoomend', () => {
+      };
+      const onMapViewportChange = () => {
         scheduleDistanceMarks();
         scheduleAnnotationMarks();
-      });
-      map.on('moveend', () => {
-        scheduleDistanceMarks();
-        scheduleAnnotationMarks();
-      });
-      map.on('resize', () => {
-        scheduleDistanceMarks();
-        scheduleAnnotationMarks();
-      });
+      };
+      map.on('move', onMapMove);
+      map.on('zoomend', onMapViewportChange);
+      map.on('moveend', onMapViewportChange);
+      map.on('resize', onMapViewportChange);
 
       for (const area of gpx.areas || []) {
         const shape = L.polygon(area.rings.map((ring) => ring.map((point) => [point.lat, point.lon])), {
@@ -547,7 +553,7 @@ export function createTrackLayer({ L, el, localized, t, pointPopup, onFocusBound
               weight: 4,
               opacity: 0.9,
               className: 'gpx-track',
-            }).addTo(baseLayer);
+            }).addTo(singleLineLayer);
             if (tooltipNode) {
               polyline.bindTooltip(tooltipNode, { sticky: true });
             }
@@ -635,14 +641,12 @@ export function createTrackLayer({ L, el, localized, t, pointPopup, onFocusBound
         if (network || resolved === 'single') {
           colorOverlayGroup.clearLayers();
           colorOverlayGroup.remove();
-          for (const entry of singleTrackEntries) {
-            if (!map.hasLayer(entry.polyline)) entry.polyline.addTo(map);
+          if (baseVisible && !map.hasLayer(singleLineLayer)) {
+            singleLineLayer.addTo(map);
           }
           return resolved;
         }
-        for (const entry of singleTrackEntries) {
-          if (map.hasLayer(entry.polyline)) entry.polyline.removeFrom(map);
-        }
+        singleLineLayer.remove();
         colorOverlayGroup.clearLayers();
         const range = trackColorRange(gpx.tracks, resolved);
         for (const entry of singleTrackEntries) {
@@ -669,7 +673,7 @@ export function createTrackLayer({ L, el, localized, t, pointPopup, onFocusBound
             if (entry.tooltipNode) subLine.bindTooltip(entry.tooltipNode, { sticky: true });
           }
         }
-        colorOverlayGroup.addTo(map);
+        if (baseVisible) colorOverlayGroup.addTo(map);
         return resolved;
       }
 
@@ -728,12 +732,21 @@ export function createTrackLayer({ L, el, localized, t, pointPopup, onFocusBound
           }
         },
         setBaseVisible(visible) {
-          if (visible) {
+          baseVisible = Boolean(visible);
+          if (baseVisible) {
             baseLayer.addTo(map);
+            if (network || colorMode === 'single') {
+              singleLineLayer.addTo(map);
+              colorOverlayGroup.remove();
+            } else {
+              singleLineLayer.remove();
+              colorOverlayGroup.addTo(map);
+            }
             anomalyLineLayer.addTo(map);
             gapLineLayer.addTo(map);
           } else {
             baseLayer.remove();
+            singleLineLayer.remove();
             colorOverlayGroup.remove();
             anomalyLineLayer.remove();
             gapLineLayer.remove();
@@ -774,7 +787,22 @@ export function createTrackLayer({ L, el, localized, t, pointPopup, onFocusBound
           renderAnnotationMarks();
         },
         destroy() {
+          if (pendingDistanceRender) {
+            cancelAnimationFrame(pendingDistanceRender);
+            pendingDistanceRender = 0;
+          }
+          if (pendingAnnotationRender) {
+            cancelAnimationFrame(pendingAnnotationRender);
+            pendingAnnotationRender = 0;
+          }
+          map.off('move', onMapMove);
+          map.off('zoomend', onMapViewportChange);
+          map.off('moveend', onMapViewportChange);
+          map.off('resize', onMapViewportChange);
           baseLayer.remove();
+          singleLineLayer.remove();
+          networkLayer?.destroy?.();
+          networkLayer?.remove?.();
           distanceLayer.remove();
           colorOverlayGroup.remove();
           anomalyLineLayer.remove();

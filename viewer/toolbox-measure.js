@@ -52,6 +52,7 @@ export function createMeasureTool({ el, t, formatDistance, measurement, map, onB
     });
     instruction.textContent = t('measure.instruction');
     finish.disabled = !measurement.canEndSection();
+    centre.disabled = !active;
     undo.disabled = !measurement.canUndo();
     redo.disabled = !measurement.canRedo();
     clear.disabled = summary.pointCount === 0;

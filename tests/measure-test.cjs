@@ -1,4 +1,4 @@
-// Distance measurement and the combined toolbox. The route exists only in memory; right-click commits a
+// Distance measurement and the combined toolbox. The route exists only in memory; left-click commits a
 // point while Leaflet keeps ownership of ordinary dragging and wheel zoom.
 const path = require('path');
 const {
@@ -174,30 +174,31 @@ async function main() {
   check('the measurement page returns to the tools',
     await page.locator('.toolbox-main').isVisible()
       && await page.evaluate(() => window.trailViewer.measure.toolboxOpen()) === true);
-  check('going back keeps the measuring state', await page.evaluate(() => window.trailViewer.measure.active()) === true);
+  check('going back stops the measuring state', await page.evaluate(() => window.trailViewer.measure.active()) === false);
   await page.click('.toolbox-action[data-tool="measure"]');
-  check('the measure action returns to the running measurement',
-    await page.locator('.toolbox-measure').isVisible());
+  check('the measure action resumes measuring',
+    await page.locator('.toolbox-measure').isVisible()
+      && await page.evaluate(() => window.trailViewer.measure.active()) === true);
 
-  // Left click and a left drag are map gestures, never point insertions.
-  await page.click('#map', { button: 'left', position: { x: 560, y: 360 } });
+  // Right click and a right drag are map gestures, never point insertions.
+  await page.click('#map', { button: 'right', position: { x: 560, y: 360 } });
   await waitForLayout(page);
-  check('a left click does not add a point',
+  check('a right click does not add a point',
     (await page.evaluate(() => window.trailViewer.measure.summary().pointCount)) === 0);
   const centerBefore = await page.evaluate(() => {
     const center = window.trailViewer.map.getCenter();
     return [center.lat, center.lng];
   });
   await page.mouse.move(570, 420);
-  await page.mouse.down();
+  await page.mouse.down({ button: 'right' });
   await page.mouse.move(650, 470, { steps: 8 });
-  await page.mouse.up();
+  await page.mouse.up({ button: 'right' });
   await waitForMapIdle(page);
   const centerAfter = await page.evaluate(() => {
     const center = window.trailViewer.map.getCenter();
     return [center.lat, center.lng];
   });
-  check('left-drag still pans the map',
+  check('right-drag still pans the map',
     centerBefore[0] !== centerAfter[0] || centerBefore[1] !== centerAfter[1]);
   check('panning adds no measurement point',
     (await page.evaluate(() => window.trailViewer.measure.summary().pointCount)) === 0);
@@ -229,7 +230,7 @@ async function main() {
     return null;
   });
   check('a recorded point is available for the interaction test', Boolean(visibleTrackPoint));
-  await page.mouse.move(visibleTrackPoint.x + 9, visibleTrackPoint.y);
+  await page.mouse.move(visibleTrackPoint.x + 5, visibleTrackPoint.y);
   await page.waitForFunction(() => {
     const node = document.querySelector('.measure-snap-label');
     return Boolean(node) && getComputedStyle(node).display !== 'none';
@@ -252,12 +253,26 @@ async function main() {
       && trackSnapStyle.border === 'rgba(255, 242, 168, 0.55)',
     JSON.stringify(trackSnapStyle));
 
-  await page.mouse.click(visibleTrackPoint.x + 9, visibleTrackPoint.y, { button: 'right' });
+  await page.mouse.click(visibleTrackPoint.x + 5, visibleTrackPoint.y);
   await page.waitForFunction(() => window.trailViewer.measure.summary().pointCount === 1);
-  await page.mouse.click(680, 440, { button: 'right' });
+  await page.mouse.click(680, 440);
   await page.waitForFunction(() => window.trailViewer.measure.summary().pointCount === 2);
   const first = await page.evaluate(() => window.trailViewer.measure.summary());
-  check('right-click commits measurement points', first.pointCount === 2, `${first.pointCount}`);
+  check('left-click commits measurement points', first.pointCount === 2, `${first.pointCount}`);
+
+  // Right-button drag pans the map without committing a measurement point.
+  const beforePan = await page.evaluate(() => window.trailViewer.map.getCenter());
+  await page.mouse.move(500, 340);
+  await page.mouse.down({ button: 'right' });
+  await page.mouse.move(560, 380, { steps: 4 });
+  await page.mouse.up({ button: 'right' });
+  const afterPan = await page.evaluate(() => ({
+    center: window.trailViewer.map.getCenter(),
+    points: window.trailViewer.measure.summary().pointCount,
+  }));
+  check('right-drag pans the map without adding a point',
+    (afterPan.center.lat !== beforePan.lat || afterPan.center.lng !== beforePan.lng) && afterPan.points === 2,
+    JSON.stringify(afterPan));
   check('each leg contributes to the total', first.totalMeters > 0, `${first.totalMeters}`);
   const snappedPoint = await page.evaluate(() => window.trailViewer.measure.sections()[0][0]);
   check('the committed first point keeps the exact snapped coordinates',
@@ -268,7 +283,7 @@ async function main() {
 
   // Manual measured points: exclude the active tip, snap earlier points to close loops, and snap across sections.
   await page.evaluate(() => window.trailViewer.measure.clear());
-  await page.mouse.click(540, 320, { button: 'right' });
+  await page.mouse.click(540, 320);
   await page.waitForFunction(() => window.trailViewer.measure.summary().pointCount === 1);
   const tipSnap = await page.evaluate(() => {
     const api = window.trailViewer;
@@ -281,7 +296,7 @@ async function main() {
   check('the active section tip is excluded from snapping to prevent self-snapping',
     tipSnap.kind !== 'measure', JSON.stringify(tipSnap));
 
-  await page.mouse.click(660, 360, { button: 'right' });
+  await page.mouse.click(660, 360);
   await page.waitForFunction(() => window.trailViewer.measure.summary().pointCount === 2);
   const manualFirst = await page.evaluate(() => {
     const p0 = window.trailViewer.measure.sections()[0][0];
@@ -297,10 +312,10 @@ async function main() {
   check('hovering an earlier measured point shows the square snap reticle and label',
     await page.locator('.snap-indicator-measure svg').getAttribute('data-symbol') === 'snap-measure'
       && (await page.locator('.measure-snap-label').textContent()).includes('measured point'));
-  await page.mouse.click(manualFirst.x + 7, manualFirst.y, { button: 'right' });
+  await page.mouse.click(manualFirst.x + 7, manualFirst.y);
   await page.waitForFunction(() => window.trailViewer.measure.summary().pointCount === 3);
   const loopClosing = await page.evaluate(() => window.trailViewer.measure.sections()[0][2]);
-  check('right-clicking near an earlier manual point closes the loop with exact coordinates',
+  check('left-clicking near an earlier manual point closes the loop with exact coordinates',
     loopClosing.kind === 'measure'
       && loopClosing.lat === manualFirst.lat
       && loopClosing.lon === manualFirst.lon,
@@ -323,9 +338,9 @@ async function main() {
 
   // Restore two-point baseline for the undo/redo and multi-section assertions below.
   await page.evaluate(() => window.trailViewer.measure.clear());
-  await page.mouse.click(visibleTrackPoint.x + 9, visibleTrackPoint.y, { button: 'right' });
+  await page.mouse.click(visibleTrackPoint.x + 9, visibleTrackPoint.y);
   await page.waitForFunction(() => window.trailViewer.measure.summary().pointCount === 1);
-  await page.mouse.click(680, 440, { button: 'right' });
+  await page.mouse.click(680, 440);
   await page.waitForFunction(() => window.trailViewer.measure.summary().pointCount === 2);
 
   await page.keyboard.press('Control+z');

@@ -105,8 +105,9 @@ export function createTrackColorControl({
   L, map, el, t, tracks, initialMode = 'single',
   showToast = () => {}, onChange = () => {},
 }) {
-  const capabilities = tracks.colorCapabilities();
-  const availableModes = TRACK_COLOR_MODES.filter((mode) => mode === 'single' || Boolean(capabilities[mode]));
+  let activeTracks = tracks;
+  let capabilities = activeTracks.colorCapabilities();
+  let availableModes = TRACK_COLOR_MODES.filter((mode) => mode === 'single' || Boolean(capabilities[mode]));
   let preferredMode = normalizeTrackColorMode(initialMode);
   let activeMode = preferredMode !== 'single' && !capabilities[preferredMode] ? 'single' : preferredMode;
   let control = null;
@@ -130,7 +131,7 @@ export function createTrackColorControl({
     const normalized = normalizeTrackColorMode(nextMode);
     if (normalized !== 'single' && !capabilities[normalized]) return;
     preferredMode = normalized;
-    activeMode = tracks.setColorMode(normalized);
+    activeMode = activeTracks.setColorMode(normalized);
     if (persist) {
       writeStored(STORAGE_KEY, preferredMode);
       onChange(preferredMode);
@@ -150,7 +151,7 @@ export function createTrackColorControl({
 
   function mount() {
     if (activeMode !== 'single') {
-      activeMode = tracks.setColorMode(activeMode);
+      activeMode = activeTracks.setColorMode(activeMode);
     }
     const Switch = L.Control.extend({
       options: { position: 'topright' },
@@ -182,6 +183,16 @@ export function createTrackColorControl({
     setMode: (nextMode) => applyMode(nextMode, true, false),
     cycle: cycleMode,
     relabel: updateButton,
+    setTracks(nextTracks) {
+      if (!nextTracks) return;
+      activeTracks = nextTracks;
+      capabilities = activeTracks.colorCapabilities();
+      availableModes = TRACK_COLOR_MODES.filter((mode) => mode === 'single' || Boolean(capabilities[mode]));
+      const target = preferredMode !== 'single' && capabilities[preferredMode] ? preferredMode : 'single';
+      activeMode = activeTracks.setColorMode(target);
+      if (button) button.disabled = availableModes.length <= 1;
+      updateButton();
+    },
     destroy() {
       control?.remove();
     },

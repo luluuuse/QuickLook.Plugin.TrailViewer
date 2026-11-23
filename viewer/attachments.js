@@ -133,10 +133,11 @@ export function createAttachmentExporter({ post, hasHost }) {
     let type;
     let bytes;
     if (item.kind === 'inline') {
-      const match = /^data:(image\/[^;,]+)(;base64)?,(.*)$/is.exec(item.url);
+      const match = /^data:(image\/[^;,]+)((?:;[^;,]*)*),(.*)$/is.exec(item.url);
       if (!match) throw new Error('the inline image was invalid');
       type = match[1];
-      if (match[2]) {
+      const isBase64 = /(?:^|;)base64$/i.test(match[2] || '');
+      if (isBase64) {
         const binary = atob(match[3]);
         bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
       } else {
@@ -149,6 +150,7 @@ export function createAttachmentExporter({ post, hasHost }) {
       if (!/^image\//i.test(type)) throw new Error('the response is not an image');
       bytes = new Uint8Array(await response.arrayBuffer());
     }
+    if (bytes.length === 0) throw new Error('the image was empty');
     if (bytes.length > MAX_IMAGE_BYTES) throw new Error('the image is larger than 30 MB');
     const data = base64Of(bytes);
     const id = `${batch}-${item.index}`;

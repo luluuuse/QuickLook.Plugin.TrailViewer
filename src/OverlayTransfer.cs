@@ -194,10 +194,11 @@ internal static class AtomicFile
             using (var output = new FileStream(temporary, FileMode.CreateNew, FileAccess.Write, FileShare.None))
                 source.CopyTo(output);
 
-            if (File.Exists(target))
-                File.Replace(temporary, target, null);
-            else
-                File.Move(temporary, target);
+            if (!MoveFileEx(temporary!, target, MoveFileReplaceExisting))
+            {
+                var error = System.Runtime.InteropServices.Marshal.GetLastWin32Error();
+                throw new IOException($"Could not replace {target} (Win32 error {error}).");
+            }
             temporary = null;
         }
         finally
@@ -209,4 +210,10 @@ internal static class AtomicFile
             }
         }
     }
+
+    private const uint MoveFileReplaceExisting = 0x1;
+
+    [System.Runtime.InteropServices.DllImport("kernel32.dll", EntryPoint = "MoveFileExW",
+        CharSet = System.Runtime.InteropServices.CharSet.Unicode, SetLastError = true)]
+    private static extern bool MoveFileEx(string existingFileName, string newFileName, uint flags);
 }

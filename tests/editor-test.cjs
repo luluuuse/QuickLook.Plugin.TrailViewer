@@ -209,13 +209,17 @@ async function run() {
     await page.click('.editor-exit-guard .editor-btn-danger');
     await page.waitForSelector('body:not(.is-editing)');
 
-    // 8. Overwrite-save + exit refreshes preview state instead of rolling back
+    // 8. Overwrite-save + exit refreshes preview state (summary, splits, controls) instead of rolling back
     await page.click('.toolbox-switch button');
     await page.click('[data-tool="edit"]');
     await page.waitForSelector('body.is-editing #editor-topbar:not([hidden])');
     const distBeforeOverwrite = await page.evaluate(() => document.querySelector('#info')?.textContent || '');
-    await page.click('[data-editor-tool="topology"]');
-    await page.click('#editor-drawer .editor-mode-btn:nth-child(2)'); // Out & back doubles distance
+    const cropHandle = await page.locator('.editor-crop-overlay .editor-crop-handle').first().boundingBox();
+    await page.mouse.move(cropHandle.x + cropHandle.width / 2, cropHandle.y + cropHandle.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(cropHandle.x + 120, cropHandle.y + cropHandle.height / 2);
+    await page.mouse.up();
+    await page.click('#editor-drawer .editor-btn-success'); // Apply crop (preserves timestamps)
     await page.click('.editor-save-opts-btn');
     await page.locator('.editor-save-popover input[type="checkbox"]').nth(1).check();
     await page.click('#editor-topbar .editor-btn-primary');
@@ -224,6 +228,18 @@ async function run() {
     await page.waitForSelector('body:not(.is-editing)');
     const distAfterOverwrite = await page.evaluate(() => document.querySelector('#info')?.textContent || '');
     check('overwrite-save updates preview summary on exit', distAfterOverwrite !== distBeforeOverwrite);
+    const controlCountsAfterOverwrite = await page.evaluate(() => ({
+      pins: document.querySelectorAll('.pins-switch').length,
+      overview: document.querySelectorAll('.waypoint-overview-switch').length,
+    }));
+    check('overwrite-save exit does not duplicate waypoint/list controls',
+      controlCountsAfterOverwrite.pins <= 1 && controlCountsAfterOverwrite.overview <= 1,
+      JSON.stringify(controlCountsAfterOverwrite));
+    await page.click('.split-toggle');
+    await page.waitForFunction(() => document.querySelectorAll('#splits tbody tr').length > 0);
+    const splitCountAfter = await page.evaluate(() => document.querySelectorAll('#splits tbody tr').length);
+    check('overwrite-save refreshes splits table with updated distance', splitCountAfter > 0 && splitCountAfter < 16);
+    await page.click('.split-toggle');
 
     // 9. Non-GPX source disables overwrite original option in save popover
     await openViewer(page, base, 'kml-photos.kml');

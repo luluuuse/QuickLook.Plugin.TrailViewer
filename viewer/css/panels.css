@@ -961,6 +961,7 @@ body.with-profile .leaflet-bottom {
 body.chrome-hidden #info,
 body.chrome-hidden #splits,
 body.chrome-hidden #profile,
+body.chrome-hidden .waypoint-overview,
 body.chrome-hidden #map .leaflet-top {
   display: none;
 }
@@ -1842,11 +1843,21 @@ body.failed #map {
   backdrop-filter: var(--toolbar-blur);
   color: var(--text);
   border-color: rgba(255, 255, 255, 0.08);
+  transition: background var(--motion-panel);
 }
 
-.leaflet-bar a:hover, .layer-switch button:hover, .locate-switch button:hover, .track-color-switch button:hover, .toolbox-switch button:hover,
-.pins-switch button:hover, .waypoint-overview-switch button:hover {
-  background: rgba(255, 255, 255, 0.09);
+.leaflet-bar a:not(.leaflet-disabled):hover,
+.locate-switch button:not(:disabled):hover,
+.track-color-switch button:not(:disabled):hover,
+.pins-switch button:not(:disabled):hover,
+.waypoint-overview-switch button:not(:disabled):hover {
+  background: var(--toolbar-hover-tint);
+  color: var(--text-bright);
+}
+
+.toolbox-switch > button:not(:disabled):hover,
+.layer-switch > button:not(:disabled):hover {
+  background: var(--toolbar-surface-hover);
   color: var(--text-bright);
 }
 

@@ -84,8 +84,10 @@ export function createMeasurement({
   let redoStack = [];
 
   function getWaypointIndex() {
+    const live = sharedWaypointIndex?.();
+    if (live) return live;
     if (!waypointIndex) {
-      waypointIndex = sharedWaypointIndex?.() || createPointIndex(gpx.waypoints || []);
+      waypointIndex = createPointIndex(gpx.waypoints || []);
     }
     return waypointIndex;
   }
@@ -298,26 +300,70 @@ export function createMeasurement({
     return target;
   }
 
-  function onContextMenu(event) {
+  let panState = null;
+
+  function onMapClick(event) {
     if (!active) return;
-    L.DomEvent.preventDefault(event.originalEvent);
+    if (event.originalEvent?.target?.closest?.('.leaflet-control, .leaflet-control-container')) {
+      return;
+    }
     addAt(event.latlng);
   }
 
-  function onMouseMove(event) {
+  function onContextMenu(event) {
     if (!active) return;
+    L.DomEvent.preventDefault(event.originalEvent);
+  }
+
+  function clearPan() {
+    if (!panState) return;
+    panState = null;
+    map.getContainer().style.cursor = '';
+  }
+
+  const domLifecycle = new AbortController();
+  const container = map.getContainer();
+  container.addEventListener('pointerdown', (event) => {
+    if (!active || (event.button !== 2 && event.button !== 1)) return;
+    if (event.target instanceof Element && event.target.closest('.leaflet-control, .leaflet-control-container')) {
+      return;
+    }
+    event.preventDefault();
+    panState = { x: event.clientX, y: event.clientY };
+    hideHover();
+    container.style.cursor = 'grabbing';
+  }, { signal: domLifecycle.signal });
+  window.addEventListener('pointermove', (event) => {
+    if (!panState) return;
+    const dx = panState.x - event.clientX;
+    const dy = panState.y - event.clientY;
+    panState.x = event.clientX;
+    panState.y = event.clientY;
+    map.panBy([dx, dy], { animate: false });
+  }, { signal: domLifecycle.signal });
+  window.addEventListener('pointerup', clearPan, { signal: domLifecycle.signal });
+  window.addEventListener('pointercancel', clearPan, { signal: domLifecycle.signal });
+  window.addEventListener('blur', clearPan, { signal: domLifecycle.signal });
+
+  let pendingHoverLatLng = null;
+  function onMouseMove(event) {
+    if (!active || panState) return;
     if (event.originalEvent?.target?.closest?.('.leaflet-control')) {
+      pendingHoverLatLng = null;
       hideHover();
       return;
     }
+    pendingHoverLatLng = event.latlng;
     if (moveFrame) return;
-    const latlng = event.latlng;
     moveFrame = requestAnimationFrame(() => {
       moveFrame = 0;
-      if (active) paintHover(snapAt(latlng));
+      const latlng = pendingHoverLatLng;
+      pendingHoverLatLng = null;
+      if (active && !panState && latlng) paintHover(snapAt(latlng));
     });
   }
 
+  map.on('click', onMapClick);
   map.on('contextmenu', onContextMenu);
   map.on('mousemove', onMouseMove);
   map.on('mouseout', hideHover);
@@ -326,12 +372,15 @@ export function createMeasurement({
   function start() {
     getTrackIndex();
     active = true;
+    if (map.dragging) map.dragging.disable();
     document.body.classList.add('measuring');
     notify();
   }
 
   function stop() {
     active = false;
+    clearPan();
+    if (map.dragging) map.dragging.enable();
     document.body.classList.remove('measuring');
     hideHover();
     notify();
@@ -342,6 +391,7 @@ export function createMeasurement({
     remember();
     current = null;
     hideHover();
+    draw();
     notify();
     return true;
   }
@@ -383,15 +433,42 @@ export function createMeasurement({
     notify();
   }
 
+  function destroy() {
+    stop();
+    if (moveFrame) {
+      cancelAnimationFrame(moveFrame);
+      moveFrame = 0;
+    }
+    pendingHoverLatLng = null;
+    domLifecycle.abort();
+    map.off('click', onMapClick);
+    map.off('contextmenu', onContextMenu);
+    map.off('mousemove', onMouseMove);
+    map.off('mouseout', hideHover);
+    map.off('movestart zoomstart', hideHover);
+    layer.remove();
+    previewLayer.remove();
+    listeners.clear();
+  }
+
   return {
     start,
     stop,
+    destroy,
     addAt,
     endSection,
     undo,
     redo,
     clear,
     relabel,
+    /** @param {{ gpx?: any, segments?: any }} [next] */
+    updateData(next = {}) {
+      const { gpx: nextGpx, segments: nextSegments } = next;
+      if (nextGpx) gpx = nextGpx;
+      if (nextSegments) segments = nextSegments;
+      waypointIndex = null;
+      trackIndex = null;
+    },
     subscribe(listener) {
       listeners.add(listener);
       return () => listeners.delete(listener);

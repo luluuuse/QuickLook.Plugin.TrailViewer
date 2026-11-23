@@ -63,17 +63,20 @@ export function createOverlayExport({
     content: remembered(params, CONTENT_KEY, CONTENTS, 'full'),
     profile: remembered(params, PROFILE_KEY, PROFILES, 'off'),
   };
-  const elevationSamples = elevations?.samples?.length >= 2 && elevations.max > elevations.min
-    ? elevations.samples
+  let currentGpx = gpx;
+  let currentSummary = summary;
+  let currentElevations = elevations;
+  let elevationSamples = currentElevations?.samples?.length >= 2 && currentElevations.max > currentElevations.min
+    ? currentElevations.samples
     : null;
-  const profileAvailable = Boolean(elevationSamples);
+  let profileAvailable = Boolean(elevationSamples);
   let panel = null;
   let exporting = false;
-  const lines = routeModel
+  let lines = routeModel
     ? routeModel.lines.map((line) => line.points)
     : [
-      ...gpx.tracks.flatMap((track) => track.segments),
-      ...(gpx.routes || []).map((route) => route.points),
+      ...currentGpx.tracks.flatMap((track) => track.segments),
+      ...(currentGpx.routes || []).map((route) => route.points),
     ].filter((line) => line && line.length > 0);
 
   function segments() {
@@ -81,35 +84,35 @@ export function createOverlayExport({
   }
 
   function exportRows() {
-    if (summary.network) {
+    if (currentSummary.network) {
       return [
-        { label: t('info.routeLength'), ...splitUnit(formatDistance(summary.distanceMeters)) },
-        { label: t('export.segments'), value: String(summary.segments), unit: '' },
+        { label: t('info.routeLength'), ...splitUnit(formatDistance(currentSummary.distanceMeters)) },
+        { label: t('export.segments'), value: String(currentSummary.segments), unit: '' },
       ];
     }
-    const rows = [{ label: t('info.distance'), ...splitUnit(formatDistance(summary.distanceMeters)) }];
-    if (summary.durationSeconds !== null && summary.durationSeconds !== undefined) {
-      rows.push({ label: t('info.totalTime'), value: clock(summary.durationSeconds), unit: '' });
+    const rows = [{ label: t('info.distance'), ...splitUnit(formatDistance(currentSummary.distanceMeters)) }];
+    if (currentSummary.durationSeconds !== null && currentSummary.durationSeconds !== undefined) {
+      rows.push({ label: t('info.totalTime'), value: clock(currentSummary.durationSeconds), unit: '' });
     }
-    if (elevations) {
+    if (currentElevations) {
       rows.push({
         label: t('info.ascent'),
-        value: Math.round(elevations.ascent).toLocaleString(),
+        value: Math.round(currentElevations.ascent).toLocaleString(),
         unit: t('unit.m'),
       });
     }
-    if (elevations) {
+    if (currentElevations) {
       rows.push({
         label: t('export.maxEle'),
-        value: Math.round(elevations.max).toLocaleString(),
+        value: Math.round(currentElevations.max).toLocaleString(),
         unit: t('unit.m'),
       });
     }
-    const speedSeconds = summary.movingDurationSeconds || summary.durationSeconds;
-    if (speedSeconds > 0 && summary.distanceMeters > 0) {
+    const speedSeconds = currentSummary.movingDurationSeconds || currentSummary.durationSeconds;
+    if (speedSeconds > 0 && currentSummary.distanceMeters > 0) {
       rows.push({
-        label: t(summary.movingDurationSeconds ? 'info.movingSpeed' : 'info.speed'),
-        value: ((summary.distanceMeters / speedSeconds) * 3.6).toFixed(1),
+        label: t(currentSummary.movingDurationSeconds ? 'info.movingSpeed' : 'info.speed'),
+        value: ((currentSummary.distanceMeters / speedSeconds) * 3.6).toFixed(1),
         unit: t('unit.kmh'),
       });
     }
@@ -117,9 +120,9 @@ export function createOverlayExport({
   }
 
   function title() {
-    const named = gpx.name
-      || gpx.tracks.find((track) => track.name)?.name
-      || gpx.routes?.find((route) => route.name)?.name;
+    const named = currentGpx.name
+      || currentGpx.tracks.find((track) => track.name)?.name
+      || currentGpx.routes?.find((route) => route.name)?.name;
     const value = String(named || fileName || '').replace(/\.[^.]+$/, '').trim();
     return value.replace(/\s*-\s*\d{10,}$/, '').trim() || t('export.untitled');
   }
@@ -217,5 +220,22 @@ export function createOverlayExport({
     mount,
     focus: () => panel?.focus(),
     relabel: () => panel?.relabel(),
+    /** @param {{ gpx?: any, summary?: any, elevations?: any, routeModel?: any }} [next] */
+    updateData(next = {}) {
+      const { gpx: nextGpx, summary: nextSummary, elevations: nextElevations, routeModel: nextRouteModel } = next;
+      if (nextGpx) currentGpx = nextGpx;
+      if (nextSummary) currentSummary = nextSummary;
+      if (nextElevations !== undefined) currentElevations = nextElevations;
+      elevationSamples = currentElevations?.samples?.length >= 2 && currentElevations.max > currentElevations.min
+        ? currentElevations.samples
+        : null;
+      profileAvailable = Boolean(elevationSamples);
+      lines = nextRouteModel
+        ? nextRouteModel.lines.map((line) => line.points)
+        : [
+          ...currentGpx.tracks.flatMap((track) => track.segments),
+          ...(currentGpx.routes || []).map((route) => route.points),
+        ].filter((line) => line && line.length > 0);
+    },
   };
 }

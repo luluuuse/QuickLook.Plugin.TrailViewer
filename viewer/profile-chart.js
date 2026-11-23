@@ -180,6 +180,7 @@ export function createProfileChart({
       svg.append(heartGroup);
     }
 
+    const chartLifecycle = new AbortController();
     const guide = el('div', 'guide');
     const dot = el('div', 'dot');
     const heartDot = el('div', 'heart-dot');
@@ -276,7 +277,7 @@ export function createProfileChart({
     for (const [sample, kind] of extrema) {
       const tag = localized(el('span', `extremum ${kind}`),
         () => t(kind === 'high' ? 'profile.high' : 'profile.low'), 'title');
-      tag.append(el('b', '', `${Math.round(sample.ele)} ${t('unit.m')}`));
+      tag.append(localized(el('b'), () => `${Math.round(sample.ele)} ${t('unit.m')}`));
       const across = sample.along / Math.max(total, 1);
       const down = yOf(sample.ele) / height;
       tag.style.left = `${(across * 100).toFixed(2)}%`;
@@ -433,7 +434,7 @@ export function createProfileChart({
           climbDrawer.classList.add('dragging');
         }
         climbDrawer.scrollLeft = dragStartScroll - dx;
-      });
+      }, { signal: chartLifecycle.signal });
       const finishDrawerDrag = (event) => {
         if (event.pointerId !== dragPointerId) return;
         dragPointerId = null;
@@ -444,8 +445,8 @@ export function createProfileChart({
           setTimeout(() => { suppressClick = false; }, 0);
         }
       };
-      window.addEventListener('pointerup', finishDrawerDrag);
-      window.addEventListener('pointercancel', finishDrawerDrag);
+      window.addEventListener('pointerup', finishDrawerDrag, { signal: chartLifecycle.signal });
+      window.addEventListener('pointercancel', finishDrawerDrag, { signal: chartLifecycle.signal });
       climbDrawer.addEventListener('click', (event) => {
         if (!suppressClick) return;
         suppressClick = false;
@@ -501,7 +502,11 @@ export function createProfileChart({
       const title = collapseTitle();
       collapseButton.title = title;
       collapseButton.setAttribute('aria-label', title);
-      if (collapsed) brushStats.hidden = true;
+      if (collapsed) {
+        brushStats.hidden = true;
+      } else if (brushStatsText.textContent) {
+        brushStats.hidden = false;
+      }
       document.documentElement.style.setProperty('--profile-height', `${box.offsetHeight}px`);
       if (!collapsed) fit();
       onLayoutChange?.();
@@ -674,7 +679,7 @@ export function createProfileChart({
         refitFrame = 0;
         fit();
       });
-    });
+    }, { signal: chartLifecycle.signal });
     fit();
 
     return {
@@ -713,6 +718,13 @@ export function createProfileChart({
       setCollapsed,
       toggleCollapsed: () => setCollapsed(!collapsed),
       refreshSplitFocus: positionSplitFocus,
+      destroy() {
+        if (refitFrame) {
+          cancelAnimationFrame(refitFrame);
+          refitFrame = 0;
+        }
+        chartLifecycle.abort();
+      },
     };
   };
 }

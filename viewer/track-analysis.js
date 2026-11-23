@@ -57,11 +57,13 @@ export function movementSummary(tracks, {
       for (const point of segment) {
         if (!previous?.time || !point.time) {
           previous = point;
+          moving = false;
           continue;
         }
         const seconds = (point.time - previous.time) / 1000;
         if (!(seconds > 0)) {
           previous = point;
+          moving = false;
           continue;
         }
         const startsSegment = boundary;
@@ -335,5 +337,5 @@ export function gradeAwareHikeSeconds({
     + bins.steepDown * downScale
     - bins.gentleDown * downScale
   ) * penalty;
-  return Math.round(base + correction);
+  return Math.max(0, Math.round(base + correction));
 }
