@@ -793,6 +793,7 @@ body.is-editing #map.editor-cursor-grabbing {
 }
 
 .editor-list-row-main {
+  flex: 1;
   display: inline-flex;
   align-items: center;
   gap: 6px;

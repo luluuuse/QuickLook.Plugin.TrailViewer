@@ -2,6 +2,7 @@ import { formatDuration } from './format.js';
 import { iconElement } from './icons.js';
 import {
   addWaypoint,
+  applyDrawnPath,
   cleanAnomalies,
   closeLoop,
   cropTrack,
@@ -16,6 +17,7 @@ import {
   reverseTrack,
   shiftTrackTimestamps,
   simplifyTrack,
+  smoothTrackElevation,
   sortWaypointsByRoute,
   trackTotalDistance,
   updateWaypoint,
@@ -215,8 +217,11 @@ export function createEditorDrawers(ctx) {
   function renderCleanDrawer() {
     const drawerBody = getDrawerBody();
     const modeList = el('div', 'editor-mode-list');
-    const isBox = state.getSubMode() === 'box-erase';
-    const autoBtn = makeBtn(`editor-mode-btn${!isBox ? ' is-active' : ''}`, 'editor-clean', t('editor.clean.autoMode'), () => {
+    const subMode = state.getSubMode();
+    const isBox = subMode === 'box-erase';
+    const isSmooth = subMode === 'smooth-ele';
+    const isAuto = !isBox && !isSmooth;
+    const autoBtn = makeBtn(`editor-mode-btn${isAuto ? ' is-active' : ''}`, 'editor-clean', t('editor.clean.autoMode'), () => {
       state.setSubMode('clean');
       overlay.setTool('clean', 'clean');
       renderDrawer();
@@ -226,7 +231,12 @@ export function createEditorDrawers(ctx) {
       overlay.setTool('clean', 'box-erase');
       renderDrawer();
     });
-    modeList.append(autoBtn, boxBtn);
+    const smoothBtn = makeBtn(`editor-mode-btn${isSmooth ? ' is-active' : ''}`, 'editor-simplify', t('editor.clean.smoothTitle'), () => {
+      state.setSubMode('smooth-ele');
+      overlay.setTool('clean', 'smooth-ele');
+      renderDrawer();
+    });
+    modeList.append(autoBtn, boxBtn, smoothBtn);
     drawerBody.append(modeList);
 
     if (isBox) {
@@ -235,6 +245,46 @@ export function createEditorDrawers(ctx) {
     }
 
     const current = store.getCurrent();
+
+    if (isSmooth) {
+      const smoothBox = el('div', 'editor-stat-box');
+      const windowSize = state.getSmoothWindow?.() || 5;
+      const preview = smoothTrackElevation(current, { windowSize });
+      const levelRow = el('div', 'editor-mode-list');
+      for (const [win, key] of [[3, 'editor.clean.smoothLight'], [5, 'editor.clean.smoothStandard'], [9, 'editor.clean.smoothStrong']]) {
+        const btn = makeBtn(
+          `editor-mode-btn${windowSize === win ? ' is-active' : ''}`,
+          null,
+          t(key),
+          () => {
+            state.setSmoothWindow?.(win);
+            renderDrawer();
+          },
+        );
+        levelRow.append(btn);
+      }
+      const previewText = preview.adjustedCount > 0
+        ? t('editor.clean.smoothPreview', { before: preview.beforeAscent, after: preview.afterAscent })
+        : t('editor.clean.smoothNoChange');
+      const smoothApplyBtn = makeBtn('editor-btn editor-btn-success', null, t('editor.clean.smoothApply'), () => {
+        const res = smoothTrackElevation(store.getCurrent(), { windowSize: state.getSmoothWindow?.() || 5 });
+        if (res.adjustedCount > 0) {
+          store.apply('smooth-ele', res.track);
+          notifyToast(t('editor.clean.smoothDone', { before: res.beforeAscent, after: res.afterAscent }));
+        } else {
+          notifyToast(t('editor.clean.smoothNoChange'));
+        }
+      });
+      smoothApplyBtn.disabled = preview.adjustedCount === 0;
+      smoothBox.append(
+        levelRow,
+        el('span', 'editor-drawer-hint', previewText),
+        smoothApplyBtn,
+      );
+      drawerBody.append(smoothBox);
+      return;
+    }
+
     const excludedKeys = state.getExcludedAnomalyKeys();
     const anomalies = detectAnomalyPoints(current);
     if (anomalies.length === 0) {
@@ -385,6 +435,15 @@ export function createEditorDrawers(ctx) {
     speedInput.min = '0.5';
     speedInput.max = '40';
     speedInput.step = '0.5';
+    const gradeRow = el('label', 'editor-list-row');
+    const gradeChk = el('input');
+    gradeChk.type = 'checkbox';
+    gradeChk.checked = state.getGradeAdjusted ? state.getGradeAdjusted() : true;
+    gradeChk.addEventListener('change', () => {
+      state.setGradeAdjusted?.(gradeChk.checked);
+    });
+    gradeRow.append(gradeChk, el('span', 'editor-list-row-main', t('editor.time.gradeAdjusted')));
+
     const virtBtn = makeBtn('editor-btn editor-btn-success', null, t('editor.time.virtualApply'), () => {
       const kmh = Number(speedInput.value) || 4;
       const parsedStart = Date.parse(startInput.value);
@@ -393,6 +452,7 @@ export function createEditorDrawers(ctx) {
         store.getCurrent(),
         startMs,
         (kmh * 1000) / 3600,
+        { gradeAdjusted: gradeChk.checked },
       );
       if (pointCount > 0) {
         store.apply('virtual-time', track);
@@ -400,8 +460,60 @@ export function createEditorDrawers(ctx) {
       }
     });
     virtRow.append(speedInput, virtBtn);
-    virtBox.append(el('span', 'editor-stat-label', t('editor.time.virtualTitle')), startInput, virtRow);
+    virtBox.append(el('span', 'editor-stat-label', t('editor.time.virtualTitle')), startInput, gradeRow, virtRow);
     drawerBody.append(shiftBox, virtBox);
+  }
+
+  function commitDrawDraft() {
+    const draft = overlay.getDrawDraft?.();
+    if (!draft || draft.points.length < 2) return false;
+    const res = applyDrawnPath(store.getCurrent(), draft.points, {
+      startSnap: draft.startSnap,
+      endSnap: draft.endSnap,
+    });
+    if (res.mode === 'noop') return false;
+    overlay.clearDrawDraft?.();
+    store.apply('draw', res.track);
+    if (res.mode === 'close-loop') {
+      notifyToast(t(res.timestampsCleared ? 'editor.draw.doneCloseLoopCleared' : 'editor.draw.doneCloseLoop'));
+    } else if (res.mode === 'replace') {
+      notifyToast(t(res.timestampsCleared ? 'editor.draw.doneReplaceCleared' : 'editor.draw.doneReplace'));
+    } else if (res.mode === 'extend-start' || res.mode === 'extend-end') {
+      notifyToast(t('editor.draw.doneExtend'));
+    } else {
+      notifyToast(t('editor.draw.doneBranch'));
+    }
+    return true;
+  }
+
+  function renderDrawDrawer() {
+    const drawerBody = getDrawerBody();
+    drawerBody.append(el('p', 'editor-drawer-hint', t('editor.draw.hint')));
+    const draft = overlay.getDrawDraft?.() || { points: [], startSnap: null, endSnap: null, distanceMeters: 0 };
+    const count = draft.points.length;
+
+    const statBox = el('div', 'editor-stat-box');
+    statBox.append(
+      el('span', 'editor-stat-label', t('editor.draw.points', { count })),
+      el('span', 'editor-stat-value', formatDistance(draft.distanceMeters)),
+    );
+    drawerBody.append(statBox);
+
+    const actions = el('div', 'editor-action-grid');
+    const applyBtn = makeBtn('editor-btn editor-btn-success', null, t('editor.draw.apply'), () => {
+      commitDrawDraft();
+    });
+    applyBtn.disabled = count < 2;
+    const undoBtn = makeBtn('editor-btn', 'undo', t('editor.draw.undoPoint'), () => {
+      overlay.undoDrawPoint?.();
+    });
+    undoBtn.disabled = count < 1;
+    const clearBtn = makeBtn('editor-btn', 'clear', t('editor.draw.clear'), () => {
+      overlay.clearDrawDraft?.();
+    });
+    clearBtn.disabled = count < 1;
+    actions.append(applyBtn, undoBtn, clearBtn);
+    drawerBody.append(actions);
   }
 
   function renderWaypointDrawer() {
@@ -640,6 +752,8 @@ export function createEditorDrawers(ctx) {
     renderCleanDrawer,
     renderTopologyDrawer,
     renderVertexDrawer,
+    renderDrawDrawer,
+    commitDrawDraft,
     renderTimeDrawer,
     renderWaypointDrawer,
   };

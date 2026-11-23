@@ -19,6 +19,7 @@ const RAIL_TOOLS = [
   { id: 'clean', icon: 'editor-clean', labelKey: 'editor.rail.clean' },
   { id: 'topology', icon: 'editor-reverse', labelKey: 'editor.rail.topology' },
   { id: 'vertex', icon: 'editor-vertex', labelKey: 'editor.rail.vertex' },
+  { id: 'draw', icon: 'edit', labelKey: 'editor.rail.draw' },
   { id: 'waypoint', icon: 'editor-waypoint-add', labelKey: 'editor.rail.waypoint' },
   { id: 'time', icon: 'editor-time', labelKey: 'editor.rail.time' },
 ];
@@ -122,6 +123,8 @@ export function createEditorShell({
   let cropAscentLabelEl = null;
   let excludedAnomalyKeys = new Set();
   let excludedAnomalyTrackRef = null;
+  let smoothWindow = 5;
+  let gradeAdjusted = true;
   let wptListScrollTop = 0;
   let scrollWptIntoView = false;
 
@@ -499,6 +502,10 @@ export function createEditorShell({
         return val;
       },
       getExcludedAnomalyKeys: () => excludedAnomalyKeys,
+      getSmoothWindow: () => smoothWindow,
+      setSmoothWindow: (win) => { smoothWindow = win; },
+      getGradeAdjusted: () => gradeAdjusted,
+      setGradeAdjusted: (val) => { gradeAdjusted = Boolean(val); },
     },
   });
 
@@ -550,6 +557,7 @@ export function createEditorShell({
     else if (activeTool === 'clean') drawers.renderCleanDrawer();
     else if (activeTool === 'topology') drawers.renderTopologyDrawer();
     else if (activeTool === 'vertex') drawers.renderVertexDrawer();
+    else if (activeTool === 'draw') drawers.renderDrawDrawer();
     else if (activeTool === 'waypoint') drawers.renderWaypointDrawer();
     else if (activeTool === 'time') drawers.renderTimeDrawer();
 
@@ -1022,6 +1030,22 @@ export function createEditorShell({
     },
     refreshVertexStatus() {
       if (activeTool === 'vertex' && drawerOpen) renderDrawer();
+    },
+    refreshDrawStatus() {
+      if (activeTool === 'draw' && drawerOpen) renderDrawer();
+    },
+    handleKeyDown(event) {
+      if (!store.isActive() || activeTool !== 'draw') return false;
+      const draft = overlay.getDrawDraft?.();
+      const count = draft?.points?.length || 0;
+      const mod = event.ctrlKey || event.metaKey;
+      const key = event.key.toLowerCase();
+      if ((event.key === 'Backspace' || (mod && key === 'z' && !event.shiftKey)) && count > 0) {
+        event.preventDefault();
+        overlay.undoDrawPoint?.();
+        return true;
+      }
+      return false;
     },
     setSplitHover(alongMeters) {
       updateSplitHoverDisplay(alongMeters);

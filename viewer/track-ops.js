@@ -1070,11 +1070,14 @@ export function shiftTrackTimestamps(parsed, offsetSeconds) {
 
 /**
  * Generates monotonic virtual timestamps across all segments from startTimeMs at speedMps.
+ * When gradeAdjusted is true and adjacent points have elevation, applies Naismith/Langmuir
+ * climb and steep-descent adjustments while gracefully falling back to flat speed when elevation is missing.
  * @param {import('./types.js').ParsedTrack} parsed
  * @param {number} startTimeMs
  * @param {number} speedMps
+ * @param {{ gradeAdjusted?: boolean }} [options]
  */
-export function generateVirtualTimeline(parsed, startTimeMs, speedMps) {
+export function generateVirtualTimeline(parsed, startTimeMs, speedMps, { gradeAdjusted = false } = {}) {
   const next = cloneParsedTrack(parsed);
   if (!Number.isFinite(startTimeMs) || !Number.isFinite(speedMps) || speedMps <= 0) {
     return { track: next, durationSeconds: 0, pointCount: 0 };
@@ -1082,14 +1085,38 @@ export function generateVirtualTimeline(parsed, startTimeMs, speedMps) {
   const segs = ensureTracksMutable(next);
   let cursorMs = startTimeMs;
   let pointCount = 0;
+  // Langmuir slope thresholds: tan(5 deg) ~= 0.08749, tan(12 deg) ~= 0.21256.
+  const GENTLE_DOWN_TAN = Math.tan((5 * Math.PI) / 180);
+  const STEEP_DOWN_TAN = Math.tan((12 * Math.PI) / 180);
+
   segs.forEach((seg, segIdx) => {
     if (segIdx > 0 && seg.length > 0) {
       cursorMs += 1000;
     }
     for (let i = 0; i < seg.length; i += 1) {
       if (i > 0) {
-        const d = distanceMeters(seg[i - 1], seg[i]);
-        cursorMs += (d / speedMps) * 1000;
+        const a = seg[i - 1];
+        const b = seg[i];
+        const d = distanceMeters(a, b);
+        let stepSeconds = d / speedMps;
+        if (gradeAdjusted && Number.isFinite(a.ele) && Number.isFinite(b.ele)) {
+          const de = b.ele - a.ele;
+          if (de > 0) {
+            // Naismith: +1 h per 600 m climb (+6 s/m).
+            stepSeconds += de * 6;
+          } else if (de < 0 && d > 0) {
+            const drop = -de;
+            const slope = drop / d;
+            if (slope > STEEP_DOWN_TAN) {
+              // Langmuir steep descent (> 12 deg): +10 min per 300 m drop (+2 s/m).
+              stepSeconds += drop * 2;
+            } else if (slope >= GENTLE_DOWN_TAN) {
+              // Langmuir moderate descent (5-12 deg): faster, clamped at 60% of flat time.
+              stepSeconds = Math.max(stepSeconds * 0.6, stepSeconds - drop * 2);
+            }
+          }
+        }
+        cursorMs += Math.max(0, stepSeconds) * 1000;
       }
       seg[i].time = new Date(Math.round(cursorMs));
       pointCount += 1;
@@ -1098,4 +1125,276 @@ export function generateVirtualTimeline(parsed, startTimeMs, speedMps) {
   const durationSeconds = Math.max(0, Math.round((cursorMs - startTimeMs) / 1000));
   if (pointCount > 0) clearSummaryMetadata(next);
   return { track: next, durationSeconds, pointCount };
+}
+
+function isValidSegSnap(snap, segs) {
+  if (!snap || !Number.isInteger(snap.flatSegIndex) || snap.flatSegIndex < 0 || snap.flatSegIndex >= segs.length) {
+    return false;
+  }
+  const seg = segs[snap.flatSegIndex];
+  if (!Number.isInteger(snap.ptIndex) || snap.ptIndex < 0 || snap.ptIndex >= seg.length) return false;
+  const segT = Number.isFinite(snap.segT) ? Math.max(0, Math.min(1, snap.segT)) : 0;
+  if (segT > 0 && snap.ptIndex >= seg.length - 1) return false;
+  return true;
+}
+
+function normalizeSnapPosition(snap, seg) {
+  const rawT = Number.isFinite(snap.segT) ? Math.max(0, Math.min(1, snap.segT)) : 0;
+  if (rawT <= 1e-6) {
+    return { index: snap.ptIndex, t: 0, pos: snap.ptIndex, point: clonePoint(seg[snap.ptIndex]) };
+  }
+  if (rawT >= 1 - 1e-6 && snap.ptIndex + 1 < seg.length) {
+    const nextIdx = snap.ptIndex + 1;
+    return { index: nextIdx, t: 0, pos: nextIdx, point: clonePoint(seg[nextIdx]) };
+  }
+  const anchor = interpolatePoint(seg[snap.ptIndex], seg[snap.ptIndex + 1], rawT);
+  return { index: snap.ptIndex, t: rawT, pos: snap.ptIndex + rawT, point: anchor };
+}
+
+function clearSegmentTimestamps(seg) {
+  let cleared = false;
+  for (const pt of seg) {
+    if (pt.time !== undefined) {
+      delete pt.time;
+      cleared = true;
+    }
+  }
+  return cleared;
+}
+
+/**
+ * Applies a hand-drawn path to the track:
+ * 1) Both ends snapped to distinct positions (vertices or arbitrary interpolated points) on the same segment ->
+ *    replace [lo..hi] with drawn path (gap fill / detour), linearly interpolating middle elevations by cumulative
+ *    distance when both anchors have elevation.
+ * 2) Exactly one end snapped to the first or last point of a segment -> extend that segment without fabricating ele.
+ * 3) Otherwise -> append drawn points as a new segment.
+ * @param {import('./types.js').ParsedTrack} parsed
+ * @param {Array<{ lat: number, lon: number, ele?: number }>} drawnPoints
+ * @param {{ startSnap?: { flatSegIndex: number, ptIndex: number, segT?: number } | null, endSnap?: { flatSegIndex: number, ptIndex: number, segT?: number } | null }} [options]
+ */
+export function applyDrawnPath(parsed, drawnPoints, { startSnap = null, endSnap = null } = {}) {
+  const next = cloneParsedTrack(parsed);
+  if (!Array.isArray(drawnPoints) || drawnPoints.length < 2) {
+    return { track: next, mode: 'noop', addedPoints: 0, timestampsCleared: false };
+  }
+  const drawn = drawnPoints.map((pt) => {
+    const clean = { lat: Number(pt.lat), lon: Number(pt.lon) };
+    if (Number.isFinite(pt.ele)) clean.ele = Number(pt.ele);
+    return clean;
+  });
+  const segs = ensureTracksMutable(next);
+  const validStart = isValidSegSnap(startSnap, segs) ? startSnap : null;
+  const validEnd = isValidSegSnap(endSnap, segs) ? endSnap : null;
+
+  // Case 1: Both ends snapped onto the same segment.
+  if (validStart && validEnd && validStart.flatSegIndex === validEnd.flatSegIndex) {
+    const seg = segs[validStart.flatSegIndex];
+    const startNorm = normalizeSnapPosition(validStart, seg);
+    const endNorm = normalizeSnapPosition(validEnd, seg);
+    if (Math.abs(startNorm.pos - endNorm.pos) > 1e-6) {
+      const reversed = startNorm.pos > endNorm.pos;
+      const loNorm = reversed ? endNorm : startNorm;
+      const hiNorm = reversed ? startNorm : endNorm;
+      const connectsBothEndpoints = loNorm.index === 0
+        && loNorm.t === 0
+        && hiNorm.index === seg.length - 1
+        && hiNorm.t === 0;
+
+      // Case 1a: Connecting segment start <-> end closes the loop instead of erasing the whole track.
+      if (connectsBothEndpoints) {
+        // Orient drawn path from segment end -> segment start so it appends cleanly onto the end.
+        const toStart = reversed ? drawn : [...drawn].reverse();
+        const middle = toStart.slice(1, -1).map((pt) => ({ ...pt }));
+        const anchorEnd = seg[seg.length - 1];
+        const anchorStart = clonePoint(seg[0]);
+        if (middle.length > 0 && Number.isFinite(anchorEnd.ele) && Number.isFinite(anchorStart.ele)) {
+          const chain = [anchorEnd, ...middle, anchorStart];
+          const cumDist = [0];
+          for (let i = 1; i < chain.length; i += 1) {
+            cumDist.push(cumDist[i - 1] + distanceMeters(chain[i - 1], chain[i]));
+          }
+          const totalDist = cumDist[cumDist.length - 1];
+          for (let i = 0; i < middle.length; i += 1) {
+            if (!Number.isFinite(middle[i].ele)) {
+              const ratio = totalDist > 0
+                ? cumDist[i + 1] / totalDist
+                : (i + 1) / (middle.length + 1);
+              middle[i].ele = Math.round((anchorEnd.ele + (anchorStart.ele - anchorEnd.ele) * ratio) * 10) / 10;
+            }
+          }
+        }
+        delete anchorStart.time;
+        seg.push(...middle, anchorStart);
+        const timestampsCleared = clearSegmentTimestamps(seg);
+        clearSummaryMetadata(next);
+        return { track: next, mode: 'close-loop', addedPoints: middle.length + 1, timestampsCleared };
+      }
+
+      // Case 1b: Gap fill / detour replacing an interior span [lo..hi].
+      const oriented = reversed ? [...drawn].reverse() : drawn;
+      const middle = oriented.slice(1, -1).map((pt) => ({ ...pt }));
+
+      const anchorLo = loNorm.point;
+      const anchorHi = hiNorm.point;
+      if (middle.length > 0 && Number.isFinite(anchorLo.ele) && Number.isFinite(anchorHi.ele)) {
+        const chain = [anchorLo, ...middle, anchorHi];
+        const cumDist = [0];
+        for (let i = 1; i < chain.length; i += 1) {
+          cumDist.push(cumDist[i - 1] + distanceMeters(chain[i - 1], chain[i]));
+        }
+        const totalDist = cumDist[cumDist.length - 1];
+        for (let i = 0; i < middle.length; i += 1) {
+          if (!Number.isFinite(middle[i].ele)) {
+            const ratio = totalDist > 0
+              ? cumDist[i + 1] / totalDist
+              : (i + 1) / (middle.length + 1);
+            middle[i].ele = Math.round((anchorLo.ele + (anchorHi.ele - anchorLo.ele) * ratio) * 10) / 10;
+          }
+        }
+      }
+
+      const prefix = seg.slice(0, loNorm.index + 1);
+      if (loNorm.t > 0) prefix.push(anchorLo);
+      const suffix = hiNorm.t > 0 ? [anchorHi, ...seg.slice(hiNorm.index + 1)] : seg.slice(hiNorm.index);
+      const rebuilt = [...prefix, ...middle, ...suffix];
+      const timestampsCleared = clearSegmentTimestamps(rebuilt);
+      seg.length = 0;
+      seg.push(...rebuilt);
+      clearSummaryMetadata(next);
+      return { track: next, mode: 'replace', addedPoints: middle.length, timestampsCleared };
+    }
+  }
+
+  // Case 2: Extend from either endpoint of an existing segment.
+  const startNorm = validStart ? normalizeSnapPosition(validStart, segs[validStart.flatSegIndex]) : null;
+  const endNorm = validEnd ? normalizeSnapPosition(validEnd, segs[validEnd.flatSegIndex]) : null;
+  const startAtStart = startNorm && startNorm.index === 0 && startNorm.t === 0;
+  const startAtEnd = startNorm && startNorm.index === segs[validStart.flatSegIndex].length - 1 && startNorm.t === 0;
+  const endAtStart = endNorm && endNorm.index === 0 && endNorm.t === 0;
+  const endAtEnd = endNorm && endNorm.index === segs[validEnd.flatSegIndex].length - 1 && endNorm.t === 0;
+
+  if (validStart && !validEnd && (startAtStart || startAtEnd)) {
+    const seg = segs[validStart.flatSegIndex];
+    const extra = drawn.slice(1).map((pt) => ({ ...pt }));
+    if (startAtEnd) {
+      seg.push(...extra);
+    } else {
+      seg.unshift(...extra.reverse());
+    }
+    const timestampsCleared = clearSegmentTimestamps(seg);
+    clearSummaryMetadata(next);
+    return {
+      track: next,
+      mode: startAtEnd ? 'extend-end' : 'extend-start',
+      addedPoints: extra.length,
+      timestampsCleared,
+    };
+  }
+
+  if (validEnd && !validStart && (endAtStart || endAtEnd)) {
+    const seg = segs[validEnd.flatSegIndex];
+    const extra = drawn.slice(0, -1).map((pt) => ({ ...pt }));
+    if (endAtStart) {
+      seg.unshift(...extra);
+    } else {
+      seg.push(...extra.reverse());
+    }
+    const timestampsCleared = clearSegmentTimestamps(seg);
+    clearSummaryMetadata(next);
+    return {
+      track: next,
+      mode: endAtStart ? 'extend-start' : 'extend-end',
+      addedPoints: extra.length,
+      timestampsCleared,
+    };
+  }
+
+  // Case 3: Append as a new branch segment.
+  if (next.tracks.length === 0) {
+    next.tracks.push({ name: next.name ?? null, segments: [] });
+  }
+  next.tracks[next.tracks.length - 1].segments.push(drawn);
+  clearSummaryMetadata(next);
+  return { track: next, mode: 'branch', addedPoints: drawn.length, timestampsCleared: false };
+}
+
+function segmentAscentMeters(segs) {
+  let gain = 0;
+  for (const seg of segs) {
+    let prevEle = null;
+    for (const pt of seg) {
+      if (!Number.isFinite(pt.ele)) continue;
+      if (prevEle !== null && pt.ele > prevEle) gain += pt.ele - prevEle;
+      prevEle = pt.ele;
+    }
+  }
+  return Math.round(gain);
+}
+
+function medianValue(values) {
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 1 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) * 0.5;
+}
+
+/**
+ * Smooths GPS elevation spikes and micro-jitter while preserving segment endpoints and all non-elevation fields.
+ * Step 1: local median filter removes isolated spikes and zero-dropouts.
+ * Step 2: symmetric triangular weighted moving average smooths jitter.
+ * @param {import('./types.js').ParsedTrack} parsed
+ * @param {{ windowSize?: number, spikeThresholdMeters?: number }} [options]
+ */
+export function smoothTrackElevation(parsed, { windowSize = 5, spikeThresholdMeters = 30 } = {}) {
+  const next = cloneParsedTrack(parsed);
+  const segs = ensureTracksMutable(next);
+  const beforeAscent = segmentAscentMeters(segs);
+  const radius = Math.max(1, Math.floor((Math.max(3, Number(windowSize) || 5)) / 2));
+  const spikeLimit = Math.max(1, Number(spikeThresholdMeters) || 30);
+  let adjustedCount = 0;
+
+  for (const seg of segs) {
+    const validIndices = [];
+    for (let i = 0; i < seg.length; i += 1) {
+      if (Number.isFinite(seg[i].ele)) validIndices.push(i);
+    }
+    if (validIndices.length < 3) continue;
+
+    const raw = validIndices.map((idx) => seg[idx].ele);
+    // Step 1: despike with local median (preserve first & last valid points).
+    const despiked = [...raw];
+    for (let k = 1; k < raw.length - 1; k += 1) {
+      const start = Math.max(0, k - radius);
+      const end = Math.min(raw.length - 1, k + radius);
+      const neighborhood = [];
+      for (let j = start; j <= end; j += 1) neighborhood.push(raw[j]);
+      const med = medianValue(neighborhood);
+      if (Math.abs(raw[k] - med) >= spikeLimit || (raw[k] === 0 && Math.abs(med) >= spikeLimit)) {
+        despiked[k] = med;
+      }
+    }
+
+    // Step 2: symmetric triangular weighted moving average (preserve first & last valid points).
+    for (let k = 1; k < despiked.length - 1; k += 1) {
+      const start = Math.max(0, k - radius);
+      const end = Math.min(despiked.length - 1, k + radius);
+      let weightedSum = 0;
+      let weightTotal = 0;
+      for (let j = start; j <= end; j += 1) {
+        const w = radius + 1 - Math.abs(j - k);
+        weightedSum += despiked[j] * w;
+        weightTotal += w;
+      }
+      const smoothed = Math.round((weightedSum / weightTotal) * 10) / 10;
+      const idx = validIndices[k];
+      if (Math.abs(smoothed - seg[idx].ele) >= 0.05) {
+        seg[idx].ele = smoothed;
+        adjustedCount += 1;
+      }
+    }
+  }
+
+  const afterAscent = segmentAscentMeters(segs);
+  if (adjustedCount > 0) clearSummaryMetadata(next);
+  return { track: next, beforeAscent, afterAscent, adjustedCount };
 }

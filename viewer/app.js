@@ -395,6 +395,7 @@ async function ensureEditorLoaded() {
             editorStore.apply('insert-vertex', opsMod.insertTrackVertex(current, flatSegIndex, afterIndex, lat, lon, ele));
           },
           onViewportChange: () => editorShell?.refreshVertexStatus?.(),
+          onDrawChange: () => editorShell?.refreshDrawStatus?.(),
           onContextMenu: (info) => editorShell?.showContextMenu(info),
         });
         editorShell = shellMod.createEditorShell({
@@ -915,6 +916,9 @@ async function main() {
     && Boolean(node.closest('input, textarea, select, [contenteditable="true"]'));
   document.addEventListener('keydown', (event) => {
     if (editorStore?.isActive()) {
+      if (!textFieldOf(event.target) && editorShell?.handleKeyDown?.(event)) {
+        return;
+      }
       const mod = event.ctrlKey || event.metaKey;
       const key = event.key.toLowerCase();
       if (mod && key === 'z') {

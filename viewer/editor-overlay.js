@@ -1,6 +1,8 @@
 import { distanceMeters } from './geo.js';
 import { symbolMarkup } from './icons.js';
+import { SNAP_PIXELS, chooseSnap } from './measure.js';
 import { createSnapReticleMarker } from './snap-indicator.js';
+import { createPointIndex } from './spatial.js';
 import { sliceRouteByDistance } from './track-analysis.js';
 import { detectAnomalyPoints, normalizedTracks, trackTotalDistance } from './track-ops.js';
 
@@ -45,10 +47,11 @@ function pointAtDistance(paths, targetMeters) {
   return null;
 }
 
-function buildScreenCache(map, paths) {
+function buildScreenCache(map, pathEntries) {
   const segments = [];
   let along = 0;
-  for (const pts of paths) {
+  for (const entry of pathEntries) {
+    const pts = entry.points;
     let prevPt = null;
     let prevPx = null;
     for (let i = 0; i < pts.length; i += 1) {
@@ -56,7 +59,16 @@ function buildScreenCache(map, paths) {
       const px = map.latLngToContainerPoint([pt.lat, pt.lon]);
       if (prevPt && prevPx) {
         const step = distanceMeters(prevPt, pt);
-        segments.push({ a: prevPt, b: pt, pa: prevPx, pb: px, along, step });
+        segments.push({
+          flatSegIndex: entry.flatSegIndex,
+          segPtIndex: i - 1,
+          a: prevPt,
+          b: pt,
+          pa: prevPx,
+          pb: px,
+          along,
+          step,
+        });
         along += step;
       }
       prevPt = pt;
@@ -73,7 +85,7 @@ function nearestOnTrack(map, cachedSegments, latlng) {
 
   for (let i = 0; i < cachedSegments.length; i += 1) {
     const seg = cachedSegments[i];
-    const { a, b, pa, pb, along, step } = seg;
+    const { flatSegIndex, segPtIndex, a, b, pa, pb, along, step } = seg;
     const dx = pb.x - pa.x;
     const dy = pb.y - pa.y;
     const lenSq = dx * dx + dy * dy;
@@ -89,7 +101,16 @@ function nearestOnTrack(map, cachedSegments, latlng) {
       const ele = Number.isFinite(a.ele) && Number.isFinite(b.ele)
         ? a.ele + (b.ele - a.ele) * t
         : (Number.isFinite(a.ele) ? a.ele : undefined);
-      best = { distPx, lat, lon, ele, alongMeters: along + step * t };
+      best = {
+        distPx,
+        lat,
+        lon,
+        ele,
+        alongMeters: along + step * t,
+        flatSegIndex,
+        segPtIndex,
+        segT: t,
+      };
     }
   }
   return best;
@@ -134,6 +155,7 @@ export function createEditorOverlay({
   onInsertVertex = () => {},
   onViewportChange = () => {},
   onContextMenu = () => {},
+  onDrawChange = () => {},
 }) {
   /** @type {(meters: number) => void} */
   const handleSplitAt = onSplitAt;
@@ -157,10 +179,18 @@ export function createEditorOverlay({
   const handleViewportChange = onViewportChange;
   /** @type {(info: any) => void} */
   const handleContextMenu = onContextMenu;
+  /** @type {(draft: { count: number, distanceMeters: number, startSnap: any, endSnap: any }) => void} */
+  const handleDrawChange = onDrawChange;
   let group = null;
   let trackGroup = null;
   let waypointGroup = null;
   let vertexGroup = null;
+  let drawGroup = null;
+  let drawPoints = [];
+  let drawRubberLine = null;
+  let drawSnapReticle = null;
+  let drawEndpointIndex = null;
+  let drawWptIndex = null;
   let boxEl = null;
   let boxStartPt = null;
   let panState = null;
@@ -209,6 +239,172 @@ export function createEditorOverlay({
     return Boolean(group) && activeTool === 'clean' && activeSubMode === 'box-erase';
   }
 
+  function isDrawMode() {
+    return Boolean(group) && activeTool === 'draw';
+  }
+
+  function rebuildDrawSnapIndexes() {
+    const endpoints = [];
+    for (const entry of cachedPathEntries) {
+      const pts = entry.points;
+      if (pts.length === 0) continue;
+      endpoints.push({
+        lat: pts[0].lat,
+        lon: pts[0].lon,
+        ele: pts[0].ele,
+        flatSegIndex: entry.flatSegIndex,
+        ptIndex: 0,
+      });
+      if (pts.length > 1) {
+        const lastIdx = pts.length - 1;
+        endpoints.push({
+          lat: pts[lastIdx].lat,
+          lon: pts[lastIdx].lon,
+          ele: pts[lastIdx].ele,
+          flatSegIndex: entry.flatSegIndex,
+          ptIndex: lastIdx,
+        });
+      }
+    }
+    drawEndpointIndex = endpoints.length > 0 ? createPointIndex(endpoints) : null;
+    const wpts = (currentParsed?.waypoints || []).filter(
+      (wpt) => Number.isFinite(wpt.lat) && Number.isFinite(wpt.lon),
+    );
+    drawWptIndex = wpts.length > 0 ? createPointIndex(wpts) : null;
+  }
+
+  function computeDrawDistance() {
+    let total = 0;
+    for (let i = 1; i < drawPoints.length; i += 1) {
+      total += distanceMeters(drawPoints[i - 1], drawPoints[i]);
+    }
+    return total;
+  }
+
+  function notifyDrawChange() {
+    const startSnap = drawPoints.length > 0 ? (drawPoints[0].snap || null) : null;
+    const endSnap = drawPoints.length > 1 ? (drawPoints[drawPoints.length - 1].snap || null) : null;
+    handleDrawChange({
+      count: drawPoints.length,
+      distanceMeters: computeDrawDistance(),
+      startSnap,
+      endSnap,
+    });
+  }
+
+  function resolveDrawSnap(latlng) {
+    if (!latlng) return null;
+    const cursorPt = map.latLngToContainerPoint(latlng);
+    // Tier 1 (higher priority): waypoints and segment start/end/break endpoints.
+    const priorityCandidates = [];
+    const nearWpt = drawWptIndex?.nearest({ lat: latlng.lat, lon: latlng.lng });
+    if (nearWpt) {
+      const p = map.latLngToContainerPoint([nearWpt.lat, nearWpt.lon]);
+      const d = Math.hypot(p.x - cursorPt.x, p.y - cursorPt.y);
+      if (d <= SNAP_PIXELS) {
+        // If this waypoint sits right on a segment endpoint/track (< 3m), preserve track anchor too.
+        let attachedSnap = null;
+        const nearEnd = drawEndpointIndex?.nearest({ lat: nearWpt.lat, lon: nearWpt.lon });
+        if (nearEnd && distanceMeters(nearWpt, nearEnd) <= 3) {
+          attachedSnap = { flatSegIndex: nearEnd.flatSegIndex, ptIndex: nearEnd.ptIndex, segT: 0 };
+        }
+        priorityCandidates.push({
+          kind: 'marker',
+          distancePixels: d,
+          lat: nearWpt.lat,
+          lon: nearWpt.lon,
+          ele: nearWpt.ele,
+          snap: attachedSnap,
+        });
+      }
+    }
+    const nearEnd = drawEndpointIndex?.nearest({ lat: latlng.lat, lon: latlng.lng });
+    if (nearEnd) {
+      const p = map.latLngToContainerPoint([nearEnd.lat, nearEnd.lon]);
+      const d = Math.hypot(p.x - cursorPt.x, p.y - cursorPt.y);
+      if (d <= SNAP_PIXELS) {
+        priorityCandidates.push({
+          kind: 'measure',
+          distancePixels: d,
+          lat: nearEnd.lat,
+          lon: nearEnd.lon,
+          ele: nearEnd.ele,
+          snap: { flatSegIndex: nearEnd.flatSegIndex, ptIndex: nearEnd.ptIndex, segT: 0 },
+        });
+      }
+    }
+    const priorityHit = chooseSnap(priorityCandidates);
+    if (priorityHit) return priorityHit;
+
+    // Tier 2: arbitrary continuous point along any track segment.
+    const trackHit = nearestOnTrack(map, getScreenSegments(), latlng);
+    if (trackHit && trackHit.distPx <= SNAP_PIXELS) {
+      return {
+        kind: 'track',
+        distancePixels: trackHit.distPx,
+        lat: trackHit.lat,
+        lon: trackHit.lon,
+        ele: trackHit.ele,
+        snap: {
+          flatSegIndex: trackHit.flatSegIndex,
+          ptIndex: trackHit.segPtIndex,
+          segT: trackHit.segT,
+        },
+      };
+    }
+    return null;
+  }
+
+  function clearDrawHover() {
+    if (drawRubberLine) {
+      drawRubberLine.remove();
+      drawRubberLine = null;
+    }
+    if (drawSnapReticle) {
+      drawSnapReticle.remove();
+      drawSnapReticle = null;
+    }
+  }
+
+  function renderDrawLayer() {
+    if (!drawGroup) return;
+    drawGroup.clearLayers();
+    clearDrawHover();
+    if (!isDrawMode() || drawPoints.length === 0) return;
+
+    if (drawPoints.length >= 2) {
+      L.polyline(
+        drawPoints.map((pt) => [pt.lat, pt.lon]),
+        {
+          color: '#38bdf8',
+          weight: 4,
+          opacity: 0.95,
+          dashArray: '8 5',
+          interactive: false,
+        },
+      ).addTo(drawGroup);
+    }
+    drawPoints.forEach((pt, idx) => {
+      const isEndpoint = idx === 0 || idx === drawPoints.length - 1;
+      L.circleMarker([pt.lat, pt.lon], {
+        radius: isEndpoint ? 6 : 4.5,
+        color: '#ffffff',
+        weight: 2,
+        fillColor: pt.snap ? '#22c55e' : '#38bdf8',
+        fillOpacity: 1,
+        interactive: false,
+      }).addTo(drawGroup);
+    });
+  }
+
+  function clearDrawDraft({ notify = true } = {}) {
+    const hadPoints = drawPoints.length > 0;
+    drawPoints = [];
+    clearDrawHover();
+    if (drawGroup) drawGroup.clearLayers();
+    if (notify && hadPoints) notifyDrawChange();
+  }
+
   function updateCursorClass() {
     const container = map.getContainer();
     const isSplit = activeTool === 'crop' && activeSubMode === 'split';
@@ -220,10 +416,11 @@ export function createEditorOverlay({
         || isLoopStart
         || activeTool === 'waypoint'
         || isBoxEraseMode()
+        || isDrawMode()
       ),
     );
     if (map.dragging) {
-      if (isBoxEraseMode()) map.dragging.disable();
+      if (isBoxEraseMode() || isDrawMode()) map.dragging.disable();
       else map.dragging.enable();
     }
   }
@@ -266,7 +463,7 @@ export function createEditorOverlay({
 
   function getScreenSegments() {
     if (!cachedScreenSegments) {
-      cachedScreenSegments = buildScreenCache(map, cachedPaths);
+      cachedScreenSegments = buildScreenCache(map, cachedPathEntries);
     }
     return cachedScreenSegments;
   }
@@ -393,7 +590,7 @@ export function createEditorOverlay({
     }
 
     // Highlight detected GPS drift anomalies in clean mode
-    if (activeTool === 'clean') {
+    if (activeTool === 'clean' && activeSubMode !== 'smooth-ele') {
       for (const spike of detectAnomalyPoints(currentParsed)) {
         const excluded = excludedAnomalyKeys.has(spike.key);
         L.circleMarker([spike.lat, spike.lon], {
@@ -451,6 +648,7 @@ export function createEditorOverlay({
     if (!waypointsVisible) return;
 
     const canDrag = activeTool === 'waypoint';
+    const allowWptInteract = !isDrawMode();
     (currentParsed.waypoints || []).forEach((wpt, index) => {
       if (!Number.isFinite(wpt.lat) || !Number.isFinite(wpt.lon)) return;
       const isSelected = index === selectedWptIndex;
@@ -475,9 +673,11 @@ export function createEditorOverlay({
       const marker = L.marker([wpt.lat, wpt.lon], {
         icon,
         draggable: canDrag,
+        interactive: allowWptInteract,
         zIndexOffset: isSelected ? 400 : 200,
       }).addTo(waypointGroup);
       wptMarkers.set(index, marker);
+      if (!allowWptInteract) return;
       marker.bindTooltip(() => buildWptTooltip(wpt, index), {
         direction: 'top',
         offset: [0, -24],
@@ -662,6 +862,35 @@ export function createEditorOverlay({
     const isSplit = activeTool === 'crop' && activeSubMode === 'split';
     const isTrackSnap = isSplit || isLoopStart;
     const isWpt = activeTool === 'waypoint';
+    if (isDrawMode()) {
+      clearSplitPreview();
+      clearDrawHover();
+      const snapped = resolveDrawSnap(latlng);
+      const targetLat = snapped ? snapped.lat : latlng.lat;
+      const targetLon = snapped ? snapped.lon : latlng.lng;
+      if (snapped && drawGroup) {
+        drawSnapReticle = createSnapReticleMarker(L, { lat: targetLat, lon: targetLon }, {
+          kind: snapped.kind === 'track' ? 'track' : 'marker',
+          animate: false,
+          zIndexOffset: 500,
+        });
+        drawSnapReticle?.addTo(drawGroup);
+      }
+      if (drawPoints.length > 0 && drawGroup) {
+        const prev = drawPoints[drawPoints.length - 1];
+        drawRubberLine = L.polyline(
+          [[prev.lat, prev.lon], [targetLat, targetLon]],
+          {
+            color: '#38bdf8',
+            weight: 2.5,
+            opacity: 0.7,
+            dashArray: '5 5',
+            interactive: false,
+          },
+        ).addTo(drawGroup);
+      }
+      return;
+    }
     if (isTrackSnap || isWpt) {
       const maxPx = isTrackSnap ? 24 : 18;
       const hit = nearestOnTrack(map, getScreenSegments(), latlng);
@@ -693,6 +922,26 @@ export function createEditorOverlay({
 
   const onMapClick = (event) => {
     if (!group || !currentParsed) return;
+    if (isDrawMode()) {
+      if (event.originalEvent && event.originalEvent.button !== 0) return;
+      const snapped = resolveDrawSnap(event.latlng);
+      const pt = snapped
+        ? {
+          lat: snapped.lat,
+          lon: snapped.lon,
+          ele: Number.isFinite(snapped.ele) ? snapped.ele : undefined,
+          snap: snapped.snap || null,
+        }
+        : {
+          lat: event.latlng.lat,
+          lon: event.latlng.lng,
+          snap: null,
+        };
+      drawPoints.push(pt);
+      renderDrawLayer();
+      notifyDrawChange();
+      return;
+    }
     if (activeTool === 'crop' && activeSubMode === 'split') {
       const hit = nearestOnTrack(map, getScreenSegments(), event.latlng);
       if (hit && hit.distPx <= 24) {
@@ -762,11 +1011,13 @@ export function createEditorOverlay({
     trackGroup = L.layerGroup().addTo(group);
     waypointGroup = L.layerGroup().addTo(group);
     vertexGroup = L.layerGroup().addTo(group);
+    drawGroup = L.layerGroup().addTo(group);
     currentParsed = parsed;
     cachedPathEntries = allPathEntries(parsed);
     cachedPaths = cachedPathEntries.map((entry) => entry.points);
     cachedTotalMeters = trackTotalDistance(parsed);
     cachedScreenSegments = null;
+    rebuildDrawSnapIndexes();
     cropRange = [0, cachedTotalMeters];
 
     const container = map.getContainer();
@@ -775,7 +1026,7 @@ export function createEditorOverlay({
       clearBox();
     }, { signal: lifecycle.signal });
     container.addEventListener('pointerdown', (event) => {
-      if (!isBoxEraseMode()) return;
+      if (!isBoxEraseMode() && !isDrawMode()) return;
       if (event.target instanceof Element && event.target.closest('.leaflet-control, .leaflet-control-container')) {
         return;
       }
@@ -792,6 +1043,7 @@ export function createEditorOverlay({
         container.classList.add('editor-cursor-grabbing');
         return;
       }
+      if (!isBoxEraseMode()) return;
       if (event.button !== 0 || panState) return;
       clearBox();
       const rect = container.getBoundingClientRect();
@@ -888,9 +1140,13 @@ export function createEditorOverlay({
       group.remove();
       group = null;
     }
+    clearDrawDraft({ notify: false });
     trackGroup = null;
     waypointGroup = null;
     vertexGroup = null;
+    drawGroup = null;
+    drawEndpointIndex = null;
+    drawWptIndex = null;
     cachedPathEntries = [];
     cachedPaths = [];
     cachedTotalMeters = 0;
@@ -910,6 +1166,8 @@ export function createEditorOverlay({
       cachedPaths = cachedPathEntries.map((entry) => entry.points);
       cachedTotalMeters = trackTotalDistance(parsed);
       cachedScreenSegments = null;
+      rebuildDrawSnapIndexes();
+      clearDrawDraft({ notify: true });
       cropRange = [0, Math.min(cachedTotalMeters, cropRange[1] > 0 ? cropRange[1] : cachedTotalMeters)];
       if (cropRange[0] >= cropRange[1]) cropRange = [0, cachedTotalMeters];
       render();
@@ -918,6 +1176,7 @@ export function createEditorOverlay({
       clearBox();
       clearPan();
       clearSplitPreview();
+      clearDrawDraft({ notify: true });
       handleSplitHover(null);
       activeTool = tool;
       activeSubMode = subMode;
@@ -969,6 +1228,24 @@ export function createEditorOverlay({
     },
     getVertexStatus() {
       return { zoom: map.getZoom(), visibleCount: visibleVertexCount, hiddenMidpoints };
+    },
+    getDrawDraft() {
+      return {
+        points: drawPoints.map((pt) => ({ lat: pt.lat, lon: pt.lon, ele: pt.ele })),
+        startSnap: drawPoints.length > 0 ? (drawPoints[0].snap || null) : null,
+        endSnap: drawPoints.length > 1 ? (drawPoints[drawPoints.length - 1].snap || null) : null,
+        distanceMeters: computeDrawDistance(),
+      };
+    },
+    undoDrawPoint() {
+      if (drawPoints.length === 0) return false;
+      drawPoints.pop();
+      renderDrawLayer();
+      notifyDrawChange();
+      return true;
+    },
+    clearDrawDraft() {
+      clearDrawDraft({ notify: true });
     },
   };
 }

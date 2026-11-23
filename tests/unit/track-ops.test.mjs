@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   addWaypoint,
+  applyDrawnPath,
   cleanAnomalies,
   closeLoop,
   cropTrack,
@@ -20,6 +21,7 @@ import {
   rotateLoopStart,
   shiftTrackTimestamps,
   simplifyTrack,
+  smoothTrackElevation,
   sortWaypointsByRoute,
   splitTrackAt,
   trackTotalDistance,
@@ -446,4 +448,251 @@ test('sortWaypointsByRoute orders waypoints along route distance including loop 
   const ordered = sortWaypointsByRoute(base);
   assert.deepEqual(ordered.map((item) => item.wpt.name), ['起点', '中途垭口', '终点']);
   assert.deepEqual(ordered.map((item) => item.index), [1, 2, 0]);
+});
+
+test('applyDrawnPath replaces same-segment span forward with interpolated elevation and clears timestamps', () => {
+  const base = {
+    name: 'gap',
+    tracks: [{
+      name: 'Main',
+      segments: [[
+        { lat: 39.900, lon: 116.300, ele: 100, time: new Date('2026-10-01T08:00:00Z') },
+        { lat: 39.905, lon: 116.300, ele: 150, time: new Date('2026-10-01T08:05:00Z') },
+        { lat: 39.910, lon: 116.300, ele: 200, time: new Date('2026-10-01T08:10:00Z') },
+        { lat: 39.920, lon: 116.300, ele: 300, time: new Date('2026-10-01T08:20:00Z') },
+      ]],
+    }],
+    routes: [],
+    waypoints: [],
+    areas: [],
+  };
+  const drawn = [
+    { lat: 39.900, lon: 116.300 },
+    { lat: 39.905, lon: 116.302 },
+    { lat: 39.910, lon: 116.300 },
+  ];
+  const res = applyDrawnPath(base, drawn, {
+    startSnap: { flatSegIndex: 0, ptIndex: 0 },
+    endSnap: { flatSegIndex: 0, ptIndex: 2 },
+  });
+  assert.equal(res.mode, 'replace');
+  assert.equal(res.addedPoints, 1);
+  assert.equal(res.timestampsCleared, true);
+  const seg = res.track.tracks[0].segments[0];
+  assert.equal(seg.length, 4);
+  assert.equal(seg[1].lon, 116.302);
+  assert.ok(Math.abs(seg[1].ele - 150) < 2);
+  assert.equal(seg[0].time, undefined);
+});
+
+test('applyDrawnPath reverses drawn middle points when endSnap precedes startSnap', () => {
+  const base = {
+    name: 'reverse-gap',
+    tracks: [{
+      name: 'Main',
+      segments: [[
+        { lat: 39.900, lon: 116.300, ele: 100 },
+        { lat: 39.905, lon: 116.300, ele: 150 },
+        { lat: 39.910, lon: 116.300, ele: 200 },
+        { lat: 39.920, lon: 116.300, ele: 300 },
+      ]],
+    }],
+    routes: [],
+    waypoints: [],
+    areas: [],
+  };
+  const drawn = [
+    { lat: 39.910, lon: 116.300 },
+    { lat: 39.907, lon: 116.303 },
+    { lat: 39.903, lon: 116.303 },
+    { lat: 39.900, lon: 116.300 },
+  ];
+  const res = applyDrawnPath(base, drawn, {
+    startSnap: { flatSegIndex: 0, ptIndex: 2 },
+    endSnap: { flatSegIndex: 0, ptIndex: 0 },
+  });
+  assert.equal(res.mode, 'replace');
+  const seg = res.track.tracks[0].segments[0];
+  assert.equal(seg.length, 5);
+  assert.equal(seg[1].lat, 39.903);
+  assert.equal(seg[2].lat, 39.907);
+  assert.ok(seg[1].ele < seg[2].ele);
+});
+
+test('applyDrawnPath extends segment endpoints without fabricating elevation', () => {
+  const base = {
+    name: 'ext',
+    tracks: [{
+      name: 'Main',
+      segments: [[
+        { lat: 39.900, lon: 116.300, ele: 100 },
+        { lat: 39.910, lon: 116.300, ele: 200 },
+      ]],
+    }],
+    routes: [],
+    waypoints: [],
+    areas: [],
+  };
+  const res = applyDrawnPath(base, [
+    { lat: 39.910, lon: 116.300 },
+    { lat: 39.915, lon: 116.305 },
+    { lat: 39.920, lon: 116.310 },
+  ], { startSnap: { flatSegIndex: 0, ptIndex: 1 }, endSnap: null });
+  assert.equal(res.mode, 'extend-end');
+  const seg = res.track.tracks[0].segments[0];
+  assert.equal(seg.length, 4);
+  assert.equal(seg[2].ele, undefined);
+  assert.equal(seg[3].lat, 39.920);
+});
+
+test('applyDrawnPath appends a new branch segment when not anchored to one segment', () => {
+  const base = sampleTrack();
+  const res = applyDrawnPath(base, [
+    { lat: 39.95, lon: 116.35 },
+    { lat: 39.96, lon: 116.36 },
+  ]);
+  assert.equal(res.mode, 'branch');
+  assert.equal(res.track.tracks[0].segments.length, 2);
+  assert.equal(res.track.tracks[0].segments[1].length, 2);
+});
+
+test('generateVirtualTimeline gradeAdjusted adds Naismith climb time and falls back when elevation is missing', () => {
+  const climbing = {
+    name: 'climb',
+    tracks: [{
+      name: 't',
+      segments: [[
+        { lat: 39.900, lon: 116.300, ele: 100 },
+        { lat: 39.909, lon: 116.300, ele: 400 },
+      ]],
+    }],
+    routes: [],
+    waypoints: [],
+    areas: [],
+  };
+  const start = Date.parse('2026-10-01T08:00:00Z');
+  const flat = generateVirtualTimeline(climbing, start, 1.25, { gradeAdjusted: false });
+  const graded = generateVirtualTimeline(climbing, start, 1.25, { gradeAdjusted: true });
+  // +300m climb adds ~1800s under Naismith (+6 s/m).
+  assert.ok(graded.durationSeconds - flat.durationSeconds >= 1790);
+
+  const noEle = {
+    name: 'flat',
+    tracks: [{
+      name: 't',
+      segments: [[
+        { lat: 39.900, lon: 116.300 },
+        { lat: 39.909, lon: 116.300 },
+      ]],
+    }],
+    routes: [],
+    waypoints: [],
+    areas: [],
+  };
+  const noEleFlat = generateVirtualTimeline(noEle, start, 1.25, { gradeAdjusted: false });
+  const noEleGraded = generateVirtualTimeline(noEle, start, 1.25, { gradeAdjusted: true });
+  assert.equal(noEleGraded.durationSeconds, noEleFlat.durationSeconds);
+});
+
+test('smoothTrackElevation removes isolated spikes, keeps endpoints and non-ele fields intact', () => {
+  const noisy = {
+    name: 'noisy',
+    tracks: [{
+      name: 't',
+      segments: [[
+        { lat: 39.900, lon: 116.300, ele: 100, heartRate: 120, time: new Date('2026-10-01T08:00:00Z') },
+        { lat: 39.901, lon: 116.300, ele: 110, heartRate: 125, time: new Date('2026-10-01T08:01:00Z') },
+        { lat: 39.902, lon: 116.300, ele: 450, heartRate: 130, time: new Date('2026-10-01T08:02:00Z') },
+        { lat: 39.903, lon: 116.300, ele: 125, heartRate: 132, time: new Date('2026-10-01T08:03:00Z') },
+        { lat: 39.904, lon: 116.300, ele: 0, heartRate: 135, time: new Date('2026-10-01T08:04:00Z') },
+        { lat: 39.905, lon: 116.300, ele: 140, heartRate: 138, time: new Date('2026-10-01T08:05:00Z') },
+        { lat: 39.906, lon: 116.300, ele: 150, heartRate: 140, time: new Date('2026-10-01T08:06:00Z') },
+      ]],
+    }],
+    routes: [],
+    waypoints: [],
+    areas: [],
+  };
+  const res = smoothTrackElevation(noisy, { windowSize: 5, spikeThresholdMeters: 30 });
+  const seg = res.track.tracks[0].segments[0];
+  assert.equal(seg[0].ele, 100);
+  assert.equal(seg[seg.length - 1].ele, 150);
+  assert.ok(seg[2].ele < 200);
+  assert.ok(seg[4].ele > 100);
+  assert.ok(res.afterAscent < res.beforeAscent);
+  assert.ok(res.adjustedCount >= 2);
+  assert.equal(seg[2].heartRate, 130);
+  assert.equal(seg[2].time.toISOString(), '2026-10-01T08:02:00.000Z');
+});
+
+test('applyDrawnPath supports snapping onto arbitrary interpolated points along a segment', () => {
+  const base = {
+    name: 'mid-seg',
+    tracks: [{
+      name: 'Main',
+      segments: [[
+        { lat: 39.900, lon: 116.300, ele: 100 },
+        { lat: 39.910, lon: 116.300, ele: 200 },
+        { lat: 39.920, lon: 116.300, ele: 300 },
+      ]],
+    }],
+    routes: [],
+    waypoints: [],
+    areas: [],
+  };
+  const res = applyDrawnPath(base, [
+    { lat: 39.905, lon: 116.300 },
+    { lat: 39.910, lon: 116.305 },
+    { lat: 39.915, lon: 116.300 },
+  ], {
+    startSnap: { flatSegIndex: 0, ptIndex: 0, segT: 0.5 },
+    endSnap: { flatSegIndex: 0, ptIndex: 1, segT: 0.5 },
+  });
+  assert.equal(res.mode, 'replace');
+  const seg = res.track.tracks[0].segments[0];
+  // Original start + interpolated anchorLo + drawn middle + interpolated anchorHi + original end = 5 points.
+  assert.equal(seg.length, 5);
+  assert.ok(Math.abs(seg[1].lat - 39.905) < 1e-6);
+  assert.ok(Math.abs(seg[1].ele - 150) < 1e-6);
+  assert.equal(seg[2].lon, 116.305);
+  assert.ok(Math.abs(seg[2].ele - 200) < 2);
+  assert.ok(Math.abs(seg[3].lat - 39.915) < 1e-6);
+  assert.ok(Math.abs(seg[3].ele - 250) < 1e-6);
+});
+
+test('applyDrawnPath closes loop instead of erasing track when snapping segment end to start', () => {
+  const base = {
+    name: 'almost-loop',
+    tracks: [{
+      name: 'Main',
+      segments: [[
+        { lat: 39.900, lon: 116.300, ele: 100, time: new Date('2026-10-01T08:00:00Z') },
+        { lat: 39.910, lon: 116.300, ele: 200, time: new Date('2026-10-01T08:10:00Z') },
+        { lat: 39.910, lon: 116.310, ele: 220, time: new Date('2026-10-01T08:20:00Z') },
+        { lat: 39.901, lon: 116.302, ele: 120, time: new Date('2026-10-01T08:30:00Z') },
+      ]],
+    }],
+    routes: [],
+    waypoints: [],
+    areas: [],
+  };
+  // Draw from end (ptIndex 3) back to start (ptIndex 0) with 1 middle point.
+  const res = applyDrawnPath(base, [
+    { lat: 39.901, lon: 116.302 },
+    { lat: 39.9005, lon: 116.301 },
+    { lat: 39.900, lon: 116.300 },
+  ], {
+    startSnap: { flatSegIndex: 0, ptIndex: 3, segT: 0 },
+    endSnap: { flatSegIndex: 0, ptIndex: 0, segT: 0 },
+  });
+  assert.equal(res.mode, 'close-loop');
+  assert.equal(res.timestampsCleared, true);
+  const seg = res.track.tracks[0].segments[0];
+  // All 4 original points kept + 1 middle + 1 closing start point = 6 points.
+  assert.equal(seg.length, 6);
+  assert.equal(seg[1].lat, 39.910);
+  assert.equal(seg[4].lat, 39.9005);
+  assert.ok(seg[4].ele > 100 && seg[4].ele < 120);
+  assert.equal(seg[5].lat, 39.900);
+  assert.equal(seg[5].lon, 116.300);
 });
