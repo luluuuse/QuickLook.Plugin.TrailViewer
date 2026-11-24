@@ -17,6 +17,28 @@ Added / Changed / Deprecated / Removed / Fixed / Security 分类；没有内容�
 
 None yet.
 
+## 1.30.1 — 2026-11-25
+
+### 中文
+
+#### 变更
+
+- **优化检查更新角标与按钮视觉**：将顶部工具箱入口的更新圆点改为 5px 柔和青蓝微光点，底部发现新版按钮改为清新翠绿描边胶囊（`↑ vX.Y.Z`），更贴合暗色玻璃态界面；同步更新「编辑轨迹」卡片副标题以反映多格式导出能力。
+
+#### 修复
+
+- **修复更新圆点误覆盖底部按钮文字**：收紧工具箱角标样式选择器，避免圆点错误挂载到底部版本胶囊上遮挡版本号末尾数字。
+
+### English
+
+#### Changed
+
+- **Refined Update Indicator & Badge Styling**: Replaced the red dot with a subtle 5px cyan glow dot on the top Toolbox button and restyled the footer update pill as a soft emerald badge (`↑ vX.Y.Z`) matching the dark glass theme; updated the Edit Track card subtitle to reflect multi-format export.
+
+#### Fixed
+
+- **Prevented Update Dot from Overlapping Footer Pill Text**: Scoped the corner indicator selector strictly to the top-level Toolbox toggle button so it no longer renders over the version number inside the footer update pill.
+
 ## 1.30.0 — 2026-11-25
 
 ### 中文
