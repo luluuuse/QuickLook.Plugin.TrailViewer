@@ -136,6 +136,7 @@ function nearestOnTrack(map, cachedSegments, latlng) {
  *   onInsertVertex?: (flatSegIndex: number, afterIndex: number, lat: number, lon: number, ele?: number) => void,
  *   onViewportChange?: () => void,
  *   onContextMenu?: (info: { clientX: number, clientY: number, lat: number, lon: number, ele?: number, splitMeters: number | null, waypointIndex?: number }) => void,
+ *   onDrawChange?: (draft: { count: number, distanceMeters: number, startSnap: any, endSnap: any }) => void,
  * }} opts
  */
 export function createEditorOverlay({

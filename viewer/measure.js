@@ -33,7 +33,9 @@ export function measurementSummary(sections) {
  * Pick the closest target within the snap radius. Exact ties follow marker > measure > track so
  * explicit waypoints win over measured vertices, which win over dense track samples.
  *
- * @param {{kind:string, distancePixels:number}[]} candidates
+ * @template {{ kind: string, distancePixels: number }} T
+ * @param {T[]} candidates
+ * @returns {T | null}
  */
 export function chooseSnap(candidates) {
   let best = null;

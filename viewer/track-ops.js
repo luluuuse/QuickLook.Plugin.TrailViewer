@@ -1180,6 +1180,7 @@ export function applyDrawnPath(parsed, drawnPoints, { startSnap = null, endSnap 
     return { track: next, mode: 'noop', addedPoints: 0, timestampsCleared: false };
   }
   const drawn = drawnPoints.map((pt) => {
+    /** @type {{ lat: number, lon: number, ele?: number }} */
     const clean = { lat: Number(pt.lat), lon: Number(pt.lon) };
     if (Number.isFinite(pt.ele)) clean.ele = Number(pt.ele);
     return clean;
