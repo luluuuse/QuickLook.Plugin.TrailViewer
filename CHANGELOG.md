@@ -17,6 +17,22 @@ Added / Changed / Deprecated / Removed / Fixed / Security 分类；没有内容�
 
 None yet.
 
+## 1.30.2 — 2026-11-25
+
+### 中文
+
+#### 新增
+
+- **国内 GitCode 镜像双源更新**：检查更新新增 GitCode 国内镜像源并与 GitHub 并行竞速，单边超时或不可达时自动无缝回退；下载安装包失败时同步回退到备用镜像，显著提升国内网络下的检查与下载稳定性。
+- **安装包 SHA256 强校验**：下载 `.qlplugin` 安装包后自动核对官方发布说明中的 SHA256 哈希与插件清单完整性，防篡改、防下载截断。
+
+### English
+
+#### Added
+
+- **GitHub + GitCode Dual-Source Update Fallback**: Update checks now race GitHub Releases and the GitCode mirror with automatic failover for both metadata lookup and `.qlplugin` package downloads, improving reliability on mainland China networks.
+- **SHA256 Package Verification**: Downloaded `.qlplugin` packages are now verified against the published SHA256 checksum in addition to manifest archive validation before handing off to QuickLook.
+
 ## 1.30.1 — 2026-11-25
 
 ### 中文
