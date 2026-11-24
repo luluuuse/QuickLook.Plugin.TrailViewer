@@ -407,8 +407,17 @@ async function ensureEditorLoaded() {
           getTrackName: () => ctx.fileName,
           getProfileState: () => activeProfile,
           isGpxSource: () => /\.gpx$/i.test((ctx.fileName || ctx.src || '').split(/[?#]/)[0]),
-          onSaveTrack: ({ id, fileName: outName, xml, overwrite }) =>
-            hostBridge.saveTrackGpx({ id, fileName: outName, xml, overwrite }),
+          onSaveTrack: ({ id, fileName: outName, xml, content, format, overwrite, packRemoteImages, onProgress }) =>
+            hostBridge.saveTrackGpx({
+              id,
+              fileName: outName,
+              xml,
+              content: content ?? xml,
+              format,
+              overwrite,
+              packRemoteImages,
+              onProgress,
+            }),
           onListSiblingTracks: hasQuickLookHost ? () => hostBridge.listSiblingTracks() : null,
           onImportExternalTrack: hasQuickLookHost ? (opts) => hostBridge.importExternalTrack(opts) : null,
           onToggleLayers: () => layerSwitch?.toggle?.(),

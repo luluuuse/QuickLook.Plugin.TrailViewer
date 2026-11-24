@@ -360,6 +360,7 @@ export function createWaypointController({
       if (descriptions.length > 0) point.description = descriptions.join(' · ');
       if (insightTexts.length > 0) point.insightText = insightTexts.join('\n');
       if (icons.length > 0) point.icon = icons.join(' ');
+      const preferred = group.find(({ stop }) => stop.photos.length > 0) || first;
       return {
         ...first,
         stop: {
@@ -369,7 +370,7 @@ export function createWaypointController({
           mergedCount: group.length,
         },
         members: group.map(({ index }) => index),
-        navIndex: first.navIndex,
+        navIndex: preferred.navIndex,
       };
     });
     return overviewCache;

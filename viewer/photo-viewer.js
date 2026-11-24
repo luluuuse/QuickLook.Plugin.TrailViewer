@@ -1,5 +1,6 @@
 import { createFocusTrap } from './focus.js';
 import { iconElement, setIcon } from './icons.js';
+import { openExternal } from './weather.js';
 
 const ZOOM_LEVELS = [
   0.05, 0.067, 0.1, 0.125, 0.167, 0.2, 0.25, 0.333, 0.4, 0.5, 0.667, 0.75,
@@ -300,6 +301,20 @@ export function createPhotoViewer({ el, formatters, formatCoord, t }) {
     if (preloader.src !== nextUrl) preloader.src = nextUrl;
   }
 
+  function renderFailed(url) {
+    const nodes = [el('div', null, t('photo.failed')), el('code', null, url)];
+    if (typeof url === 'string' && /^https:\/\//i.test(url)) {
+      const openButton = /** @type {HTMLButtonElement} */ (el('button', 'photo-open-external', t('photo.openExternal')));
+      openButton.type = 'button';
+      openButton.addEventListener('click', (event) => {
+        event.stopPropagation();
+        openExternal(url);
+      });
+      nodes.push(openButton);
+    }
+    status.replaceChildren(...nodes);
+  }
+
   function load() {
     const url = list[index];
     const mine = ++token;
@@ -329,7 +344,7 @@ export function createPhotoViewer({ el, formatters, formatCoord, t }) {
       status.hidden = false;
       statusKind = 'failed';
       status.className = 'photo-status failed';
-      status.replaceChildren(el('div', null, t('photo.failed')), el('code', null, url));
+      renderFailed(url);
     };
     img.src = url;
   }
@@ -389,7 +404,7 @@ export function createPhotoViewer({ el, formatters, formatCoord, t }) {
     if (zoomOutput && !zoomOutput.hidden) paintZoom();
     if (statusKind === 'loading') status.textContent = t('photo.loading');
     if (statusKind === 'failed') {
-      status.replaceChildren(el('div', null, t('photo.failed')), el('code', null, list[index]));
+      renderFailed(list[index]);
     }
   }
 

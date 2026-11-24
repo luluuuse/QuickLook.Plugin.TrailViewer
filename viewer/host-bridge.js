@@ -127,11 +127,38 @@ export function createHostBridge() {
     }
   }
 
-  function saveTrackGpx({ id, fileName, xml, overwrite = false }) {
+  function trackSaveProgress(id, completed = 0, total = 0, failed = 0) {
+    const pending = pendingTrackSaves.get(id);
+    if (!pending || typeof pending.onProgress !== 'function') return;
+    pending.onProgress({
+      completed: Math.max(0, Number(completed) || 0),
+      total: Math.max(0, Number(total) || 0),
+      failed: Math.max(0, Number(failed) || 0),
+    });
+  }
+
+  /**
+   * Sends a serialized track payload in chunks to the host for saving.
+   * @param {{ id: string, fileName: string, xml?: string, content?: string, format?: string, overwrite?: boolean, packRemoteImages?: boolean, onProgress?: ((info: { completed: number, total: number, failed: number }) => void) | null }} opts
+   */
+  function saveTrackGpx({
+    id,
+    fileName,
+    xml = '',
+    content,
+    format = 'gpx',
+    overwrite = false,
+    packRemoteImages = false,
+    onProgress = null,
+  }) {
     if (!hasHost) {
       return Promise.resolve({ ok: true, cancelled: false, path: fileName, detail: 'browser-preview' });
     }
-    const bytes = new TextEncoder().encode(xml);
+    const safeFormat = String(format || 'gpx').toLowerCase();
+    const text = content ?? xml ?? '';
+    const effectiveOverwrite = safeFormat === 'gpx' && Boolean(overwrite);
+    const effectivePackRemote = safeFormat === 'kmz' && Boolean(packRemoteImages);
+    const bytes = new TextEncoder().encode(text);
     let binary = '';
     const sliceSize = 0x8000;
     for (let i = 0; i < bytes.length; i += sliceSize) {
@@ -145,9 +172,12 @@ export function createHostBridge() {
       const timer = setTimeout(() => {
         pendingTrackSaves.delete(id);
         resolve({ ok: false, cancelled: false, path: '', detail: 'save timed out' });
-      }, overwrite ? 30000 : 300000);
-      pendingTrackSaves.set(id, { resolve, timer });
-      post(`trackbegin\t${id}\t${totalChunks}\t${overwrite ? '1' : '0'}\t${encodeURIComponent(fileName)}`);
+      }, effectivePackRemote ? 600000 : (effectiveOverwrite ? 30000 : 300000));
+      pendingTrackSaves.set(id, { resolve, timer, onProgress });
+      post(
+        `trackbegin\t${id}\t${totalChunks}\t${effectiveOverwrite ? '1' : '0'}`
+        + `\t${encodeURIComponent(fileName)}\t${safeFormat}\t${effectivePackRemote ? '1' : '0'}`,
+      );
       for (let i = 0; i < totalChunks; i += 1) {
         const chunk = base64.slice(i * chunkSize, (i + 1) * chunkSize);
         post(`trackchunk\t${id}\t${i}\t${chunk}`);
@@ -316,6 +346,8 @@ export function createHostBridge() {
         api.tileCacheCleared?.(Number(parts[1]), Number(parts[2]));
       } else if (parts[0] === 'trackSaveResult') {
         trackSaveResult(parts[1], Number(parts[2]), parts[3], parts[4]);
+      } else if (parts[0] === 'trackSaveProgress') {
+        trackSaveProgress(parts[1], Number(parts[2]), Number(parts[3]), Number(parts[4]));
       } else if (parts[0] === 'nodeProbeResult') {
         nodeProbeResult(parts[1], parts[2] === '1', Number(parts[3]), parts[4]);
       } else if (parts[0] === 'trackImportList') {

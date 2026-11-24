@@ -21,8 +21,8 @@ namespace QuickLook.Plugin.TrailViewer;
 internal sealed class AttachmentExport : IDisposable
 {
     private const long MaxImageBytes = 30L * 1024 * 1024;
-    private const long MaxTotalBytes = 300L * 1024 * 1024;
-    private const int MaxImageCount = 200;
+    private const long MaxTotalBytes = 1024L * 1024 * 1024;
+    private const int MaxImageCount = 1000;
     private const string ManifestName = ".trailviewer-photo-export.json";
     private static readonly Regex BatchPattern = new("^[a-z0-9-]+$", RegexOptions.CultureInvariant);
 
@@ -467,14 +467,20 @@ internal sealed class AttachmentExport : IDisposable
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException) { }
     }
 
-    private async Task<DownloadedImage> DownloadImageAsync(string value, CancellationToken cancel)
+    private Task<DownloadedImage> DownloadImageAsync(string value, CancellationToken cancel) =>
+        DownloadImageWithHostCacheAsync(value, _hostChecks, cancel);
+
+    internal static async Task<DownloadedImage> DownloadImageWithHostCacheAsync(
+        string value,
+        ConcurrentDictionary<string, Task<bool>> hostChecks,
+        CancellationToken cancel)
     {
         var uri = new Uri(value, UriKind.Absolute);
         for (var redirect = 0; redirect <= 4; redirect++)
         {
             if (!IsAllowedUri(uri.AbsoluteUri))
                 throw new InvalidDataException("only public HTTPS image links can be downloaded");
-            await EnsurePublicHostAsync(uri, cancel).ConfigureAwait(false);
+            await EnsurePublicHostAsync(uri, hostChecks, cancel).ConfigureAwait(false);
 
             using var request = new HttpRequestMessage(HttpMethod.Get, uri);
             request.Headers.Accept.ParseAdd("image/*");
@@ -534,14 +540,15 @@ internal sealed class AttachmentExport : IDisposable
     /// shortcut: DNS is checked before HttpClient resolves it again. Upgrade to a pinned-IP connector if hostile
     /// DNS rebinding becomes part of the threat model.
     /// </summary>
-    private async Task EnsurePublicHostAsync(Uri uri, CancellationToken cancel)
+    private static async Task EnsurePublicHostAsync(
+        Uri uri, ConcurrentDictionary<string, Task<bool>> hostChecks, CancellationToken cancel)
     {
         string host = uri.DnsSafeHost;
-        var check = _hostChecks.GetOrAdd(host, _ => ValidatePublicHostAsync(host, cancel));
+        var check = hostChecks.GetOrAdd(host, _ => ValidatePublicHostAsync(host, cancel));
         if (!await check.ConfigureAwait(false))
         {
             // A DNS timeout is transient. Do not poison every later image from this host in the batch.
-            _hostChecks.TryRemove(host, out _);
+            hostChecks.TryRemove(host, out _);
             throw new InvalidDataException("the image host did not resolve to a public address");
         }
     }
@@ -670,7 +677,7 @@ internal sealed class AttachmentExport : IDisposable
         // cancellation source alive until those tasks finish; both are managed objects and will be collected.
     }
 
-    private sealed class DownloadedImage : IDisposable
+    internal sealed class DownloadedImage : IDisposable
     {
         internal DownloadedImage(MemoryStream bytes, string extension)
         {

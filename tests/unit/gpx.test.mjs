@@ -231,6 +231,27 @@ test('parseGpx throws GpxError on malformed XML or wrong root element', () => {
   assert.throws(() => parseGpx('<kml></kml>'), GpxError);
 });
 
+test('parseGpx lifts URL-only waypoint desc and <link> into images instead of a description', () => {
+  const url = 'https://down-files.2bulu.com/f/d1?downParams=abc%3D%3D%0A';
+  const xml = `<gpx version="1.1">
+    <wpt lat="27.45" lon="114.11">
+      <name>Start</name>
+      <desc>${url}</desc>
+      <link href="${url}"><text>media</text></link>
+    </wpt>
+    <wpt lat="27.46" lon="114.12"><name>Note</name><desc>Turn left at ${url}</desc></wpt>
+    <wpt lat="27.47" lon="114.13"><name>Plain</name></wpt>
+    <trk><trkseg><trkpt lat="27.45" lon="114.11"/><trkpt lat="27.46" lon="114.12"/></trkseg></trk>
+  </gpx>`;
+  const gpx = parseGpx(xml);
+  const [start, note, plain] = gpx.waypoints;
+  assert.deepEqual(start.images, [url]);
+  assert.equal(start.description, undefined);
+  assert.equal(note.description, `Turn left at ${url}`);
+  assert.equal(note.images, undefined);
+  assert.equal(plain.images, undefined);
+});
+
 test('parseGpx strips waypoint telemetry, falls back to cmt, backfills missing time and keeps placeholders', () => {
   const xml = `<gpx version="1.1">
     <wpt lat="30.5000" lon="114.3000">

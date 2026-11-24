@@ -35,6 +35,9 @@ internal static class ViewerMessages
     internal static string TrackSaveResult(string id, int statusCode, string path, string detail) =>
         $"trackSaveResult\t{id}\t{statusCode}\t{Encode(path)}\t{Encode(detail)}";
 
+    internal static string TrackSaveProgress(string id, int completed, int total, int failed) =>
+        $"trackSaveProgress\t{id}\t{completed}\t{total}\t{failed}";
+
     internal static string NodeProbeResult(string id, bool ok, int elapsedMs, string reason) =>
         $"nodeProbeResult\t{id}\t{(ok ? 1 : 0)}\t{elapsedMs}\t{Encode(reason)}";
 

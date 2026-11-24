@@ -97,6 +97,11 @@ export function serializeGpx(parsed, {
     if (iso) lines.push(`    <time>${iso}</time>`);
     if (wpt.name) lines.push(`    <name>${escapeXml(wpt.name)}</name>`);
     if (wpt.description) lines.push(`    <desc>${escapeXml(wpt.description)}</desc>`);
+    for (const href of Array.isArray(wpt.images) ? wpt.images : []) {
+      if (typeof href === 'string' && /^https:\/\//i.test(href)) {
+        lines.push(`    <link href="${escapeXml(href)}"><text>media</text></link>`);
+      }
+    }
     if (wpt.icon) lines.push(`    <sym>${escapeXml(wpt.icon)}</sym>`);
     lines.push('  </wpt>');
   }

@@ -1,9 +1,11 @@
 import { summariseRange } from './climb-analysis.js';
 import { createEditorDrawers } from './editor-drawers.js';
-import { findGarminWaypointWarnings, serializeGpx } from './gpx-serializer.js';
+import { findGarminWaypointWarnings } from './gpx-serializer.js';
 import { iconElement } from './icons.js';
+import { EXPORT_FORMATS, hasTrackTimestamps, serializeTrack } from './track-serializers.js';
 import {
   cloneParsedTrack,
+  createSegmentColorResolver,
   deleteTrackVertex,
   deleteWaypoint,
   normalizedTracks,
@@ -12,16 +14,13 @@ import {
   trackTotalDistance,
 } from './track-ops.js';
 
-const SPLIT_COLORS = ['#f97316', '#38bdf8', '#22c55e', '#eab308'];
-
 const RAIL_TOOLS = [
-  { id: 'crop', icon: 'editor-crop', labelKey: 'editor.rail.crop' },
-  { id: 'clean', icon: 'editor-clean', labelKey: 'editor.rail.clean' },
-  { id: 'topology', icon: 'editor-reverse', labelKey: 'editor.rail.topology' },
-  { id: 'vertex', icon: 'editor-vertex', labelKey: 'editor.rail.vertex' },
-  { id: 'draw', icon: 'edit', labelKey: 'editor.rail.draw' },
-  { id: 'waypoint', icon: 'editor-waypoint-add', labelKey: 'editor.rail.waypoint' },
-  { id: 'time', icon: 'editor-time', labelKey: 'editor.rail.time' },
+  { id: 'crop', icon: 'editor-crop', labelKey: 'editor.rail.crop', group: 'geometry', defaultSubMode: 'crop' },
+  { id: 'draw', icon: 'edit', labelKey: 'editor.rail.draw', group: 'geometry', defaultSubMode: 'draw' },
+  { id: 'topology', icon: 'editor-reverse', labelKey: 'editor.rail.topology', group: 'geometry', defaultSubMode: 'topology' },
+  { id: 'clean', icon: 'editor-clean', labelKey: 'editor.rail.clean', group: 'data', defaultSubMode: 'clean' },
+  { id: 'waypoint', icon: 'editor-waypoint-add', labelKey: 'editor.rail.waypoint', group: 'data', defaultSubMode: '' },
+  { id: 'time', icon: 'editor-time', labelKey: 'editor.rail.time', group: 'data', defaultSubMode: '' },
 ];
 
 /**
@@ -35,7 +34,7 @@ const RAIL_TOOLS = [
  *   getTrackName: () => string,
  *   getProfileState: () => any,
  *   isGpxSource?: () => boolean,
- *   onSaveTrack: (opts: { id: string, fileName: string, xml: string, overwrite: boolean }) => Promise<any>,
+ *   onSaveTrack: (opts: { id: string, fileName: string, xml: string, content?: string, format?: string, overwrite: boolean, packRemoteImages?: boolean, onProgress?: (info: { completed: number, total: number, failed: number }) => void }) => Promise<any>,
  *   onListSiblingTracks?: (() => Promise<Array<{ name: string, size: number }>>) | null,
  *   onImportExternalTrack?: ((opts: { mode?: string, name?: string }) => Promise<any>) | null,
  *   onExit: (info?: { overwroteOriginal?: boolean, committed?: any }) => void,
@@ -87,6 +86,9 @@ export function createEditorShell({
   let saveBtn = null;
   let saveOptsBtn = null;
   let savePopover = null;
+  let saveProgress = null;
+  let saveProgressText = null;
+  let saveProgressFill = null;
   let exitBtn = null;
   let exitGuard = null;
   let rail = null;
@@ -113,9 +115,15 @@ export function createEditorShell({
   let drawerOpen = true;
   let cropFromMeters = 0;
   let cropToMeters = 0;
+  let selectedSegIndex = -1;
+  let hoveredSegIndex = -1;
+  const segmentColorResolver = createSegmentColorResolver();
+  let splitFocusLine = null;
   let selectedWptIndex = -1;
   let pendingWptCoords = null;
   let watchFriendly = true;
+  let exportFormat = 'gpx';
+  let packRemoteImages = false;
   let overwriteOriginal = false;
   let sessionOverwroteOriginal = false;
   let lastOverwrittenTrack = null;
@@ -235,9 +243,38 @@ export function createEditorShell({
     }
   }
 
+  function updateSplitProfileHighlight(activeIdx) {
+    if (!splitBandsLayer) return;
+    const hasActive = activeIdx >= 0;
+    let activeBand = null;
+    for (const node of splitBandsLayer.querySelectorAll('.editor-split-band')) {
+      const idx = Number(node.dataset.segIndex);
+      const isHit = hasActive && idx === activeIdx;
+      node.classList.toggle('is-highlighted', isHit);
+      node.classList.toggle('is-dimmed', hasActive && !isHit);
+      if (isHit) activeBand = node;
+    }
+    if (splitFocusLine) {
+      if (activeBand) {
+        splitFocusLine.style.left = `${activeBand.dataset.midPx || '0'}px`;
+        splitFocusLine.style.setProperty('--split-color', activeBand.dataset.color || '#f97316');
+        splitFocusLine.hidden = false;
+      } else {
+        splitFocusLine.hidden = true;
+      }
+    }
+  }
+
+  function syncSegmentHighlight() {
+    const activeIdx = hoveredSegIndex >= 0 ? hoveredSegIndex : selectedSegIndex;
+    overlay.setHighlightedSegment?.(activeIdx);
+    updateSplitProfileHighlight(activeIdx);
+  }
+
   function renderSplitProfileMarkers() {
     if (!splitOverlay || !splitBandsLayer || splitOverlay.hidden) return;
     splitBandsLayer.textContent = '';
+    splitFocusLine = null;
     const current = store.getCurrent();
     const tracks = normalizedTracks(current);
     if (tracks.length <= 1) return;
@@ -245,17 +282,24 @@ export function createEditorShell({
     const width = splitOverlay.clientWidth;
     if (!(total > 0) || width <= 0) return;
 
+    const colors = segmentColorResolver.resolve(tracks);
     let acc = 0;
     tracks.forEach((trk, idx) => {
       const len = trackTotalDistance({ name: '', tracks: [trk], routes: [], waypoints: [] });
       const startPx = (acc / total) * width;
       const endPx = ((acc + len) / total) * width;
-      const color = SPLIT_COLORS[idx % SPLIT_COLORS.length];
+      const color = colors[idx];
+      const bandWidth = Math.max(4, endPx - startPx);
+      const bandLeft = Math.min(startPx, Math.max(0, width - bandWidth));
+      const midPx = Math.max(2, Math.min(width - 2, (startPx + endPx) * 0.5));
 
       const band = el('div', 'editor-split-band');
-      band.style.left = `${startPx.toFixed(1)}px`;
-      band.style.width = `${Math.max(1, endPx - startPx).toFixed(1)}px`;
+      band.style.left = `${bandLeft.toFixed(1)}px`;
+      band.style.width = `${bandWidth.toFixed(1)}px`;
       band.style.setProperty('--split-color', color);
+      band.dataset.segIndex = String(idx);
+      band.dataset.midPx = midPx.toFixed(1);
+      band.dataset.color = color;
       splitBandsLayer.append(band);
 
       if (idx > 0) {
@@ -268,6 +312,12 @@ export function createEditorShell({
       }
       acc += len;
     });
+
+    splitFocusLine = el('div', 'editor-split-focus-line');
+    splitFocusLine.hidden = true;
+    splitBandsLayer.append(splitFocusLine);
+    const activeIdx = hoveredSegIndex >= 0 ? hoveredSegIndex : selectedSegIndex;
+    updateSplitProfileHighlight(activeIdx);
   }
 
   function mountSplitOverlay(plot) {
@@ -495,7 +545,24 @@ export function createEditorShell({
     },
     state: {
       getSubMode: () => activeSubMode,
-      setSubMode: (mode) => { activeSubMode = mode; },
+      setSubMode: (mode) => {
+        activeSubMode = mode;
+        if (mode !== 'split') {
+          selectedSegIndex = -1;
+          hoveredSegIndex = -1;
+          syncSegmentHighlight();
+        }
+      },
+      getSegmentColors: (tracks) => segmentColorResolver.resolve(tracks),
+      getSelectedSegIndex: () => selectedSegIndex,
+      setSelectedSegIndex: (idx) => {
+        selectedSegIndex = Number.isInteger(idx) ? idx : -1;
+        syncSegmentHighlight();
+      },
+      setHoveredSegIndex: (idx) => {
+        hoveredSegIndex = Number.isInteger(idx) ? idx : -1;
+        syncSegmentHighlight();
+      },
       getCropRange: () => ({ from: cropFromMeters, to: cropToMeters }),
       setCropRange: (from, to) => { cropFromMeters = from; cropToMeters = to; },
       getSelectedWptIndex: () => selectedWptIndex,
@@ -536,6 +603,18 @@ export function createEditorShell({
   function buildSavePopoverContent() {
     if (!savePopover) return;
     savePopover.textContent = '';
+
+    const fmtRow = el('label', 'editor-save-format-row');
+    const fmtLabel = el('span', 'editor-save-format-label', t('editor.save.format'));
+    const fmtSelect = el('select', 'editor-save-format-select');
+    for (const item of EXPORT_FORMATS) {
+      const opt = el('option', '', item.label);
+      opt.value = item.id;
+      if (item.id === exportFormat) opt.selected = true;
+      fmtSelect.append(opt);
+    }
+    fmtRow.append(fmtLabel, fmtSelect);
+
     const wfRow = el('label', 'editor-check-row');
     const wfCheck = el('input');
     wfCheck.type = 'checkbox';
@@ -543,17 +622,47 @@ export function createEditorShell({
     wfCheck.addEventListener('change', () => { watchFriendly = wfCheck.checked; });
     wfRow.append(wfCheck, el('span', '', t('editor.save.watchFriendly')));
 
-    const allowOverwrite = canOverwriteSource();
-    const owRow = el('label', `editor-check-row${allowOverwrite ? '' : ' is-disabled'}`);
+    const owRow = el('label', 'editor-check-row');
     const owCheck = el('input');
     owCheck.type = 'checkbox';
-    if (!allowOverwrite) overwriteOriginal = false;
-    owCheck.checked = allowOverwrite && overwriteOriginal;
-    owCheck.disabled = !allowOverwrite;
+    const owLabel = el('span', '');
     owCheck.addEventListener('change', () => { overwriteOriginal = owCheck.checked; });
-    owRow.append(owCheck, el('span', '', t(allowOverwrite ? 'editor.save.overwrite' : 'editor.save.overwriteGpxOnly')));
+    owRow.append(owCheck, owLabel);
 
-    savePopover.append(wfRow, owRow);
+    const kmzRemoteRow = el('label', 'editor-check-row');
+    kmzRemoteRow.dataset.saveOption = 'kmz-remote';
+    const kmzRemoteCheck = el('input');
+    kmzRemoteCheck.type = 'checkbox';
+    kmzRemoteCheck.checked = packRemoteImages;
+    kmzRemoteCheck.addEventListener('change', () => { packRemoteImages = kmzRemoteCheck.checked; });
+    kmzRemoteRow.append(kmzRemoteCheck, el('span', '', t('editor.save.kmzPackRemote')));
+
+    const syncSavePopoverState = () => {
+      const isGpxFmt = exportFormat === 'gpx';
+      const isKmzFmt = exportFormat === 'kmz';
+      wfCheck.disabled = !isGpxFmt;
+      wfRow.classList.toggle('is-disabled', !isGpxFmt);
+
+      const allowOverwrite = canOverwriteSource() && isGpxFmt;
+      if (!allowOverwrite) overwriteOriginal = false;
+      owCheck.checked = allowOverwrite && overwriteOriginal;
+      owCheck.disabled = !allowOverwrite;
+      owRow.classList.toggle('is-disabled', !allowOverwrite);
+      owLabel.textContent = t(allowOverwrite
+        ? 'editor.save.overwrite'
+        : (isGpxFmt ? 'editor.save.overwriteGpxOnly' : 'editor.save.overwriteFormatGpxOnly'));
+
+      kmzRemoteRow.hidden = !isKmzFmt;
+      kmzRemoteCheck.checked = packRemoteImages;
+    };
+
+    fmtSelect.addEventListener('change', () => {
+      exportFormat = fmtSelect.value || 'gpx';
+      syncSavePopoverState();
+    });
+    syncSavePopoverState();
+
+    savePopover.append(fmtRow, wfRow, owRow, kmzRemoteRow);
   }
 
   function renderDrawer({ preserveWptScroll = false } = {}) {
@@ -575,12 +684,31 @@ export function createEditorShell({
     if (activeTool === 'crop') drawers.renderCropDrawer();
     else if (activeTool === 'clean') drawers.renderCleanDrawer();
     else if (activeTool === 'topology') drawers.renderTopologyDrawer();
-    else if (activeTool === 'vertex') drawers.renderVertexDrawer();
     else if (activeTool === 'draw') drawers.renderDrawDrawer();
     else if (activeTool === 'waypoint') drawers.renderWaypointDrawer();
     else if (activeTool === 'time') drawers.renderTimeDrawer();
 
     handleLayoutChange();
+  }
+
+  function setSaveProgressUi(info) {
+    if (!saveProgress || !saveProgressText || !saveProgressFill) return;
+    if (!info || !(info.total > 0)) {
+      saveProgress.hidden = true;
+      saveProgressFill.style.width = '0%';
+      return;
+    }
+    const { completed, total, failed } = info;
+    const pct = Math.max(0, Math.min(100, Math.round((completed / total) * 100)));
+    saveProgress.hidden = false;
+    saveProgressFill.style.width = `${pct}%`;
+    if (completed >= total) {
+      saveProgressText.textContent = t('editor.save.kmzWriting');
+    } else if (failed > 0) {
+      saveProgressText.textContent = t('editor.save.kmzProgressWithFail', { completed, total, failed });
+    } else {
+      saveProgressText.textContent = t('editor.save.kmzProgress', { completed, total });
+    }
   }
 
   async function triggerSave() {
@@ -589,35 +717,63 @@ export function createEditorShell({
     if (!current) return false;
     isSaving = true;
     if (saveBtn) saveBtn.disabled = true;
+    let lastProgress = { completed: 0, total: 0, failed: 0 };
     try {
-      if (watchFriendly) {
+      const fmtMeta = EXPORT_FORMATS.find((item) => item.id === exportFormat) || EXPORT_FORMATS[0];
+      const fmt = fmtMeta.id;
+      if (fmt === 'gpx' && watchFriendly) {
         const warn = findGarminWaypointWarnings(current.waypoints);
         if (warn.tooLongCount > 0) {
           notifyToast(t('editor.save.garminWarn', { count: warn.tooLongCount }), 3200);
         }
+      } else if (fmt === 'tcx' && !hasTrackTimestamps(current)) {
+        notifyToast(t('editor.save.tcxNoTime'), 3500);
       }
-      const xml = serializeGpx(current, { watchFriendly });
+      const content = serializeTrack(current, fmt, { watchFriendly });
       saveSequence += 1;
       const id = `save-${saveSequence}`;
       const baseName = (getTrackName() || 'track').replace(/\.[^.]+$/, '');
-      const fileName = `${baseName}-edited.gpx`;
-      const allowOverwrite = canOverwriteSource();
+      const fileName = `${baseName}-edited${fmtMeta.ext}`;
+      const allowOverwrite = canOverwriteSource() && fmt === 'gpx';
       const didOverwrite = allowOverwrite && overwriteOriginal;
       const savingVersion = store.getVersion();
       const result = await onSaveTrack({
         id,
         fileName,
-        xml,
+        xml: content,
+        content,
+        format: fmt,
         overwrite: didOverwrite,
+        packRemoteImages: fmt === 'kmz' && packRemoteImages,
+        onProgress: (info) => {
+          lastProgress = info;
+          setSaveProgressUi(info);
+        },
       });
       if (result?.ok) {
-        if (didOverwrite || result?.overwrote) {
+        if (fmt === 'gpx' && (didOverwrite || result?.overwrote)) {
           sessionOverwroteOriginal = true;
           lastOverwrittenTrack = cloneParsedTrack(current);
         }
         store.markSaved(savingVersion);
         updateTopbar();
-        notifyToast(t('editor.save.ok', { path: result.path || fileName }));
+        const savedPath = result.path || fileName;
+        if (lastProgress.total > 0) {
+          const packed = Math.max(0, lastProgress.total - lastProgress.failed);
+          notifyToast(
+            lastProgress.failed > 0
+              ? t('editor.save.okWithRemotePartial', {
+                path: savedPath,
+                packed,
+                total: lastProgress.total,
+                failed: lastProgress.failed,
+              })
+              : t('editor.save.okWithRemote', { path: savedPath, packed }),
+            3200,
+          );
+        } else {
+          notifyToast(t('editor.save.ok', { path: savedPath }));
+        }
         return true;
       }
       if (result?.cancelled) return false;
@@ -625,6 +781,7 @@ export function createEditorShell({
       return false;
     } finally {
       isSaving = false;
+      setSaveProgressUi(null);
       if (saveBtn) saveBtn.disabled = false;
     }
   }
@@ -632,6 +789,7 @@ export function createEditorShell({
   function requestExit() {
     if (!store.isActive()) return;
     closeSavePopover();
+    setSaveProgressUi(null);
     closeContextMenu();
     if (!store.isDirty()) {
       close();
@@ -705,6 +863,14 @@ export function createEditorShell({
     savePopover = el('div', 'editor-save-popover');
     savePopover.hidden = true;
 
+    saveProgress = el('div', 'editor-save-progress');
+    saveProgress.hidden = true;
+    saveProgressText = el('span', 'editor-save-progress-text', '');
+    const progressBar = el('div', 'editor-save-progress-bar');
+    saveProgressFill = el('div', 'editor-save-progress-fill');
+    progressBar.append(saveProgressFill);
+    saveProgress.append(saveProgressText, progressBar);
+
     exitGuard = el('div', 'editor-exit-guard');
     exitGuard.hidden = true;
     exitGuard.append(el('span', '', t('editor.exitGuard')));
@@ -724,7 +890,14 @@ export function createEditorShell({
     rail = el('div', 'editor-rail');
     rail.id = 'editor-rail';
     rail.setAttribute('role', 'toolbar');
+    let lastGroup = null;
     for (const tool of RAIL_TOOLS) {
+      if (lastGroup && tool.group !== lastGroup) {
+        const sep = el('div', 'editor-rail-sep');
+        sep.setAttribute('role', 'separator');
+        rail.append(sep);
+      }
+      lastGroup = tool.group;
       const btn = el('button', 'editor-rail-btn');
       btn.type = 'button';
       btn.dataset.editorTool = tool.id;
@@ -738,7 +911,7 @@ export function createEditorShell({
           overlay.setTool(activeTool, activeSubMode);
         } else {
           activeTool = tool.id;
-          activeSubMode = tool.id === 'crop' ? 'crop' : '';
+          activeSubMode = tool.defaultSubMode ?? '';
           drawerOpen = true;
           ensureWaypointSelection();
           overlay.setTool(activeTool, activeSubMode);
@@ -796,7 +969,7 @@ export function createEditorShell({
     contextMenu = el('div', 'editor-context-menu');
     contextMenu.hidden = true;
 
-    root.append(topbar, savePopover, exitGuard, rail, drawer, drawerTooltip, contextMenu);
+    root.append(topbar, savePopover, saveProgress, exitGuard, rail, drawer, drawerTooltip, contextMenu);
     document.body.append(root);
   }
 
@@ -924,12 +1097,19 @@ export function createEditorShell({
       cropFromMeters = 0;
       cropToMeters = total;
     }
-    activeTool = initialTool;
-    activeSubMode = initialTool === 'crop' ? 'crop' : '';
+    const initialMeta = RAIL_TOOLS.find((item) => item.id === initialTool) || RAIL_TOOLS[0];
+    activeTool = initialMeta.id;
+    activeSubMode = initialMeta.defaultSubMode ?? '';
     drawerOpen = true;
+    selectedSegIndex = -1;
+    hoveredSegIndex = -1;
+    segmentColorResolver.reset();
+    overlay.setSegmentColorResolver?.((tracks) => segmentColorResolver.resolve(tracks));
     selectedWptIndex = -1;
     pendingWptCoords = null;
     wptNoteOpen = false;
+    exportFormat = 'gpx';
+    packRemoteImages = false;
     sessionOverwroteOriginal = false;
     lastOverwrittenTrack = null;
     excludedAnomalyKeys = new Set();
@@ -939,6 +1119,7 @@ export function createEditorShell({
     root.hidden = false;
     hideExitGuard();
     closeSavePopover();
+    setSaveProgressUi(null);
     closeContextMenu();
 
     overlay.mount(store.getCurrent());
@@ -973,7 +1154,7 @@ export function createEditorShell({
       void Promise.resolve(onListSiblingTracks()).then((items) => {
         if (signal.aborted || !store.isActive()) return;
         siblingTracks = Array.isArray(items) ? items : [];
-        if (activeTool === 'topology' && drawerOpen) renderDrawer();
+        if (activeTool === 'crop' && activeSubMode === 'append' && drawerOpen) renderDrawer();
       });
     }
     requestAnimationFrame(() => window.dispatchEvent(new Event('resize')));
@@ -987,6 +1168,7 @@ export function createEditorShell({
     cropResizeObserver?.disconnect();
     cropResizeObserver = null;
     closeSavePopover();
+    setSaveProgressUi(null);
     closeContextMenu();
     if (cropOverlay) cropOverlay.hidden = true;
     if (splitOverlay) {
@@ -1016,6 +1198,8 @@ export function createEditorShell({
       cachedTotalMeters = total;
       cropFromMeters = 0;
       cropToMeters = total;
+      selectedSegIndex = -1;
+      hoveredSegIndex = -1;
       const wptCount = current?.waypoints?.length || 0;
       if (selectedWptIndex >= wptCount) {
         selectedWptIndex = -1;
@@ -1058,13 +1242,15 @@ export function createEditorShell({
       renderDrawer();
     },
     refreshVertexStatus() {
-      if (activeTool === 'vertex' && drawerOpen) renderDrawer();
+      if (activeTool === 'draw' && activeSubMode === 'vertex' && drawerOpen) renderDrawer();
     },
     refreshDrawStatus() {
-      if (activeTool === 'draw' && drawerOpen) renderDrawer();
+      if (activeTool === 'draw' && (activeSubMode === 'draw' || activeSubMode === '') && drawerOpen) renderDrawer();
     },
     handleKeyDown(event) {
-      if (!store.isActive() || activeTool !== 'draw') return false;
+      if (!store.isActive() || activeTool !== 'draw' || (activeSubMode !== 'draw' && activeSubMode !== '')) {
+        return false;
+      }
       const draft = overlay.getDrawDraft?.();
       const count = draft?.points?.length || 0;
       const mod = event.ctrlKey || event.metaKey;

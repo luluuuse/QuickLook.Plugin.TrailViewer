@@ -37,6 +37,7 @@ internal static class SelfTests
             TestViewerBuildId(temporary);
             TestOverlayTransfer();
             TestTrackSaveService(temporary);
+            TestKmzBuild(root, temporary);
             TestAtomicFile(temporary);
             TestViewerMessages();
             TestAttachmentExport(temporary);
@@ -264,6 +265,11 @@ internal static class SelfTests
             !TrailViewerPanel.IsOversized(TrailViewerPanel.MaxInputBytes));
         Check("a direct track over 64 MB is rejected",
             TrailViewerPanel.IsOversized(TrailViewerPanel.MaxInputBytes + 1));
+        Check("a photo-heavy KMZ archive up to 384 MB is accepted",
+            !TrailViewerPanel.IsOversized(120L * 1024 * 1024, isKmz: true)
+            && !TrailViewerPanel.IsOversized(TrailViewerPanel.MaxKmzInputBytes, isKmz: true));
+        Check("a KMZ archive over 384 MB is rejected",
+            TrailViewerPanel.IsOversized(TrailViewerPanel.MaxKmzInputBytes + 1, isKmz: true));
 
         var source = Path.Combine(temporary, "source", "route.kmz");
         var target = TrailViewerPanel.OverlayTarget(source, "overlay.png");
@@ -667,8 +673,28 @@ internal static class SelfTests
             svc.Append($"s1\t0\t{b64}");
             var payload = svc.Complete("s1");
             Check("track save reassembles UTF-8 GPX payload",
-                payload != null && Encoding.UTF8.GetString(payload.Bytes) == gpx && !payload.Overwrite);
+                payload != null && Encoding.UTF8.GetString(payload.Bytes) == gpx
+                && !payload.Overwrite && payload.Format == "gpx");
+
+            foreach (var fmt in new[] { "kml", "kmz", "geojson", "tcx", "csv" })
+            {
+                svc.Begin($"fmt-{fmt}\t1\t1\tdemo-edited.{fmt}\t{fmt}\t1");
+                svc.Append($"fmt-{fmt}\t0\t{b64}");
+                var fmtPayload = svc.Complete($"fmt-{fmt}");
+                Check($"track save records {fmt} format and disables overwrite",
+                    fmtPayload != null && fmtPayload.Format == fmt && !fmtPayload.Overwrite
+                    && fmtPayload.PackRemoteImages == (fmt == "kmz"));
+            }
+
+            ExpectInvalidData("track save rejects unsupported export format", () =>
+                svc.Begin("bad-fmt\t1\t0\tdemo.fit\tfit"));
         }
+
+        Check("track save maps extensions and dialog filters for all formats",
+            TrackSaveService.GetDefaultExtension("geojson") == ".geojson"
+            && TrackSaveService.GetDefaultExtension("kmz") == ".kmz"
+            && TrackSaveService.GetFileDialogFilter("tcx").Contains("*.tcx")
+            && TrackSaveService.GetFileDialogFilter("csv").Contains("*.csv"));
 
         var folder = Path.Combine(temporary, "tracksave");
         Directory.CreateDirectory(folder);
@@ -680,6 +706,116 @@ internal static class SelfTests
         TrackSaveService.WriteWithBackup(target, Encoding.UTF8.GetBytes("newer-gpx"), createBackup: true);
         Check("track save preserves original .bak on subsequent overwrites",
             File.ReadAllText(target + ".bak") == "old-gpx" && File.ReadAllText(target) == "newer-gpx");
+    }
+
+    private static void TestKmzBuild(string root, string temporary)
+    {
+        var photo = File.ReadAllBytes(Path.Combine(root, "tests", "fixtures", "photo.png"));
+        var photo2 = File.ReadAllBytes(Path.Combine(root, "tests", "fixtures", "photo2.png"));
+        var fileRoot = Path.Combine(temporary, "kmz-build-root");
+        var albumDir = Path.Combine(fileRoot, "album");
+        var mediaDir = Path.Combine(albumDir, "media");
+        var sharedDir = Path.Combine(fileRoot, "shared");
+        Directory.CreateDirectory(mediaDir);
+        Directory.CreateDirectory(sharedDir);
+
+        File.WriteAllBytes(Path.Combine(mediaDir, "local.png"), photo);
+        File.WriteAllBytes(Path.Combine(sharedDir, "photo.png"), photo2);
+        var outsideSecret = Path.Combine(temporary, "secret.png");
+        File.WriteAllBytes(outsideSecret, photo);
+
+        var dataUri = "data:image/png;base64," + Convert.ToBase64String(photo2);
+        var kmlText =
+            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+            + "<kml xmlns=\"http://www.opengis.net/kml/2.2\">\n"
+            + "  <Document>\n"
+            + "    <Placemark>\n"
+            + "      <name>Album Stop</name>\n"
+            + "      <description><![CDATA["
+            + "<img src=\"media/local.png\" />"
+            + "<img src=\"../shared/photo.png\" />"
+            + "<img src=\"../../secret.png\" />"
+            + $"<img src=\"{dataUri}\" />"
+            + "<img src=\"https://example.com/remote.jpg\" />"
+            + "]]></description>\n"
+            + "      <Point><coordinates>114.3,30.5,100</coordinates></Point>\n"
+            + "    </Placemark>\n"
+            + "  </Document>\n"
+            + "</kml>\n";
+
+        var kmzBytes = KmzArchive.BuildKmzBytes(Encoding.UTF8.GetBytes(kmlText), albumDir, fileRoot);
+        var outKmz = Path.Combine(temporary, "built-output.kmz");
+        File.WriteAllBytes(outKmz, kmzBytes);
+
+        Check("built KMZ archive is recognized as valid KMZ", KmzArchive.HasDocument(outKmz));
+        var extractDir = Path.Combine(temporary, "kmz-build-extract");
+        Directory.CreateDirectory(extractDir);
+        var extractedKml = KmzArchive.ExtractDocument(outKmz, extractDir);
+        var extractedText = File.ReadAllText(extractedKml);
+        Check("built KMZ round-trips local image inside archive",
+            File.Exists(Path.Combine(extractDir, "media", "local.png"))
+            && File.ReadAllBytes(Path.Combine(extractDir, "media", "local.png")).SequenceEqual(photo));
+        Check("built KMZ remaps parent-relative image safely inside archive",
+            File.Exists(Path.Combine(extractDir, "files", "photo.png"))
+            && File.ReadAllBytes(Path.Combine(extractDir, "files", "photo.png")).SequenceEqual(photo2));
+        Check("built KMZ extracts embedded data-URI image into files/",
+            File.Exists(Path.Combine(extractDir, "files", "embedded-1.png"))
+            && File.ReadAllBytes(Path.Combine(extractDir, "files", "embedded-1.png")).SequenceEqual(photo2));
+        Check("built KMZ excludes files outside fileRoot and preserves HTTPS URLs",
+            !File.Exists(Path.Combine(extractDir, "secret.png"))
+            && !File.Exists(Path.Combine(extractDir, "files", "secret.png"))
+            && extractedText.Contains("https://example.com/remote.jpg")
+            && !extractedText.Contains("data:image/png;base64,"));
+
+        var remoteKml =
+            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+            + "<kml xmlns=\"http://www.opengis.net/kml/2.2\">\n"
+            + "  <Document>\n"
+            + "    <Placemark>\n"
+            + "      <name>Remote Album</name>\n"
+            + "      <description><![CDATA["
+            + "<img src=\"https://images.example/ok.png\" />"
+            + "<img src=\"https://images.example/dead.png\" />"
+            + "]]></description>\n"
+            + "      <Point><coordinates>114.3,30.5,100</coordinates></Point>\n"
+            + "    </Placemark>\n"
+            + "  </Document>\n"
+            + "</kml>\n";
+        var progressLog = new System.Collections.Generic.List<string>();
+        var remoteKmzBytes = KmzArchive.BuildKmzBytesAsync(
+            Encoding.UTF8.GetBytes(remoteKml),
+            albumDir,
+            fileRoot,
+            packRemoteImages: true,
+            remoteFetcher: (url, _) =>
+            {
+                if (url == "https://images.example/ok.png")
+                    return System.Threading.Tasks.Task.FromResult(
+                        new KmzArchive.KmzRemoteImage(photo, ".png"));
+                throw new InvalidDataException("simulated 404");
+            },
+            onProgress: (done, total, fail) =>
+            {
+                lock (progressLog) progressLog.Add($"{done}/{total}:{fail}");
+            }).GetAwaiter().GetResult();
+        var remoteKmz = Path.Combine(temporary, "built-remote.kmz");
+        File.WriteAllBytes(remoteKmz, remoteKmzBytes);
+        var remoteExtractDir = Path.Combine(temporary, "kmz-remote-extract");
+        Directory.CreateDirectory(remoteExtractDir);
+        var remoteExtractedKml = KmzArchive.ExtractDocument(remoteKmz, remoteExtractDir);
+        var remoteExtractedText = File.ReadAllText(remoteExtractedKml);
+        Check("KMZ remote packing downloads valid HTTPS image into files/ and keeps failed links untouched",
+            File.Exists(Path.Combine(remoteExtractDir, "files", "remote-1.png"))
+            && File.ReadAllBytes(Path.Combine(remoteExtractDir, "files", "remote-1.png")).SequenceEqual(photo)
+            && remoteExtractedText.Contains("files/remote-1.png")
+            && !remoteExtractedText.Contains("https://images.example/ok.png")
+            && remoteExtractedText.Contains("https://images.example/dead.png"));
+        Check("KMZ remote packing reports initial and final download progress counts",
+            progressLog.Count == 3
+            && progressLog[0] == "0/2:0"
+            && progressLog[progressLog.Count - 1] == "2/2:1"
+            && ViewerMessages.TrackSaveProgress("s1", 2, 5, 1) == "trackSaveProgress\ts1\t2\t5\t1",
+            string.Join(", ", progressLog));
     }
 
     private static void TestAtomicFile(string temporary)

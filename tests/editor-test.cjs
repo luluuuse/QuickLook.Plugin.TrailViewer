@@ -44,8 +44,9 @@ async function run() {
       };
     });
     check('enters editing mode and hides read-only chrome', mounted.editing && mounted.infoHidden && mounted.colorHidden);
-    check('renders 6 active rail tools, drawer and 2 profile crop handles',
-      mounted.railCount === 6 && mounted.drawerVisible && mounted.cropHandles === 2);
+    check('renders 6 categorized rail tools with group separator, drawer and 2 profile crop handles',
+      mounted.railCount === 6 && mounted.drawerVisible && mounted.cropHandles === 2
+      && await page.locator('#editor-rail .editor-rail-sep').count() === 1);
     check('left rail does not overlap zoom or locate controls',
       mounted.railClearOfZoom && mounted.railClearOfLocate);
     check('left rail is vertically centered on screen', await page.evaluate(() => {
@@ -204,6 +205,28 @@ async function run() {
     }));
     check('context menu split switches to split list and hides menu',
       afterCtxSplit.menuHidden && afterCtxSplit.segCount === 2);
+    const segBeforeDel = await page.evaluate(() => {
+      const rows = [...document.querySelectorAll('.editor-seg-list .editor-list-row')];
+      return rows.map((r) => ({
+        color: r.querySelector('.editor-seg-swatch')?.style.background || '',
+        dist: r.querySelector('.editor-seg-dist')?.textContent?.trim() || '',
+      }));
+    });
+    check('split list rows show segment distances',
+      segBeforeDel.length === 2 && Boolean(segBeforeDel[0].dist) && Boolean(segBeforeDel[1].dist),
+      JSON.stringify(segBeforeDel));
+    await page.locator('.editor-seg-list .editor-list-row-main').nth(1).click();
+    const afterSegClick = await page.evaluate(() => ({
+      selected: document.querySelectorAll('.editor-seg-list .editor-list-row')[1]?.classList.contains('is-selected'),
+      focusLineVisible: document.querySelector('.editor-split-focus-line')?.hidden === false,
+    }));
+    check('clicking split row highlights row and shows profile focus line',
+      Boolean(afterSegClick.selected && afterSegClick.focusLineVisible), JSON.stringify(afterSegClick));
+    await page.locator('.editor-seg-list .editor-list-row').first().locator('.editor-btn-danger').click();
+    const colorAfterDel = await page.evaluate(() =>
+      document.querySelector('.editor-seg-list .editor-seg-swatch')?.style.background || '');
+    check('deleting first segment preserves second segment color',
+      colorAfterDel === segBeforeDel[1].color, `${colorAfterDel} vs ${segBeforeDel[1].color}`);
     await page.keyboard.press('Escape');
     await page.waitForSelector('.editor-exit-guard:not([hidden])');
     await page.click('.editor-exit-guard .editor-btn-danger');
@@ -221,6 +244,34 @@ async function run() {
     await page.mouse.up();
     await page.click('#editor-drawer .editor-btn-success'); // Apply crop (preserves timestamps)
     await page.click('.editor-save-opts-btn');
+    const fmtCheck = await page.evaluate(() => {
+      const sel = document.querySelector('.editor-save-format-select');
+      const opts = sel ? [...sel.querySelectorAll('option')].map((o) => o.value) : [];
+      return { value: sel?.value, opts };
+    });
+    check('save popover exposes 6 export formats defaulting to gpx',
+      fmtCheck.value === 'gpx' && fmtCheck.opts.join(',') === 'gpx,kml,kmz,geojson,tcx,csv',
+      JSON.stringify(fmtCheck));
+    for (const fmt of ['kml', 'kmz', 'geojson', 'tcx', 'csv']) {
+      await page.selectOption('.editor-save-format-select', fmt);
+      const disabledForFmt = await page.locator('.editor-save-popover input[type="checkbox"]').nth(1).isDisabled();
+      check(`export format ${fmt} disables overwrite original checkbox`, disabledForFmt);
+      if (fmt === 'kmz') {
+        const kmzRemoteState = await page.evaluate(() => {
+          const row = document.querySelector('[data-save-option="kmz-remote"]');
+          const input = row?.querySelector('input[type="checkbox"]');
+          return { visible: Boolean(row && !row.hidden), checked: Boolean(input?.checked) };
+        });
+        check('selecting kmz reveals remote photo packing option unchecked by default',
+          kmzRemoteState.visible && !kmzRemoteState.checked, JSON.stringify(kmzRemoteState));
+      }
+    }
+    await page.selectOption('.editor-save-format-select', 'gpx');
+    const kmzRemoteHiddenOnGpx = await page.evaluate(() =>
+      document.querySelector('[data-save-option="kmz-remote"]')?.hidden === true);
+    check('switching back to gpx hides kmz remote photo option', kmzRemoteHiddenOnGpx);
+    const enabledForGpx = await page.locator('.editor-save-popover input[type="checkbox"]').nth(1).isEnabled();
+    check('switching back to gpx re-enables overwrite original checkbox', enabledForGpx);
     await page.locator('.editor-save-popover input[type="checkbox"]').nth(1).check();
     await page.click('#editor-topbar .editor-btn-primary');
     await page.waitForSelector('#editor-topbar:not(.is-dirty)');
@@ -292,18 +343,78 @@ async function run() {
       document.querySelector('.editor-context-menu')?.hidden === true);
     check('right-clicking empty map keeps context menu hidden', ctxHiddenOnEmptyMap);
 
-    // 12. P2/P3 tools: clean auto/box modes, topology simplify, vertex refine zoom guard, timeline generation
+    // 12. Categorized 6-tool rail: crop(3 tabs), draw(draw/vertex/box-erase), topology(4 actions), clean(3 tabs), time
+    await page.click('[data-editor-tool="crop"]');
+    const cropTabCount = await page.locator('#editor-drawer .editor-segmented-tab').count();
+    check('crop tool exposes crop, split and append tabs', cropTabCount === 3);
+
     await page.click('[data-editor-tool="clean"]');
-    const hasCleanModes = await page.locator('#editor-drawer .editor-mode-btn').count();
-    check('clean tool exposes auto-detect and box-erase mode buttons', hasCleanModes === 2);
+    const cleanTabCount = await page.locator('#editor-drawer .editor-segmented-tab').count();
+    check('clean tool exposes auto-detect, smooth-ele and simplify tabs', cleanTabCount === 3);
+
+    await page.click('[data-editor-tool="draw"]');
+    const drawTabCount = await page.locator('#editor-drawer .editor-segmented-tab').count();
+    check('draw tool exposes hand-draw, vertex-refine and box-erase tabs', drawTabCount === 3);
+
+    await page.locator('#editor-drawer .editor-segmented-tab').nth(2).click();
+    const boxDrag = await page.evaluate(() => {
+      const pts = window.trailViewer.gpx.tracks[0].segments[0];
+      const a = window.trailViewer.map.latLngToContainerPoint([pts[1].lat, pts[1].lon]);
+      const b = window.trailViewer.map.latLngToContainerPoint([pts[Math.min(pts.length - 2, 12)].lat, pts[Math.min(pts.length - 2, 12)].lon]);
+      const minX = Math.min(a.x, b.x) - 20;
+      const minY = Math.min(a.y, b.y) - 20;
+      const maxX = Math.max(a.x, b.x) + 20;
+      const maxY = Math.max(a.y, b.y) + 20;
+      return { minX, minY, maxX, maxY };
+    });
+    await page.mouse.move(boxDrag.minX, boxDrag.minY);
+    await page.mouse.down();
+    await page.mouse.move(boxDrag.maxX, boxDrag.maxY, { steps: 3 });
+    await page.waitForTimeout(80);
+    const boxPreviewState = await page.evaluate(() => {
+      const box = document.querySelector('.editor-box-select');
+      const badge = document.querySelector('.editor-box-badge');
+      return {
+        hasBox: Boolean(box),
+        badgeVisible: Boolean(badge && !badge.hidden && badge.textContent?.trim()),
+        badgeText: badge?.textContent?.trim() || '',
+      };
+    });
+    check('box-erase drag shows live selection box and deletion count badge',
+      boxPreviewState.hasBox && boxPreviewState.badgeVisible, JSON.stringify(boxPreviewState));
+    await page.mouse.up();
+    await page.waitForTimeout(40);
+    check('releasing box-erase drag removes selection overlay cleanly',
+      await page.evaluate(() => !document.querySelector('.editor-box-select')));
+
+    await page.locator('#editor-drawer .editor-segmented-tab').nth(1).click();
+    const vertexHintVisible = await page.locator('#editor-drawer .editor-drawer-hint').isVisible();
+    check('vertex tab displays zoom/edit hint', vertexHintVisible);
+
+    await page.evaluate(() => {
+      const seg = window.trailViewer.gpx.tracks[0].segments[0];
+      const pt = seg[Math.floor(seg.length / 2)];
+      window.trailViewer.map.setView([pt.lat, pt.lon], 16, { animate: false });
+    });
+    await page.waitForTimeout(120);
+    const vertexPoolResult = await page.evaluate(() => {
+      const beforeNodes = [...document.querySelectorAll('.editor-vertex-dot')];
+      window.trailViewer.map.panBy([20, 0], { animate: false });
+      const afterNodes = [...document.querySelectorAll('.editor-vertex-dot')];
+      const reusedCount = beforeNodes.filter((node) => afterNodes.includes(node)).length;
+      return {
+        beforeCount: beforeNodes.length,
+        afterCount: afterNodes.length,
+        reusedCount,
+      };
+    });
+    check('vertex pooling reuses existing DOM markers across small viewport pans',
+      vertexPoolResult.beforeCount > 0 && vertexPoolResult.reusedCount > 0,
+      JSON.stringify(vertexPoolResult));
 
     await page.click('[data-editor-tool="topology"]');
     const topoCount = await page.locator('#editor-drawer .editor-mode-btn').count();
-    check('topology tool includes reverse, roundtrip, close-loop and loop-start buttons', topoCount === 4);
-
-    await page.click('[data-editor-tool="vertex"]');
-    const vertexHintVisible = await page.locator('#editor-drawer .editor-drawer-hint').isVisible();
-    check('vertex tool displays zoom/edit hint', vertexHintVisible);
+    check('topology tool directly shows reverse, roundtrip, close-loop and loop-start buttons', topoCount === 4);
 
     await page.click('[data-editor-tool="time"]');
     await page.click('#editor-drawer .editor-btn-success');

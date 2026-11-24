@@ -12,6 +12,7 @@ import { cleanWaypointDescription } from './waypoint-description.js';
 export class KmlError extends Error {}
 
 const MAX_DESCRIPTION = 200;
+const MEDIA_URL_RE = /^https:\/\/[^\s<>"]+$/i;
 const MAX_INSIGHT_TEXT = 12000;
 // Enough for an album, few enough that a pathological description cannot queue hundreds of requests.
 const MAX_IMAGES = 9;
@@ -140,17 +141,44 @@ function readTime(placemark) {
  */
 function readDescription(placemark) {
   const raw = childText(placemark, 'description');
-  if (!raw) return { text: undefined, insightText: undefined, images: [], time: undefined };
-  const { text: plain, time } = cleanWaypointDescription(raw, { html: true });
+  const extraImages = readExtendedMediaLinks(placemark);
+  if (!raw) {
+    return {
+      text: undefined,
+      insightText: undefined,
+      images: [...new Set(extraImages)].slice(0, MAX_IMAGES),
+      time: undefined,
+    };
+  }
+  const { text: cleaned, time } = cleanWaypointDescription(raw, { html: true });
+  // A description that is nothing but attachment URLs (2bulu exports, or a GPX re-saved as KML) is not a
+  // remark: treat the URLs as waypoint photos so they open directly in the photo card and viewer.
+  const urlParts = cleaned ? cleaned.split(/\s+/).filter(Boolean) : [];
+  const urlOnly = urlParts.length > 0 && urlParts.every((part) => MEDIA_URL_RE.test(part));
+  const plain = urlOnly ? undefined : cleaned;
   const insightText = plain
     ? (plain.length > MAX_INSIGHT_TEXT ? `${plain.slice(0, MAX_INSIGHT_TEXT - 1)}…` : plain)
     : undefined;
+  const images = [...new Set([...readImages(raw), ...(urlOnly ? urlParts : []), ...extraImages])].slice(0, MAX_IMAGES);
   return {
     text: plain ? (plain.length > MAX_DESCRIPTION ? `${plain.slice(0, MAX_DESCRIPTION - 1)}…` : plain) : undefined,
     insightText,
-    images: readImages(raw),
+    images,
     time,
   };
+}
+
+/** Attachment links the viewer itself writes as <ExtendedData><Data name="mediaLink">. */
+function readExtendedMediaLinks(placemark) {
+  const links = [];
+  const extended = child(placemark, 'ExtendedData');
+  if (!extended) return links;
+  for (const data of children(extended, 'Data')) {
+    if ((data.getAttribute('name') || '') !== 'mediaLink') continue;
+    const value = (childText(data, 'value') || '').trim();
+    if (MEDIA_URL_RE.test(value)) links.push(value);
+  }
+  return links;
 }
 
 /**

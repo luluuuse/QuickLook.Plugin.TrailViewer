@@ -12,6 +12,10 @@ import { cleanWaypointDescription } from './waypoint-description.js';
 
 export class GpxError extends Error {}
 
+/** An absolute HTTPS URL with no whitespace -- safe to load as a remote photo or hand to the browser. */
+const MEDIA_URL_RE = /^https:\/\/[^\s<>"]+$/i;
+const MAX_IMAGES = 9;
+
 function children(parent, name) {
   return Array.from(parent.children).filter((el) => el.localName === name);
 }
@@ -48,19 +52,38 @@ function readPoint(el) {
   const point = { lat, lon };
   const direct = new Map();
   const extensions = [];
+  const imageLinks = [];
   for (const child of el.children) {
     if (child.localName === 'extensions') extensions.push(child);
+    if (child.localName === 'link') {
+      const href = (child.getAttribute('href') || '').trim();
+      if (MEDIA_URL_RE.test(href)) imageLinks.push(href);
+    }
     if (!direct.has(child.localName)) direct.set(child.localName, child.textContent.trim());
   }
   const text = (name) => direct.get(name) || null;
+  // Some exporters (2bulu) put the photo URL into <desc> as its only content. That is not a remark:
+  // lift it into point.images so the waypoint behaves like any other photo waypoint.
+  const urlOnly = (value) => {
+    if (value === null) return null;
+    const parts = value.split(/\s+/).filter(Boolean);
+    return parts.length > 0 && parts.every((part) => MEDIA_URL_RE.test(part)) ? parts : null;
+  };
+  let rawDescValue = text('desc');
+  let rawCmtValue = text('cmt');
+  const descUrls = urlOnly(rawDescValue);
+  if (descUrls) { imageLinks.push(...descUrls); rawDescValue = null; }
+  const cmtUrls = urlOnly(rawCmtValue);
+  if (cmtUrls) { imageLinks.push(...cmtUrls); rawCmtValue = null; }
+  if (imageLinks.length > 0) point.images = [...new Set(imageLinks)].slice(0, MAX_IMAGES);
   const ele = text('ele');
   if (ele !== null && Number.isFinite(Number(ele))) point.ele = Number(ele);
   const time = text('time');
   if (time !== null && !Number.isNaN(Date.parse(time))) point.time = new Date(time);
   const name = text('name');
   if (name !== null) point.name = name;
-  const rawDesc = text('desc');
-  const rawCmt = text('cmt');
+  const rawDesc = rawDescValue;
+  const rawCmt = rawCmtValue;
   if (rawDesc !== null || rawCmt !== null) {
     const cleanedDesc = rawDesc !== null ? cleanWaypointDescription(rawDesc, { html: false }) : null;
     const cleanedCmt = !cleanedDesc?.text && rawCmt !== null && rawCmt !== rawDesc

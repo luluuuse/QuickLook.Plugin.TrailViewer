@@ -1,11 +1,13 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  SPLIT_COLORS,
   addWaypoint,
   appendExternalTrack,
   applyDrawnPath,
   cleanAnomalies,
   closeLoop,
+  createSegmentColorResolver,
   cropTrack,
   dedupeWaypoints,
   deleteTrackSegment,
@@ -834,4 +836,26 @@ test('generateMilestoneWaypoints creates interval and summit waypoints while ski
   assert.equal(res.track.waypoints.length, 3);
   assert.equal(res.track.waypoints[1].name, '2 km');
   assert.equal(res.track.waypoints[2].name, '4 km');
+});
+
+test('createSegmentColorResolver provides 12 unique colors and preserves colors when earlier segments are deleted', () => {
+  assert.equal(SPLIT_COLORS.length, 12);
+  const resolver = createSegmentColorResolver();
+  const tracks = Array.from({ length: 12 }, (_, i) => ({
+    name: `Seg ${i + 1}`,
+    segments: [[
+      { lat: 30 + i * 0.01, lon: 114 + i * 0.01 },
+      { lat: 30 + i * 0.01 + 0.005, lon: 114 + i * 0.01 + 0.005 },
+    ]],
+  }));
+  const initialColors = resolver.resolve(tracks);
+  assert.equal(new Set(initialColors).size, 12);
+
+  // Deleting segment 0 must NOT shift colors of remaining segments 1..11
+  const afterDelete = resolver.resolve(tracks.slice(1));
+  assert.deepEqual(afterDelete, initialColors.slice(1));
+
+  // Undoing delete restores segment 0's original color
+  const afterUndo = resolver.resolve(tracks);
+  assert.deepEqual(afterUndo, initialColors);
 });

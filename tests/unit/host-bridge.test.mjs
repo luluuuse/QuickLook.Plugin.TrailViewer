@@ -203,3 +203,56 @@ test('listSiblingTracks and importExternalTrack exchange host messages safely', 
   emitWebMessage(`trackImportResult\t${impId}\t0\t${encodeURIComponent('day2.gpx')}\t`);
   assert.deepEqual(await importPromise, { ok: true, cancelled: false, name: 'day2.gpx', text: '<gpx>轨迹</gpx>', detail: '' });
 });
+
+test('saveTrackGpx includes export format and disables overwrite for non-GPX formats', async () => {
+  posted.length = 0;
+  webviewListeners.clear();
+  const bridge = createHostBridge();
+  bridge.installViewerMessages({ attachments: { result() {} } }, () => {});
+
+  const gpxPromise = bridge.saveTrackGpx({
+    id: 'save-gpx',
+    fileName: 'route-edited.gpx',
+    content: '<gpx/>',
+    format: 'gpx',
+    overwrite: true,
+  });
+  const gpxBegin = posted[0].split('\t');
+  assert.equal(gpxBegin[0], 'trackbegin');
+  assert.equal(gpxBegin[3], '1');
+  assert.equal(decodeURIComponent(gpxBegin[4]), 'route-edited.gpx');
+  assert.equal(gpxBegin[5], 'gpx');
+  emitWebMessage('trackSaveResult\tsave-gpx\t0\tC%3A%5Croute-edited.gpx\toverwrote');
+  assert.equal((await gpxPromise).overwrote, true);
+
+  for (const fmt of ['kml', 'kmz', 'geojson', 'tcx', 'csv']) {
+    posted.length = 0;
+    const progressEvents = [];
+    const p = bridge.saveTrackGpx({
+      id: `save-${fmt}`,
+      fileName: `route-edited.${fmt}`,
+      content: 'payload',
+      format: fmt,
+      overwrite: true,
+      packRemoteImages: true,
+      onProgress: (info) => progressEvents.push(info),
+    });
+    const begin = posted[0].split('\t');
+    assert.equal(begin[0], 'trackbegin');
+    assert.equal(begin[3], '0');
+    assert.equal(begin[5], fmt);
+    assert.equal(begin[6], fmt === 'kmz' ? '1' : '0');
+    if (fmt === 'kmz') {
+      emitWebMessage(`trackSaveProgress\tsave-${fmt}\t0\t3\t0`);
+      emitWebMessage(`trackSaveProgress\tsave-${fmt}\t2\t3\t1`);
+      assert.deepEqual(progressEvents, [
+        { completed: 0, total: 3, failed: 0 },
+        { completed: 2, total: 3, failed: 1 },
+      ]);
+    }
+    emitWebMessage(`trackSaveResult\tsave-${fmt}\t0\tC%3A%5Croute-edited.${fmt}\t`);
+    const res = await p;
+    assert.equal(res.ok, true);
+    assert.equal(res.overwrote, false);
+  }
+});

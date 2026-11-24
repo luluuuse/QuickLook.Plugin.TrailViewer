@@ -773,9 +773,11 @@ internal sealed partial class TrailViewerPanel
 
         string? targetPath = null;
         var createBackup = false;
+        var format = payload.Format;
+        var isGpxFormat = string.Equals(format, "gpx", StringComparison.OrdinalIgnoreCase);
         var isGpxSource = !string.IsNullOrEmpty(_sourcePath)
             && string.Equals(Path.GetExtension(_sourcePath), ".gpx", StringComparison.OrdinalIgnoreCase);
-        if (payload.Overwrite && isGpxSource)
+        if (payload.Overwrite && isGpxFormat && isGpxSource)
         {
             targetPath = _sourcePath;
             createBackup = true;
@@ -785,8 +787,8 @@ internal sealed partial class TrailViewerPanel
             var dialog = new Microsoft.Win32.SaveFileDialog
             {
                 FileName = payload.FileName,
-                DefaultExt = ".gpx",
-                Filter = "GPX Track (*.gpx)|*.gpx|All Files (*.*)|*.*",
+                DefaultExt = TrackSaveService.GetDefaultExtension(format),
+                Filter = TrackSaveService.GetFileDialogFilter(format),
                 InitialDirectory = !string.IsNullOrEmpty(_sourcePath)
                     ? (Path.GetDirectoryName(_sourcePath) ?? Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments))
                     : Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
@@ -799,30 +801,48 @@ internal sealed partial class TrailViewerPanel
                 return;
             }
             targetPath = dialog.FileName;
-            if (!isGpxSource && !string.IsNullOrEmpty(_sourcePath)
+            if ((!isGpxSource || !isGpxFormat) && !string.IsNullOrEmpty(_sourcePath)
                 && string.Equals(targetPath, _sourcePath, StringComparison.OrdinalIgnoreCase))
             {
                 _ = PostToViewerMessageAsync(ViewerMessages.TrackSaveResult(
-                    payload.Id, 1, "", "Cannot overwrite a non-GPX source file."));
+                    payload.Id, 1, "", "Cannot overwrite the original file with a different format."));
                 return;
             }
-            createBackup = string.Equals(targetPath, _sourcePath, StringComparison.OrdinalIgnoreCase);
+            createBackup = isGpxFormat && string.Equals(targetPath, _sourcePath, StringComparison.OrdinalIgnoreCase);
         }
 
         try
         {
             var resolvedPath = targetPath!;
+            var docDir = !string.IsNullOrEmpty(_path) ? Path.GetDirectoryName(_path) : null;
+            var fileRoot = _fileRoot;
+            var bytesToWrite = string.Equals(format, "kmz", StringComparison.OrdinalIgnoreCase)
+                ? await KmzArchive.BuildKmzBytesAsync(
+                    payload.Bytes,
+                    docDir,
+                    fileRoot,
+                    payload.PackRemoteImages,
+                    onProgress: (completed, total, failed) =>
+                    {
+                        if (!_disposed)
+                        {
+                            _ = PostToViewerMessageAsync(
+                                ViewerMessages.TrackSaveProgress(payload.Id, completed, total, failed));
+                        }
+                    },
+                    cancel: _lifecycle.Token)
+                : payload.Bytes;
             await System.Threading.Tasks.Task.Run(
-                () => TrackSaveService.WriteWithBackup(resolvedPath, payload.Bytes, createBackup),
+                () => TrackSaveService.WriteWithBackup(resolvedPath, bytesToWrite, createBackup),
                 System.Threading.CancellationToken.None);
             _editorDirty = false;
             _ = PostToViewerMessageAsync(ViewerMessages.TrackSaveResult(
-                payload.Id, 0, resolvedPath, (payload.Overwrite || createBackup) ? "overwrote" : ""));
+                payload.Id, 0, resolvedPath, (isGpxFormat && (payload.Overwrite || createBackup)) ? "overwrote" : ""));
         }
         catch (OperationCanceledException) when (_finished)
         {
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException or InvalidDataException)
         {
             _ = PostToViewerMessageAsync(ViewerMessages.TrackSaveResult(payload.Id, 1, "", ex.Message));
         }

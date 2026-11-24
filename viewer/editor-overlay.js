@@ -4,11 +4,10 @@ import { SNAP_PIXELS, chooseSnap } from './measure.js';
 import { createSnapReticleMarker } from './snap-indicator.js';
 import { createPointIndex } from './spatial.js';
 import { sliceRouteByDistance } from './track-analysis.js';
-import { detectAnomalyPoints, normalizedTracks, trackTotalDistance } from './track-ops.js';
+import { SPLIT_COLORS, detectAnomalyPoints, normalizedTracks, trackTotalDistance } from './track-ops.js';
 
 const KEEP_COLOR = '#f97316';
 const CUT_COLOR = '#64748b';
-const SPLIT_COLORS = ['#f97316', '#38bdf8', '#22c55e', '#eab308'];
 const KNOWN_WPT_SYMS = new Set(['pin', 'water', 'supply', 'camp', 'summit', 'danger', 'junction']);
 
 function allPathEntries(parsed) {
@@ -19,7 +18,20 @@ function allPathEntries(parsed) {
     : normalizedTracks(parsed);
   for (const t of tracks || []) {
     for (const seg of t.segments || []) {
-      if (seg.length >= 2) entries.push({ flatSegIndex, points: seg });
+      if (seg.length >= 2) {
+        let south = Infinity;
+        let west = Infinity;
+        let north = -Infinity;
+        let east = -Infinity;
+        for (let i = 0; i < seg.length; i += 1) {
+          const pt = seg[i];
+          if (pt.lat < south) south = pt.lat;
+          if (pt.lat > north) north = pt.lat;
+          if (pt.lon < west) west = pt.lon;
+          if (pt.lon > east) east = pt.lon;
+        }
+        entries.push({ flatSegIndex, points: seg, south, west, north, east });
+      }
       flatSegIndex += 1;
     }
   }
@@ -184,6 +196,7 @@ export function createEditorOverlay({
   const handleDrawChange = onDrawChange;
   let group = null;
   let trackGroup = null;
+  let boxPreviewGroup = null;
   let waypointGroup = null;
   let vertexGroup = null;
   let drawGroup = null;
@@ -193,7 +206,11 @@ export function createEditorOverlay({
   let drawEndpointIndex = null;
   let drawWptIndex = null;
   let boxEl = null;
+  let boxBadgeEl = null;
   let boxStartPt = null;
+  let boxLatestClient = null;
+  let boxPreviewFrame = 0;
+  const boxTargetedWpts = new Set();
   let panState = null;
   let suppressNextContextMenu = false;
   let visibleVertexCount = 0;
@@ -213,17 +230,190 @@ export function createEditorOverlay({
   let activeSubMode = 'crop';
   let cropRange = [0, 0];
   let selectedWptIndex = -1;
+  let highlightedSegIndex = -1;
+  let segmentColorResolver = null;
   let waypointsVisible = true;
+
+  function resolveColors(tracks) {
+    if (typeof segmentColorResolver === 'function') return segmentColorResolver(tracks);
+    return tracks.map((_, idx) => SPLIT_COLORS[idx % SPLIT_COLORS.length]);
+  }
   const wptMarkers = new Map();
   let wptSelectionReticle = null;
   let focusFrame = 0;
+  const vertexDotIcon = L.divIcon({
+    className: 'editor-vertex-dot',
+    iconSize: [10, 10],
+    iconAnchor: [5, 5],
+  });
+  const vertexMidIcon = L.divIcon({
+    className: 'editor-vertex-mid',
+    html: '+',
+    iconSize: [12, 12],
+    iconAnchor: [6, 6],
+  });
+  const MAX_MARKER_POOL = 220;
+  const markerMeta = new WeakMap();
+  const activeVertexMarkers = new Map();
+  const vertexMarkerPool = [];
+  const activeMidMarkers = new Map();
+  const midMarkerPool = [];
+
+  function clearBoxPreview() {
+    if (boxPreviewFrame) {
+      cancelAnimationFrame(boxPreviewFrame);
+      boxPreviewFrame = 0;
+    }
+    boxPreviewGroup?.clearLayers();
+    for (const elNode of boxTargetedWpts) {
+      elNode.classList.remove('is-box-targeted');
+    }
+    boxTargetedWpts.clear();
+  }
 
   function clearBox() {
+    clearBoxPreview();
     if (boxEl) {
       boxEl.remove();
       boxEl = null;
     }
+    boxBadgeEl = null;
     boxStartPt = null;
+    boxLatestClient = null;
+  }
+
+  function pointInGeoBounds(pt, bounds) {
+    return pt.lat >= bounds.south && pt.lat <= bounds.north
+      && pt.lon >= bounds.west && pt.lon <= bounds.east;
+  }
+
+  function flushBoxPreview() {
+    boxPreviewFrame = 0;
+    clearBoxPreview();
+    if (!boxStartPt || !boxLatestClient || !boxBadgeEl || !currentParsed || !boxPreviewGroup) return;
+    const width = Math.abs(boxLatestClient.x - boxStartPt.x);
+    const height = Math.abs(boxLatestClient.y - boxStartPt.y);
+    if (width < 6 && height < 6) {
+      boxBadgeEl.hidden = true;
+      return;
+    }
+
+    const p1 = map.containerPointToLatLng([
+      Math.min(boxStartPt.x, boxLatestClient.x),
+      Math.max(boxStartPt.y, boxLatestClient.y),
+    ]);
+    const p2 = map.containerPointToLatLng([
+      Math.max(boxStartPt.x, boxLatestClient.x),
+      Math.min(boxStartPt.y, boxLatestClient.y),
+    ]);
+    const bounds = {
+      south: Math.min(p1.lat, p2.lat),
+      west: Math.min(p1.lng, p2.lng),
+      north: Math.max(p1.lat, p2.lat),
+      east: Math.max(p1.lng, p2.lng),
+    };
+
+    let validSegCount = 0;
+    const segStates = cachedPathEntries.map((entry) => {
+      if (entry.north < bounds.south || entry.south > bounds.north
+        || entry.east < bounds.west || entry.west > bounds.east) {
+        validSegCount += 1;
+        return { entry, overlaps: false, keptCount: entry.points.length };
+      }
+      let keptCount = 0;
+      const pts = entry.points;
+      for (let i = 0; i < pts.length; i += 1) {
+        if (!pointInGeoBounds(pts[i], bounds)) keptCount += 1;
+      }
+      if (keptCount >= 2) validSegCount += 1;
+      return { entry, overlaps: true, keptCount };
+    });
+
+    if (validSegCount === 0) {
+      boxBadgeEl.classList.add('is-blocked');
+      boxBadgeEl.textContent = t('editor.clean.boxPreviewBlocked');
+      boxBadgeEl.hidden = false;
+      return;
+    }
+
+    let erasedPtCount = 0;
+    let previewDots = 0;
+    for (const item of segStates) {
+      if (!item.overlaps) continue;
+      const pts = item.entry.points;
+      if (item.keptCount < 2) {
+        erasedPtCount += pts.length;
+        L.polyline(
+          pts.map((pt) => [pt.lat, pt.lon]),
+          { color: '#ef4444', weight: 6, opacity: 0.9, interactive: false },
+        ).addTo(boxPreviewGroup);
+        continue;
+      }
+      let run = [];
+      const flushRun = () => {
+        if (run.length >= 2) {
+          L.polyline(
+            run.map((pt) => [pt.lat, pt.lon]),
+            { color: '#ef4444', weight: 6, opacity: 0.9, interactive: false },
+          ).addTo(boxPreviewGroup);
+        } else if (run.length === 1 && previewDots < 120) {
+          previewDots += 1;
+          L.circleMarker([run[0].lat, run[0].lon], {
+            radius: 4.5,
+            color: '#ffffff',
+            weight: 1.5,
+            fillColor: '#ef4444',
+            fillOpacity: 0.95,
+            interactive: false,
+          }).addTo(boxPreviewGroup);
+        }
+        run = [];
+      };
+      for (let i = 0; i < pts.length; i += 1) {
+        const pt = pts[i];
+        if (pointInGeoBounds(pt, bounds)) {
+          erasedPtCount += 1;
+          run.push(pt);
+        } else {
+          flushRun();
+        }
+      }
+      flushRun();
+    }
+
+    let erasedWptCount = 0;
+    (currentParsed.waypoints || []).forEach((wpt, index) => {
+      if (!Number.isFinite(wpt.lat) || !Number.isFinite(wpt.lon)) return;
+      if (!pointInGeoBounds(wpt, bounds)) return;
+      erasedWptCount += 1;
+      L.circleMarker([wpt.lat, wpt.lon], {
+        radius: 11,
+        color: '#ef4444',
+        weight: 2.5,
+        fillColor: '#ef4444',
+        fillOpacity: 0.25,
+        interactive: false,
+      }).addTo(boxPreviewGroup);
+      const wptEl = wptMarkers.get(index)?.getElement();
+      if (wptEl) {
+        wptEl.classList.add('is-box-targeted');
+        boxTargetedWpts.add(wptEl);
+      }
+    });
+
+    boxBadgeEl.classList.remove('is-blocked');
+    if (erasedPtCount > 0 && erasedWptCount > 0) {
+      boxBadgeEl.textContent = t('editor.clean.boxPreviewBoth', { points: erasedPtCount, waypoints: erasedWptCount });
+      boxBadgeEl.hidden = false;
+    } else if (erasedPtCount > 0) {
+      boxBadgeEl.textContent = t('editor.clean.boxPreviewPoints', { points: erasedPtCount });
+      boxBadgeEl.hidden = false;
+    } else if (erasedWptCount > 0) {
+      boxBadgeEl.textContent = t('editor.clean.boxPreviewWaypoints', { waypoints: erasedWptCount });
+      boxBadgeEl.hidden = false;
+    } else {
+      boxBadgeEl.hidden = true;
+    }
   }
 
   function clearPan() {
@@ -237,11 +427,15 @@ export function createEditorOverlay({
   }
 
   function isBoxEraseMode() {
-    return Boolean(group) && activeTool === 'clean' && activeSubMode === 'box-erase';
+    return Boolean(group) && activeTool === 'draw' && activeSubMode === 'box-erase';
+  }
+
+  function isVertexMode() {
+    return Boolean(group) && activeTool === 'draw' && activeSubMode === 'vertex';
   }
 
   function isDrawMode() {
-    return Boolean(group) && activeTool === 'draw';
+    return Boolean(group) && activeTool === 'draw' && (activeSubMode === 'draw' || activeSubMode === '');
   }
 
   function rebuildDrawSnapIndexes() {
@@ -508,6 +702,7 @@ export function createEditorOverlay({
       }
       const tracks = normalizedTracks(currentParsed);
       if (tracks.length > 1) {
+        const colors = resolveColors(tracks);
         let trackOffset = 0;
         tracks.forEach((track, idx) => {
           const trackSegs = (track.segments || []).filter((s) => s.length >= 2);
@@ -515,7 +710,7 @@ export function createEditorOverlay({
           const overlapFrom = Math.max(from, trackOffset) - trackOffset;
           const overlapTo = Math.min(to, trackOffset + trackLen) - trackOffset;
           if (overlapTo > overlapFrom && trackSegs.length > 0) {
-            const color = SPLIT_COLORS[idx % SPLIT_COLORS.length];
+            const color = colors[idx] || SPLIT_COLORS[idx % SPLIT_COLORS.length];
             for (const seg of sliceRouteByDistance(trackSegs, { from: overlapFrom, to: overlapTo })) {
               L.polyline(seg.map((p) => [p.lat, p.lon]), {
                 color,
@@ -541,18 +736,52 @@ export function createEditorOverlay({
       const tracks = normalizedTracks(currentParsed);
       const weight = activeTool === 'crop' && activeSubMode === 'split' ? 5 : 4.5;
       if (tracks.length > 1) {
-        tracks.forEach((track, idx) => {
-          const color = SPLIT_COLORS[idx % SPLIT_COLORS.length];
-          for (const seg of track.segments || []) {
-            if (seg.length < 2) continue;
-            L.polyline(seg.map((p) => [p.lat, p.lon]), {
+        const colors = resolveColors(tracks);
+        const hasHighlight = highlightedSegIndex >= 0 && highlightedSegIndex < tracks.length;
+        const drawTrackItem = (track, idx, isFocused) => {
+          const color = colors[idx] || SPLIT_COLORS[idx % SPLIT_COLORS.length];
+          const segs = (track.segments || []).filter((s) => s.length >= 2);
+          for (const seg of segs) {
+            const latlngs = seg.map((p) => [p.lat, p.lon]);
+            if (isFocused) {
+              L.polyline(latlngs, {
+                color: '#ffffff',
+                weight: 9,
+                opacity: 0.8,
+                interactive: false,
+              }).addTo(trackGroup);
+            }
+            L.polyline(latlngs, {
               color,
-              weight,
-              opacity: 0.92,
+              weight: isFocused ? 5.5 : (hasHighlight ? 3.5 : weight),
+              opacity: isFocused ? 1 : (hasHighlight ? 0.28 : 0.92),
               interactive: false,
             }).addTo(trackGroup);
           }
+          if (isFocused && segs.length > 0) {
+            const firstPt = segs[0][0];
+            const lastSeg = segs[segs.length - 1];
+            const lastPt = lastSeg[lastSeg.length - 1];
+            for (const endPt of [firstPt, lastPt]) {
+              if (!endPt) continue;
+              L.circleMarker([endPt.lat, endPt.lon], {
+                radius: 6.5,
+                color: '#ffffff',
+                weight: 2,
+                fillColor: color,
+                fillOpacity: 1,
+                interactive: false,
+              }).addTo(trackGroup);
+            }
+          }
+        };
+        tracks.forEach((track, idx) => {
+          if (hasHighlight && idx === highlightedSegIndex) return;
+          drawTrackItem(track, idx, false);
         });
+        if (hasHighlight) {
+          drawTrackItem(tracks[highlightedSegIndex], highlightedSegIndex, true);
+        }
       } else {
         for (const seg of paths) {
           L.polyline(seg.map((p) => [p.lat, p.lon]), {
@@ -590,8 +819,8 @@ export function createEditorOverlay({
       }).addTo(trackGroup);
     }
 
-    // Highlight detected GPS drift anomalies in clean mode
-    if (activeTool === 'clean' && activeSubMode !== 'smooth-ele') {
+    // Highlight detected GPS drift anomalies in clean auto-detect mode
+    if (activeTool === 'clean' && activeSubMode !== 'smooth-ele' && activeSubMode !== 'simplify') {
       for (const spike of detectAnomalyPoints(currentParsed)) {
         const excluded = excludedAnomalyKeys.has(spike.key);
         L.circleMarker([spike.lat, spike.lon], {
@@ -718,44 +947,23 @@ export function createEditorOverlay({
     });
   }
 
-  function renderVertexLayer() {
-    visibleVertexCount = 0;
-    hiddenMidpoints = false;
-    if (!vertexGroup || !currentParsed) return;
-    vertexGroup.clearLayers();
-    if (activeTool !== 'vertex' || map.getZoom() < 15) return;
-
-    const bounds = map.getBounds();
-    const visible = [];
-    cachedPathEntries.forEach(({ flatSegIndex, points: seg }) => {
-      for (let i = 0; i < seg.length; i += 1) {
-        const pt = seg[i];
-        if (bounds.contains([pt.lat, pt.lon])) {
-          visible.push({ flatSegIndex, ptIndex: i, pt, seg });
-        }
-      }
-    });
-    const maxRender = 160;
-    const step = visible.length > maxRender ? Math.ceil(visible.length / maxRender) : 1;
-    hiddenMidpoints = step > 1;
-    for (let k = 0; k < visible.length; k += step) {
-      const { flatSegIndex, ptIndex, pt, seg } = visible[k];
-      visibleVertexCount += 1;
-      const vIcon = L.divIcon({
-        className: 'editor-vertex-dot',
-        iconSize: [10, 10],
-        iconAnchor: [5, 5],
-      });
-      const marker = L.marker([pt.lat, pt.lon], {
-        icon: vIcon,
+  function acquireVertexMarker(lat, lon, meta) {
+    let marker = vertexMarkerPool.pop();
+    if (!marker) {
+      marker = L.marker([lat, lon], {
+        icon: vertexDotIcon,
         draggable: true,
         zIndexOffset: 300,
-      }).addTo(vertexGroup);
+      });
       marker.on('dragend', () => {
+        const info = markerMeta.get(marker);
+        if (!info) return;
         const pos = marker.getLatLng();
-        handleMoveVertex(flatSegIndex, ptIndex, pos.lat, pos.lng);
+        handleMoveVertex(info.flatSegIndex, info.ptIndex, pos.lat, pos.lng);
       });
       marker.on('contextmenu', (event) => {
+        const info = markerMeta.get(marker);
+        if (!info) return;
         L.DomEvent.stopPropagation(event);
         event.originalEvent?.preventDefault?.();
         if (suppressNextContextMenu) {
@@ -765,38 +973,158 @@ export function createEditorOverlay({
         handleContextMenu({
           clientX: event.originalEvent?.clientX ?? 200,
           clientY: event.originalEvent?.clientY ?? 200,
-          lat: pt.lat,
-          lon: pt.lon,
-          ele: pt.ele,
+          lat: info.pt.lat,
+          lon: info.pt.lon,
+          ele: info.pt.ele,
           splitMeters: null,
           waypointIndex: -1,
-          vertexTarget: { flatSegIndex, ptIndex },
+          vertexTarget: { flatSegIndex: info.flatSegIndex, ptIndex: info.ptIndex },
         });
       });
+    } else {
+      marker.setLatLng([lat, lon]);
+    }
+    markerMeta.set(marker, meta);
+    marker.addTo(vertexGroup);
+    return marker;
+  }
+
+  function releaseVertexMarker(marker) {
+    if (vertexGroup) vertexGroup.removeLayer(marker);
+    markerMeta.delete(marker);
+    if (vertexMarkerPool.length < MAX_MARKER_POOL) vertexMarkerPool.push(marker);
+  }
+
+  function acquireMidMarker(lat, lon, meta) {
+    let marker = midMarkerPool.pop();
+    if (!marker) {
+      marker = L.marker([lat, lon], {
+        icon: vertexMidIcon,
+        zIndexOffset: 250,
+      });
+      marker.on('click', (event) => {
+        const info = markerMeta.get(marker);
+        if (!info) return;
+        L.DomEvent.stopPropagation(event);
+        handleInsertVertex(info.flatSegIndex, info.ptIndex, info.midLat, info.midLon, info.midEle);
+      });
+    } else {
+      marker.setLatLng([lat, lon]);
+    }
+    markerMeta.set(marker, meta);
+    marker.addTo(vertexGroup);
+    return marker;
+  }
+
+  function releaseMidMarker(marker) {
+    if (vertexGroup) vertexGroup.removeLayer(marker);
+    markerMeta.delete(marker);
+    if (midMarkerPool.length < MAX_MARKER_POOL) midMarkerPool.push(marker);
+  }
+
+  function releaseAllVertexMarkers() {
+    for (const marker of activeVertexMarkers.values()) releaseVertexMarker(marker);
+    activeVertexMarkers.clear();
+    for (const marker of activeMidMarkers.values()) releaseMidMarker(marker);
+    activeMidMarkers.clear();
+  }
+
+  function renderVertexLayer() {
+    visibleVertexCount = 0;
+    hiddenMidpoints = false;
+    const zoom = map.getZoom();
+    if (!vertexGroup || !currentParsed || !isVertexMode() || zoom < 15) {
+      releaseAllVertexMarkers();
+      return;
+    }
+
+    const bounds = map.getBounds();
+    const bSouth = bounds.getSouth();
+    const bWest = bounds.getWest();
+    const bNorth = bounds.getNorth();
+    const bEast = bounds.getEast();
+    const visible = [];
+    for (let eIdx = 0; eIdx < cachedPathEntries.length; eIdx += 1) {
+      const entry = cachedPathEntries[eIdx];
+      if (entry.north < bSouth || entry.south > bNorth || entry.east < bWest || entry.west > bEast) {
+        continue;
+      }
+      const seg = entry.points;
+      for (let i = 0; i < seg.length; i += 1) {
+        const pt = seg[i];
+        if (pt.lat >= bSouth && pt.lat <= bNorth && pt.lon >= bWest && pt.lon <= bEast) {
+          visible.push({ flatSegIndex: entry.flatSegIndex, ptIndex: i, pt, seg });
+        }
+      }
+    }
+
+    const maxRender = zoom >= 17 ? 200 : zoom === 16 ? 160 : 120;
+    const step = visible.length > maxRender ? Math.ceil(visible.length / maxRender) : 1;
+    hiddenMidpoints = step > 1;
+
+    const nextVertices = new Map();
+    const nextMids = new Map();
+    for (let k = 0; k < visible.length; k += step) {
+      const item = visible[k];
+      const { flatSegIndex, ptIndex, pt, seg } = item;
+      const key = `${flatSegIndex}:${ptIndex}`;
+      nextVertices.set(key, item);
 
       if (step === 1 && ptIndex + 1 < seg.length) {
         const nextPt = seg[ptIndex + 1];
-        const midLat = (pt.lat + nextPt.lat) * 0.5;
-        const midLon = (pt.lon + nextPt.lon) * 0.5;
-        const midEle = Number.isFinite(pt.ele) && Number.isFinite(nextPt.ele)
-          ? (pt.ele + nextPt.ele) * 0.5
-          : undefined;
-        const mIcon = L.divIcon({
-          className: 'editor-vertex-mid',
-          html: '+',
-          iconSize: [12, 12],
-          iconAnchor: [6, 6],
-        });
-        const midMarker = L.marker([midLat, midLon], {
-          icon: mIcon,
-          zIndexOffset: 250,
-        }).addTo(vertexGroup);
-        midMarker.on('click', (event) => {
-          L.DomEvent.stopPropagation(event);
-          handleInsertVertex(flatSegIndex, ptIndex, midLat, midLon, midEle);
-        });
+        const p1 = map.latLngToContainerPoint([pt.lat, pt.lon]);
+        const p2 = map.latLngToContainerPoint([nextPt.lat, nextPt.lon]);
+        if (Math.hypot(p1.x - p2.x, p1.y - p2.y) >= 10) {
+          const midLat = (pt.lat + nextPt.lat) * 0.5;
+          const midLon = (pt.lon + nextPt.lon) * 0.5;
+          const midEle = Number.isFinite(pt.ele) && Number.isFinite(nextPt.ele)
+            ? (pt.ele + nextPt.ele) * 0.5
+            : undefined;
+          nextMids.set(key, { flatSegIndex, ptIndex, midLat, midLon, midEle });
+        }
       }
     }
+
+    for (const [key, marker] of activeVertexMarkers.entries()) {
+      if (!nextVertices.has(key)) {
+        releaseVertexMarker(marker);
+        activeVertexMarkers.delete(key);
+      }
+    }
+    for (const [key, marker] of activeMidMarkers.entries()) {
+      if (!nextMids.has(key)) {
+        releaseMidMarker(marker);
+        activeMidMarkers.delete(key);
+      }
+    }
+
+    for (const [key, item] of nextVertices.entries()) {
+      const existing = activeVertexMarkers.get(key);
+      if (existing) {
+        markerMeta.set(existing, item);
+        const cur = existing.getLatLng();
+        if (Math.abs(cur.lat - item.pt.lat) > 1e-9 || Math.abs(cur.lng - item.pt.lon) > 1e-9) {
+          existing.setLatLng([item.pt.lat, item.pt.lon]);
+        }
+      } else {
+        activeVertexMarkers.set(key, acquireVertexMarker(item.pt.lat, item.pt.lon, item));
+      }
+    }
+
+    for (const [key, mid] of nextMids.entries()) {
+      const existing = activeMidMarkers.get(key);
+      if (existing) {
+        markerMeta.set(existing, mid);
+        const cur = existing.getLatLng();
+        if (Math.abs(cur.lat - mid.midLat) > 1e-9 || Math.abs(cur.lng - mid.midLon) > 1e-9) {
+          existing.setLatLng([mid.midLat, mid.midLon]);
+        }
+      } else {
+        activeMidMarkers.set(key, acquireMidMarker(mid.midLat, mid.midLon, mid));
+      }
+    }
+
+    visibleVertexCount = activeVertexMarkers.size;
   }
 
   function render() {
@@ -999,7 +1327,7 @@ export function createEditorOverlay({
 
   const onViewportUpdated = () => {
     invalidateScreenCache();
-    if (activeTool === 'vertex') {
+    if (isVertexMode()) {
       renderVertexLayer();
       handleViewportChange();
     }
@@ -1010,6 +1338,7 @@ export function createEditorOverlay({
     lifecycle = new AbortController();
     group = L.layerGroup().addTo(map);
     trackGroup = L.layerGroup().addTo(group);
+    boxPreviewGroup = L.layerGroup().addTo(group);
     waypointGroup = L.layerGroup().addTo(group);
     vertexGroup = L.layerGroup().addTo(group);
     drawGroup = L.layerGroup().addTo(group);
@@ -1049,10 +1378,15 @@ export function createEditorOverlay({
       clearBox();
       const rect = container.getBoundingClientRect();
       boxStartPt = { x: event.clientX - rect.left, y: event.clientY - rect.top, pointerId: event.pointerId };
+      boxLatestClient = { x: boxStartPt.x, y: boxStartPt.y };
       boxEl = document.createElement('div');
       boxEl.className = 'editor-box-select';
       boxEl.style.left = `${boxStartPt.x}px`;
       boxEl.style.top = `${boxStartPt.y}px`;
+      boxBadgeEl = document.createElement('span');
+      boxBadgeEl.className = 'editor-box-badge';
+      boxBadgeEl.hidden = true;
+      boxEl.append(boxBadgeEl);
       container.append(boxEl);
     }, { signal: lifecycle.signal });
     window.addEventListener('pointermove', (event) => {
@@ -1070,10 +1404,12 @@ export function createEditorOverlay({
       const rect = container.getBoundingClientRect();
       const cx = event.clientX - rect.left;
       const cy = event.clientY - rect.top;
+      boxLatestClient = { x: cx, y: cy };
       boxEl.style.left = `${Math.min(boxStartPt.x, cx)}px`;
       boxEl.style.top = `${Math.min(boxStartPt.y, cy)}px`;
       boxEl.style.width = `${Math.abs(cx - boxStartPt.x)}px`;
       boxEl.style.height = `${Math.abs(cy - boxStartPt.y)}px`;
+      if (!boxPreviewFrame) boxPreviewFrame = requestAnimationFrame(flushBoxPreview);
     }, { signal: lifecycle.signal });
     window.addEventListener('pointercancel', () => {
       clearPan();
@@ -1121,10 +1457,14 @@ export function createEditorOverlay({
     }
     wptMarkers.clear();
     selectedWptIndex = -1;
+    highlightedSegIndex = -1;
     wptSelectionReticle = null;
     pendingHoverLatLng = null;
     clearBox();
     clearPan();
+    releaseAllVertexMarkers();
+    vertexMarkerPool.length = 0;
+    midMarkerPool.length = 0;
     suppressNextContextMenu = false;
     if (map.dragging) map.dragging.enable();
     map.off('mousemove', onMapMouseMove);
@@ -1143,6 +1483,7 @@ export function createEditorOverlay({
     }
     clearDrawDraft({ notify: false });
     trackGroup = null;
+    boxPreviewGroup = null;
     waypointGroup = null;
     vertexGroup = null;
     drawGroup = null;
@@ -1163,6 +1504,7 @@ export function createEditorOverlay({
     unmount,
     setTrack(parsed) {
       currentParsed = parsed;
+      highlightedSegIndex = -1;
       cachedPathEntries = allPathEntries(parsed);
       cachedPaths = cachedPathEntries.map((entry) => entry.points);
       cachedTotalMeters = trackTotalDistance(parsed);
@@ -1181,7 +1523,35 @@ export function createEditorOverlay({
       handleSplitHover(null);
       activeTool = tool;
       activeSubMode = subMode;
+      if (activeTool !== 'crop' || activeSubMode !== 'split') highlightedSegIndex = -1;
       render();
+    },
+    setSegmentColorResolver(fn) {
+      segmentColorResolver = typeof fn === 'function' ? fn : null;
+    },
+    setHighlightedSegment(index) {
+      const next = Number.isInteger(index) ? index : -1;
+      if (next === highlightedSegIndex) return;
+      highlightedSegIndex = next;
+      renderTrackLayer();
+    },
+    focusTrackSegment(index) {
+      const tracks = normalizedTracks(currentParsed);
+      const track = tracks[index];
+      if (!track) return;
+      const pts = [];
+      for (const seg of track.segments || []) {
+        for (const pt of seg) {
+          if (Number.isFinite(pt?.lat) && Number.isFinite(pt?.lon)) pts.push([pt.lat, pt.lon]);
+        }
+      }
+      if (pts.length === 0) return;
+      const bounds = L.latLngBounds(pts);
+      if (bounds.getNorthEast().equals(bounds.getSouthWest())) {
+        map.setView(pts[0], Math.max(map.getZoom(), 16), { animate: true });
+      } else {
+        map.fitBounds(bounds, { padding: [90, 90], maxZoom: 17, animate: true });
+      }
     },
     showSplitPreviewAt(alongMeters) {
       if (!group || !currentParsed || alongMeters == null || !Number.isFinite(alongMeters)) {

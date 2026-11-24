@@ -1,10 +1,14 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
 using System.Net;
+using System.Net.Http;
+using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Xml;
 
 namespace QuickLook.Plugin.TrailViewer;
@@ -27,8 +31,8 @@ internal static class KmzArchive
     // A KMZ can legally carry a large photo album. Only images referenced by the KML are copied, and these
     // bounds stop a crafted archive from turning one preview into unbounded disk or decompression work.
     private const long MaxResourceBytes = 30L * 1024 * 1024;
-    private const long MaxTotalResourceBytes = 300L * 1024 * 1024;
-    private const int MaxResourceCount = 200;
+    private const long MaxTotalResourceBytes = 1024L * 1024 * 1024;
+    private const int MaxResourceCount = 1000;
 
     private static readonly HashSet<string> ImageExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -39,6 +43,10 @@ internal static class KmzArchive
         @"(?:\bsrc|\bhref)\s*=\s*(?:""(?<url>[^""]*)""|'(?<url>[^']*)')",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
+    private static readonly Regex DataImagePattern = new(
+        @"^data:image/[a-z0-9.+-]+;base64,(?<b64>[a-z0-9+/=\s]+)$",
+        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+
     private static readonly XmlReaderSettings ResourceReaderSettings = new()
     {
         DtdProcessing = DtdProcessing.Prohibit,
@@ -46,6 +54,15 @@ internal static class KmzArchive
         IgnoreComments = true,
         IgnoreProcessingInstructions = true,
         CloseInput = true,
+    };
+
+    private static readonly XmlReaderSettings ResourceStreamReaderSettings = new()
+    {
+        DtdProcessing = DtdProcessing.Prohibit,
+        XmlResolver = null,
+        IgnoreComments = true,
+        IgnoreProcessingInstructions = true,
+        CloseInput = false,
     };
 
     private static readonly string RootFolderName = PluginIdentity.Name;
@@ -201,10 +218,17 @@ internal static class KmzArchive
     /// <summary>Scan only the XML events needed for image references; never materialise the whole document.</summary>
     private static HashSet<string> ReadResourceReferences(string path, CancellationToken cancel)
     {
+        using var stream = File.OpenRead(path);
+        return ReadResourceReferences(stream, ResourceReaderSettings, cancel);
+    }
+
+    private static HashSet<string> ReadResourceReferences(
+        Stream stream, XmlReaderSettings settings, CancellationToken cancel)
+    {
         var references = new HashSet<string>(StringComparer.Ordinal);
         try
         {
-            using var reader = XmlReader.Create(path, ResourceReaderSettings);
+            using var reader = XmlReader.Create(stream, settings);
             var advance = true;
             while (!advance || reader.Read())
             {
@@ -247,6 +271,401 @@ internal static class KmzArchive
             throw new InvalidDataException("the .kml inside is not valid XML", ex);
         }
         return references;
+    }
+
+    internal sealed class KmzRemoteImage
+    {
+        internal KmzRemoteImage(byte[] bytes, string extension)
+        {
+            Bytes = bytes;
+            Extension = extension;
+        }
+
+        internal byte[] Bytes { get; }
+        internal string Extension { get; }
+    }
+
+    private sealed class KmzRemoteDownloadResult
+    {
+        internal KmzRemoteDownloadResult(string rawRef, KmzRemoteImage? image)
+        {
+            RawRef = rawRef;
+            Image = image;
+        }
+
+        internal string RawRef { get; }
+        internal KmzRemoteImage? Image { get; }
+    }
+
+    /// <summary>
+    /// Packages KML bytes and any referenced local or embedded data-URI images into a .kmz archive.
+    /// External HTTPS links are preserved untouched unless <paramref name="packRemoteImages"/> is enabled.
+    /// </summary>
+    internal static byte[] BuildKmzBytes(byte[] kmlBytes, string? documentDirectory, string? fileRoot) =>
+        BuildKmzBytesAsync(kmlBytes, documentDirectory, fileRoot, packRemoteImages: false)
+            .GetAwaiter()
+            .GetResult();
+
+    internal static async Task<byte[]> BuildKmzBytesAsync(
+        byte[] kmlBytes,
+        string? documentDirectory,
+        string? fileRoot,
+        bool packRemoteImages = false,
+        Func<string, CancellationToken, Task<KmzRemoteImage?>>? remoteFetcher = null,
+        Action<int, int, int>? onProgress = null,
+        CancellationToken cancel = default)
+    {
+        if (kmlBytes == null || kmlBytes.Length == 0)
+            throw new InvalidDataException("the KML payload was empty");
+        if (kmlBytes.Length > MaxDocumentBytes)
+            throw new InvalidDataException($"the .kml exceeds the {MaxDocumentBytes / (1024 * 1024)} MB limit");
+
+        HashSet<string> references;
+        using (var kmlStream = new MemoryStream(kmlBytes, writable: false))
+        {
+            references = ReadResourceReferences(kmlStream, ResourceStreamReaderSettings, cancel);
+        }
+
+        var kmlText = Encoding.UTF8.GetString(kmlBytes);
+        var resources = new Dictionary<string, byte[]>(StringComparer.OrdinalIgnoreCase);
+        var remoteCandidates = new List<string>();
+        var seenRemote = new HashSet<string>(StringComparer.Ordinal);
+        long totalBytes = 0;
+        var count = 0;
+        var embeddedIndex = 0;
+
+        string? fullRoot = null;
+        string? docBaseDir = null;
+        if (!string.IsNullOrWhiteSpace(fileRoot))
+        {
+            fullRoot = Path.GetFullPath(fileRoot).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+                + Path.DirectorySeparatorChar;
+            var trimmedRoot = fullRoot.TrimEnd(Path.DirectorySeparatorChar);
+            docBaseDir = trimmedRoot;
+            if (!string.IsNullOrWhiteSpace(documentDirectory))
+            {
+                var candidateDocDir = Path.GetFullPath(documentDirectory).TrimEnd(
+                    Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                if (string.Equals(candidateDocDir, trimmedRoot, StringComparison.OrdinalIgnoreCase)
+                    || (candidateDocDir + Path.DirectorySeparatorChar).StartsWith(fullRoot, StringComparison.OrdinalIgnoreCase))
+                {
+                    docBaseDir = candidateDocDir;
+                }
+            }
+        }
+
+        foreach (var reference in references)
+        {
+            cancel.ThrowIfCancellationRequested();
+            var rawRef = (reference ?? string.Empty).Trim();
+            if (rawRef.Length == 0)
+                continue;
+
+            var dataMatch = DataImagePattern.Match(rawRef);
+            if (dataMatch.Success)
+            {
+                byte[] imgBytes;
+                try
+                {
+                    imgBytes = Convert.FromBase64String(dataMatch.Groups["b64"].Value);
+                }
+                catch (FormatException)
+                {
+                    continue;
+                }
+
+                if (imgBytes.Length == 0
+                    || imgBytes.Length > MaxResourceBytes
+                    || totalBytes + imgBytes.Length > MaxTotalResourceBytes
+                    || count >= MaxResourceCount)
+                    continue;
+
+                var ext = AttachmentExport.ImageExtensionFor(imgBytes);
+                if (ext == null)
+                    continue;
+
+                string entryName;
+                do
+                {
+                    embeddedIndex++;
+                    entryName = $"files/embedded-{embeddedIndex}{ext}";
+                }
+                while (resources.ContainsKey(entryName));
+
+                resources[entryName] = imgBytes;
+                count++;
+                totalBytes += imgBytes.Length;
+                kmlText = ReplaceKmlReference(kmlText, rawRef, entryName);
+                continue;
+            }
+
+            if (rawRef.StartsWith("//", StringComparison.Ordinal) || HasSchemePrefix(rawRef))
+            {
+                if (packRemoteImages && AttachmentExport.IsAllowedUri(rawRef) && seenRemote.Add(rawRef))
+                    remoteCandidates.Add(rawRef);
+                continue;
+            }
+
+            if (fullRoot == null || docBaseDir == null)
+                continue;
+
+            if (!TryResolveLocalDiskImage(rawRef, fullRoot, docBaseDir, out var cleanPath, out var diskPath))
+                continue;
+
+            FileInfo info;
+            try
+            {
+                info = new FileInfo(diskPath!);
+                if (!info.Exists
+                    || info.Length <= 0
+                    || info.Length > MaxResourceBytes
+                    || totalBytes + info.Length > MaxTotalResourceBytes
+                    || count >= MaxResourceCount)
+                    continue;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                continue;
+            }
+
+            string archiveEntry;
+            var remapped = false;
+            if (!cleanPath!.StartsWith("/", StringComparison.Ordinal)
+                && !cleanPath.StartsWith("\\", StringComparison.Ordinal)
+                && TryResolveArchivePath(cleanPath, string.Empty, out var directEntry)
+                && !string.Equals(directEntry, PreferredEntryName, StringComparison.OrdinalIgnoreCase))
+            {
+                archiveEntry = directEntry!;
+            }
+            else
+            {
+                var safeName = OverlayTransfer.SanitiseFileName(Path.GetFileName(diskPath!));
+                var stem = Path.GetFileNameWithoutExtension(safeName);
+                var ext = Path.GetExtension(safeName);
+                archiveEntry = $"files/{safeName}";
+                for (var suffix = 2; resources.ContainsKey(archiveEntry); suffix++)
+                    archiveEntry = $"files/{stem}-{suffix}{ext}";
+                remapped = true;
+            }
+
+            if (!resources.ContainsKey(archiveEntry))
+            {
+                byte[] imgBytes;
+                try
+                {
+                    imgBytes = File.ReadAllBytes(diskPath!);
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                    continue;
+                }
+
+                if (imgBytes.Length == 0
+                    || imgBytes.Length > MaxResourceBytes
+                    || totalBytes + imgBytes.Length > MaxTotalResourceBytes
+                    || count >= MaxResourceCount)
+                    continue;
+
+                resources[archiveEntry] = imgBytes;
+                count++;
+                totalBytes += imgBytes.Length;
+            }
+
+            if (remapped)
+                kmlText = ReplaceKmlReference(kmlText, rawRef, archiveEntry);
+        }
+
+        if (packRemoteImages && remoteCandidates.Count > 0 && count < MaxResourceCount)
+        {
+            var hostChecks = new ConcurrentDictionary<string, Task<bool>>(StringComparer.OrdinalIgnoreCase);
+            var fetcher = remoteFetcher ?? (async (url, token) =>
+            {
+                using var downloaded = await AttachmentExport
+                    .DownloadImageWithHostCacheAsync(url, hostChecks, token)
+                    .ConfigureAwait(false);
+                return new KmzRemoteImage(downloaded.Bytes.ToArray(), downloaded.Extension);
+            });
+
+            var remainingSlots = MaxResourceCount - count;
+            var targets = remoteCandidates.Count > remainingSlots
+                ? remoteCandidates.GetRange(0, remainingSlots)
+                : remoteCandidates;
+
+            onProgress?.Invoke(0, targets.Count, 0);
+            var completedCount = 0;
+            var failedCount = 0;
+
+            using var slots = new SemaphoreSlim(6);
+            var tasks = new List<Task<KmzRemoteDownloadResult>>(targets.Count);
+            foreach (var rawRef in targets)
+            {
+                tasks.Add(DownloadRemoteForKmzAsync(rawRef, slots, fetcher, ok =>
+                {
+                    var failNow = ok ? Volatile.Read(ref failedCount) : Interlocked.Increment(ref failedCount);
+                    var doneNow = Interlocked.Increment(ref completedCount);
+                    onProgress?.Invoke(doneNow, targets.Count, failNow);
+                }, cancel));
+            }
+            var downloadedResults = await Task.WhenAll(tasks).ConfigureAwait(false);
+
+            var remoteIndex = 0;
+            foreach (var result in downloadedResults)
+            {
+                var image = result.Image;
+                if (image == null
+                    || image.Bytes == null
+                    || image.Bytes.Length == 0
+                    || image.Bytes.Length > MaxResourceBytes
+                    || totalBytes + image.Bytes.Length > MaxTotalResourceBytes
+                    || count >= MaxResourceCount)
+                    continue;
+
+                var ext = !string.IsNullOrWhiteSpace(image.Extension) && ImageExtensions.Contains(image.Extension)
+                    ? image.Extension
+                    : AttachmentExport.ImageExtensionFor(image.Bytes);
+                if (ext == null)
+                    continue;
+
+                string entryName;
+                do
+                {
+                    remoteIndex++;
+                    entryName = $"files/remote-{remoteIndex}{ext}";
+                }
+                while (resources.ContainsKey(entryName));
+
+                resources[entryName] = image.Bytes;
+                count++;
+                totalBytes += image.Bytes.Length;
+                kmlText = ReplaceKmlReference(kmlText, result.RawRef, entryName);
+            }
+        }
+
+        var finalKmlBytes = new UTF8Encoding(false).GetBytes(kmlText);
+        using var output = new MemoryStream();
+        using (var archive = new ZipArchive(output, ZipArchiveMode.Create, leaveOpen: true))
+        {
+            var docEntry = archive.CreateEntry(PreferredEntryName, CompressionLevel.Optimal);
+            using (var docStream = docEntry.Open())
+                docStream.Write(finalKmlBytes, 0, finalKmlBytes.Length);
+
+            foreach (var item in resources)
+            {
+                var resEntry = archive.CreateEntry(item.Key, CompressionLevel.NoCompression);
+                using var resStream = resEntry.Open();
+                resStream.Write(item.Value, 0, item.Value.Length);
+            }
+        }
+        return output.ToArray();
+    }
+
+    private static async Task<KmzRemoteDownloadResult> DownloadRemoteForKmzAsync(
+        string rawRef,
+        SemaphoreSlim slots,
+        Func<string, CancellationToken, Task<KmzRemoteImage?>> fetcher,
+        Action<bool>? onItemDone,
+        CancellationToken cancel)
+    {
+        await slots.WaitAsync(cancel).ConfigureAwait(false);
+        var ok = false;
+        try
+        {
+            var image = await fetcher(rawRef, cancel).ConfigureAwait(false);
+            ok = image != null && image.Bytes != null && image.Bytes.Length > 0;
+            return new KmzRemoteDownloadResult(rawRef, image);
+        }
+        catch (OperationCanceledException) when (cancel.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or InvalidDataException
+            or IOException or UriFormatException or NotSupportedException)
+        {
+            // Keep the original HTTPS link in doc.kml if a single remote image fails or times out.
+            return new KmzRemoteDownloadResult(rawRef, null);
+        }
+        finally
+        {
+            slots.Release();
+            if (!cancel.IsCancellationRequested)
+                onItemDone?.Invoke(ok);
+        }
+    }
+
+    private static bool HasSchemePrefix(string reference)
+    {
+        var firstDelim = reference.IndexOfAny(new[] { '/', '?', '#' });
+        var colon = reference.IndexOf(':');
+        return colon >= 0 && (firstDelim < 0 || colon < firstDelim);
+    }
+
+    private static string ReplaceKmlReference(string kmlText, string rawRef, string replacement)
+    {
+        var updated = kmlText.Replace(rawRef, replacement);
+        var ampEncoded = rawRef.Replace("&", "&amp;");
+        if (!string.Equals(ampEncoded, rawRef, StringComparison.Ordinal))
+            updated = updated.Replace(ampEncoded, replacement);
+        var htmlEncoded = WebUtility.HtmlEncode(rawRef);
+        if (!string.IsNullOrEmpty(htmlEncoded) && !string.Equals(htmlEncoded, rawRef, StringComparison.Ordinal))
+            updated = updated.Replace(htmlEncoded, replacement);
+        return updated;
+    }
+
+    private static bool TryResolveLocalDiskImage(
+        string rawRef,
+        string fullRoot,
+        string docBaseDir,
+        out string? cleanPath,
+        out string? diskPath)
+    {
+        cleanPath = null;
+        diskPath = null;
+
+        var decoded = WebUtility.HtmlDecode(rawRef).Trim();
+        var query = decoded.IndexOfAny(new[] { '?', '#' });
+        if (query >= 0) decoded = decoded.Substring(0, query);
+        if (decoded.Length == 0 || decoded.IndexOf('\0') >= 0)
+            return false;
+
+        string unescaped;
+        try
+        {
+            unescaped = Uri.UnescapeDataString(decoded).Replace('\\', '/');
+        }
+        catch (UriFormatException)
+        {
+            return false;
+        }
+
+        if (unescaped.IndexOf(':') >= 0
+            || unescaped.IndexOfAny(new[] { '"', '<', '>', '|', '*', '?' }) >= 0)
+            return false;
+
+        if (!ImageExtensions.Contains(Path.GetExtension(unescaped)))
+            return false;
+
+        var rooted = unescaped.StartsWith("/", StringComparison.Ordinal);
+        var baseDir = rooted ? fullRoot.TrimEnd(Path.DirectorySeparatorChar) : docBaseDir;
+        var relative = unescaped.TrimStart('/').Replace('/', Path.DirectorySeparatorChar);
+        if (string.IsNullOrEmpty(relative))
+            return false;
+
+        string candidate;
+        try
+        {
+            candidate = Path.GetFullPath(Path.Combine(baseDir, relative));
+        }
+        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
+        {
+            return false;
+        }
+
+        if (!candidate.StartsWith(fullRoot, StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        cleanPath = decoded;
+        diskPath = candidate;
+        return true;
     }
 
     private static void AddAttributeReferences(HashSet<string> references, string text)

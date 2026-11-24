@@ -1,6 +1,114 @@
 import { distanceMeters } from './geo.js';
 import { findTrackGaps, isValidHeartRate } from './track-analysis.js';
 
+/** High-contrast 12-color palette for multi-segment tracks (avoids common topo greens and grays). */
+export const SPLIT_COLORS = Object.freeze([
+  '#f97316', // orange
+  '#38bdf8', // sky
+  '#eab308', // amber
+  '#e879f9', // fuchsia
+  '#22d3ee', // cyan
+  '#fb7185', // rose
+  '#a78bfa', // violet
+  '#2dd4bf', // teal
+  '#facc15', // gold
+  '#60a5fa', // blue
+  '#f43f5e', // crimson
+  '#c084fc', // orchid
+]);
+
+function trackColorSignature(track) {
+  const segs = (track?.segments || []).filter((s) => Array.isArray(s) && s.length > 0);
+  if (segs.length === 0) return '';
+  let count = 0;
+  for (const s of segs) count += s.length;
+  const firstSeg = segs[0];
+  const lastSeg = segs[segs.length - 1];
+  const first = firstSeg[0];
+  const last = lastSeg[lastSeg.length - 1];
+  const midSeg = segs[Math.floor(segs.length / 2)];
+  const mid = midSeg[Math.floor(midSeg.length / 2)];
+  return `${first.lat.toFixed(6)},${first.lon.toFixed(6)}|`
+    + `${mid.lat.toFixed(6)},${mid.lon.toFixed(6)}|`
+    + `${last.lat.toFixed(6)},${last.lon.toFixed(6)}|${count}`;
+}
+
+function trackStartKey(track) {
+  const seg = (track?.segments || []).find((s) => Array.isArray(s) && s.length > 0);
+  const first = seg?.[0];
+  return first ? `${first.lat.toFixed(6)},${first.lon.toFixed(6)}` : '';
+}
+
+/**
+ * Creates a session-scoped color resolver so deleting an earlier segment never shifts colors
+ * of remaining segments, and splitting preserves the left half's color while assigning a fresh one.
+ */
+export function createSegmentColorResolver() {
+  /** @type {Map<string, number>} */
+  const sigToColorIndex = new Map();
+  /** @type {Map<string, number>} */
+  const startToColorIndex = new Map();
+  let nextColorIndex = 0;
+
+  return {
+    reset() {
+      sigToColorIndex.clear();
+      startToColorIndex.clear();
+      nextColorIndex = 0;
+    },
+    resolve(tracks) {
+      const list = Array.isArray(tracks) ? tracks : [];
+      if (list.length === 0) return [];
+      const activeIndices = new Set();
+      const pending = [];
+      const assigned = new Array(list.length).fill(-1);
+
+      // Pass 1: preserve exact known signatures first so deletions never shift remaining colors.
+      list.forEach((trk, idx) => {
+        const sig = trackColorSignature(trk);
+        if (sig && sigToColorIndex.has(sig)) {
+          const ci = sigToColorIndex.get(sig);
+          assigned[idx] = ci;
+          activeIndices.add(ci);
+        } else {
+          pending.push({ idx, trk, sig });
+        }
+      });
+
+      // Pass 2: assign unseen segments (inheriting start-point color if not already in use, else next fresh color).
+      for (const { idx, trk, sig } of pending) {
+        const startKey = trackStartKey(trk);
+        let ci = -1;
+        if (startKey && startToColorIndex.has(startKey)) {
+          const inherited = startToColorIndex.get(startKey);
+          if (!activeIndices.has(inherited)) ci = inherited;
+        }
+        if (ci < 0) {
+          // Pick the next unused color index when possible to avoid collisions.
+          for (let tries = 0; tries < SPLIT_COLORS.length; tries += 1) {
+            const candidate = (nextColorIndex + tries) % SPLIT_COLORS.length;
+            if (!activeIndices.has(candidate)) {
+              ci = candidate;
+              nextColorIndex = (candidate + 1) % SPLIT_COLORS.length;
+              break;
+            }
+          }
+          if (ci < 0) {
+            ci = nextColorIndex % SPLIT_COLORS.length;
+            nextColorIndex = (nextColorIndex + 1) % SPLIT_COLORS.length;
+          }
+        }
+        assigned[idx] = ci;
+        activeIndices.add(ci);
+        if (sig) sigToColorIndex.set(sig, ci);
+        if (startKey) startToColorIndex.set(startKey, ci);
+      }
+
+      return assigned.map((ci) => SPLIT_COLORS[ci % SPLIT_COLORS.length]);
+    },
+  };
+}
+
 /**
  * Pure immutable geometry and metadata operations on ParsedTrack objects.
  * Zero DOM dependencies.

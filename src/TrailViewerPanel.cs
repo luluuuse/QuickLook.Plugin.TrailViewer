@@ -36,6 +36,7 @@ internal sealed partial class TrailViewerPanel : UserControl, IDisposable
     private static readonly object EnvironmentGate = new();
     private static System.Threading.Tasks.Task<CoreWebView2Environment>? _environmentTask;
     internal const long MaxInputBytes = 64L * 1024 * 1024;
+    internal const long MaxKmzInputBytes = 384L * 1024 * 1024;
 
     private readonly Stopwatch _clock = Stopwatch.StartNew();
     private readonly DispatcherTimer _timeout;
@@ -139,9 +140,11 @@ internal sealed partial class TrailViewerPanel : UserControl, IDisposable
                 Fail(Strings.PreviewFailed(ex.Message));
                 return;
             }
-            if (IsOversized(sourceBytes))
+            var isKmz = KmzArchive.IsKmz(path);
+            var limitBytes = isKmz ? MaxKmzInputBytes : MaxInputBytes;
+            if (IsOversized(sourceBytes, isKmz))
             {
-                Fail(Strings.FileTooLarge(MaxInputBytes));
+                Fail(Strings.FileTooLarge(limitBytes));
                 return;
             }
 
@@ -308,7 +311,8 @@ internal sealed partial class TrailViewerPanel : UserControl, IDisposable
         }
     }
 
-    internal static bool IsOversized(long bytes) => bytes > MaxInputBytes;
+    internal static bool IsOversized(long bytes, bool isKmz = false) =>
+        bytes > (isKmz ? MaxKmzInputBytes : MaxInputBytes);
 
     internal static bool IsViewerShutdown(Exception exception) =>
         exception is InvalidOperationException or ObjectDisposedException

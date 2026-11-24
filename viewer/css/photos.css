@@ -432,6 +432,24 @@
   overflow-wrap: anywhere;
 }
 
+.photo-open-external {
+  margin-top: 4px;
+  padding: 5px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.photo-open-external:hover,
+.photo-open-external:focus-visible {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
 .photo-arrow {
   position: absolute;
   top: 50%;

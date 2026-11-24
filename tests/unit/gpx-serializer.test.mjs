@@ -17,6 +17,7 @@ test('serializeGpx outputs UTF-8 GPX 1.1 XML preserving ele, time, heartRate and
     routes: [],
     waypoints: [
       { lat: 39.905, lon: 116.305, ele: 175, name: 'Water', description: 'Clean spring', icon: 'water' },
+      { lat: 39.906, lon: 116.306, name: 'Photo', images: ['https://example.com/f?a=1&b=2'] },
     ],
     areas: [],
   };
@@ -25,6 +26,7 @@ test('serializeGpx outputs UTF-8 GPX 1.1 XML preserving ele, time, heartRate and
   assert.ok(!xml.startsWith('\uFEFF'));
   assert.ok(xml.includes('<metadata><name>Test &amp; &lt;Trail&gt;</name></metadata>'));
   assert.ok(xml.includes('<sym>water</sym>'));
+  assert.ok(xml.includes('<link href="https://example.com/f?a=1&amp;b=2"><text>media</text></link>'));
   assert.ok(xml.includes('<gpxtpx:hr>132</gpxtpx:hr>'));
   assert.ok(xml.includes('<gpxtpx:hr>158</gpxtpx:hr>'));
   assert.equal((xml.match(/<trkpt /g) || []).length, 2);

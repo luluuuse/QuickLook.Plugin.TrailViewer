@@ -29,7 +29,6 @@ import {
   updateWaypoint,
 } from './track-ops.js';
 
-const SPLIT_COLORS = ['#f97316', '#38bdf8', '#22c55e', '#eab308'];
 const WAYPOINT_SYMS = ['pin', 'water', 'supply', 'camp', 'summit', 'danger', 'junction'];
 
 function formatLocalDatetimeInput(ms) {
@@ -82,8 +81,11 @@ export function createEditorDrawers(ctx) {
   function renderCropDrawer() {
     const drawerBody = getDrawerBody();
     const activeSubMode = state.getSubMode();
-    const modeList = el('div', 'editor-segmented-tabs is-two');
-    const cropModeBtn = el('button', `editor-segmented-tab${activeSubMode === 'crop' ? ' is-active' : ''}`);
+    const isSplit = activeSubMode === 'split';
+    const isAppend = activeSubMode === 'append';
+    const isCrop = !isSplit && !isAppend;
+    const modeList = el('div', 'editor-segmented-tabs');
+    const cropModeBtn = el('button', `editor-segmented-tab${isCrop ? ' is-active' : ''}`);
     cropModeBtn.type = 'button';
     cropModeBtn.textContent = t('editor.crop.mode');
     cropModeBtn.addEventListener('click', () => {
@@ -93,7 +95,7 @@ export function createEditorDrawers(ctx) {
       renderDrawer();
     });
 
-    const splitModeBtn = el('button', `editor-segmented-tab${activeSubMode === 'split' ? ' is-active' : ''}`);
+    const splitModeBtn = el('button', `editor-segmented-tab${isSplit ? ' is-active' : ''}`);
     splitModeBtn.type = 'button';
     splitModeBtn.textContent = t('editor.split.mode');
     splitModeBtn.addEventListener('click', () => {
@@ -103,12 +105,75 @@ export function createEditorDrawers(ctx) {
       renderDrawer();
     });
 
-    modeList.append(cropModeBtn, splitModeBtn);
+    const appendModeBtn = el('button', `editor-segmented-tab${isAppend ? ' is-active' : ''}`);
+    appendModeBtn.type = 'button';
+    appendModeBtn.textContent = t('editor.topology.appendTitle');
+    appendModeBtn.addEventListener('click', () => {
+      state.setSubMode('append');
+      overlay.setTool('crop', 'append');
+      mountCropOverlay();
+      renderDrawer();
+    });
+
+    modeList.append(cropModeBtn, splitModeBtn, appendModeBtn);
     drawerBody.append(modeList, el('div', 'editor-tab-divider'));
 
     const current = store.getCurrent();
     setCropStatEls(null, null);
-    if (activeSubMode === 'crop') {
+    if (isAppend) {
+      const appendBox = el('div', 'editor-stat-box');
+      const mergeRow = el('label', 'editor-list-row');
+      const mergeChk = el('input');
+      mergeChk.type = 'checkbox';
+      mergeChk.checked = Boolean(state.getAppendMergeSingle?.());
+      mergeChk.addEventListener('change', () => {
+        state.setAppendMergeSingle?.(mergeChk.checked);
+      });
+      mergeRow.append(mergeChk, el('span', 'editor-list-row-main', t('editor.topology.appendMerge')));
+
+      let fallbackFileInput = null;
+      if (typeof onImportExternalTrack !== 'function') {
+        fallbackFileInput = el('input');
+        fallbackFileInput.type = 'file';
+        fallbackFileInput.accept = '.gpx,.kml';
+        fallbackFileInput.hidden = true;
+        fallbackFileInput.addEventListener('change', () => {
+          const file = fallbackFileInput.files?.[0];
+          fallbackFileInput.value = '';
+          if (file) void importExternalFile(file);
+        });
+      }
+
+      const appendBtn = makeBtn('editor-btn editor-btn-primary', 'editor-merge', t('editor.topology.appendBtn'), () => {
+        if (typeof onImportExternalTrack === 'function') {
+          void importFromHost({ mode: 'dialog' });
+        } else {
+          fallbackFileInput?.click();
+        }
+      });
+      appendBox.append(mergeRow, appendBtn);
+      if (fallbackFileInput) appendBox.append(fallbackFileInput);
+
+      const siblings = state.getSiblingTracks?.() || [];
+      if (siblings.length > 0 && typeof onImportExternalTrack === 'function') {
+        appendBox.append(el('span', 'editor-drawer-hint', t('editor.topology.appendSiblings')));
+        const sibList = el('div', 'editor-seg-list editor-sibling-list');
+        for (const item of siblings) {
+          const row = el('div', 'editor-list-row');
+          const label = el('span', 'editor-list-row-main', item.name);
+          label.title = item.name;
+          const joinBtn = makeBtn('editor-btn', null, t('editor.topology.appendOne'), () => {
+            void importFromHost({ mode: 'sibling', name: item.name });
+          });
+          row.append(label, joinBtn);
+          sibList.append(row);
+        }
+        appendBox.append(sibList);
+      }
+      drawerBody.append(appendBox);
+      return;
+    }
+    if (isCrop) {
       const statsBox = el('div', 'editor-stat-box');
       const rangeRow = el('div', 'editor-stat-row');
       const rangeLabelEl = el('span', 'editor-stat-label', '');
@@ -184,18 +249,43 @@ export function createEditorDrawers(ctx) {
     } else {
       drawerBody.append(el('p', 'editor-drawer-hint', t('editor.split.hint')));
       const tracks = normalizedTracks(current);
+      const segColors = state.getSegmentColors ? state.getSegmentColors(tracks) : [];
+      const selectedSeg = state.getSelectedSegIndex ? state.getSelectedSegIndex() : -1;
       const segTitle = el('div', 'editor-stat-label', t('editor.split.segments', { count: tracks.length }));
       const segList = el('div', 'editor-seg-list');
       tracks.forEach((trk, idx) => {
-        const row = el('div', 'editor-list-row');
+        const row = el('div', `editor-list-row${idx === selectedSeg ? ' is-selected' : ''}`);
+        row.dataset.segIndex = String(idx);
         const swatch = el('span', 'editor-seg-swatch');
-        swatch.style.background = SPLIT_COLORS[idx % SPLIT_COLORS.length];
+        swatch.style.background = segColors[idx] || '#f97316';
         const label = trk.name || `#${idx + 1}`;
-        const main = el('span', 'editor-list-row-main');
-        main.append(swatch, document.createTextNode(label));
+        const segMeters = trackTotalDistance({ name: '', tracks: [trk], routes: [], waypoints: [] });
+        const distText = formatDistance(segMeters);
+        const main = el('span', 'editor-list-row-main editor-seg-main');
+        main.title = `${label} · ${distText}`;
+        const info = el('span', 'editor-seg-info');
+        const nameSpan = el('span', 'editor-seg-name', label);
+        const distSpan = el('span', 'editor-seg-dist', distText);
+        info.append(nameSpan, distSpan);
+        main.append(swatch, info);
+        main.addEventListener('click', () => {
+          state.setSelectedSegIndex?.(idx);
+          for (const item of segList.querySelectorAll('.editor-list-row')) {
+            item.classList.toggle('is-selected', Number(item.dataset.segIndex) === idx);
+          }
+          overlay.focusTrackSegment?.(idx);
+        });
+        row.addEventListener('pointerenter', () => {
+          state.setHoveredSegIndex?.(idx);
+        });
+        row.addEventListener('pointerleave', () => {
+          state.setHoveredSegIndex?.(-1);
+        });
         row.append(main);
         if (tracks.length > 1) {
           const del = makeBtn('editor-btn editor-btn-danger', null, t('editor.split.deleteSeg'), () => {
+            state.setHoveredSegIndex?.(-1);
+            state.setSelectedSegIndex?.(-1);
             store.apply('delete-segment', deleteTrackSegment(store.getCurrent(), idx));
           });
           row.append(del);
@@ -225,17 +315,12 @@ export function createEditorDrawers(ctx) {
     const drawerBody = getDrawerBody();
     const modeList = el('div', 'editor-segmented-tabs');
     const subMode = state.getSubMode();
-    const isBox = subMode === 'box-erase';
     const isSmooth = subMode === 'smooth-ele';
-    const isAuto = !isBox && !isSmooth;
+    const isSimplify = subMode === 'simplify';
+    const isAuto = !isSmooth && !isSimplify;
     const autoBtn = makeBtn(`editor-segmented-tab${isAuto ? ' is-active' : ''}`, null, t('editor.clean.autoMode'), () => {
       state.setSubMode('clean');
       overlay.setTool('clean', 'clean');
-      renderDrawer();
-    });
-    const boxBtn = makeBtn(`editor-segmented-tab${isBox ? ' is-active' : ''}`, null, t('editor.clean.boxMode'), () => {
-      state.setSubMode('box-erase');
-      overlay.setTool('clean', 'box-erase');
       renderDrawer();
     });
     const smoothBtn = makeBtn(`editor-segmented-tab${isSmooth ? ' is-active' : ''}`, null, t('editor.clean.smoothTitle'), () => {
@@ -243,15 +328,41 @@ export function createEditorDrawers(ctx) {
       overlay.setTool('clean', 'smooth-ele');
       renderDrawer();
     });
-    modeList.append(autoBtn, boxBtn, smoothBtn);
+    const simplifyBtn = makeBtn(`editor-segmented-tab${isSimplify ? ' is-active' : ''}`, null, t('editor.topology.simplify'), () => {
+      state.setSubMode('simplify');
+      overlay.setTool('clean', 'simplify');
+      renderDrawer();
+    });
+    modeList.append(autoBtn, smoothBtn, simplifyBtn);
     drawerBody.append(modeList, el('div', 'editor-tab-divider'));
 
-    if (isBox) {
-      drawerBody.append(el('p', 'editor-drawer-hint', t('editor.clean.boxHint')));
+    const current = store.getCurrent();
+
+    if (isSimplify) {
+      const simplifyBox = el('div', 'editor-stat-box');
+      const tolRow = el('div', 'editor-wpt-row');
+      const tolSelect = el('select');
+      for (const meters of [3, 5, 10, 20]) {
+        const opt = el('option', '', `${meters} m`);
+        opt.value = String(meters);
+        if (meters === 5) opt.selected = true;
+        tolSelect.append(opt);
+      }
+      const simBtn = makeBtn('editor-btn editor-btn-primary', 'editor-simplify', t('editor.topology.simplifyApply'), () => {
+        const tol = Number(tolSelect.value) || 5;
+        const { track, beforeCount, afterCount } = simplifyTrack(store.getCurrent(), tol);
+        if (afterCount < beforeCount) {
+          store.apply('simplify', track);
+          notifyToast(t('editor.topology.simplifyDone', { before: beforeCount, after: afterCount }));
+        } else {
+          notifyToast(t('editor.topology.simplifyNone'));
+        }
+      });
+      tolRow.append(tolSelect, simBtn);
+      simplifyBox.append(tolRow);
+      drawerBody.append(simplifyBox);
       return;
     }
-
-    const current = store.getCurrent();
 
     if (isSmooth) {
       const smoothBox = el('div', 'editor-stat-box');
@@ -332,124 +443,7 @@ export function createEditorDrawers(ctx) {
     const drawerBody = getDrawerBody();
     const current = store.getCurrent();
     const subMode = state.getSubMode();
-    const isSimplify = subMode === 'simplify';
-    const isAppend = subMode === 'append';
     const isLoopStart = subMode === 'loop-start';
-    const isMainTab = !isSimplify && !isAppend;
-
-    const tabs = el('div', 'editor-segmented-tabs');
-    const mainTabBtn = makeBtn(
-      `editor-segmented-tab${isMainTab ? ' is-active' : ''}`,
-      null,
-      t('editor.topology.tabMain'),
-      () => {
-        state.setSubMode('topology');
-        overlay.setTool('topology', 'topology');
-        renderDrawer();
-      },
-    );
-    const simplifyTabBtn = makeBtn(
-      `editor-segmented-tab${isSimplify ? ' is-active' : ''}`,
-      null,
-      t('editor.topology.simplify'),
-      () => {
-        state.setSubMode('simplify');
-        overlay.setTool('topology', 'simplify');
-        renderDrawer();
-      },
-    );
-    const appendTabBtn = makeBtn(
-      `editor-segmented-tab${isAppend ? ' is-active' : ''}`,
-      null,
-      t('editor.topology.appendTitle'),
-      () => {
-        state.setSubMode('append');
-        overlay.setTool('topology', 'append');
-        renderDrawer();
-      },
-    );
-    tabs.append(mainTabBtn, simplifyTabBtn, appendTabBtn);
-    drawerBody.append(tabs, el('div', 'editor-tab-divider'));
-
-    if (isSimplify) {
-      const simplifyBox = el('div', 'editor-stat-box');
-      const tolRow = el('div', 'editor-wpt-row');
-      const tolSelect = el('select');
-      for (const meters of [3, 5, 10, 20]) {
-        const opt = el('option', '', `${meters} m`);
-        opt.value = String(meters);
-        if (meters === 5) opt.selected = true;
-        tolSelect.append(opt);
-      }
-      const simBtn = makeBtn('editor-btn editor-btn-primary', 'editor-simplify', t('editor.topology.simplifyApply'), () => {
-        const tol = Number(tolSelect.value) || 5;
-        const { track, beforeCount, afterCount } = simplifyTrack(store.getCurrent(), tol);
-        if (afterCount < beforeCount) {
-          store.apply('simplify', track);
-          notifyToast(t('editor.topology.simplifyDone', { before: beforeCount, after: afterCount }));
-        } else {
-          notifyToast(t('editor.topology.simplifyNone'));
-        }
-      });
-      tolRow.append(tolSelect, simBtn);
-      simplifyBox.append(tolRow);
-      drawerBody.append(simplifyBox);
-      return;
-    }
-
-    if (isAppend) {
-      const appendBox = el('div', 'editor-stat-box');
-      const mergeRow = el('label', 'editor-list-row');
-      const mergeChk = el('input');
-      mergeChk.type = 'checkbox';
-      mergeChk.checked = Boolean(state.getAppendMergeSingle?.());
-      mergeChk.addEventListener('change', () => {
-        state.setAppendMergeSingle?.(mergeChk.checked);
-      });
-      mergeRow.append(mergeChk, el('span', 'editor-list-row-main', t('editor.topology.appendMerge')));
-
-      let fallbackFileInput = null;
-      if (typeof onImportExternalTrack !== 'function') {
-        fallbackFileInput = el('input');
-        fallbackFileInput.type = 'file';
-        fallbackFileInput.accept = '.gpx,.kml';
-        fallbackFileInput.hidden = true;
-        fallbackFileInput.addEventListener('change', () => {
-          const file = fallbackFileInput.files?.[0];
-          fallbackFileInput.value = '';
-          if (file) void importExternalFile(file);
-        });
-      }
-
-      const appendBtn = makeBtn('editor-btn editor-btn-primary', 'editor-merge', t('editor.topology.appendBtn'), () => {
-        if (typeof onImportExternalTrack === 'function') {
-          void importFromHost({ mode: 'dialog' });
-        } else {
-          fallbackFileInput?.click();
-        }
-      });
-      appendBox.append(mergeRow, appendBtn);
-      if (fallbackFileInput) appendBox.append(fallbackFileInput);
-
-      const siblings = state.getSiblingTracks?.() || [];
-      if (siblings.length > 0 && typeof onImportExternalTrack === 'function') {
-        appendBox.append(el('span', 'editor-drawer-hint', t('editor.topology.appendSiblings')));
-        const sibList = el('div', 'editor-seg-list editor-sibling-list');
-        for (const item of siblings) {
-          const row = el('div', 'editor-list-row');
-          const label = el('span', 'editor-list-row-main', item.name);
-          label.title = item.name;
-          const joinBtn = makeBtn('editor-btn', null, t('editor.topology.appendOne'), () => {
-            void importFromHost({ mode: 'sibling', name: item.name });
-          });
-          row.append(label, joinBtn);
-          sibList.append(row);
-        }
-        appendBox.append(sibList);
-      }
-      drawerBody.append(appendBox);
-      return;
-    }
 
     const strictlyClosed = isTrackClosedLoop(current, 0.5);
     const loopReady = isTrackClosedLoop(current, 50);
@@ -652,6 +646,54 @@ export function createEditorDrawers(ctx) {
 
   function renderDrawDrawer() {
     const drawerBody = getDrawerBody();
+    const subMode = state.getSubMode();
+    const isVertex = subMode === 'vertex';
+    const isBox = subMode === 'box-erase';
+    const isDraw = !isVertex && !isBox;
+
+    const tabs = el('div', 'editor-segmented-tabs');
+    const drawTabBtn = makeBtn(
+      `editor-segmented-tab${isDraw ? ' is-active' : ''}`,
+      null,
+      t('editor.draw.tabDraw'),
+      () => {
+        state.setSubMode('draw');
+        overlay.setTool('draw', 'draw');
+        renderDrawer();
+      },
+    );
+    const vertexTabBtn = makeBtn(
+      `editor-segmented-tab${isVertex ? ' is-active' : ''}`,
+      null,
+      t('editor.rail.vertex'),
+      () => {
+        state.setSubMode('vertex');
+        overlay.setTool('draw', 'vertex');
+        renderDrawer();
+      },
+    );
+    const boxTabBtn = makeBtn(
+      `editor-segmented-tab${isBox ? ' is-active' : ''}`,
+      null,
+      t('editor.clean.boxMode'),
+      () => {
+        state.setSubMode('box-erase');
+        overlay.setTool('draw', 'box-erase');
+        renderDrawer();
+      },
+    );
+    tabs.append(drawTabBtn, vertexTabBtn, boxTabBtn);
+    drawerBody.append(tabs, el('div', 'editor-tab-divider'));
+
+    if (isVertex) {
+      renderVertexDrawer();
+      return;
+    }
+    if (isBox) {
+      drawerBody.append(el('p', 'editor-drawer-hint', t('editor.clean.boxHint')));
+      return;
+    }
+
     drawerBody.append(el('p', 'editor-drawer-hint', t('editor.draw.hint')));
     const draft = overlay.getDrawDraft?.() || { points: [], startSnap: null, endSnap: null, distanceMeters: 0 };
     const count = draft.points.length;
@@ -1012,7 +1054,6 @@ export function createEditorDrawers(ctx) {
     renderCropDrawer,
     renderCleanDrawer,
     renderTopologyDrawer,
-    renderVertexDrawer,
     renderDrawDrawer,
     commitDrawDraft,
     importExternalFile,
