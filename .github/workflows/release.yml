@@ -106,3 +106,13 @@ jobs:
           $arguments = @('release', 'create', $env:GITHUB_REF_NAME, $package.FullName, $sha, '--verify-tag', '--notes-file', 'release-notes.md')
           if ($env:GITHUB_REF_NAME.Contains('-')) { $arguments += '--prerelease' }
           gh @arguments
+
+      - name: Sync release to GitCode mirror
+        continue-on-error: true
+        shell: pwsh
+        env:
+          GITCODE_TOKEN: ${{ secrets.GITCODE_TOKEN }}
+        run: |
+          $package = Get-ChildItem QuickLook.Plugin.TrailViewer-*.qlplugin | Select-Object -First 1
+          $sha = "$($package.FullName).sha256"
+          node scripts/sync-gitcode-release.cjs $env:GITHUB_REF_NAME release-notes.md $package.FullName $sha

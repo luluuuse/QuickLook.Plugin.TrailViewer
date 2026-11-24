@@ -5,6 +5,7 @@ using System.IO;
 using System.IO.Compression;
 using System.Net;
 using System.Net.Http;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
@@ -22,7 +23,10 @@ internal sealed class UpdateStatusInfo
     public string ReleaseUrl { get; set; } = string.Empty;
     public string AssetName { get; set; } = string.Empty;
     public string AssetUrl { get; set; } = string.Empty;
+    public string FallbackAssetUrl { get; set; } = string.Empty;
     public long AssetSize { get; set; }
+    public string ExpectedSha256 { get; set; } = string.Empty;
+    public string Source { get; set; } = string.Empty; // "github" | "gitcode"
     public string NotesZh { get; set; } = string.Empty;
     public string NotesEn { get; set; } = string.Empty;
     public string IgnoredVersion { get; set; } = string.Empty;
@@ -40,14 +44,17 @@ internal sealed class UpdateStateRecord
     public string ReleaseUrl { get; set; } = string.Empty;
     public string AssetName { get; set; } = string.Empty;
     public string AssetUrl { get; set; } = string.Empty;
+    public string FallbackAssetUrl { get; set; } = string.Empty;
     public long AssetSize { get; set; }
+    public string ExpectedSha256 { get; set; } = string.Empty;
+    public string Source { get; set; } = string.Empty;
     public string NotesZh { get; set; } = string.Empty;
     public string NotesEn { get; set; } = string.Empty;
 }
 
 /// <summary>
-/// Checks GitHub Releases for newer TrailViewer versions, caches results for 24 h, and downloads
-/// verified .qlplugin packages to hand off to QuickLook's native plugin installer.
+/// Checks GitHub Releases and the GitCode mirror for newer TrailViewer versions, caches results for 24 h,
+/// verifies SHA256 and package manifest integrity, and hands verified .qlplugin packages to QuickLook.
 /// </summary>
 internal static class UpdateChecker
 {
@@ -58,10 +65,20 @@ internal static class UpdateChecker
     internal const string ReleasesPageUrl =
         "https://github.com/" + RepoOwner + "/" + RepoName + "/releases";
 
+    internal const string MirrorOwner = "luluse";
+    internal const string MirrorRepoName = "QuickLook.Plugin.TrailViewer";
+    internal const string MirrorReleasesApiUrl =
+        "https://api.gitcode.com/api/v5/repos/" + MirrorOwner + "/" + MirrorRepoName + "/releases";
+    internal const string MirrorReleasesPageUrl =
+        "https://gitcode.com/" + MirrorOwner + "/" + MirrorRepoName + "/releases";
+
     private const long MaxPackageBytes = 32L * 1024 * 1024;
     private static readonly TimeSpan CheckInterval = TimeSpan.FromHours(24);
     private static readonly Regex SemverPattern = new(
         @"^v?(?<major>\d+)\.(?<minor>\d+)\.(?<patch>\d+)(?<pre>-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$",
+        RegexOptions.CultureInvariant);
+    private static readonly Regex Sha256Pattern = new(
+        @"\b(?<hex>[0-9a-fA-F]{64})\b",
         RegexOptions.CultureInvariant);
 
     private static readonly object StateLock = new();
@@ -81,7 +98,7 @@ internal static class UpdateChecker
         var client = new HttpClient(handler) { Timeout = timeout };
         client.DefaultRequestHeaders.UserAgent.ParseAdd(
             $"QuickLook.Plugin.TrailViewer/{BuildInfo.ProductVersion}");
-        client.DefaultRequestHeaders.Accept.ParseAdd("application/vnd.github+json");
+        client.DefaultRequestHeaders.Accept.ParseAdd("application/json");
         return client;
     }
 
@@ -168,7 +185,10 @@ internal static class UpdateChecker
         }
         var host = uri.Host;
         return string.Equals(host, "github.com", StringComparison.OrdinalIgnoreCase)
-            || host.EndsWith(".githubusercontent.com", StringComparison.OrdinalIgnoreCase);
+            || host.EndsWith(".githubusercontent.com", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(host, "gitcode.com", StringComparison.OrdinalIgnoreCase)
+            || host.EndsWith(".gitcode.com", StringComparison.OrdinalIgnoreCase)
+            || host.EndsWith(".gitcode.net", StringComparison.OrdinalIgnoreCase);
     }
 
     internal static bool IsAllowedReleasePageUrl(string? url)
@@ -179,17 +199,31 @@ internal static class UpdateChecker
         {
             return false;
         }
-        return string.Equals(uri.Host, "github.com", StringComparison.OrdinalIgnoreCase)
-            && uri.AbsolutePath.StartsWith($"/{RepoOwner}/{RepoName}/releases", StringComparison.OrdinalIgnoreCase);
+        if (string.Equals(uri.Host, "github.com", StringComparison.OrdinalIgnoreCase)
+            && uri.AbsolutePath.StartsWith($"/{RepoOwner}/{RepoName}/releases", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+        return string.Equals(uri.Host, "gitcode.com", StringComparison.OrdinalIgnoreCase)
+            && uri.AbsolutePath.StartsWith($"/{MirrorOwner}/{MirrorRepoName}/releases", StringComparison.OrdinalIgnoreCase);
     }
 
     internal static UpdateStatusInfo ParseReleaseJson(
-        string json, string currentVersion, string ignoredVersion)
+        string json, string currentVersion, string ignoredVersion, string source = "github")
     {
         var serializer = new JavaScriptSerializer { MaxJsonLength = 2 * 1024 * 1024 };
-        var root = serializer.DeserializeObject(json) as Dictionary<string, object>;
+        var parsed = serializer.DeserializeObject(json);
+        Dictionary<string, object>? root = null;
+        if (parsed is Dictionary<string, object> dict)
+        {
+            root = dict;
+        }
+        else if (parsed is object[] list)
+        {
+            root = SelectLatestStableRelease(list);
+        }
         if (root == null)
-            throw new InvalidDataException("release response was not a JSON object");
+            throw new InvalidDataException("release response contained no valid release object");
 
         var isDraft = root.TryGetValue("draft", out var draftObj) && draftObj is bool d && d;
         var isPre = root.TryGetValue("prerelease", out var preObj) && preObj is bool p && p;
@@ -199,12 +233,19 @@ internal static class UpdateChecker
             throw new InvalidDataException("release tag was not a valid version");
 
         var publishedAt = ReadString(root, "published_at");
+        if (string.IsNullOrEmpty(publishedAt))
+            publishedAt = ReadString(root, "created_at");
+
+        var defaultPage = string.Equals(source, "gitcode", StringComparison.OrdinalIgnoreCase)
+            ? $"{MirrorReleasesPageUrl}/tag/{Uri.EscapeDataString(tag)}"
+            : ReleasesPageUrl;
         var releaseUrl = ReadString(root, "html_url");
         if (!IsAllowedReleasePageUrl(releaseUrl))
-            releaseUrl = ReleasesPageUrl;
+            releaseUrl = defaultPage;
 
         var body = ReadString(root, "body");
         ExtractBilingualNotes(body, out var notesZh, out var notesEn);
+        var expectedSha256 = ExtractSha256(body);
 
         var assetName = string.Empty;
         var assetUrl = string.Empty;
@@ -216,11 +257,17 @@ internal static class UpdateChecker
                 if (item is not Dictionary<string, object> asset) continue;
                 var name = ReadString(asset, "name");
                 var dl = ReadString(asset, "browser_download_url");
-                if (!name.EndsWith(".qlplugin", StringComparison.OrdinalIgnoreCase)
-                    || !IsAllowedReleaseAssetUrl(dl))
-                {
+                if (string.IsNullOrEmpty(dl))
+                    dl = ReadString(asset, "url");
+                if (!name.EndsWith(".qlplugin", StringComparison.OrdinalIgnoreCase))
                     continue;
+                if (string.IsNullOrEmpty(dl) && string.Equals(source, "gitcode", StringComparison.OrdinalIgnoreCase))
+                {
+                    dl = $"https://gitcode.com/{MirrorOwner}/{MirrorRepoName}/releases/download/"
+                        + $"{Uri.EscapeDataString(tag)}/{Uri.EscapeDataString(name)}";
                 }
+                if (!IsAllowedReleaseAssetUrl(dl))
+                    continue;
                 assetName = name;
                 assetUrl = dl;
                 if (asset.TryGetValue("size", out var sizeObj))
@@ -247,11 +294,42 @@ internal static class UpdateChecker
             AssetName = assetName,
             AssetUrl = assetUrl,
             AssetSize = assetSize,
+            ExpectedSha256 = expectedSha256,
+            Source = source,
             NotesZh = notesZh,
             NotesEn = notesEn,
             IgnoredVersion = ignoredVersion ?? string.Empty,
             HasUpdate = isNewer && !isIgnored,
         };
+    }
+
+    private static Dictionary<string, object>? SelectLatestStableRelease(object[] list)
+    {
+        Dictionary<string, object>? best = null;
+        string? bestVersion = null;
+        foreach (var item in list)
+        {
+            if (item is not Dictionary<string, object> entry) continue;
+            var isDraft = entry.TryGetValue("draft", out var dObj) && dObj is bool d && d;
+            var isPre = entry.TryGetValue("prerelease", out var pObj) && pObj is bool p && p;
+            if (isDraft || isPre) continue;
+            var ver = NormalizeVersion(ReadString(entry, "tag_name"));
+            if (string.IsNullOrEmpty(ver) || IsPrerelease(ver)) continue;
+            if (best == null || CompareVersions(ver, bestVersion) > 0)
+            {
+                best = entry;
+                bestVersion = ver;
+            }
+        }
+        return best;
+    }
+
+    internal static string ExtractSha256(string body)
+    {
+        if (string.IsNullOrWhiteSpace(body))
+            return string.Empty;
+        var match = Sha256Pattern.Match(body);
+        return match.Success ? match.Groups["hex"].Value.ToUpperInvariant() : string.Empty;
     }
 
     internal static void ExtractBilingualNotes(string body, out string zh, out string en)
@@ -299,7 +377,9 @@ internal static class UpdateChecker
     private static string TrimNotes(string raw)
     {
         var text = raw.Trim();
-        // Strip trailing SHA256/package checksum footer if present
+        var pkgHeading = Regex.Match(text, @"(?m)^##\s+安装包\s*/\s*Package\b");
+        if (pkgHeading.Success && pkgHeading.Index > 0)
+            text = text.Substring(0, pkgHeading.Index).Trim();
         var sep = text.IndexOf("\n---", StringComparison.Ordinal);
         if (sep > 0) text = text.Substring(0, sep).Trim();
         return text.Length > 2400 ? text.Substring(0, 2400).TrimEnd() + "…" : text;
@@ -360,7 +440,8 @@ internal static class UpdateChecker
         CancellationToken cancel,
         string? statePath = null,
         string? currentVersion = null,
-        Func<CancellationToken, Task<string>>? fetcher = null)
+        Func<CancellationToken, Task<string>>? fetcher = null,
+        Func<CancellationToken, Task<string>>? mirrorFetcher = null)
     {
         var current = currentVersion ?? BuildInfo.ProductVersion;
         var state = LoadState(statePath);
@@ -375,10 +456,20 @@ internal static class UpdateChecker
 
         try
         {
-            var json = fetcher != null
-                ? await fetcher(cancel).ConfigureAwait(false)
-                : await FetchLatestReleaseJsonAsync(cancel).ConfigureAwait(false);
-            var info = ParseReleaseJson(json, current, state.IgnoredVersion);
+            UpdateStatusInfo info;
+            if (fetcher != null && mirrorFetcher == null)
+            {
+                // Single injected fetcher (unit test compatibility path)
+                var json = await fetcher(cancel).ConfigureAwait(false);
+                info = ParseReleaseJson(json, current, state.IgnoredVersion, "github");
+            }
+            else
+            {
+                var ghFetch = fetcher ?? (token => FetchJsonAsync(LatestReleaseApiUrl, token));
+                var gcFetch = mirrorFetcher ?? (token => FetchJsonAsync(MirrorReleasesApiUrl, token));
+                info = await CheckDualSourceAsync(ghFetch, gcFetch, current, state.IgnoredVersion, cancel)
+                    .ConfigureAwait(false);
+            }
 
             state.LastCheckedUtc = DateTimeOffset.UtcNow.ToString("o");
             state.LatestVersion = info.LatestVersion;
@@ -386,7 +477,10 @@ internal static class UpdateChecker
             state.ReleaseUrl = info.ReleaseUrl;
             state.AssetName = info.AssetName;
             state.AssetUrl = info.AssetUrl;
+            state.FallbackAssetUrl = info.FallbackAssetUrl;
             state.AssetSize = info.AssetSize;
+            state.ExpectedSha256 = info.ExpectedSha256;
+            state.Source = info.Source;
             state.NotesZh = info.NotesZh;
             state.NotesEn = info.NotesEn;
             SaveState(state, statePath);
@@ -402,11 +496,82 @@ internal static class UpdateChecker
             {
                 Status = force ? "error" : "silent-error",
                 CurrentVersion = NormalizeVersion(current),
-                ReleaseUrl = ReleasesPageUrl,
+                ReleaseUrl = MirrorReleasesPageUrl,
                 IgnoredVersion = state.IgnoredVersion ?? string.Empty,
                 Detail = ex is TaskCanceledException ? "timeout" : ex.Message,
                 HasUpdate = false,
             };
+        }
+    }
+
+    private static async Task<UpdateStatusInfo> CheckDualSourceAsync(
+        Func<CancellationToken, Task<string>> githubFetcher,
+        Func<CancellationToken, Task<string>> gitcodeFetcher,
+        string currentVersion,
+        string ignoredVersion,
+        CancellationToken cancel)
+    {
+        var ghTask = TryFetchParsedAsync(githubFetcher, currentVersion, ignoredVersion, "github", cancel);
+        var gcTask = TryFetchParsedAsync(gitcodeFetcher, currentVersion, ignoredVersion, "gitcode", cancel);
+
+        var firstDone = await Task.WhenAny(ghTask, gcTask).ConfigureAwait(false);
+        var first = await firstDone.ConfigureAwait(false);
+        var otherTask = firstDone == ghTask ? gcTask : ghTask;
+
+        // If the fastest source already found a newer release, give the second source a short grace window
+        // so we can attach a fallback download URL if both are reachable, without delaying slow networks.
+        UpdateStatusInfo? second = null;
+        if (first != null)
+        {
+            var graceMs = first.HasUpdate ? 600 : 2500;
+            var completed = await Task.WhenAny(otherTask, Task.Delay(graceMs, cancel)).ConfigureAwait(false);
+            if (completed == otherTask)
+                second = await otherTask.ConfigureAwait(false);
+        }
+        else
+        {
+            second = await otherTask.ConfigureAwait(false);
+        }
+
+        if (first == null && second == null)
+            throw new HttpRequestException("both GitHub and GitCode update sources failed");
+
+        if (first == null) return second!;
+        if (second == null) return first;
+
+        var cmp = CompareVersions(second.LatestVersion, first.LatestVersion);
+        var winner = cmp > 0 ? second : first;
+        var runnerUp = winner == first ? second : first;
+        if (CompareVersions(winner.LatestVersion, runnerUp.LatestVersion) == 0
+            && !string.IsNullOrEmpty(runnerUp.AssetUrl)
+            && !string.Equals(winner.AssetUrl, runnerUp.AssetUrl, StringComparison.OrdinalIgnoreCase))
+        {
+            winner.FallbackAssetUrl = runnerUp.AssetUrl;
+            if (string.IsNullOrEmpty(winner.ExpectedSha256) && !string.IsNullOrEmpty(runnerUp.ExpectedSha256))
+                winner.ExpectedSha256 = runnerUp.ExpectedSha256;
+        }
+        return winner;
+    }
+
+    private static async Task<UpdateStatusInfo?> TryFetchParsedAsync(
+        Func<CancellationToken, Task<string>> fetcher,
+        string currentVersion,
+        string ignoredVersion,
+        string source,
+        CancellationToken cancel)
+    {
+        try
+        {
+            var json = await fetcher(cancel).ConfigureAwait(false);
+            return ParseReleaseJson(json, currentVersion, ignoredVersion, source);
+        }
+        catch (OperationCanceledException) when (cancel.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or InvalidDataException or IOException)
+        {
+            return null;
         }
     }
 
@@ -427,7 +592,10 @@ internal static class UpdateChecker
             ReleaseUrl = IsAllowedReleasePageUrl(state.ReleaseUrl) ? state.ReleaseUrl : ReleasesPageUrl,
             AssetName = state.AssetName ?? string.Empty,
             AssetUrl = IsAllowedReleaseAssetUrl(state.AssetUrl) ? state.AssetUrl : string.Empty,
+            FallbackAssetUrl = IsAllowedReleaseAssetUrl(state.FallbackAssetUrl) ? state.FallbackAssetUrl : string.Empty,
             AssetSize = state.AssetSize,
+            ExpectedSha256 = state.ExpectedSha256 ?? string.Empty,
+            Source = state.Source ?? string.Empty,
             NotesZh = state.NotesZh ?? string.Empty,
             NotesEn = state.NotesEn ?? string.Empty,
             IgnoredVersion = state.IgnoredVersion ?? string.Empty,
@@ -436,9 +604,9 @@ internal static class UpdateChecker
         };
     }
 
-    private static async Task<string> FetchLatestReleaseJsonAsync(CancellationToken cancel)
+    private static async Task<string> FetchJsonAsync(string url, CancellationToken cancel)
     {
-        using var response = await ApiClient.GetAsync(LatestReleaseApiUrl, cancel).ConfigureAwait(false);
+        using var response = await ApiClient.GetAsync(url, cancel).ConfigureAwait(false);
         if (!response.IsSuccessStatusCode)
             throw new HttpRequestException($"HTTP {(int)response.StatusCode}");
         return await response.Content.ReadAsStringAsync().ConfigureAwait(false);
@@ -449,14 +617,42 @@ internal static class UpdateChecker
         string assetName,
         Action<long, long>? onProgress,
         CancellationToken cancel,
-        string? downloadDir = null)
+        string? downloadDir = null,
+        string? fallbackAssetUrl = null,
+        string? expectedSha256 = null)
+    {
+        try
+        {
+            return await DownloadSinglePackageAsync(
+                assetUrl, assetName, expectedSha256, onProgress, cancel, downloadDir).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cancel.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception) when (!string.IsNullOrEmpty(fallbackAssetUrl)
+            && !string.Equals(fallbackAssetUrl, assetUrl, StringComparison.OrdinalIgnoreCase)
+            && IsAllowedReleaseAssetUrl(fallbackAssetUrl))
+        {
+            return await DownloadSinglePackageAsync(
+                fallbackAssetUrl!, assetName, expectedSha256, onProgress, cancel, downloadDir).ConfigureAwait(false);
+        }
+    }
+
+    private static async Task<string> DownloadSinglePackageAsync(
+        string assetUrl,
+        string assetName,
+        string? expectedSha256,
+        Action<long, long>? onProgress,
+        CancellationToken cancel,
+        string? downloadDir)
     {
         if (!IsAllowedReleaseAssetUrl(assetUrl))
             throw new InvalidDataException("release asset URL is not allowed");
 
         var safeName = OverlayTransfer.SanitiseFileName(assetName);
         if (!safeName.EndsWith(".qlplugin", StringComparison.OrdinalIgnoreCase))
-            safeName = $"QuickLook.Plugin.TrailViewer-update.qlplugin";
+            safeName = "QuickLook.Plugin.TrailViewer-update.qlplugin";
 
         var folder = downloadDir ?? Path.Combine(Path.GetTempPath(), "TrailViewer-Updates");
         Directory.CreateDirectory(folder);
@@ -498,7 +694,7 @@ internal static class UpdateChecker
                 }
             }
 
-            VerifyPluginPackage(tempPath);
+            VerifyPluginPackage(tempPath, expectedSha256);
             if (File.Exists(finalPath))
                 File.Delete(finalPath);
             File.Move(tempPath, finalPath);
@@ -512,8 +708,15 @@ internal static class UpdateChecker
         }
     }
 
-    internal static void VerifyPluginPackage(string packagePath)
+    internal static void VerifyPluginPackage(string packagePath, string? expectedSha256 = null)
     {
+        if (!string.IsNullOrWhiteSpace(expectedSha256))
+        {
+            var actual = ComputeFileSha256(packagePath);
+            if (!string.Equals(actual, expectedSha256!.Trim(), StringComparison.OrdinalIgnoreCase))
+                throw new InvalidDataException("downloaded package SHA256 verification failed");
+        }
+
         using var archive = ZipFile.OpenRead(packagePath);
         var hasMetadata = false;
         foreach (var entry in archive.Entries)
@@ -526,6 +729,17 @@ internal static class UpdateChecker
         }
         if (!hasMetadata)
             throw new InvalidDataException("downloaded file is not a valid QuickLook plugin package");
+    }
+
+    internal static string ComputeFileSha256(string path)
+    {
+        using var sha = SHA256.Create();
+        using var stream = File.OpenRead(path);
+        var hash = sha.ComputeHash(stream);
+        var sb = new StringBuilder(hash.Length * 2);
+        foreach (var b in hash)
+            sb.Append(b.ToString("X2"));
+        return sb.ToString();
     }
 
     internal static void LaunchPackageInstaller(string packagePath)

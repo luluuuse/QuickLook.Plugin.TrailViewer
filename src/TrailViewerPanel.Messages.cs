@@ -1113,6 +1113,13 @@ internal sealed partial class TrailViewerPanel
 
             var assetUrl = Uri.UnescapeDataString(parts[0]);
             var assetName = Uri.UnescapeDataString(parts[1]);
+            var cachedState = UpdateChecker.LoadState();
+            var fallbackUrl = string.Equals(cachedState.AssetUrl, assetUrl, StringComparison.OrdinalIgnoreCase)
+                ? cachedState.FallbackAssetUrl
+                : string.Empty;
+            var expectedSha = string.Equals(cachedState.AssetName, assetName, StringComparison.OrdinalIgnoreCase)
+                ? cachedState.ExpectedSha256
+                : string.Empty;
             var downloadedPath = await UpdateChecker.DownloadPackageAsync(
                 assetUrl,
                 assetName,
@@ -1121,7 +1128,9 @@ internal sealed partial class TrailViewerPanel
                     if (!_disposed)
                         _ = PostToViewerMessageAsync(ViewerMessages.UpdateDownloadProgress(downloaded, total));
                 },
-                cancel: _lifecycle.Token).ConfigureAwait(false);
+                cancel: _lifecycle.Token,
+                fallbackAssetUrl: fallbackUrl,
+                expectedSha256: expectedSha).ConfigureAwait(false);
 
             if (_disposed)
                 return;

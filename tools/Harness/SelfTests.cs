@@ -1164,9 +1164,11 @@ internal static class SelfTests
         Check("update checker enforces GitHub HTTPS allowlist for assets and release pages",
             UpdateChecker.IsAllowedReleaseAssetUrl("https://github.com/luluuuse/QuickLook.Plugin.TrailViewer/releases/download/v1.30.0/pkg.qlplugin")
             && UpdateChecker.IsAllowedReleaseAssetUrl("https://objects.githubusercontent.com/github-production-release-asset/123")
+            && UpdateChecker.IsAllowedReleaseAssetUrl("https://gitcode.com/luluse/QuickLook.Plugin.TrailViewer/releases/download/v1.30.0/pkg.qlplugin")
             && !UpdateChecker.IsAllowedReleaseAssetUrl("http://github.com/a.qlplugin")
             && !UpdateChecker.IsAllowedReleaseAssetUrl("https://evil.example.com/a.qlplugin")
             && UpdateChecker.IsAllowedReleasePageUrl("https://github.com/luluuuse/QuickLook.Plugin.TrailViewer/releases/tag/v1.30.0")
+            && UpdateChecker.IsAllowedReleasePageUrl("https://gitcode.com/luluse/QuickLook.Plugin.TrailViewer/releases/tag/v1.30.0")
             && !UpdateChecker.IsAllowedReleasePageUrl("https://github.com/other/repo/releases"));
 
         var sampleJson =
@@ -1214,8 +1216,36 @@ internal static class SelfTests
         var validPkg = Path.Combine(temporary, "valid.qlplugin");
         using (var archive = ZipFile.Open(validPkg, ZipArchiveMode.Create))
             WriteEntry(archive, "QuickLook.Plugin.Metadata.config", Encoding.UTF8.GetBytes("<Metadata/>"));
-        UpdateChecker.VerifyPluginPackage(validPkg);
-        Check("update checker accepts valid .qlplugin archive containing metadata config", true);
+        var validSha = UpdateChecker.ComputeFileSha256(validPkg);
+        UpdateChecker.VerifyPluginPackage(validPkg, validSha);
+        Check("update checker accepts valid .qlplugin archive containing metadata config and matching SHA256", true);
+        ExpectInvalidData("update checker rejects .qlplugin archive when SHA256 mismatches", () =>
+            UpdateChecker.VerifyPluginPackage(validPkg, new string('0', 64)));
+
+        var gitcodeListJson =
+            "[{"
+            + "\"tag_name\":\"v1.31.0\","
+            + "\"prerelease\":false,"
+            + "\"created_at\":\"2026-11-27T08:00:00Z\","
+            + "\"body\":\"### 中文\\n- 镜像同步测试\\n\\n## 安装包 / Package\\n```text\\nQuickLook.Plugin.TrailViewer-1.31.0.qlplugin\\n" + validSha + "\\n```\","
+            + "\"assets\":[{\"name\":\"QuickLook.Plugin.TrailViewer-1.31.0.qlplugin\",\"size\":860000,"
+            + "\"browser_download_url\":\"https://gitcode.com/luluse/QuickLook.Plugin.TrailViewer/releases/download/v1.31.0/QuickLook.Plugin.TrailViewer-1.31.0.qlplugin\"}]"
+            + "}]";
+        var mirrorStatePath = Path.Combine(temporary, "mirror-state.json");
+        var mirrorFallback = UpdateChecker.CheckLatestAsync(
+            force: true,
+            CancellationToken.None,
+            statePath: mirrorStatePath,
+            currentVersion: "1.30.1",
+            fetcher: _ => System.Threading.Tasks.Task.FromException<string>(new IOException("github unreachable")),
+            mirrorFetcher: _ => System.Threading.Tasks.Task.FromResult(gitcodeListJson))
+            .GetAwaiter().GetResult();
+        Check("update checker falls back to GitCode mirror when GitHub fails and extracts SHA256",
+            mirrorFallback.Status == "available"
+            && mirrorFallback.Source == "gitcode"
+            && mirrorFallback.LatestVersion == "1.31.0"
+            && mirrorFallback.ExpectedSha256 == validSha
+            && mirrorFallback.AssetUrl.StartsWith("https://gitcode.com/", StringComparison.Ordinal));
 
         var invalidPkg = Path.Combine(temporary, "invalid.qlplugin");
         using (var archive = ZipFile.Open(invalidPkg, ZipArchiveMode.Create))
