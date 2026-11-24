@@ -41,6 +41,12 @@ internal sealed class ViewerMessageActions
         _ => System.Threading.Tasks.Task.CompletedTask;
     internal Func<string, System.Threading.Tasks.Task> ImportExternalTrack { get; set; } =
         _ => System.Threading.Tasks.Task.CompletedTask;
+    internal Func<bool, System.Threading.Tasks.Task> CheckUpdate { get; set; } =
+        _ => System.Threading.Tasks.Task.CompletedTask;
+    internal Func<string, System.Threading.Tasks.Task> DownloadUpdate { get; set; } =
+        _ => System.Threading.Tasks.Task.CompletedTask;
+    internal Action<string> IgnoreUpdate { get; set; } = _ => { };
+    internal Action<string> OpenUpdateRelease { get; set; } = _ => { };
 }
 
 internal sealed class ViewerMessageRouter
@@ -107,5 +113,13 @@ internal sealed class ViewerMessageRouter
             _ = _actions.ListSiblingTracks(message.Substring("track-import-list\t".Length));
         else if (message.StartsWith("track-import-read\t", StringComparison.Ordinal))
             _ = _actions.ImportExternalTrack(message.Substring("track-import-read\t".Length));
+        else if (message == "update-check\t1" || message == "update-check\t0")
+            _ = _actions.CheckUpdate(message.EndsWith("\t1", StringComparison.Ordinal));
+        else if (message.StartsWith("update-download\t", StringComparison.Ordinal))
+            _ = _actions.DownloadUpdate(message.Substring("update-download\t".Length));
+        else if (message.StartsWith("update-ignore\t", StringComparison.Ordinal))
+            _actions.IgnoreUpdate(message.Substring("update-ignore\t".Length));
+        else if (message.StartsWith("update-open\t", StringComparison.Ordinal))
+            _actions.OpenUpdateRelease(message.Substring("update-open\t".Length));
     }
 }

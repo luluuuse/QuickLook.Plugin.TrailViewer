@@ -4,6 +4,7 @@ import { createCoordinateTool } from './toolbox-coordinates.js';
 import { createAttachmentTool } from './toolbox-attachments.js';
 import { createMeasureTool } from './toolbox-measure.js';
 import { createToolboxMain } from './toolbox-main.js';
+import { createUpdateTool } from './toolbox-update.js';
 
 /**
  * One map-corner entry for task tools. Every tool page shares this panel, header and back navigation.
@@ -30,6 +31,12 @@ export function createToolbox({
   weatherHasElevation = () => true,
   editAvailable = () => true,
   onEdit,
+  currentVersion = '',
+  hasHost = false,
+  onCheckUpdate,
+  onDownloadUpdate,
+  onIgnoreUpdate,
+  onOpenUpdateRelease,
   lang = () => 'zh',
   setLang = () => false,
   onOpen,
@@ -118,6 +125,20 @@ export function createToolbox({
       showView('main');
     },
   });
+  const updateTool = createUpdateTool({
+    el,
+    t,
+    lang: readLang,
+    currentVersion,
+    hasHost,
+    onCheck: onCheckUpdate,
+    onDownload: onDownloadUpdate,
+    onIgnore: onIgnoreUpdate,
+    onOpenRelease: onOpenUpdateRelease,
+    onBack: () => showView('main'),
+    onStateChange: () => render(),
+    showToast,
+  });
   const main = createToolboxMain({
     el,
     t,
@@ -126,6 +147,7 @@ export function createToolbox({
     weatherAvailable,
     weatherHasElevation,
     weatherModes,
+    currentVersion,
     onMeasure: () => startMeasure(),
     onCoordinates: () => {
       if (measurement.active()) measurement.stop();
@@ -142,6 +164,12 @@ export function createToolbox({
     },
     onEdit: () => onEdit?.(),
     onWeather: (mode) => onWeather?.(mode),
+    onUpdate: () => {
+      if (measurement.active()) measurement.stop();
+      showView('update');
+      const st = updateTool.getState();
+      if (st.status === 'idle' || st.status === 'error') updateTool.triggerCheck(true);
+    },
     onClose: () => closePanel(),
   });
 
@@ -149,18 +177,24 @@ export function createToolbox({
     if (!panel) return;
     const summary = measurement.summary();
     const active = measurement.active();
+    const updateState = updateTool.getState();
+    const hasUpdateBadge = Boolean(updateState?.hasUpdate);
     button?.classList.toggle('active', active);
+    button?.classList.toggle('has-update', hasUpdateBadge);
     button?.setAttribute('aria-pressed', String(active));
     const description = active
       ? `${t('toolbox.toggle')} · ${t('measure.active')}`
-      : t('toolbox.toggle');
+      : (hasUpdateBadge
+        ? `${t('toolbox.toggle')} · ${t('update.newBadge', { version: `v${updateState.latestVersion}` })}`
+        : t('toolbox.toggle'));
     button?.setAttribute('title', description);
     button?.setAttribute('aria-label', description);
 
     coordinates.render();
     const attachmentCounts = attachments.render();
-    main.render({ active, summary, attachmentCounts });
+    main.render({ active, summary, attachmentCounts, updateState });
     measureTool.render();
+    updateTool.render();
 
     // Entering measurement switches to its page; leaving it closes that page. Both are the measuring mode's
     // own transitions, so a language switch or a layout refresh does not pull the page out from under the user.
@@ -177,6 +211,7 @@ export function createToolbox({
     attachments.view.hidden = view !== 'attachments';
     exportView.hidden = view !== 'export';
     shortcutsView.hidden = view !== 'shortcuts';
+    updateTool.view.hidden = view !== 'update';
     helpButton.classList.toggle('active', view === 'shortcuts');
     helpButton.setAttribute('aria-pressed', String(view === 'shortcuts'));
     renderLanguage();
@@ -353,6 +388,7 @@ export function createToolbox({
         exportView,
         shortcutsView,
         measureTool.view,
+        updateTool.view,
       );
       helpButton.title = t('toolbox.help');
       helpButton.setAttribute('aria-label', t('toolbox.help'));
@@ -396,6 +432,9 @@ export function createToolbox({
     weatherMode: main.weatherMode,
     isWeatherModeEnabled: main.isWeatherModeEnabled,
     setWeatherMode: main.setWeatherMode,
+    applyUpdateStatus: updateTool.applyStatus,
+    applyUpdateProgress: updateTool.applyProgress,
+    applyUpdateDownloadResult: updateTool.applyDownloadResult,
     destroy() {
       lifecycle.abort();
       coordinates.destroy();
@@ -419,6 +458,7 @@ export function createToolbox({
       for (const label of shortcutRows) label.textContent = t(label.dataset.labelKey);
       exportSettingsPanel?.relabel();
       measureTool.relabel();
+      updateTool.relabel();
       render();
       onLayoutChange?.();
     },

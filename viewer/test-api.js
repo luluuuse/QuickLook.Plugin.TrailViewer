@@ -90,6 +90,9 @@ export function createTestApi({
       switcher.setTileCacheStats(totalBytes, tileCount);
       showToast(t('layer.cacheCleared'), 3000);
     },
+    updateStatus: (info) => toolboxController?.applyUpdateStatus?.(info),
+    updateProgress: (downloaded, total) => toolboxController?.applyUpdateProgress?.(downloaded, total),
+    updateDownloadResult: (ok, detail) => toolboxController?.applyUpdateDownloadResult?.(ok, detail),
     locate: () => mapViewController.fit(),
     mapLayout: () => ({
       state: mapViewController.layoutState(),

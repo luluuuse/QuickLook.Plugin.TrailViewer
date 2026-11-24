@@ -256,3 +256,36 @@ test('saveTrackGpx includes export format and allows overwrite for GPX/KML/KMZ o
     assert.equal(res.overwrote, false);
   }
 });
+
+test('host bridge routes update check, download, ignore, open and host update callbacks', () => {
+  posted.length = 0;
+  webviewListeners.clear();
+  const bridge = createHostBridge();
+  const events = [];
+  bridge.installViewerMessages({
+    attachments: { result() {} },
+    updateStatus: (info) => events.push(['status', info]),
+    updateProgress: (done, total) => events.push(['progress', done, total]),
+    updateDownloadResult: (ok, detail) => events.push(['done', ok, detail]),
+  }, () => {});
+
+  assert.equal(bridge.checkUpdate(false), true);
+  assert.equal(bridge.checkUpdate(true), true);
+  assert.equal(bridge.downloadUpdate('https://github.com/a/b.qlplugin', 'b.qlplugin'), true);
+  assert.equal(bridge.ignoreUpdate('1.30.0'), true);
+  assert.equal(bridge.openUpdateRelease('https://github.com/luluuuse/QuickLook.Plugin.TrailViewer/releases'), true);
+  assert.equal(posted[0], 'update-check\t0');
+  assert.equal(posted[1], 'update-check\t1');
+  assert.equal(posted[2], `update-download\t${encodeURIComponent('https://github.com/a/b.qlplugin')}\tb.qlplugin`);
+  assert.equal(posted[3], 'update-ignore\t1.30.0');
+  assert.equal(posted[4], `update-open\t${encodeURIComponent('https://github.com/luluuuse/QuickLook.Plugin.TrailViewer/releases')}`);
+
+  emitWebMessage(`updateStatus\t${encodeURIComponent(JSON.stringify({ Status: 'available', LatestVersion: '1.30.0', HasUpdate: true }))}`);
+  emitWebMessage('updateProgress\t1024\t4096');
+  emitWebMessage('updateDownloadResult\t1\tC%3A%5Ctemp%5Cb.qlplugin');
+  assert.deepEqual(events, [
+    ['status', { Status: 'available', LatestVersion: '1.30.0', HasUpdate: true }],
+    ['progress', 1024, 4096],
+    ['done', true, 'C:\\temp\\b.qlplugin'],
+  ]);
+});

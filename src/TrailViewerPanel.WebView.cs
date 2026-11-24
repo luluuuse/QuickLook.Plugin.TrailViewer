@@ -117,7 +117,7 @@ internal sealed partial class TrailViewerPanel
         var preferences = ViewerPreferences.Query();
         var suffix = string.IsNullOrEmpty(preferences) ? string.Empty : "&" + preferences;
         return $"https://{AppHost}/index.html?src={Uri.EscapeDataString(source)}"
-            + $"&name={Uri.EscapeDataString(name)}{suffix}";
+            + $"&name={Uri.EscapeDataString(name)}&ver={Uri.EscapeDataString(BuildInfo.ProductVersion)}{suffix}";
     }
 
     /// <summary>

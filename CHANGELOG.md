@@ -17,6 +17,24 @@ Added / Changed / Deprecated / Removed / Fixed / Security 分类；没有内容�
 
 None yet.
 
+## 1.30.0 — 2026-11-25
+
+### 中文
+
+#### 新增
+
+- **内置检查更新与一键下载安装**：工具箱底部新增当前版本栏与「检查更新」入口，默认每 24 小时在后台静默检查 GitHub Releases；发现新正式版时仅在顶部工具箱图标右上角亮起小红点提醒，绝不弹窗打断预览。
+- **双语更新详情与忽略版本**：点击进入更新详情页可查看当前版本 → 最新版本对比、发布日期与按当前界面语言自动提取的更新摘要，并支持「忽略此版本」消除角标。
+- **安全下载并调起 QuickLook 原生安装**：点击「下载并安装」后由宿主带进度条下载 `.qlplugin` 安装包，严格校验 GitHub 官方域名与插件包清单完整性，随后直接交由 QuickLook 原生插件窗口完成安装；断网或被限流时提供「打开发布页」兜底。
+
+### English
+
+#### Added
+
+- **Built-in Update Checker & One-Click Package Download**: Added a compact version bar and "Check updates" entry at the bottom of the Toolbox with quiet 24-hour background checks against GitHub Releases. When a newer stable release is found, a subtle red dot appears on the Toolbox button without interrupting preview.
+- **Bilingual Release Notes & Version Muting**: The update subview compares the installed and latest versions, renders release notes in the active interface language, and lets you mute a specific release.
+- **Verified Download & Native QuickLook Installer Handoff**: Clicking "Download & install" streams the `.qlplugin` package with progress reporting, verifies the GitHub HTTPS allowlist and plugin manifest archive integrity, and launches QuickLook's native plugin installer (with a browser fallback to the Releases page).
+
 ## 1.29.0 — 2026-11-25
 
 ### 中文

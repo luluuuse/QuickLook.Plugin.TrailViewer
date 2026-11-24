@@ -41,6 +41,7 @@ internal static class SelfTests
             TestAtomicFile(temporary);
             TestViewerMessages();
             TestAttachmentExport(temporary);
+            TestUpdateChecker(temporary);
         }
         finally
         {
@@ -1151,6 +1152,76 @@ internal static class SelfTests
         Console.WriteLine($"{(okay ? "PASS" : "FAIL")}  host: {what}{(detail == null ? "" : "  (" + detail + ")")}");
         if (!okay)
             _failures++;
+    }
+
+    private static void TestUpdateChecker(string temporary)
+    {
+        Check("update checker compares semantic versions accurately",
+            UpdateChecker.CompareVersions("v1.30.0", "1.29.0") > 0
+            && UpdateChecker.CompareVersions("1.29.0", "v1.29.0") == 0
+            && UpdateChecker.CompareVersions("1.29.0", "1.29.0-beta.1") > 0
+            && UpdateChecker.CompareVersions("1.28.9", "1.29.0") < 0);
+        Check("update checker enforces GitHub HTTPS allowlist for assets and release pages",
+            UpdateChecker.IsAllowedReleaseAssetUrl("https://github.com/luluuuse/QuickLook.Plugin.TrailViewer/releases/download/v1.30.0/pkg.qlplugin")
+            && UpdateChecker.IsAllowedReleaseAssetUrl("https://objects.githubusercontent.com/github-production-release-asset/123")
+            && !UpdateChecker.IsAllowedReleaseAssetUrl("http://github.com/a.qlplugin")
+            && !UpdateChecker.IsAllowedReleaseAssetUrl("https://evil.example.com/a.qlplugin")
+            && UpdateChecker.IsAllowedReleasePageUrl("https://github.com/luluuuse/QuickLook.Plugin.TrailViewer/releases/tag/v1.30.0")
+            && !UpdateChecker.IsAllowedReleasePageUrl("https://github.com/other/repo/releases"));
+
+        var sampleJson =
+            "{"
+            + "\"tag_name\":\"v1.30.0\","
+            + "\"draft\":false,"
+            + "\"prerelease\":false,"
+            + "\"published_at\":\"2026-11-26T08:00:00Z\","
+            + "\"html_url\":\"https://github.com/luluuuse/QuickLook.Plugin.TrailViewer/releases/tag/v1.30.0\","
+            + "\"body\":\"### 中文\\n- 新增检查更新\\n\\n### English\\n- Added update checker\","
+            + "\"assets\":[{\"name\":\"QuickLook.Plugin.TrailViewer-1.30.0.qlplugin\",\"size\":850000,"
+            + "\"browser_download_url\":\"https://github.com/luluuuse/QuickLook.Plugin.TrailViewer/releases/download/v1.30.0/QuickLook.Plugin.TrailViewer-1.30.0.qlplugin\"}]"
+            + "}";
+        var statePath = Path.Combine(temporary, "update-state.json");
+        var fetchCount = 0;
+        var firstCheck = UpdateChecker.CheckLatestAsync(
+            force: false,
+            CancellationToken.None,
+            statePath: statePath,
+            currentVersion: "1.29.0",
+            fetcher: _ => { fetchCount++; return System.Threading.Tasks.Task.FromResult(sampleJson); })
+            .GetAwaiter().GetResult();
+        Check("update checker detects newer release and extracts bilingual notes",
+            firstCheck.Status == "available"
+            && firstCheck.HasUpdate
+            && firstCheck.LatestVersion == "1.30.0"
+            && firstCheck.NotesZh.Contains("新增检查更新")
+            && firstCheck.NotesEn.Contains("Added update checker")
+            && firstCheck.AssetName == "QuickLook.Plugin.TrailViewer-1.30.0.qlplugin");
+
+        var cachedCheck = UpdateChecker.CheckLatestAsync(
+            force: false,
+            CancellationToken.None,
+            statePath: statePath,
+            currentVersion: "1.29.0",
+            fetcher: _ => { fetchCount++; return System.Threading.Tasks.Task.FromResult(sampleJson); })
+            .GetAwaiter().GetResult();
+        Check("update checker reuses 24h cache for background checks without refetching",
+            fetchCount == 1 && cachedCheck.FromCache && cachedCheck.HasUpdate);
+
+        var ignored = UpdateChecker.IgnoreVersion("1.30.0", statePath, "1.29.0");
+        Check("update checker persists ignored version and clears badge flag",
+            ignored.Status == "ignored" && !ignored.HasUpdate && ignored.IgnoredVersion == "1.30.0");
+
+        var validPkg = Path.Combine(temporary, "valid.qlplugin");
+        using (var archive = ZipFile.Open(validPkg, ZipArchiveMode.Create))
+            WriteEntry(archive, "QuickLook.Plugin.Metadata.config", Encoding.UTF8.GetBytes("<Metadata/>"));
+        UpdateChecker.VerifyPluginPackage(validPkg);
+        Check("update checker accepts valid .qlplugin archive containing metadata config", true);
+
+        var invalidPkg = Path.Combine(temporary, "invalid.qlplugin");
+        using (var archive = ZipFile.Open(invalidPkg, ZipArchiveMode.Create))
+            WriteEntry(archive, "readme.txt", Encoding.UTF8.GetBytes("nope"));
+        ExpectInvalidData("update checker rejects .qlplugin archive missing metadata config", () =>
+            UpdateChecker.VerifyPluginPackage(invalidPkg));
     }
 
     private static string FindRepositoryRoot()

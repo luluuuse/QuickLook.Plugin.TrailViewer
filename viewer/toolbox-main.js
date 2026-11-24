@@ -3,7 +3,8 @@ import { iconMarkup, weatherMarkMarkup } from './icons.js';
 /** Main toolbox menu: quick actions, keyboard hints and route weather card. */
 export function createToolboxMain({
   el, t, exportAvailable, editAvailable = () => true, weatherAvailable, weatherHasElevation,
-  weatherModes, onMeasure, onCoordinates, onExport, onAttachments, onWeather, onEdit, onClose,
+  weatherModes, currentVersion = '', onMeasure, onCoordinates, onExport, onAttachments,
+  onWeather, onEdit, onUpdate, onClose,
 }) {
   let weatherMode = weatherModes[0] || 'start';
   let measureButton;
@@ -14,6 +15,9 @@ export function createToolboxMain({
   let weatherButton;
   let weatherPicker;
   let quickGrid;
+  let versionBar;
+  let versionLabel;
+  let updateButton;
   let latestState = null;
 
   function build() {
@@ -104,14 +108,24 @@ export function createToolboxMain({
     const weatherRow = el('div', 'toolbox-weather-card');
     weatherRow.append(weatherButton, weatherPicker);
     quickGrid.append(measureButton, coordinateButton, exportButton, attachmentButton);
-    view.append(editButton, quickGrid, weatherRow);
+
+    versionBar = el('div', 'toolbox-version-bar');
+    versionLabel = el('span', 'toolbox-version-text', currentVersion ? `v${currentVersion}` : 'TrailViewer');
+    updateButton = el('button', 'toolbox-version-btn');
+    updateButton.type = 'button';
+    updateButton.dataset.tool = 'update';
+    updateButton.textContent = t('update.checkNow');
+    updateButton.addEventListener('click', () => onUpdate?.());
+    versionBar.append(versionLabel, updateButton);
+
+    view.append(editButton, quickGrid, weatherRow, versionBar);
     return view;
   }
 
   const view = build();
 
-  function render({ active, summary, attachmentCounts }) {
-    latestState = { active, summary, attachmentCounts };
+  function render({ active, summary, attachmentCounts, updateState = null }) {
+    latestState = { active, summary, attachmentCounts, updateState };
     measureButton.querySelector('strong').textContent = t(active
       ? 'measure.active' : summary.pointCount > 0 ? 'measure.resume' : 'measure.start');
     measureButton.title = t(active ? 'measure.stopTitle' : 'measure.startTitle');
@@ -132,6 +146,13 @@ export function createToolboxMain({
       option.disabled = Boolean(option.dataset.weatherMode === 'highest' && !weatherHasElevation());
     }
     weatherPicker.hidden = !weatherAvailable() || weatherModes.length === 0;
+    const ver = updateState?.currentVersion || currentVersion;
+    versionLabel.textContent = ver ? `v${ver}` : 'TrailViewer';
+    const hasNew = Boolean(updateState?.hasUpdate && updateState?.latestVersion);
+    updateButton.classList.toggle('has-update', hasNew);
+    updateButton.textContent = hasNew
+      ? t('update.newBadge', { version: `v${updateState.latestVersion}` })
+      : (updateState?.status === 'checking' ? t('update.checking') : t('update.checkNow'));
   }
 
   function relabel() {

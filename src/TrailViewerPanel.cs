@@ -105,6 +105,10 @@ internal sealed partial class TrailViewerPanel : UserControl, IDisposable
             ProbeNode = ProbeNodeAsync,
             ListSiblingTracks = ListSiblingTracksAsync,
             ImportExternalTrack = ImportExternalTrackAsync,
+            CheckUpdate = CheckUpdateAsync,
+            DownloadUpdate = DownloadUpdateAsync,
+            IgnoreUpdate = IgnoreUpdateVersion,
+            OpenUpdateRelease = OpenUpdateReleaseUrl,
         });
     }
 

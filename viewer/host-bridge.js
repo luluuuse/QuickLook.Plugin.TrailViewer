@@ -315,6 +315,30 @@ export function createHostBridge() {
     });
   }
 
+  function checkUpdate(force = false) {
+    if (!hasHost) return false;
+    post(`update-check\t${force ? '1' : '0'}`);
+    return true;
+  }
+
+  function downloadUpdate(assetUrl, assetName) {
+    if (!hasHost || !assetUrl) return false;
+    post(`update-download\t${encodeURIComponent(assetUrl)}\t${encodeURIComponent(assetName || '')}`);
+    return true;
+  }
+
+  function ignoreUpdate(version) {
+    if (!hasHost || !version) return false;
+    post(`update-ignore\t${encodeURIComponent(version)}`);
+    return true;
+  }
+
+  function openUpdateRelease(url) {
+    if (!hasHost) return false;
+    post(`update-open\t${encodeURIComponent(url || '')}`);
+    return true;
+  }
+
   function installViewerMessages(api, clipboardResultHandler) {
     window.chrome?.webview?.addEventListener('message', (event) => {
       if (typeof event.data !== 'string') return;
@@ -357,6 +381,14 @@ export function createHostBridge() {
         trackImportChunk(parts[1], Number(parts[2]), Number(parts[3]), parts[4]);
       } else if (parts[0] === 'trackImportResult') {
         trackImportResult(parts[1], Number(parts[2]), parts[3], parts[4]);
+      } else if (parts[0] === 'updateStatus') {
+        let parsed = null;
+        try { parsed = JSON.parse(decodeMessage(parts[1])); } catch { parsed = null; }
+        if (parsed) api.updateStatus?.(parsed);
+      } else if (parts[0] === 'updateProgress') {
+        api.updateProgress?.(Number(parts[1]), Number(parts[2]));
+      } else if (parts[0] === 'updateDownloadResult') {
+        api.updateDownloadResult?.(parts[1] === '1', decodeMessage(parts[2]));
       }
     });
   }
@@ -387,6 +419,10 @@ export function createHostBridge() {
     probeNode,
     listSiblingTracks,
     importExternalTrack,
+    checkUpdate,
+    downloadUpdate,
+    ignoreUpdate,
+    openUpdateRelease,
     installViewerMessages,
     installTextInputReporting,
   };

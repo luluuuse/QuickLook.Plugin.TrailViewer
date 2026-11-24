@@ -50,5 +50,14 @@ internal static class ViewerMessages
     internal static string TrackImportResult(string id, int statusCode, string name, string detail) =>
         $"trackImportResult\t{id}\t{statusCode}\t{Encode(name)}\t{Encode(detail)}";
 
+    internal static string UpdateStatus(string json) =>
+        $"updateStatus\t{Encode(json)}";
+
+    internal static string UpdateDownloadProgress(long downloaded, long total) =>
+        $"updateProgress\t{downloaded}\t{total}";
+
+    internal static string UpdateDownloadResult(bool ok, string detail) =>
+        $"updateDownloadResult\t{(ok ? 1 : 0)}\t{Encode(detail)}";
+
     private static string Encode(string value) => Uri.EscapeDataString(value ?? "");
 }

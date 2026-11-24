@@ -57,6 +57,7 @@ const L = window.L;
 const params = new URLSearchParams(location.search);
 const src = params.get('src');
 const fileName = params.get('name') || fileNameFromSource(src);
+const appVersion = params.get('ver') || '';
 const timing = {
   parseMs: null,
   prepareMs: null,
@@ -848,6 +849,12 @@ async function main() {
     setLang,
     editAvailable: () => Boolean(liveState.gpx && !liveState.gpx.network),
     onEdit: () => openTrackEditor({ initialTool: 'crop' }),
+    currentVersion: appVersion,
+    hasHost: hostBridge.hasHost,
+    onCheckUpdate: (force) => hostBridge.checkUpdate(force),
+    onDownloadUpdate: (url, name) => hostBridge.downloadUpdate(url, name),
+    onIgnoreUpdate: (version) => hostBridge.ignoreUpdate(version),
+    onOpenUpdateRelease: (url) => hostBridge.openUpdateRelease(url),
     onWeather: (mode) => {
       const target = weatherTarget(liveState.gpx, mode);
       const url = windyUrl(target, zoomFor(mode));
@@ -1020,6 +1027,9 @@ async function main() {
     timing.firstPaintMs = performance.now() - started;
   }));
   post(`ready\t${summary.points} points, ${distanceLog(summary.distanceMeters)}`);
+  if (hostBridge.hasHost) {
+    setTimeout(() => hostBridge.checkUpdate(false), 1200);
+  }
 }
 
 main().catch((error) => showError(t('error.unexpected', { detail: error.message })));

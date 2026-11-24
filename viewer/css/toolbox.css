@@ -816,6 +816,231 @@
   color: #e3a0a0;
 }
 
+.toolbox-switch button.has-update {
+  position: relative;
+}
+
+.toolbox-switch button.has-update::after {
+  content: '';
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #ff6b6b;
+  box-shadow: 0 0 0 1.5px rgba(24, 24, 24, 0.9);
+  pointer-events: none;
+}
+
+.toolbox-version-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-top: 6px;
+  margin-top: 2px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 11px;
+  color: var(--ink-muted);
+}
+
+.toolbox-version-text {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.85;
+}
+
+.toolbox-version-btn {
+  padding: 2px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+
+.toolbox-version-btn:hover {
+  border-color: rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.toolbox-version-btn.has-update {
+  border-color: rgba(255, 107, 107, 0.55);
+  background: rgba(255, 107, 107, 0.16);
+  color: #ffd3d3;
+  font-weight: 600;
+}
+
+.toolbox-version-btn.has-update:hover {
+  background: rgba(255, 107, 107, 0.25);
+}
+
+.toolbox-update-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-sm);
+  background: var(--surface-card);
+}
+
+.toolbox-update-versions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.toolbox-update-ver-cur {
+  color: var(--text);
+}
+
+.toolbox-update-ver-arrow {
+  color: var(--ink-muted);
+}
+
+.toolbox-update-ver-new {
+  color: #7ee787;
+}
+
+.toolbox-update-ver-date {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--ink-muted);
+}
+
+.toolbox-update-status {
+  margin: 0;
+}
+
+.toolbox-update-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.toolbox-update-progress[hidden],
+.toolbox-update-notes[hidden],
+.toolbox-update-link[hidden] {
+  display: none;
+}
+
+.toolbox-update-progress-bar {
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+}
+
+.toolbox-update-progress-fill {
+  height: 100%;
+  width: 0%;
+  background: var(--accent);
+  transition: width 120ms ease;
+}
+
+.toolbox-update-progress-text {
+  font-size: 11px;
+  color: var(--ink-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.toolbox-update-notes {
+  max-height: 170px;
+  overflow-y: auto;
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-sm);
+  background: rgba(0, 0, 0, 0.22);
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--text);
+}
+
+.toolbox-update-notes-heading {
+  margin: 4px 0 3px;
+  font-weight: 600;
+  color: var(--text-bright, #fff);
+}
+
+.toolbox-update-notes-heading:first-child {
+  margin-top: 0;
+}
+
+.toolbox-update-notes-list {
+  margin: 0 0 6px;
+  padding-left: 16px;
+}
+
+.toolbox-update-notes-list li {
+  margin-bottom: 3px;
+}
+
+.toolbox-update-notes-para {
+  margin: 0 0 6px;
+}
+
+.toolbox-update-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.toolbox-update-btn {
+  width: 100%;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid #356d9d;
+  border-radius: var(--radius-sm);
+  background: #234f79;
+  color: #fff;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.toolbox-update-btn:hover:not(:disabled) {
+  filter: brightness(1.12);
+}
+
+.toolbox-update-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.toolbox-update-secondary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.toolbox-update-link {
+  padding: 2px 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink-muted);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.toolbox-update-link:hover:not(:disabled) {
+  color: var(--text);
+}
+
 @media (max-width: 700px) {
   .toolbox-panel {
     top: var(--floating-panel-top);

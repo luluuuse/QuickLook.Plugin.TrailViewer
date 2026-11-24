@@ -237,6 +237,7 @@ Canvas 绘制路线，并跳过普通轨迹点圆点、公里数字和路网级�
   - **剪辑拼接与清洗优化**：支持剖面双柄裁剪、点击拆分删段、导入本地或同目录 GPX / KML 拼接合并、漂移点清洗、海拔平滑（轻度/标准/强力）与轨迹抽稀。
   - **路线方向与绘制修点**：支持反转方向、往返倍增、闭合环线、手绘补线（支持自动替换区段/闭合/续画）、顶点微调、框选擦除实时计数与坡度估算虚拟时间轴。
   - **航点管理**：支持点击轨迹吸附落点、`Alt+点击` 自由落点、序号化航点列表、沿轨重排、20 米去重与批量生成里程/最高点航点。
+- **检查更新**：工具箱底部显示当前版本号与「检查更新」按钮；后台每 24 小时最多静默检查一次 GitHub Releases，发现正式新版时在工具箱图标右上角显示小红点，可在更新详情页查看双语日志、忽略该版本或一键下载并交由 QuickLook 原生安装。
 
 ### 大文件与隐私
 
@@ -507,6 +508,7 @@ export so another style can be produced immediately.
   - **Clip & Merge / Clean & Optimize:** profile range crop, click-to-split, local/sibling GPX & KML append with auto-merge, drift spike cleanup, three-level elevation smoothing, and simplification.
   - **Route Direction / Draw & Refine:** reverse, out-and-back, close loop, hand-drawn path splicing, vertex editing, live-count box erase, and Naismith grade-adjusted virtual timelines.
   - **Waypoints:** snap onto the track or `Alt+Click` to place freely, sort along track, dedupe within 20 m, and batch-generate distance milestone and summit waypoints.
+- **Check for updates:** the Toolbox footer shows the installed version and a **Check updates** button; background checks run quietly at most once every 24 hours against GitHub Releases and light a small dot on the Toolbox icon when a newer stable release is available, with bilingual release notes, version muting, and one-click verified `.qlplugin` download into QuickLook's native installer.
 
 ### Large files and privacy
 

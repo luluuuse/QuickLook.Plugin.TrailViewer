@@ -35,6 +35,7 @@ Common controls:
 ## Highlights
 
 - **Non-destructive track editor & multi-format export:** enter the four-zone editor from the Toolbox hero card for **Clip & Merge** (profile crop, click split, external GPX/KML append), **Clean & Optimize** (drift cleanup, elevation smoothing, simplify), **Route Direction** (reverse, out-and-back, close loop, loop start), **Draw & Refine** (hand-drawn path, vertex editing, box erase), and **Waypoint Batch Tools** (sort, dedupe, milestone generation); export to GPX, KML, KMZ (with optional offline remote photo packing and time/HR preservation), GeoJSON, TCX, or CSV, with same-format overwrite + `.bak` backup for GPX / KML / KMZ.
+- **Built-in update checker:** the Toolbox footer displays the installed version and checks GitHub Releases quietly at most once every 24 hours (showing a subtle dot on the Toolbox button when a newer stable release exists), with bilingual release notes, version muting, and verified `.qlplugin` download handed off to QuickLook's native installer.
 - **Track rendering & coloring:** GPX tracks, KML LineStrings and `gx:Track`, plus FIT activity/course records, each segment in its own colour, with adaptive direction arrows and distance labels; press <kbd>L</kbd> or click the trail-color button beside the Toolbox to cycle **Single / Elevation / Speed / Heart rate** modes.
 - **Route intelligence:** moving time, recording gaps, implausible GPS jumps and a grade-aware time estimate
   using Naismith, Langmuir descents and a steep-uphill correction.

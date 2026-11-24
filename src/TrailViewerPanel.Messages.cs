@@ -1079,4 +1079,114 @@ internal sealed partial class TrailViewerPanel
                 _ = PostToViewerMessageAsync(ViewerMessages.TrackImportResult(id, 1, "", ex.Message));
         }
     }
+
+    private int _updateDownloading;
+
+    private async Task CheckUpdateAsync(bool force)
+    {
+        if (_disposed)
+            return;
+        try
+        {
+            var info = await UpdateChecker.CheckLatestAsync(force, _lifecycle.Token).ConfigureAwait(false);
+            if (!_disposed)
+                _ = PostToViewerMessageAsync(ViewerMessages.UpdateStatus(UpdateChecker.SerializeStatus(info)));
+        }
+        catch (OperationCanceledException) when (_disposed || _lifecycle.IsCancellationRequested)
+        {
+            // Preview closed while checking.
+        }
+    }
+
+    private async Task DownloadUpdateAsync(string body)
+    {
+        if (_disposed)
+            return;
+        if (System.Threading.Interlocked.CompareExchange(ref _updateDownloading, 1, 0) != 0)
+            return;
+
+        try
+        {
+            var parts = body.Split(new[] { '\t' }, 2);
+            if (parts.Length < 2)
+                throw new InvalidDataException("update download parameters were invalid");
+
+            var assetUrl = Uri.UnescapeDataString(parts[0]);
+            var assetName = Uri.UnescapeDataString(parts[1]);
+            var downloadedPath = await UpdateChecker.DownloadPackageAsync(
+                assetUrl,
+                assetName,
+                onProgress: (downloaded, total) =>
+                {
+                    if (!_disposed)
+                        _ = PostToViewerMessageAsync(ViewerMessages.UpdateDownloadProgress(downloaded, total));
+                },
+                cancel: _lifecycle.Token).ConfigureAwait(false);
+
+            if (_disposed)
+                return;
+
+            UpdateChecker.LaunchPackageInstaller(downloadedPath);
+            _ = PostToViewerMessageAsync(ViewerMessages.UpdateDownloadResult(true, downloadedPath));
+        }
+        catch (OperationCanceledException) when (_disposed || _lifecycle.IsCancellationRequested)
+        {
+            // Preview closed while downloading.
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or InvalidDataException
+            or IOException or UnauthorizedAccessException or UriFormatException or System.ComponentModel.Win32Exception)
+        {
+            if (!_disposed)
+                _ = PostToViewerMessageAsync(ViewerMessages.UpdateDownloadResult(false, ex.Message));
+        }
+        finally
+        {
+            System.Threading.Interlocked.Exchange(ref _updateDownloading, 0);
+        }
+    }
+
+    private void IgnoreUpdateVersion(string rawVersion)
+    {
+        if (_disposed)
+            return;
+        string version;
+        try
+        {
+            version = Uri.UnescapeDataString(rawVersion);
+        }
+        catch (UriFormatException)
+        {
+            return;
+        }
+        var info = UpdateChecker.IgnoreVersion(version);
+        _ = PostToViewerMessageAsync(ViewerMessages.UpdateStatus(UpdateChecker.SerializeStatus(info)));
+    }
+
+    private void OpenUpdateReleaseUrl(string rawUrl)
+    {
+        if (_disposed)
+            return;
+        string url;
+        try
+        {
+            url = Uri.UnescapeDataString(rawUrl);
+        }
+        catch (UriFormatException)
+        {
+            url = UpdateChecker.ReleasesPageUrl;
+        }
+        var safeUrl = UpdateChecker.IsAllowedReleasePageUrl(url) ? url : UpdateChecker.ReleasesPageUrl;
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = safeUrl,
+                UseShellExecute = true,
+            });
+        }
+        catch
+        {
+            // Ignore shell launch failures.
+        }
+    }
 }
