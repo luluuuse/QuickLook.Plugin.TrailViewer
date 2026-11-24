@@ -189,7 +189,7 @@ internal static class SelfTests
         var description = new StringBuilder();
         using (var archive = ZipFile.Open(tooMany, ZipArchiveMode.Create))
         {
-            for (var i = 0; i < 201; i++)
+            for (var i = 0; i < 1001; i++)
             {
                 var name = $"files/image-{i}.png";
                 description.Append($"<img src=\"{name}\" />");
@@ -203,7 +203,7 @@ internal static class SelfTests
 
         var tooManyFolder = Path.Combine(temporary, "too-many-resources");
         Directory.CreateDirectory(tooManyFolder);
-        ExpectInvalidData("a KMZ over the 200-image limit is rejected", () =>
+        ExpectInvalidData("a KMZ over the 1000-image limit is rejected", () =>
             KmzArchive.ExtractDocument(tooMany, tooManyFolder));
         Check("a resource-limit failure removes the KML and copied images",
             Directory.GetFiles(tooManyFolder, "*", SearchOption.AllDirectories).Length == 0);
