@@ -17,6 +17,56 @@ Added / Changed / Deprecated / Removed / Fixed / Security 分类；没有内容�
 
 None yet.
 
+## 1.29.0 — 2026-11-25
+
+### 中文
+
+#### 新增
+
+- **多格式轨迹导出与离线 KMZ 打包**：编辑器支持导出 GPX、KML、KMZ、GeoJSON、TCX 和 CSV 六种格式；导出 KMZ 时可选下载并打包外链 HTTPS 照片，实时展示下载与打包进度，失败项自动保留原链。
+- **KML / KMZ 完整保留时间与心率**：带时间戳或心率的轨迹自动导出为标准 `<gx:Track>`（含 `<when>` 与 `gx:SimpleArrayData` 心率数组）及航点图标样式，KML 解析器同步支持读取心率数组，FIT 等活动记录转存 KML/KMZ 不再丢数据。
+- **同格式原地覆盖（GPX / KML / KMZ）**：编辑 GPX、KML、KMZ 时默认跟随原文件格式导出并允许同格式覆盖（首次覆盖前自动保留 `.bak` 备份），跨格式导出自动禁覆盖以防写坏原文件。
+- **手绘补线工具**：支持地图左键打点、撤回一笔与吸附轨迹/航点，自动识别区段替换、闭合起终点缺口、端点续画或追加新分段。
+- **外部轨迹拼接**：支持在编辑器内导入本地 GPX / KML 文件，提供同目录快捷拼接与可选的就近自动翻转合并为单段。
+- **海拔平滑与坡度估算虚拟时间轴**：提供轻度、标准、强力三档海拔平滑并实时预览累计爬升变化；虚拟时间轴支持按坡度（Naismith 规则）估算各段用时。
+- **航点批量工具**：支持沿轨迹里程自动重排、20 米内重复航点去重，以及按里程间隔批量生成里程/最高点航点。
+- **每公里分段抗极值柱形图**：运动速度、垂直速度与单公里时间三列自动按四分位距识别坐车/长休等离群极值，正常徒步段恢复线性满宽对比，超限异常段以满格斜纹与侧边竖条标识。
+- **照片灯箱外部打开**：新增「在浏览器中打开」入口，方便查看原图或外链图片。
+
+#### 变更
+
+- **编辑器工具栏重组与交互打磨**：归类为「剪辑拼接、清洗优化、路线方向、绘制修点、航点」五大模块；多段轨迹自动分配高区分度配色；框选擦除实时显示待删轨迹点与航点数量；KMZ 预览与打包图片上限统一放宽至 1000 张 / 1 GB（单包上限 1088 MB）。
+
+#### 修复
+
+- **修复另存为弹窗吞字与多图 KMZ 卡界面**：弹出保存对话框期间自动屏蔽全局快捷键；KMZ 打包读图与压缩移至后台线程执行。
+- **修复 KMZ 打包链接前缀破坏、同名图碰撞与根目录路径解析**：改为单遍边界精确替换并优先保留直接本地图路径，防止跨目录同名图静默覆盖原图；修复盘符根目录下的本地图解析及大相册外链增量内存控制。
+- **修复编辑器与解析边界问题**：修复 GPX 普通网页 `<link>` 误判为照片、KML 多边形 `<LinearRing>` 未闭合、正向轨迹拼接未清理倒流时间戳、保存中退出/重开竞态、点绘制图标折叠抽屉清空草稿，以及手绘吸附轨中航点丢失轨迹锚点的问题。
+
+### English
+
+#### Added
+
+- **Multi-Format Track Export & Offline KMZ Packing**: Export edited tracks as GPX, KML, KMZ, GeoJSON, TCX, or CSV. KMZ export optionally downloads and packs remote HTTPS photos with live progress reporting while keeping failed links intact.
+- **Full KML / KMZ Time & Heart-Rate Round-Trip**: Tracks with timestamps or heart rate export as standard `<gx:Track>` with `<when>` and `gx:SimpleArrayData` heart-rate arrays plus waypoint icon styles, and the KML parser now reads heart-rate arrays back so FIT-to-KML/KMZ exports keep telemetry intact.
+- **Same-Format Overwrite for GPX / KML / KMZ**: The save popover defaults to the source track's format and allows overwriting GPX, KML, and KMZ files in place (creating a `.bak` backup on first overwrite) while blocking cross-format overwrites.
+- **Hand-Drawn Path Tool**: Click-to-draw path editing with step undo and track/waypoint snapping, automatically splicing span replacements, closing loop gaps, extending endpoints, or appending branches.
+- **External Track Append**: Import local GPX / KML files or pick sibling tracks in the same folder, with optional nearest-endpoint auto-flip and single-segment merging.
+- **Elevation Smoothing & Grade-Adjusted Timeline**: Light, standard, and strong elevation smoothing with live ascent preview, plus Naismith grade-adjusted virtual timeline generation.
+- **Waypoint Batch Tools**: Sort waypoints along the track, merge duplicates within 20 m, and batch-generate distance milestone and summit waypoints.
+- **Outlier-Resistant Split Bars**: Moving speed, vertical speed, and split time columns now use an IQR-based scale so isolated car-ride or long-rest spikes no longer crush normal hiking bars; capped outliers display a diagonal hatch and edge marker.
+- **Open Photo in Browser**: Added an external browser button to the photo lightbox.
+
+#### Changed
+
+- **Reorganized Editor Rail & Polish**: Grouped tools into Clip & Merge, Clean & Optimize, Route Direction, Draw & Refine, and Waypoints; added distinct multi-segment colors and live box-erase deletion counts; aligned KMZ photo limits to 1000 images / 1 GB (1088 MB archive cap).
+
+#### Fixed
+
+- **Save Dialog Shortcut Leakage & UI Blocking**: Suppressed global shortcuts while `SaveFileDialog` is open and moved KMZ archive assembly off the WPF UI thread.
+- **KMZ Reference Replacement, Name Collisions & Drive-Root Paths**: Replaced global substring substitution with single-pass boundary-safe replacement, reserved direct local entry paths before remapped images, fixed drive-root path resolution, and enforced incremental byte budgeting during remote photo downloads.
+- **Parser & Editor Edge Cases**: Stopped non-image GPX `<link>` URLs from being treated as photos, auto-closed KML `<LinearRing>` polygons, cleared non-monotonic timestamps on forward track merges, guarded against async save/close races, preserved draw drafts when collapsing the Draw drawer, and kept track anchors when snapping to mid-track waypoints.
+
 ## 1.28.2 — 2026-11-24
 
 ### 中文

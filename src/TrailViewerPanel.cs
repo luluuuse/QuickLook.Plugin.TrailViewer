@@ -36,7 +36,7 @@ internal sealed partial class TrailViewerPanel : UserControl, IDisposable
     private static readonly object EnvironmentGate = new();
     private static System.Threading.Tasks.Task<CoreWebView2Environment>? _environmentTask;
     internal const long MaxInputBytes = 64L * 1024 * 1024;
-    internal const long MaxKmzInputBytes = 384L * 1024 * 1024;
+    internal const long MaxKmzInputBytes = 1088L * 1024 * 1024;
 
     private readonly Stopwatch _clock = Stopwatch.StartNew();
     private readonly DispatcherTimer _timeout;

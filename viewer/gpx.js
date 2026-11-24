@@ -14,7 +14,19 @@ export class GpxError extends Error {}
 
 /** An absolute HTTPS URL with no whitespace -- safe to load as a remote photo or hand to the browser. */
 const MEDIA_URL_RE = /^https:\/\/[^\s<>"]+$/i;
+const IMAGE_EXT_RE = /\.(?:jpe?g|png|gif|webp|avif|bmp|heic|heif)$/i;
+const IMAGE_LINK_TEXT_RE = /^(?:media|photo|image|img|picture)$/i;
 const MAX_IMAGES = 9;
+
+function isImageLinkElement(linkEl, href) {
+  if (!MEDIA_URL_RE.test(href)) return false;
+  const linkType = childText(linkEl, 'type');
+  if (linkType && /^image\//i.test(linkType)) return true;
+  const linkText = childText(linkEl, 'text');
+  if (linkText && IMAGE_LINK_TEXT_RE.test(linkText)) return true;
+  const pathPart = href.split(/[?#]/)[0];
+  return IMAGE_EXT_RE.test(pathPart);
+}
 
 function children(parent, name) {
   return Array.from(parent.children).filter((el) => el.localName === name);
@@ -57,7 +69,7 @@ function readPoint(el) {
     if (child.localName === 'extensions') extensions.push(child);
     if (child.localName === 'link') {
       const href = (child.getAttribute('href') || '').trim();
-      if (MEDIA_URL_RE.test(href)) imageLinks.push(href);
+      if (isImageLinkElement(child, href)) imageLinks.push(href);
     }
     if (!direct.has(child.localName)) direct.set(child.localName, child.textContent.trim());
   }

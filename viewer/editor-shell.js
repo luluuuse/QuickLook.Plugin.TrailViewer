@@ -33,6 +33,7 @@ const RAIL_TOOLS = [
  *   overlay: any,
  *   getTrackName: () => string,
  *   getProfileState: () => any,
+ *   getSourceFormat?: (() => string) | null,
  *   isGpxSource?: () => boolean,
  *   onSaveTrack: (opts: { id: string, fileName: string, xml: string, content?: string, format?: string, overwrite: boolean, packRemoteImages?: boolean, onProgress?: (info: { completed: number, total: number, failed: number }) => void }) => Promise<any>,
  *   onListSiblingTracks?: (() => Promise<Array<{ name: string, size: number }>>) | null,
@@ -55,6 +56,7 @@ export function createEditorShell({
   overlay,
   getTrackName,
   getProfileState,
+  getSourceFormat = null,
   isGpxSource = () => true,
   onSaveTrack,
   onListSiblingTracks = null,
@@ -68,8 +70,18 @@ export function createEditorShell({
   onLayoutChange = () => {},
   showToast = () => {},
 }) {
-  /** @type {() => boolean} */
-  const canOverwriteSource = isGpxSource;
+  /** @returns {string} */
+  const resolveSourceFormat = () => {
+    if (typeof getSourceFormat === 'function') {
+      const explicit = String(getSourceFormat() || '').trim().toLowerCase();
+      if (explicit === 'gpx' || explicit === 'kml' || explicit === 'kmz') return explicit;
+      return '';
+    }
+    const clean = String(getTrackName?.() || '').split(/[?#]/)[0];
+    const match = clean.match(/\.(gpx|kml|kmz)$/i);
+    if (match) return match[1].toLowerCase();
+    return isGpxSource() ? 'gpx' : '';
+  };
   /** @type {() => void} */
   const handleLayoutChange = onLayoutChange;
   /** @type {(msg: string, ms?: number) => void} */
@@ -129,6 +141,7 @@ export function createEditorShell({
   let lastOverwrittenTrack = null;
   let isSaving = false;
   let saveSequence = 0;
+  let sessionId = 0;
   let shellLifecycle = null;
   let cachedTotalMeters = 0;
   let cropRangeLabelEl = null;
@@ -626,8 +639,11 @@ export function createEditorShell({
     const owCheck = el('input');
     owCheck.type = 'checkbox';
     const owLabel = el('span', '');
-    owCheck.addEventListener('change', () => { overwriteOriginal = owCheck.checked; });
     owRow.append(owCheck, owLabel);
+
+    const owNote = el('div', 'editor-save-note', t('editor.save.overwriteKmlNote'));
+    owNote.dataset.saveOption = 'overwrite-kml-note';
+    owNote.hidden = true;
 
     const kmzRemoteRow = el('label', 'editor-check-row');
     kmzRemoteRow.dataset.saveOption = 'kmz-remote';
@@ -640,21 +656,31 @@ export function createEditorShell({
     const syncSavePopoverState = () => {
       const isGpxFmt = exportFormat === 'gpx';
       const isKmzFmt = exportFormat === 'kmz';
+      const srcFmt = resolveSourceFormat();
+      const isOverwritableSource = srcFmt === 'gpx' || srcFmt === 'kml' || srcFmt === 'kmz';
       wfCheck.disabled = !isGpxFmt;
       wfRow.classList.toggle('is-disabled', !isGpxFmt);
 
-      const allowOverwrite = canOverwriteSource() && isGpxFmt;
+      const allowOverwrite = isOverwritableSource && exportFormat === srcFmt;
       if (!allowOverwrite) overwriteOriginal = false;
       owCheck.checked = allowOverwrite && overwriteOriginal;
       owCheck.disabled = !allowOverwrite;
       owRow.classList.toggle('is-disabled', !allowOverwrite);
       owLabel.textContent = t(allowOverwrite
         ? 'editor.save.overwrite'
-        : (isGpxFmt ? 'editor.save.overwriteGpxOnly' : 'editor.save.overwriteFormatGpxOnly'));
+        : (isOverwritableSource ? 'editor.save.overwriteSameFormatOnly' : 'editor.save.overwriteUnsupported'));
+
+      const showKmlNote = allowOverwrite && overwriteOriginal && (exportFormat === 'kml' || exportFormat === 'kmz');
+      owNote.hidden = !showKmlNote;
 
       kmzRemoteRow.hidden = !isKmzFmt;
       kmzRemoteCheck.checked = packRemoteImages;
     };
+
+    owCheck.addEventListener('change', () => {
+      overwriteOriginal = owCheck.checked;
+      syncSavePopoverState();
+    });
 
     fmtSelect.addEventListener('change', () => {
       exportFormat = fmtSelect.value || 'gpx';
@@ -662,7 +688,7 @@ export function createEditorShell({
     });
     syncSavePopoverState();
 
-    savePopover.append(fmtRow, wfRow, owRow, kmzRemoteRow);
+    savePopover.append(fmtRow, wfRow, owRow, owNote, kmzRemoteRow);
   }
 
   function renderDrawer({ preserveWptScroll = false } = {}) {
@@ -715,6 +741,7 @@ export function createEditorShell({
     if (isSaving) return false;
     const current = store.getCurrent();
     if (!current) return false;
+    const mySession = sessionId;
     isSaving = true;
     if (saveBtn) saveBtn.disabled = true;
     let lastProgress = { completed: 0, total: 0, failed: 0 };
@@ -734,7 +761,8 @@ export function createEditorShell({
       const id = `save-${saveSequence}`;
       const baseName = (getTrackName() || 'track').replace(/\.[^.]+$/, '');
       const fileName = `${baseName}-edited${fmtMeta.ext}`;
-      const allowOverwrite = canOverwriteSource() && fmt === 'gpx';
+      const srcFmt = resolveSourceFormat();
+      const allowOverwrite = (srcFmt === 'gpx' || srcFmt === 'kml' || srcFmt === 'kmz') && fmt === srcFmt;
       const didOverwrite = allowOverwrite && overwriteOriginal;
       const savingVersion = store.getVersion();
       const result = await onSaveTrack({
@@ -746,12 +774,14 @@ export function createEditorShell({
         overwrite: didOverwrite,
         packRemoteImages: fmt === 'kmz' && packRemoteImages,
         onProgress: (info) => {
+          if (mySession !== sessionId || !store.isActive()) return;
           lastProgress = info;
           setSaveProgressUi(info);
         },
       });
+      if (mySession !== sessionId || !store.isActive()) return false;
       if (result?.ok) {
-        if (fmt === 'gpx' && (didOverwrite || result?.overwrote)) {
+        if (allowOverwrite && (didOverwrite || result?.overwrote)) {
           sessionOverwroteOriginal = true;
           lastOverwrittenTrack = cloneParsedTrack(current);
         }
@@ -780,14 +810,16 @@ export function createEditorShell({
       notifyToast(t('editor.save.fail', { detail: result?.detail || 'error' }), 3500);
       return false;
     } finally {
-      isSaving = false;
-      setSaveProgressUi(null);
-      if (saveBtn) saveBtn.disabled = false;
+      if (mySession === sessionId) {
+        isSaving = false;
+        setSaveProgressUi(null);
+        if (saveBtn) saveBtn.disabled = false;
+      }
     }
   }
 
   function requestExit() {
-    if (!store.isActive()) return;
+    if (!store.isActive() || isSaving) return;
     closeSavePopover();
     setSaveProgressUi(null);
     closeContextMenu();
@@ -1108,7 +1140,11 @@ export function createEditorShell({
     selectedWptIndex = -1;
     pendingWptCoords = null;
     wptNoteOpen = false;
-    exportFormat = 'gpx';
+    sessionId += 1;
+    isSaving = false;
+    if (saveBtn) saveBtn.disabled = false;
+    exportFormat = resolveSourceFormat() || 'gpx';
+    overwriteOriginal = false;
     packRemoteImages = false;
     sessionOverwroteOriginal = false;
     lastOverwrittenTrack = null;
@@ -1161,6 +1197,9 @@ export function createEditorShell({
   }
 
   function close() {
+    sessionId += 1;
+    isSaving = false;
+    if (saveBtn) saveBtn.disabled = false;
     if (shellLifecycle) {
       shellLifecycle.abort();
       shellLifecycle = null;

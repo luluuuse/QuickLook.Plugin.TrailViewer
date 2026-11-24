@@ -292,15 +292,26 @@ async function run() {
     check('overwrite-save refreshes splits table with updated distance', splitCountAfter > 0 && splitCountAfter < 16);
     await page.click('.split-toggle');
 
-    // 9. Non-GPX source disables overwrite original option in save popover
+    // 9. KML source defaults to KML export, allows same-format overwrite with note, and blocks cross-format overwrite
     await openViewer(page, base, 'kml-photos.kml');
     await waitForLayout(page);
     await page.click('.toolbox-switch button');
     await page.click('[data-tool="edit"]');
     await page.waitForSelector('body.is-editing #editor-topbar:not([hidden])');
     await page.click('.editor-save-opts-btn');
-    const overwriteDisabled = await page.locator('.editor-save-popover input[type="checkbox"]').nth(1).isDisabled();
-    check('non-GPX source disables overwrite original checkbox', overwriteDisabled);
+    const kmlDefaultFmt = await page.locator('.editor-save-format-select').inputValue();
+    check('KML source defaults export format to kml', kmlDefaultFmt === 'kml');
+    const kmlOverwriteEnabled = await page.locator('.editor-save-popover input[type="checkbox"]').nth(1).isEnabled();
+    check('KML source enables overwrite original checkbox for kml export', kmlOverwriteEnabled);
+    await page.locator('.editor-save-popover input[type="checkbox"]').nth(1).check();
+    const kmlNoteVisible = await page.evaluate(() => {
+      const note = document.querySelector('[data-save-option="overwrite-kml-note"]');
+      return Boolean(note && !note.hidden);
+    });
+    check('checking overwrite on KML shows rebuild notice', kmlNoteVisible);
+    await page.selectOption('.editor-save-format-select', 'gpx');
+    const crossFormatDisabled = await page.locator('.editor-save-popover input[type="checkbox"]').nth(1).isDisabled();
+    check('switching KML source to gpx export disables overwrite original checkbox', crossFormatDisabled);
 
     // 10. Narrow window edit topbar avoids overlapping top-right tools and zoom controls
     for (const width of [780, 420]) {

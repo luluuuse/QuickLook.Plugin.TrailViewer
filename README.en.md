@@ -28,13 +28,13 @@ Common controls:
 | Cycle track coloring | <kbd>L</kbd> |
 | Collapse/expand profile | <kbd>P</kbd> |
 | Non-destructive track editor | Toolbox → Edit track |
-| Save GPX in edit mode | <kbd>Ctrl</kbd>+<kbd>S</kbd> |
+| Save / export in edit mode | <kbd>Ctrl</kbd>+<kbd>S</kbd> |
 | Export overlay image | Toolbox → Export overlay |
 | Open route weather | Toolbox → Route weather |
 
 ## Highlights
 
-- **Non-destructive track editor:** enter the four-zone editor from the Toolbox hero card for **Profile Crop** (dual-handle elevation range crop), **Click Split** (click-to-split and segment deletion), **Drift Cleaning**, **Topology** (reverse, out-and-back, close loop), and **Waypoint Editing** (indexed list and `Alt+Click` free placement), with multi-step undo/redo (`Ctrl+Z` / `Ctrl+Shift+Z`), `Ctrl+S` Save As or overwrite-with-backup, integrated topbar layers/pins icons, and auto-repositioning compact zoom controls.
+- **Non-destructive track editor & multi-format export:** enter the four-zone editor from the Toolbox hero card for **Clip & Merge** (profile crop, click split, external GPX/KML append), **Clean & Optimize** (drift cleanup, elevation smoothing, simplify), **Route Direction** (reverse, out-and-back, close loop, loop start), **Draw & Refine** (hand-drawn path, vertex editing, box erase), and **Waypoint Batch Tools** (sort, dedupe, milestone generation); export to GPX, KML, KMZ (with optional offline remote photo packing and time/HR preservation), GeoJSON, TCX, or CSV, with same-format overwrite + `.bak` backup for GPX / KML / KMZ.
 - **Track rendering & coloring:** GPX tracks, KML LineStrings and `gx:Track`, plus FIT activity/course records, each segment in its own colour, with adaptive direction arrows and distance labels; press <kbd>L</kbd> or click the trail-color button beside the Toolbox to cycle **Single / Elevation / Speed / Heart rate** modes.
 - **Route intelligence:** moving time, recording gaps, implausible GPS jumps and a grade-aware time estimate
   using Naismith, Langmuir descents and a steep-uphill correction.

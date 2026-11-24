@@ -265,10 +265,10 @@ internal static class SelfTests
             !TrailViewerPanel.IsOversized(TrailViewerPanel.MaxInputBytes));
         Check("a direct track over 64 MB is rejected",
             TrailViewerPanel.IsOversized(TrailViewerPanel.MaxInputBytes + 1));
-        Check("a photo-heavy KMZ archive up to 384 MB is accepted",
+        Check("a photo-heavy KMZ archive up to 1088 MB is accepted",
             !TrailViewerPanel.IsOversized(120L * 1024 * 1024, isKmz: true)
             && !TrailViewerPanel.IsOversized(TrailViewerPanel.MaxKmzInputBytes, isKmz: true));
-        Check("a KMZ archive over 384 MB is rejected",
+        Check("a KMZ archive over 1088 MB is rejected",
             TrailViewerPanel.IsOversized(TrailViewerPanel.MaxKmzInputBytes + 1, isKmz: true));
 
         var source = Path.Combine(temporary, "source", "route.kmz");
@@ -681,8 +681,9 @@ internal static class SelfTests
                 svc.Begin($"fmt-{fmt}\t1\t1\tdemo-edited.{fmt}\t{fmt}\t1");
                 svc.Append($"fmt-{fmt}\t0\t{b64}");
                 var fmtPayload = svc.Complete($"fmt-{fmt}");
-                Check($"track save records {fmt} format and disables overwrite",
-                    fmtPayload != null && fmtPayload.Format == fmt && !fmtPayload.Overwrite
+                var expectOverwrite = fmt == "kml" || fmt == "kmz";
+                Check($"track save records {fmt} format and expected overwrite policy",
+                    fmtPayload != null && fmtPayload.Format == fmt && fmtPayload.Overwrite == expectOverwrite
                     && fmtPayload.PackRemoteImages == (fmt == "kmz"));
             }
 
@@ -816,6 +817,74 @@ internal static class SelfTests
             && progressLog[progressLog.Count - 1] == "2/2:1"
             && ViewerMessages.TrackSaveProgress("s1", 2, 5, 1) == "trackSaveProgress\ts1\t2\t5\t1",
             string.Join(", ", progressLog));
+
+        var prefixKml =
+            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+            + "<kml xmlns=\"http://www.opengis.net/kml/2.2\">\n"
+            + "  <Document>\n"
+            + "    <Placemark>\n"
+            + "      <name>Prefix Collision</name>\n"
+            + "      <description><![CDATA["
+            + "<img src=\"https://images.example/a.png\" />"
+            + "<img src=\"https://images.example/a.png?w=800\" />"
+            + "]]></description>\n"
+            + "      <Point><coordinates>114.3,30.5,100</coordinates></Point>\n"
+            + "    </Placemark>\n"
+            + "  </Document>\n"
+            + "</kml>\n";
+        var prefixKmzBytes = KmzArchive.BuildKmzBytesAsync(
+            Encoding.UTF8.GetBytes(prefixKml),
+            albumDir,
+            fileRoot,
+            packRemoteImages: true,
+            remoteFetcher: (url, _) =>
+            {
+                if (url == "https://images.example/a.png")
+                    return System.Threading.Tasks.Task.FromResult(
+                        new KmzArchive.KmzRemoteImage(photo, ".png"));
+                throw new InvalidDataException("simulated 404");
+            }).GetAwaiter().GetResult();
+        var prefixKmz = Path.Combine(temporary, "built-prefix.kmz");
+        File.WriteAllBytes(prefixKmz, prefixKmzBytes);
+        var prefixExtractDir = Path.Combine(temporary, "kmz-prefix-extract");
+        Directory.CreateDirectory(prefixExtractDir);
+        var prefixExtractedKml = KmzArchive.ExtractDocument(prefixKmz, prefixExtractDir);
+        var prefixExtractedText = File.ReadAllText(prefixExtractedKml);
+        Check("KMZ reference replacement does not corrupt longer URL sharing a prefix",
+            prefixExtractedText.Contains("\"files/remote-1.png\"")
+            && prefixExtractedText.Contains("\"https://images.example/a.png?w=800\"")
+            && !prefixExtractedText.Contains("files/remote-1.png?w=800"));
+
+        var directFilesDir = Path.Combine(albumDir, "files");
+        Directory.CreateDirectory(directFilesDir);
+        var directPhoto = new byte[] { 0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x77, 0x88 };
+        File.WriteAllBytes(Path.Combine(directFilesDir, "photo.png"), directPhoto);
+        var collisionKml =
+            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+            + "<kml xmlns=\"http://www.opengis.net/kml/2.2\">\n"
+            + "  <Document>\n"
+            + "    <Placemark>\n"
+            + "      <name>Collision</name>\n"
+            + "      <description><![CDATA["
+            + "<img src=\"../shared/photo.png\" />"
+            + "<img src=\"files/photo.png\" />"
+            + "]]></description>\n"
+            + "      <Point><coordinates>114.3,30.5,100</coordinates></Point>\n"
+            + "    </Placemark>\n"
+            + "  </Document>\n"
+            + "</kml>\n";
+        var collisionKmzBytes = KmzArchive.BuildKmzBytesAsync(
+            Encoding.UTF8.GetBytes(collisionKml), albumDir, fileRoot).GetAwaiter().GetResult();
+        var collisionKmz = Path.Combine(temporary, "built-collision.kmz");
+        File.WriteAllBytes(collisionKmz, collisionKmzBytes);
+        var collisionExtractDir = Path.Combine(temporary, "kmz-collision-extract");
+        Directory.CreateDirectory(collisionExtractDir);
+        KmzArchive.ExtractDocument(collisionKmz, collisionExtractDir);
+        Check("KMZ preserves both direct files/photo.png and remapped ../shared/photo.png without collision",
+            File.Exists(Path.Combine(collisionExtractDir, "files", "photo.png"))
+            && File.ReadAllBytes(Path.Combine(collisionExtractDir, "files", "photo.png")).SequenceEqual(directPhoto)
+            && File.Exists(Path.Combine(collisionExtractDir, "files", "photo-2.png"))
+            && File.ReadAllBytes(Path.Combine(collisionExtractDir, "files", "photo-2.png")).SequenceEqual(photo2));
     }
 
     private static void TestAtomicFile(string temporary)

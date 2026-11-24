@@ -41,6 +41,11 @@ internal sealed class TrackSaveService : IDisposable
         "gpx", "kml", "kmz", "geojson", "tcx", "csv",
     };
 
+    private static readonly HashSet<string> OverwritableFormats = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "gpx", "kml", "kmz",
+    };
+
     private readonly int _maxBytes;
     private MemoryStream? _buffer;
     private string? _id;
@@ -61,6 +66,9 @@ internal sealed class TrackSaveService : IDisposable
 
     internal static bool IsSupportedFormat(string? format) =>
         !string.IsNullOrWhiteSpace(format) && SupportedFormats.Contains(format!.Trim());
+
+    internal static bool IsOverwritableFormat(string? format) =>
+        !string.IsNullOrWhiteSpace(format) && OverwritableFormats.Contains(format!.Trim());
 
     internal static string GetDefaultExtension(string? format)
     {
@@ -125,7 +133,9 @@ internal sealed class TrackSaveService : IDisposable
         {
             var rawName = Uri.UnescapeDataString(parts[3]);
             var sanitised = OverlayTransfer.SanitiseFileName(rawName);
-            name = string.IsNullOrWhiteSpace(rawName) || string.IsNullOrWhiteSpace(rawName.Trim('.'))
+            var degenerateFallback = string.Equals(sanitised, "overlay.png", StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(Path.GetFileName(rawName.Trim()), "overlay.png", StringComparison.OrdinalIgnoreCase);
+            name = string.IsNullOrWhiteSpace(rawName) || string.IsNullOrWhiteSpace(rawName.Trim('.')) || degenerateFallback
                 ? "track" + GetDefaultExtension(format)
                 : sanitised;
         }
@@ -137,7 +147,7 @@ internal sealed class TrackSaveService : IDisposable
         _id = parts[0];
         _expectedChunks = count;
         _format = format;
-        _overwrite = parts[2] == "1" && string.Equals(format, "gpx", StringComparison.OrdinalIgnoreCase);
+        _overwrite = parts[2] == "1" && IsOverwritableFormat(format);
         _packRemoteImages = parts.Length >= 6
             && parts[5] == "1"
             && string.Equals(format, "kmz", StringComparison.OrdinalIgnoreCase);

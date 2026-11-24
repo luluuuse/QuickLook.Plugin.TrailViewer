@@ -859,3 +859,49 @@ test('createSegmentColorResolver provides 12 unique colors and preserves colors 
   const afterUndo = resolver.resolve(tracks);
   assert.deepEqual(afterUndo, initialColors);
 });
+
+test('appendExternalTrack clears timestamps on non-reversed merge with backwards timestamps', () => {
+  const base = {
+    tracks: [{
+      name: 'Day 2',
+      segments: [[
+        { lat: 30.0, lon: 114.0, ele: 100, time: new Date('2026-05-02T08:00:00.000Z') },
+        { lat: 30.001, lon: 114.0, ele: 110, time: new Date('2026-05-02T08:05:00.000Z') },
+      ]],
+    }],
+    routes: [],
+    waypoints: [],
+  };
+  const incoming = {
+    tracks: [{
+      name: 'Day 1',
+      segments: [[
+        { lat: 30.0011, lon: 114.0, ele: 112, time: new Date('2026-05-01T08:00:00.000Z') },
+        { lat: 30.002, lon: 114.0, ele: 120, time: new Date('2026-05-01T08:05:00.000Z') },
+      ]],
+    }],
+    routes: [],
+    waypoints: [],
+  };
+  const res = appendExternalTrack(base, incoming, { mergeIntoSingle: true });
+  assert.equal(res.merged, true);
+  assert.equal(res.reversedIncoming, false);
+  assert.equal(res.timestampsCleared, true);
+  assert.equal(res.track.tracks[0].segments[0].every((pt) => pt.time === undefined), true);
+});
+
+test('generateMilestoneWaypoints respects minDistanceMeters: 0', () => {
+  const pts = [];
+  for (let i = 0; i <= 20; i += 1) {
+    pts.push({ lat: 30.0 + i * 0.001, lon: 114.0, ele: 100 + i * 5 });
+  }
+  const base = {
+    tracks: [{ name: 'T', segments: [pts] }],
+    routes: [],
+    waypoints: [{ lat: pts[10].lat, lon: pts[10].lon, name: 'Existing' }],
+  };
+  const withDefault = generateMilestoneWaypoints(base, { intervalKm: 1, includeSummit: false, minDistanceMeters: 50 });
+  const withZero = generateMilestoneWaypoints(base, { intervalKm: 1, includeSummit: false, minDistanceMeters: 0 });
+  assert.ok(withZero.addedCount >= withDefault.addedCount);
+  assert.equal(withZero.addedCount, 2);
+});

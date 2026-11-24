@@ -200,9 +200,28 @@ function readImages(raw) {
   return images;
 }
 
+/** Reads per-point heart rate samples from gx:SimpleArrayData inside a gx:Track. */
+function readTrackHeartRates(track) {
+  const extended = child(track, 'ExtendedData');
+  if (!extended) return [];
+  for (const node of Array.from(extended.getElementsByTagName('*'))) {
+    if (node.localName !== 'SimpleArrayData') continue;
+    const name = (node.getAttribute('name') || '').trim().toLowerCase();
+    if (name !== 'heartrate' && name !== 'heart_rate' && name !== 'hr') continue;
+    return children(node, 'value').map((el) => {
+      const raw = el.textContent.trim();
+      if (!raw) return null;
+      const value = Number(raw);
+      return Number.isFinite(value) && value > 0 && value < 255 ? value : null;
+    });
+  }
+  return [];
+}
+
 /** A gx:Track keeps its times and its coordinates in two parallel lists that are matched by index. */
 function readTrack(track, { skipTime = false, skipElevation = false } = {}) {
   const times = skipTime ? [] : children(track, 'when').map((when) => Date.parse(when.textContent.trim()));
+  const heartRates = readTrackHeartRates(track);
   const coords = [];
   let lastTime = null;
   // Keep the time index tied to the original coordinate. Filtering invalid coordinates first shifted every
@@ -212,6 +231,7 @@ function readTrack(track, { skipTime = false, skipElevation = false } = {}) {
     const point = parseGxCoord(coord.textContent, { skipElevation });
     if (!point) return;
     if (lastTime !== null) point.time = new Date(lastTime);
+    if (heartRates[i] != null) point.heartRate = heartRates[i];
     coords.push(point);
   });
   return coords;

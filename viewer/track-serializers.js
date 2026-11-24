@@ -119,6 +119,71 @@ function formatKmlCoords(points) {
     .join(' ');
 }
 
+function formatGxCoord(pt) {
+  const lon = formatCoord(normalizeLon(pt.lon));
+  const lat = formatCoord(pt.lat);
+  return Number.isFinite(pt.ele) ? `${lon} ${lat} ${formatEle(pt.ele)}` : `${lon} ${lat}`;
+}
+
+function segmentHasTimestamps(seg) {
+  return Array.isArray(seg) && seg.some((pt) => Boolean(formatTime(pt.time)));
+}
+
+function segmentHasHeartRate(seg) {
+  return Array.isArray(seg) && seg.some((pt) => Number.isFinite(pt.heartRate) && pt.heartRate > 0 && pt.heartRate < 255);
+}
+
+function pushKmlSegment(lines, seg, indent) {
+  const hasTime = segmentHasTimestamps(seg);
+  const hasHr = segmentHasHeartRate(seg);
+  if (hasTime || hasHr) {
+    lines.push(`${indent}<gx:Track>`);
+    for (const pt of seg) {
+      const iso = formatTime(pt.time);
+      lines.push(iso ? `${indent}  <when>${iso}</when>` : `${indent}  <when/>`);
+    }
+    for (const pt of seg) {
+      lines.push(`${indent}  <gx:coord>${formatGxCoord(pt)}</gx:coord>`);
+    }
+    if (hasHr) {
+      lines.push(
+        `${indent}  <ExtendedData>`,
+        `${indent}    <SchemaData schemaUrl="#trailviewer-track">`,
+        `${indent}      <gx:SimpleArrayData name="heartrate">`,
+      );
+      for (const pt of seg) {
+        const hr = Number.isFinite(pt.heartRate) && pt.heartRate > 0 && pt.heartRate < 255
+          ? Math.round(pt.heartRate)
+          : null;
+        lines.push(hr !== null ? `${indent}        <gx:value>${hr}</gx:value>` : `${indent}        <gx:value/>`);
+      }
+      lines.push(
+        `${indent}      </gx:SimpleArrayData>`,
+        `${indent}    </SchemaData>`,
+        `${indent}  </ExtendedData>`,
+      );
+    }
+    lines.push(`${indent}</gx:Track>`);
+    return;
+  }
+  lines.push(
+    `${indent}<LineString>`,
+    `${indent}  <tessellate>1</tessellate>`,
+    `${indent}  <coordinates>${formatKmlCoords(seg)}</coordinates>`,
+    `${indent}</LineString>`,
+  );
+}
+
+function closeKmlRing(ring) {
+  if (ring.length < 3) return ring;
+  const first = ring[0];
+  const last = ring[ring.length - 1];
+  if (first.lat === last.lat && normalizeLon(first.lon) === normalizeLon(last.lon)) {
+    return ring;
+  }
+  return [...ring, first];
+}
+
 function formatGeoJsonCoord(pt) {
   const lon = formatNumber(normalizeLon(pt.lon), 7);
   const lat = formatNumber(pt.lat, 7);
@@ -134,7 +199,7 @@ function formatGeoJsonCoord(pt) {
 export function serializeKml(parsed, { includeImages = true } = {}) {
   const lines = [
     '<?xml version="1.0" encoding="UTF-8"?>',
-    '<kml xmlns="http://www.opengis.net/kml/2.2">',
+    '<kml xmlns="http://www.opengis.net/kml/2.2" xmlns:gx="http://www.google.com/kml/ext/2.2">',
     '  <Document>',
   ];
 
@@ -142,6 +207,9 @@ export function serializeKml(parsed, { includeImages = true } = {}) {
   if (docName) {
     lines.push(`    <name>${escapeXml(docName)}</name>`);
   }
+
+  const tracksToWrite = collectTracks(parsed);
+  const anyHeartRate = tracksToWrite.some((trk) => trk.segments.some(segmentHasHeartRate));
 
   lines.push(
     '    <Style id="trail-line">',
@@ -151,27 +219,26 @@ export function serializeKml(parsed, { includeImages = true } = {}) {
     '      </LineStyle>',
     '    </Style>',
   );
+  if (anyHeartRate) {
+    lines.push(
+      '    <Schema id="trailviewer-track">',
+      '      <gx:SimpleArrayField name="heartrate" type="int">',
+      '        <displayName>Heart Rate</displayName>',
+      '      </gx:SimpleArrayField>',
+      '    </Schema>',
+    );
+  }
 
-  for (const trk of collectTracks(parsed)) {
+  for (const trk of tracksToWrite) {
     lines.push('    <Placemark>');
     if (trk.name) lines.push(`      <name>${escapeXml(trk.name)}</name>`);
     lines.push('      <styleUrl>#trail-line</styleUrl>');
     if (trk.segments.length === 1) {
-      lines.push(
-        '      <LineString>',
-        '        <tessellate>1</tessellate>',
-        `        <coordinates>${formatKmlCoords(trk.segments[0])}</coordinates>`,
-        '      </LineString>',
-      );
+      pushKmlSegment(lines, trk.segments[0], '      ');
     } else {
       lines.push('      <MultiGeometry>');
       for (const seg of trk.segments) {
-        lines.push(
-          '        <LineString>',
-          '          <tessellate>1</tessellate>',
-          `          <coordinates>${formatKmlCoords(seg)}</coordinates>`,
-          '        </LineString>',
-        );
+        pushKmlSegment(lines, seg, '        ');
       }
       lines.push('      </MultiGeometry>');
     }
@@ -182,6 +249,15 @@ export function serializeKml(parsed, { includeImages = true } = {}) {
     if (!isValidPoint(wpt)) continue;
     lines.push('    <Placemark>');
     if (wpt.name) lines.push(`      <name>${escapeXml(wpt.name)}</name>`);
+    if (wpt.icon) {
+      lines.push(
+        '      <Style>',
+        '        <IconStyle>',
+        `          <Icon><href>${escapeXml(String(wpt.icon))}</href></Icon>`,
+        '        </IconStyle>',
+        '      </Style>',
+      );
+    }
     const images = includeImages && Array.isArray(wpt.images) ? wpt.images.filter(Boolean) : [];
     const desc = wpt.description ? String(wpt.description) : '';
     if (images.length > 0) {
@@ -216,10 +292,11 @@ export function serializeKml(parsed, { includeImages = true } = {}) {
     lines.push('      <Polygon>');
     validRings.forEach((ring, idx) => {
       const tag = idx === 0 ? 'outerBoundaryIs' : 'innerBoundaryIs';
+      const closedRing = closeKmlRing(ring);
       lines.push(
         `        <${tag}>`,
         '          <LinearRing>',
-        `            <coordinates>${formatKmlCoords(ring)}</coordinates>`,
+        `            <coordinates>${formatKmlCoords(closedRing)}</coordinates>`,
         '          </LinearRing>',
         `        </${tag}>`,
       );

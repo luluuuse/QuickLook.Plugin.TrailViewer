@@ -3,6 +3,7 @@ import { performance } from 'node:perf_hooks';
 import test from 'node:test';
 
 import { analyseSplits } from '../../viewer/split-analysis.js';
+import { computeRobustBarScale } from '../../viewer/split-view.js';
 
 const START = new Date('2026-01-01T09:00:00Z');
 
@@ -110,4 +111,28 @@ test('a 3,300-kilometre route completes without a split-by-interval quadratic sc
 
   assert.ok(data.splits.length >= 3000);
   assert.ok(elapsed < 2000, `split analysis took ${elapsed.toFixed(1)} ms`);
+});
+
+test('computeRobustBarScale resists car-ride speed outliers while preserving linear normal distributions', () => {
+  // 20 normal hiking splits (1.8..6.7 km/h) + 2 car-ride splits (58.6, 60.3 km/h)
+  const withCar = [
+    1.8, 2.5, 3.2, 3.6, 4.0, 4.2, 4.5, 4.8, 5.0, 5.1,
+    5.3, 5.5, 5.7, 5.9, 6.0, 6.1, 6.3, 6.5, 6.6, 6.7,
+    58.6, 60.3,
+  ];
+  const carScale = computeRobustBarScale(withCar);
+  assert.equal(carScale.capped, true);
+  assert.equal(carScale.scale, 6.7);
+
+  // Normal hiking splits without outliers use the true maximum linearly
+  const normalHike = [2.4, 3.1, 3.8, 4.2, 4.6, 5.0, 5.4, 6.2, 6.8];
+  const normalScale = computeRobustBarScale(normalHike);
+  assert.equal(normalScale.capped, false);
+  assert.equal(normalScale.scale, 6.8);
+
+  // Normal cycling track (18..42 km/h) is never misclassified by any fixed threshold
+  const cycling = [18, 22, 24, 26, 28, 30, 32, 35, 38, 42];
+  const cycleScale = computeRobustBarScale(cycling);
+  assert.equal(cycleScale.capped, false);
+  assert.equal(cycleScale.scale, 42);
 });

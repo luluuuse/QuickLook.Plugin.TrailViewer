@@ -227,18 +227,35 @@ const SAMPLE_TRACK = {
   ],
 };
 
-test('serializeKml outputs valid KML 2.2 with MultiGeometry/LineString and round-trips via parseKml', () => {
-  const singleTrack = {
+test('serializeKml outputs valid KML 2.2 with gx:Track/LineString/MultiGeometry and round-trips via parseKml', () => {
+  const untimedSingleTrack = {
     name: 'Single Line',
+    tracks: [{
+      name: 'Leg 1',
+      segments: [[
+        { lat: 30.5, lon: 114.3, ele: 120.5 },
+        { lat: 30.51, lon: 114.31, ele: 150.2 },
+      ]],
+    }],
+    routes: [],
+    waypoints: [],
+    areas: [],
+  };
+  const singleKml = serializeKml(untimedSingleTrack);
+  assert.ok(!singleKml.startsWith('\uFEFF'));
+  assert.ok(singleKml.includes('<LineString>'));
+  assert.ok(!singleKml.includes('<MultiGeometry>'));
+
+  const timedSingleTrack = {
+    name: 'Timed Single',
     tracks: [{ name: 'Leg 1', segments: [SAMPLE_TRACK.tracks[0].segments[0]] }],
     routes: [],
     waypoints: [],
     areas: [],
   };
-  const singleKml = serializeKml(singleTrack);
-  assert.ok(!singleKml.startsWith('\uFEFF'));
-  assert.ok(singleKml.includes('<LineString>'));
-  assert.ok(!singleKml.includes('<MultiGeometry>'));
+  const timedSingleKml = serializeKml(timedSingleTrack);
+  assert.ok(timedSingleKml.includes('<gx:Track>'));
+  assert.ok(!timedSingleKml.includes('<MultiGeometry>'));
 
   const kmlText = serializeKml(SAMPLE_TRACK);
   assert.ok(kmlText.includes('<MultiGeometry>'));
@@ -456,4 +473,53 @@ test('KML promotes URL-only description and legacy mediaLink ExtendedData into w
   const again = parseKml(xml).waypoints.find((w) => w.name === 'Start');
   assert.deepEqual(again.images, [url1]);
   assert.equal(again.description, undefined);
+});
+
+test('serializeKml preserves track timestamps and heartRate via gx:Track, waypoint icons, and closes polygon LinearRing', () => {
+  const track = {
+    name: 'Timed KML',
+    tracks: [
+      {
+        name: 'Day 1',
+        segments: [
+          [
+            { lat: 30.5, lon: 114.3, ele: 100, heartRate: 142, time: new Date('2026-05-01T08:00:00.000Z') },
+            { lat: 30.51, lon: 114.31, ele: 150, heartRate: 158, time: new Date('2026-05-01T08:10:00.000Z') },
+          ],
+        ],
+      },
+    ],
+    routes: [],
+    waypoints: [
+      { lat: 30.505, lon: 114.305, ele: 120, name: 'Camp', icon: 'camp-icon.png' },
+    ],
+    areas: [
+      {
+        name: 'Zone',
+        rings: [[
+          { lat: 30.5, lon: 114.3 },
+          { lat: 30.51, lon: 114.3 },
+          { lat: 30.51, lon: 114.31 },
+        ]],
+      },
+    ],
+  };
+
+  const xml = serializeKml(track);
+  assert.ok(xml.includes('<gx:Track>'));
+  assert.ok(xml.includes('<when>2026-05-01T08:00:00.000Z</when>'));
+  assert.ok(xml.includes('<gx:SimpleArrayData name="heartrate">'));
+  assert.ok(xml.includes('<gx:value>142</gx:value>'));
+  assert.ok(xml.includes('<Icon><href>camp-icon.png</href></Icon>'));
+
+  const reparsed = parseKml(xml);
+  assert.equal(reparsed.tracks[0].segments[0][0].time.toISOString(), '2026-05-01T08:00:00.000Z');
+  assert.equal(reparsed.tracks[0].segments[0][1].time.toISOString(), '2026-05-01T08:10:00.000Z');
+  assert.equal(reparsed.tracks[0].segments[0][0].heartRate, 142);
+  assert.equal(reparsed.tracks[0].segments[0][1].heartRate, 158);
+  assert.equal(reparsed.waypoints[0].icon, 'camp-icon.png');
+  const ring = reparsed.areas[0].rings[0];
+  assert.equal(ring.length, 4);
+  assert.equal(ring[0].lat, ring[ring.length - 1].lat);
+  assert.equal(ring[0].lon, ring[ring.length - 1].lon);
 });

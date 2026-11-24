@@ -774,10 +774,12 @@ internal sealed partial class TrailViewerPanel
         string? targetPath = null;
         var createBackup = false;
         var format = payload.Format;
-        var isGpxFormat = string.Equals(format, "gpx", StringComparison.OrdinalIgnoreCase);
-        var isGpxSource = !string.IsNullOrEmpty(_sourcePath)
-            && string.Equals(Path.GetExtension(_sourcePath), ".gpx", StringComparison.OrdinalIgnoreCase);
-        if (payload.Overwrite && isGpxFormat && isGpxSource)
+        var sourceExt = !string.IsNullOrEmpty(_sourcePath) ? Path.GetExtension(_sourcePath) : string.Empty;
+        var expectedExt = TrackSaveService.GetDefaultExtension(format);
+        var isSameOverwritableFormat = TrackSaveService.IsOverwritableFormat(format)
+            && !string.IsNullOrEmpty(_sourcePath)
+            && string.Equals(sourceExt, expectedExt, StringComparison.OrdinalIgnoreCase);
+        if (payload.Overwrite && isSameOverwritableFormat)
         {
             targetPath = _sourcePath;
             createBackup = true;
@@ -787,28 +789,38 @@ internal sealed partial class TrailViewerPanel
             var dialog = new Microsoft.Win32.SaveFileDialog
             {
                 FileName = payload.FileName,
-                DefaultExt = TrackSaveService.GetDefaultExtension(format),
+                DefaultExt = expectedExt,
                 Filter = TrackSaveService.GetFileDialogFilter(format),
                 InitialDirectory = !string.IsNullOrEmpty(_sourcePath)
                     ? (Path.GetDirectoryName(_sourcePath) ?? Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments))
                     : Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
             };
             var owner = Window.GetWindow(this);
-            var ok = owner != null ? dialog.ShowDialog(owner) : dialog.ShowDialog();
+            var prevTextInput = _textInput;
+            _textInput = true;
+            bool? ok;
+            try
+            {
+                ok = owner != null ? dialog.ShowDialog(owner) : dialog.ShowDialog();
+            }
+            finally
+            {
+                _textInput = prevTextInput;
+            }
             if (ok != true || string.IsNullOrWhiteSpace(dialog.FileName))
             {
                 _ = PostToViewerMessageAsync(ViewerMessages.TrackSaveResult(payload.Id, 2, "", "cancelled"));
                 return;
             }
             targetPath = dialog.FileName;
-            if ((!isGpxSource || !isGpxFormat) && !string.IsNullOrEmpty(_sourcePath)
+            if (!isSameOverwritableFormat && !string.IsNullOrEmpty(_sourcePath)
                 && string.Equals(targetPath, _sourcePath, StringComparison.OrdinalIgnoreCase))
             {
                 _ = PostToViewerMessageAsync(ViewerMessages.TrackSaveResult(
                     payload.Id, 1, "", "Cannot overwrite the original file with a different format."));
                 return;
             }
-            createBackup = isGpxFormat && string.Equals(targetPath, _sourcePath, StringComparison.OrdinalIgnoreCase);
+            createBackup = isSameOverwritableFormat && string.Equals(targetPath, _sourcePath, StringComparison.OrdinalIgnoreCase);
         }
 
         try
@@ -817,27 +829,30 @@ internal sealed partial class TrailViewerPanel
             var docDir = !string.IsNullOrEmpty(_path) ? Path.GetDirectoryName(_path) : null;
             var fileRoot = _fileRoot;
             var bytesToWrite = string.Equals(format, "kmz", StringComparison.OrdinalIgnoreCase)
-                ? await KmzArchive.BuildKmzBytesAsync(
-                    payload.Bytes,
-                    docDir,
-                    fileRoot,
-                    payload.PackRemoteImages,
-                    onProgress: (completed, total, failed) =>
-                    {
-                        if (!_disposed)
+                ? await System.Threading.Tasks.Task.Run(
+                    () => KmzArchive.BuildKmzBytesAsync(
+                        payload.Bytes,
+                        docDir,
+                        fileRoot,
+                        payload.PackRemoteImages,
+                        onProgress: (completed, total, failed) =>
                         {
-                            _ = PostToViewerMessageAsync(
-                                ViewerMessages.TrackSaveProgress(payload.Id, completed, total, failed));
-                        }
-                    },
-                    cancel: _lifecycle.Token)
+                            if (!_disposed)
+                            {
+                                _ = PostToViewerMessageAsync(
+                                    ViewerMessages.TrackSaveProgress(payload.Id, completed, total, failed));
+                            }
+                        },
+                        cancel: _lifecycle.Token),
+                    _lifecycle.Token)
                 : payload.Bytes;
             await System.Threading.Tasks.Task.Run(
                 () => TrackSaveService.WriteWithBackup(resolvedPath, bytesToWrite, createBackup),
                 System.Threading.CancellationToken.None);
             _editorDirty = false;
+            var didOverwrite = isSameOverwritableFormat && (payload.Overwrite || createBackup);
             _ = PostToViewerMessageAsync(ViewerMessages.TrackSaveResult(
-                payload.Id, 0, resolvedPath, (isGpxFormat && (payload.Overwrite || createBackup)) ? "overwrote" : ""));
+                payload.Id, 0, resolvedPath, didOverwrite ? "overwrote" : ""));
         }
         catch (OperationCanceledException) when (_finished)
         {
@@ -973,6 +988,7 @@ internal sealed partial class TrailViewerPanel
             }
             if (string.IsNullOrWhiteSpace(fileName)
                 || fileName.IndexOfAny(new[] { '\\', '/', ':' }) >= 0
+                || fileName.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0
                 || string.IsNullOrEmpty(_sourcePath))
             {
                 if (!_disposed)
@@ -982,9 +998,21 @@ internal sealed partial class TrailViewerPanel
             var folder = Path.GetDirectoryName(Path.GetFullPath(_sourcePath));
             if (string.IsNullOrEmpty(folder))
                 return;
-            var candidate = Path.GetFullPath(Path.Combine(folder, fileName));
-            var prefix = folder.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
-                + Path.DirectorySeparatorChar;
+            string candidate;
+            try
+            {
+                candidate = Path.GetFullPath(Path.Combine(folder, fileName));
+            }
+            catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
+            {
+                if (!_disposed)
+                    _ = PostToViewerMessageAsync(ViewerMessages.TrackImportResult(id, 1, "", "invalid file name"));
+                return;
+            }
+            var prefix = folder.EndsWith(Path.DirectorySeparatorChar.ToString(), StringComparison.Ordinal)
+                ? folder
+                : folder.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+                    + Path.DirectorySeparatorChar;
             if (!candidate.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) || !File.Exists(candidate))
             {
                 if (!_disposed)

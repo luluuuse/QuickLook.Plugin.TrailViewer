@@ -233,10 +233,10 @@ Canvas 绘制路线，并跳过普通轨迹点圆点、公里数字和路网级�
 - **海拔剖面交互**：水平拖拽剖面绘图区可框选任意区间查看里程、爬升/下降、坡度、用时与均速（按 `Esc` 清除）；支持自动识别 ClimbPro 主坡段、点击或按 <kbd>P</kbd> 一键折叠剖面，以及四等份里程刻度参考线。
 - **窄窗与矮窗联动精简**：窗口宽度 `≤ 720 px` 或高度 `≤ 520 px` 时，轨迹摘要、每公里分段微胶囊与 `26×26` 缩放/回到轨迹控件同步进入紧凑左列栈。
 - **四区无损轨迹编辑**：点击工具箱顶部的 **编辑轨迹** 进入离线编辑工作区：
-  - **顶部主控条**：显示文件名、修改状态圆点、里程增减徽标、撤销/重做（<kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd>）、复原、集成的图层/航点图标，以及 **保存**（<kbd>Ctrl</kbd>+<kbd>S</kbd>，右侧设置可勾选手表友好去重、佳明 15 字符重名检查或覆盖原文件自动备份）。
-  - **裁剪与拆分**：支持 **剖面剪**（剖面双柄区间裁剪）与 **点击拆**（点击轨迹拆分并管理/删除分段）。
-  - **清洗与拓扑**：支持检测并一键清洗 GPS 异常漂移点，以及反转方向、往返倍增和闭合环线。
-  - **航点编辑**：支持点击轨迹吸附落点、`Alt+点击` 自由落点、序号化航点列表整行选中、右键航点图标删除，以及悬停 `?` 查看操作提示与折叠备注栏。
+  - **顶部主控条**：显示文件名、修改状态圆点、里程增减徽标、撤销/重做（<kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd>）、复原、集成的图层/航点图标，以及 **保存**（<kbd>Ctrl</kbd>+<kbd>S</kbd>，支持导出 GPX / KML / KMZ / GeoJSON / TCX / CSV，支持离线 KMZ 外链照片打包与 GPX / KML / KMZ 同格式覆盖自动备份）。
+  - **剪辑拼接与清洗优化**：支持剖面双柄裁剪、点击拆分删段、导入本地或同目录 GPX / KML 拼接合并、漂移点清洗、海拔平滑（轻度/标准/强力）与轨迹抽稀。
+  - **路线方向与绘制修点**：支持反转方向、往返倍增、闭合环线、手绘补线（支持自动替换区段/闭合/续画）、顶点微调、框选擦除实时计数与坡度估算虚拟时间轴。
+  - **航点管理**：支持点击轨迹吸附落点、`Alt+点击` 自由落点、序号化航点列表、沿轨重排、20 米去重与批量生成里程/最高点航点。
 
 ### 大文件与隐私
 
@@ -502,11 +502,11 @@ export so another style can be produced immediately.
 - **Multi-dimensional track coloring:** click the trail icon to the left of the Toolbox or press <kbd>L</kbd> to cycle **Single / Elevation / Speed / Heart rate** (automatically skipping unavailable fields).
 - **Elevation profile analysis:** drag horizontally across the plot to inspect range distance, ascent/descent, grade, duration and average speed (`Esc` to clear); includes automatic ClimbPro major climb chips, quartile distance ticks and <kbd>P</kbd> shortcut collapse.
 - **Responsive compact left stack:** at `≤ 720 px` width or `≤ 520 px` height, the summary pill, per-km micro-badge and `26×26` zoom/locate controls collapse together into a compact left column.
-- **Four-zone non-destructive track editor:** open **Toolbox → Edit track** to trim, clean, reverse/close or edit waypoints:
-  - **Top bar:** shows track name, dirty indicator, distance delta pill, Undo/Redo (<kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd>), Reset, integrated Layers & Pins icon toggles, and **Save** (<kbd>Ctrl</kbd>+<kbd>S</kbd>) with Save As or overwrite-with-backup options.
-  - **Crop & Split:** switch between **Profile Crop** (dual-handle elevation range) and **Click Split** (click-to-split and segment deletion).
-  - **Clean & Topology:** detect/clean GPS drift spikes, reverse direction, create out-and-back routes or close loops.
-  - **Waypoints:** snap onto the track or `Alt+Click` to place freely, select from the indexed compact list, right-click a waypoint pin to delete, hover `?` for tips and expand Notes on demand.
+- **Four-zone non-destructive track editor:** open **Toolbox → Edit track** to edit and export routes offline:
+  - **Top bar:** shows track name, dirty indicator, distance delta pill, Undo/Redo (<kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd>), Reset, integrated Layers & Pins icon toggles, and **Save** (<kbd>Ctrl</kbd>+<kbd>S</kbd>) with GPX / KML / KMZ / GeoJSON / TCX / CSV export, optional offline KMZ remote photo packing, and same-format overwrite + `.bak` backup for GPX / KML / KMZ.
+  - **Clip & Merge / Clean & Optimize:** profile range crop, click-to-split, local/sibling GPX & KML append with auto-merge, drift spike cleanup, three-level elevation smoothing, and simplification.
+  - **Route Direction / Draw & Refine:** reverse, out-and-back, close loop, hand-drawn path splicing, vertex editing, live-count box erase, and Naismith grade-adjusted virtual timelines.
+  - **Waypoints:** snap onto the track or `Alt+Click` to place freely, sort along track, dedupe within 20 m, and batch-generate distance milestone and summit waypoints.
 
 ### Large files and privacy
 

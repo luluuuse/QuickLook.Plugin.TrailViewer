@@ -1601,7 +1601,19 @@ export function appendExternalTrack(
         reversedIncoming = true;
         mergedPts = [...[...incPts].reverse(), ...basePts];
       }
-      const timestampsCleared = reversedIncoming
+      let nonMonotonic = false;
+      let prevTimeMs = -Infinity;
+      for (const pt of mergedPts) {
+        if (pt?.time == null) continue;
+        const ms = pt.time instanceof Date ? pt.time.getTime() : Date.parse(String(pt.time));
+        if (!Number.isFinite(ms)) continue;
+        if (ms < prevTimeMs) {
+          nonMonotonic = true;
+          break;
+        }
+        prevTimeMs = ms;
+      }
+      const timestampsCleared = (reversedIncoming || nonMonotonic)
         ? clearSegmentTimestamps(mergedPts)
         : false;
       next.tracks = [{ name: next.tracks[0]?.name ?? next.name ?? null, segments: [mergedPts] }];
@@ -1754,7 +1766,8 @@ export function generateMilestoneWaypoints(
   if (segs.length === 0) return { track: next, addedCount: 0 };
 
   const stepMeters = Math.max(100, (Number(intervalKm) || 5) * 1000);
-  const minGap = Math.max(0, Number(minDistanceMeters) || 50);
+  const parsedMinGap = Number(minDistanceMeters);
+  const minGap = Number.isFinite(parsedMinGap) ? Math.max(0, parsedMinGap) : 50;
   const existing = next.waypoints || [];
   const candidates = [];
 

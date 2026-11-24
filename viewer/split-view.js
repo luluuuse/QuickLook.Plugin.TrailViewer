@@ -36,6 +36,54 @@ const BAR_COLUMNS = new Set([
   'verticalSpeed',
 ]);
 
+const ROBUST_BAR_COLUMNS = new Set([
+  'time',
+  'movingSpeed',
+  'verticalSpeed',
+]);
+
+function quantile(sorted, p) {
+  if (sorted.length === 0) return 0;
+  const pos = (sorted.length - 1) * p;
+  const lo = Math.floor(pos);
+  const hi = Math.ceil(pos);
+  if (lo === hi) return sorted[lo];
+  return sorted[lo] + (sorted[hi] - sorted[lo]) * (pos - lo);
+}
+
+/**
+ * Computes a bar-chart 100% scale that resists isolated outliers (e.g. a few car-ride or long-rest splits)
+ * while keeping normal distributions linearly scaled to their true maximum.
+ * @param {number[]} values Positive magnitudes for one column.
+ * @returns {{ scale: number, capped: boolean }}
+ */
+export function computeRobustBarScale(values) {
+  const sorted = values.filter((v) => Number.isFinite(v) && v > 0).sort((a, b) => a - b);
+  if (sorted.length === 0) return { scale: 0, capped: false };
+  const maxVal = sorted[sorted.length - 1];
+  if (sorted.length < 4) return { scale: maxVal, capped: false };
+
+  const q1 = quantile(sorted, 0.25);
+  const median = quantile(sorted, 0.5);
+  const q3 = quantile(sorted, 0.75);
+  const iqr = Math.max(0, q3 - q1);
+  const fence = Math.max(q3 + 1.5 * iqr, q3 * 1.35, median * 1.6);
+
+  if (!(fence > 0) || maxVal <= fence * 1.25) {
+    return { scale: maxVal, capped: false };
+  }
+
+  let maxInlier = 0;
+  for (let i = sorted.length - 1; i >= 0; i -= 1) {
+    if (sorted[i] <= fence) {
+      maxInlier = sorted[i];
+      break;
+    }
+  }
+  const scale = maxInlier > 0 ? maxInlier : fence;
+  return { scale, capped: scale < maxVal };
+}
+
 function splitMetric(split, column) {
   if (column === 'index') return split.index;
   if (column === 'distance') return split.distanceMeters;
@@ -202,16 +250,22 @@ export function createSplitsView({
     }
     head.append(headRow);
 
-    const barMax = {};
+    const barScale = {};
     for (const column of columns) {
       if (!BAR_COLUMNS.has(column)) continue;
+      const magnitudes = [];
       let maxVal = 0;
       for (const split of data.splits) {
         const raw = splitMetric(split, column);
         const val = column === 'verticalSpeed' && Number.isFinite(raw) ? Math.abs(raw) : raw;
-        if (Number.isFinite(val) && val > maxVal) maxVal = val;
+        if (Number.isFinite(val) && val > 0) {
+          magnitudes.push(val);
+          if (val > maxVal) maxVal = val;
+        }
       }
-      barMax[column] = maxVal;
+      barScale[column] = ROBUST_BAR_COLUMNS.has(column)
+        ? computeRobustBarScale(magnitudes)
+        : { scale: maxVal, capped: false };
     }
 
     const isPartialSplit = (split) =>
@@ -272,12 +326,21 @@ export function createSplitsView({
           value.title = t('splits.speedHint');
           cell.append(value);
         }
-        const maxVal = barMax[column];
+        const scaleInfo = barScale[column];
+        const maxVal = scaleInfo?.scale || 0;
         const metricVal = maxVal > 0 ? splitMetric(split, column) : null;
         if (Number.isFinite(metricVal) && metricVal !== 0) {
-          const pct = Math.min(100, Math.max(0, (Math.abs(metricVal) / maxVal) * 100));
+          const absVal = Math.abs(metricVal);
+          const isCapped = Boolean(scaleInfo?.capped && absVal > maxVal);
+          const pct = isCapped ? 100 : Math.min(100, Math.max(0, (absVal / maxVal) * 100));
           cell.classList.add('has-bar');
           if (metricVal < 0) cell.classList.add('is-negative');
+          if (isCapped) {
+            cell.classList.add('is-capped');
+            cell.title = cell.title
+              ? `${cell.title} · ${t('splits.cappedHint')}`
+              : t('splits.cappedHint');
+          }
           cell.style.setProperty('--split-bar', `${pct.toFixed(1)}%`);
         }
         row.append(cell);

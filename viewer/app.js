@@ -406,6 +406,11 @@ async function ensureEditorLoaded() {
           overlay: editorOverlay,
           getTrackName: () => ctx.fileName,
           getProfileState: () => activeProfile,
+          getSourceFormat: () => {
+            const clean = (ctx.fileName || ctx.src || '').split(/[?#]/)[0];
+            const match = clean.match(/\.(gpx|kml|kmz)$/i);
+            return match ? match[1].toLowerCase() : '';
+          },
           isGpxSource: () => /\.gpx$/i.test((ctx.fileName || ctx.src || '').split(/[?#]/)[0]),
           onSaveTrack: ({ id, fileName: outName, xml, content, format, overwrite, packRemoteImages, onProgress }) =>
             hostBridge.saveTrackGpx({

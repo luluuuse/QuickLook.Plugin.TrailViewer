@@ -204,7 +204,7 @@ test('listSiblingTracks and importExternalTrack exchange host messages safely', 
   assert.deepEqual(await importPromise, { ok: true, cancelled: false, name: 'day2.gpx', text: '<gpx>轨迹</gpx>', detail: '' });
 });
 
-test('saveTrackGpx includes export format and disables overwrite for non-GPX formats', async () => {
+test('saveTrackGpx includes export format and allows overwrite for GPX/KML/KMZ only', async () => {
   posted.length = 0;
   webviewListeners.clear();
   const bridge = createHostBridge();
@@ -239,7 +239,7 @@ test('saveTrackGpx includes export format and disables overwrite for non-GPX for
     });
     const begin = posted[0].split('\t');
     assert.equal(begin[0], 'trackbegin');
-    assert.equal(begin[3], '0');
+    assert.equal(begin[3], (fmt === 'kml' || fmt === 'kmz') ? '1' : '0');
     assert.equal(begin[5], fmt);
     assert.equal(begin[6], fmt === 'kmz' ? '1' : '0');
     if (fmt === 'kmz') {

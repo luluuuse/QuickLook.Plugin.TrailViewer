@@ -252,6 +252,22 @@ test('parseGpx lifts URL-only waypoint desc and <link> into images instead of a 
   assert.equal(plain.images, undefined);
 });
 
+test('parseGpx ignores non-image webpage <link> elements while keeping image links', () => {
+  const xml = `<gpx version="1.1">
+    <wpt lat="27.45" lon="114.11">
+      <name>Trailhead</name>
+      <link href="https://example.com/trails/wugong"><text>Trail page</text></link>
+      <link href="https://example.com/photos/view.jpg"><text>View</text></link>
+      <link href="https://cdn.example.com/raw/123"><type>image/png</type></link>
+    </wpt>
+  </gpx>`;
+  const gpx = parseGpx(xml);
+  assert.deepEqual(gpx.waypoints[0].images, [
+    'https://example.com/photos/view.jpg',
+    'https://cdn.example.com/raw/123',
+  ]);
+});
+
 test('parseGpx strips waypoint telemetry, falls back to cmt, backfills missing time and keeps placeholders', () => {
   const xml = `<gpx version="1.1">
     <wpt lat="30.5000" lon="114.3000">

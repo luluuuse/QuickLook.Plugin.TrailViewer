@@ -156,7 +156,8 @@ export function createHostBridge() {
     }
     const safeFormat = String(format || 'gpx').toLowerCase();
     const text = content ?? xml ?? '';
-    const effectiveOverwrite = safeFormat === 'gpx' && Boolean(overwrite);
+    const effectiveOverwrite = (safeFormat === 'gpx' || safeFormat === 'kml' || safeFormat === 'kmz')
+      && Boolean(overwrite);
     const effectivePackRemote = safeFormat === 'kmz' && Boolean(packRemoteImages);
     const bytes = new TextEncoder().encode(text);
     let binary = '';

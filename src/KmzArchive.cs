@@ -183,7 +183,8 @@ internal static class KmzArchive
                 if (entry.Length > MaxResourceBytes || entry.CompressedLength > MaxResourceBytes)
                     throw new InvalidDataException($"the image {resourcePath} is too large to preview");
                 if (entry.Length > MaxTotalResourceBytes - totalBytes)
-                    throw new InvalidDataException("the images in this .kmz exceed the 300 MB preview limit");
+                    throw new InvalidDataException(
+                        $"the images in this .kmz exceed the {MaxTotalResourceBytes / (1024 * 1024)} MB preview limit");
 
                 var target = SafeTarget(folder, resourcePath!);
                 Directory.CreateDirectory(Path.GetDirectoryName(target));
@@ -328,6 +329,10 @@ internal static class KmzArchive
 
         var kmlText = Encoding.UTF8.GetString(kmlBytes);
         var resources = new Dictionary<string, byte[]>(StringComparer.OrdinalIgnoreCase);
+        var replacements = new Dictionary<string, string>(StringComparer.Ordinal);
+        var directLocals = new List<DirectLocalImage>();
+        var remappedLocals = new List<RemappedLocalImage>();
+        var embeddedImages = new List<EmbeddedImageRef>();
         var remoteCandidates = new List<string>();
         var seenRemote = new HashSet<string>(StringComparer.Ordinal);
         long totalBytes = 0;
@@ -338,22 +343,21 @@ internal static class KmzArchive
         string? docBaseDir = null;
         if (!string.IsNullOrWhiteSpace(fileRoot))
         {
-            fullRoot = Path.GetFullPath(fileRoot).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
-                + Path.DirectorySeparatorChar;
-            var trimmedRoot = fullRoot.TrimEnd(Path.DirectorySeparatorChar);
-            docBaseDir = trimmedRoot;
+            var normalizedRoot = NormalizeDirectoryPath(fileRoot!);
+            fullRoot = EnsureTrailingSeparator(normalizedRoot);
+            docBaseDir = normalizedRoot;
             if (!string.IsNullOrWhiteSpace(documentDirectory))
             {
-                var candidateDocDir = Path.GetFullPath(documentDirectory).TrimEnd(
-                    Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-                if (string.Equals(candidateDocDir, trimmedRoot, StringComparison.OrdinalIgnoreCase)
-                    || (candidateDocDir + Path.DirectorySeparatorChar).StartsWith(fullRoot, StringComparison.OrdinalIgnoreCase))
+                var candidateDocDir = NormalizeDirectoryPath(documentDirectory!);
+                if (string.Equals(candidateDocDir, normalizedRoot, StringComparison.OrdinalIgnoreCase)
+                    || EnsureTrailingSeparator(candidateDocDir).StartsWith(fullRoot, StringComparison.OrdinalIgnoreCase))
                 {
                     docBaseDir = candidateDocDir;
                 }
             }
         }
 
+        // First pass: classify references so direct local archive paths are reserved before remapped/embedded names.
         foreach (var reference in references)
         {
             cancel.ThrowIfCancellationRequested();
@@ -364,38 +368,7 @@ internal static class KmzArchive
             var dataMatch = DataImagePattern.Match(rawRef);
             if (dataMatch.Success)
             {
-                byte[] imgBytes;
-                try
-                {
-                    imgBytes = Convert.FromBase64String(dataMatch.Groups["b64"].Value);
-                }
-                catch (FormatException)
-                {
-                    continue;
-                }
-
-                if (imgBytes.Length == 0
-                    || imgBytes.Length > MaxResourceBytes
-                    || totalBytes + imgBytes.Length > MaxTotalResourceBytes
-                    || count >= MaxResourceCount)
-                    continue;
-
-                var ext = AttachmentExport.ImageExtensionFor(imgBytes);
-                if (ext == null)
-                    continue;
-
-                string entryName;
-                do
-                {
-                    embeddedIndex++;
-                    entryName = $"files/embedded-{embeddedIndex}{ext}";
-                }
-                while (resources.ContainsKey(entryName));
-
-                resources[entryName] = imgBytes;
-                count++;
-                totalBytes += imgBytes.Length;
-                kmlText = ReplaceKmlReference(kmlText, rawRef, entryName);
+                embeddedImages.Add(new EmbeddedImageRef(rawRef, dataMatch.Groups["b64"].Value));
                 continue;
             }
 
@@ -412,67 +385,87 @@ internal static class KmzArchive
             if (!TryResolveLocalDiskImage(rawRef, fullRoot, docBaseDir, out var cleanPath, out var diskPath))
                 continue;
 
-            FileInfo info;
-            try
-            {
-                info = new FileInfo(diskPath!);
-                if (!info.Exists
-                    || info.Length <= 0
-                    || info.Length > MaxResourceBytes
-                    || totalBytes + info.Length > MaxTotalResourceBytes
-                    || count >= MaxResourceCount)
-                    continue;
-            }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-            {
-                continue;
-            }
-
-            string archiveEntry;
-            var remapped = false;
             if (!cleanPath!.StartsWith("/", StringComparison.Ordinal)
                 && !cleanPath.StartsWith("\\", StringComparison.Ordinal)
                 && TryResolveArchivePath(cleanPath, string.Empty, out var directEntry)
                 && !string.Equals(directEntry, PreferredEntryName, StringComparison.OrdinalIgnoreCase))
             {
-                archiveEntry = directEntry!;
+                directLocals.Add(new DirectLocalImage(rawRef, diskPath!, directEntry!));
             }
             else
             {
-                var safeName = OverlayTransfer.SanitiseFileName(Path.GetFileName(diskPath!));
-                var stem = Path.GetFileNameWithoutExtension(safeName);
-                var ext = Path.GetExtension(safeName);
-                archiveEntry = $"files/{safeName}";
-                for (var suffix = 2; resources.ContainsKey(archiveEntry); suffix++)
-                    archiveEntry = $"files/{stem}-{suffix}{ext}";
-                remapped = true;
+                remappedLocals.Add(new RemappedLocalImage(rawRef, diskPath!));
             }
+        }
 
-            if (!resources.ContainsKey(archiveEntry))
+        foreach (var item in directLocals)
+        {
+            cancel.ThrowIfCancellationRequested();
+            if (resources.ContainsKey(item.ArchiveEntry))
+                continue;
+
+            if (!TryReadBoundedLocalImage(item.DiskPath, totalBytes, count, out var imgBytes))
+                continue;
+
+            resources[item.ArchiveEntry] = imgBytes!;
+            count++;
+            totalBytes += imgBytes!.Length;
+        }
+
+        foreach (var item in remappedLocals)
+        {
+            cancel.ThrowIfCancellationRequested();
+            if (!TryReadBoundedLocalImage(item.DiskPath, totalBytes, count, out var imgBytes))
+                continue;
+
+            var safeName = OverlayTransfer.SanitiseFileName(Path.GetFileName(item.DiskPath));
+            var stem = Path.GetFileNameWithoutExtension(safeName);
+            var ext = Path.GetExtension(safeName);
+            var archiveEntry = $"files/{safeName}";
+            for (var suffix = 2; resources.ContainsKey(archiveEntry); suffix++)
+                archiveEntry = $"files/{stem}-{suffix}{ext}";
+
+            resources[archiveEntry] = imgBytes!;
+            count++;
+            totalBytes += imgBytes!.Length;
+            replacements[item.RawRef] = archiveEntry;
+        }
+
+        foreach (var item in embeddedImages)
+        {
+            cancel.ThrowIfCancellationRequested();
+            byte[] imgBytes;
+            try
             {
-                byte[] imgBytes;
-                try
-                {
-                    imgBytes = File.ReadAllBytes(diskPath!);
-                }
-                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-                {
-                    continue;
-                }
-
-                if (imgBytes.Length == 0
-                    || imgBytes.Length > MaxResourceBytes
-                    || totalBytes + imgBytes.Length > MaxTotalResourceBytes
-                    || count >= MaxResourceCount)
-                    continue;
-
-                resources[archiveEntry] = imgBytes;
-                count++;
-                totalBytes += imgBytes.Length;
+                imgBytes = Convert.FromBase64String(item.Base64);
+            }
+            catch (FormatException)
+            {
+                continue;
             }
 
-            if (remapped)
-                kmlText = ReplaceKmlReference(kmlText, rawRef, archiveEntry);
+            if (imgBytes.Length == 0
+                || imgBytes.Length > MaxResourceBytes
+                || totalBytes + imgBytes.Length > MaxTotalResourceBytes
+                || count >= MaxResourceCount)
+                continue;
+
+            var ext = AttachmentExport.ImageExtensionFor(imgBytes);
+            if (ext == null)
+                continue;
+
+            string entryName;
+            do
+            {
+                embeddedIndex++;
+                entryName = $"files/embedded-{embeddedIndex}{ext}";
+            }
+            while (resources.ContainsKey(entryName));
+
+            resources[entryName] = imgBytes;
+            count++;
+            totalBytes += imgBytes.Length;
+            replacements[item.RawRef] = entryName;
         }
 
         if (packRemoteImages && remoteCandidates.Count > 0 && count < MaxResourceCount)
@@ -494,12 +487,13 @@ internal static class KmzArchive
             onProgress?.Invoke(0, targets.Count, 0);
             var completedCount = 0;
             var failedCount = 0;
+            var reservedBytes = totalBytes;
 
             using var slots = new SemaphoreSlim(6);
             var tasks = new List<Task<KmzRemoteDownloadResult>>(targets.Count);
             foreach (var rawRef in targets)
             {
-                tasks.Add(DownloadRemoteForKmzAsync(rawRef, slots, fetcher, ok =>
+                tasks.Add(DownloadRemoteForKmzAsync(rawRef, slots, fetcher, byteLen => TryReserveBytes(ref reservedBytes, byteLen, MaxTotalResourceBytes), () => Volatile.Read(ref reservedBytes) >= MaxTotalResourceBytes, ok =>
                 {
                     var failNow = ok ? Volatile.Read(ref failedCount) : Interlocked.Increment(ref failedCount);
                     var doneNow = Interlocked.Increment(ref completedCount);
@@ -537,9 +531,12 @@ internal static class KmzArchive
                 resources[entryName] = image.Bytes;
                 count++;
                 totalBytes += image.Bytes.Length;
-                kmlText = ReplaceKmlReference(kmlText, result.RawRef, entryName);
+                replacements[result.RawRef] = entryName;
             }
         }
+
+        if (replacements.Count > 0)
+            kmlText = ApplyKmlReplacements(kmlText, replacements);
 
         var finalKmlBytes = new UTF8Encoding(false).GetBytes(kmlText);
         using var output = new MemoryStream();
@@ -559,10 +556,55 @@ internal static class KmzArchive
         return output.ToArray();
     }
 
+    private static bool TryReadBoundedLocalImage(string diskPath, long totalBytes, int count, out byte[]? imgBytes)
+    {
+        imgBytes = null;
+        try
+        {
+            var info = new FileInfo(diskPath);
+            if (!info.Exists
+                || info.Length <= 0
+                || info.Length > MaxResourceBytes
+                || totalBytes + info.Length > MaxTotalResourceBytes
+                || count >= MaxResourceCount)
+                return false;
+
+            var bytes = File.ReadAllBytes(diskPath);
+            if (bytes.Length == 0
+                || bytes.Length > MaxResourceBytes
+                || totalBytes + bytes.Length > MaxTotalResourceBytes
+                || count >= MaxResourceCount)
+                return false;
+
+            imgBytes = bytes;
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return false;
+        }
+    }
+
+    private static bool TryReserveBytes(ref long reserved, long delta, long limit)
+    {
+        if (delta <= 0 || delta > MaxResourceBytes)
+            return false;
+        while (true)
+        {
+            var current = Volatile.Read(ref reserved);
+            if (current + delta > limit)
+                return false;
+            if (Interlocked.CompareExchange(ref reserved, current + delta, current) == current)
+                return true;
+        }
+    }
+
     private static async Task<KmzRemoteDownloadResult> DownloadRemoteForKmzAsync(
         string rawRef,
         SemaphoreSlim slots,
         Func<string, CancellationToken, Task<KmzRemoteImage?>> fetcher,
+        Func<long, bool> tryReserve,
+        Func<bool> isBudgetExhausted,
         Action<bool>? onItemDone,
         CancellationToken cancel)
     {
@@ -570,9 +612,16 @@ internal static class KmzArchive
         var ok = false;
         try
         {
+            if (isBudgetExhausted())
+                return new KmzRemoteDownloadResult(rawRef, null);
+
             var image = await fetcher(rawRef, cancel).ConfigureAwait(false);
-            ok = image != null && image.Bytes != null && image.Bytes.Length > 0;
-            return new KmzRemoteDownloadResult(rawRef, image);
+            if (image != null && image.Bytes != null && image.Bytes.Length > 0 && tryReserve(image.Bytes.Length))
+            {
+                ok = true;
+                return new KmzRemoteDownloadResult(rawRef, image);
+            }
+            return new KmzRemoteDownloadResult(rawRef, null);
         }
         catch (OperationCanceledException) when (cancel.IsCancellationRequested)
         {
@@ -599,17 +648,82 @@ internal static class KmzArchive
         return colon >= 0 && (firstDelim < 0 || colon < firstDelim);
     }
 
-    private static string ReplaceKmlReference(string kmlText, string rawRef, string replacement)
+    private static string ApplyKmlReplacements(string kmlText, Dictionary<string, string> replacements)
     {
-        var updated = kmlText.Replace(rawRef, replacement);
-        var ampEncoded = rawRef.Replace("&", "&amp;");
-        if (!string.Equals(ampEncoded, rawRef, StringComparison.Ordinal))
-            updated = updated.Replace(ampEncoded, replacement);
-        var htmlEncoded = WebUtility.HtmlEncode(rawRef);
-        if (!string.IsNullOrEmpty(htmlEncoded) && !string.Equals(htmlEncoded, rawRef, StringComparison.Ordinal))
-            updated = updated.Replace(htmlEncoded, replacement);
-        return updated;
+        var lookup = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var pair in replacements)
+        {
+            if (string.IsNullOrEmpty(pair.Key))
+                continue;
+            lookup[pair.Key] = pair.Value;
+            var ampEncoded = pair.Key.Replace("&", "&amp;");
+            if (!lookup.ContainsKey(ampEncoded))
+                lookup[ampEncoded] = pair.Value;
+            var htmlEncoded = WebUtility.HtmlEncode(pair.Key);
+            if (!string.IsNullOrEmpty(htmlEncoded) && !lookup.ContainsKey(htmlEncoded))
+                lookup[htmlEncoded] = pair.Value;
+        }
+        if (lookup.Count == 0)
+            return kmlText;
+
+        var keys = new List<string>(lookup.Keys);
+        keys.Sort((a, b) => b.Length.CompareTo(a.Length));
+        var pattern = "(?:" + string.Join("|", keys.ConvertAll(Regex.Escape)) + @")(?=$|[\s""'<>])";
+        return Regex.Replace(kmlText, pattern, match =>
+            lookup.TryGetValue(match.Value, out var value) ? value : match.Value);
     }
+
+    private static string NormalizeDirectoryPath(string path)
+    {
+        var full = Path.GetFullPath(path);
+        var root = Path.GetPathRoot(full);
+        if (!string.IsNullOrEmpty(root) && string.Equals(full, root, StringComparison.OrdinalIgnoreCase))
+            return full;
+        return full.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+    }
+
+    private sealed class DirectLocalImage
+    {
+        internal DirectLocalImage(string rawRef, string diskPath, string archiveEntry)
+        {
+            RawRef = rawRef;
+            DiskPath = diskPath;
+            ArchiveEntry = archiveEntry;
+        }
+
+        internal string RawRef { get; }
+        internal string DiskPath { get; }
+        internal string ArchiveEntry { get; }
+    }
+
+    private sealed class RemappedLocalImage
+    {
+        internal RemappedLocalImage(string rawRef, string diskPath)
+        {
+            RawRef = rawRef;
+            DiskPath = diskPath;
+        }
+
+        internal string RawRef { get; }
+        internal string DiskPath { get; }
+    }
+
+    private sealed class EmbeddedImageRef
+    {
+        internal EmbeddedImageRef(string rawRef, string base64)
+        {
+            RawRef = rawRef;
+            Base64 = base64;
+        }
+
+        internal string RawRef { get; }
+        internal string Base64 { get; }
+    }
+
+    private static string EnsureTrailingSeparator(string path) =>
+        path.EndsWith(Path.DirectorySeparatorChar.ToString(), StringComparison.Ordinal)
+            ? path
+            : path + Path.DirectorySeparatorChar;
 
     private static bool TryResolveLocalDiskImage(
         string rawRef,
@@ -645,7 +759,7 @@ internal static class KmzArchive
             return false;
 
         var rooted = unescaped.StartsWith("/", StringComparison.Ordinal);
-        var baseDir = rooted ? fullRoot.TrimEnd(Path.DirectorySeparatorChar) : docBaseDir;
+        var baseDir = rooted ? NormalizeDirectoryPath(fullRoot) : docBaseDir;
         var relative = unescaped.TrimStart('/').Replace('/', Path.DirectorySeparatorChar);
         if (string.IsNullOrEmpty(relative))
             return false;

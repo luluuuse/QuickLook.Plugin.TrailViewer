@@ -339,7 +339,8 @@ internal sealed class AttachmentExport : IDisposable
             if (source.Length > MaxImageBytes)
                 throw new InvalidDataException($"the image is larger than {MaxImageBytes / (1024 * 1024)} MB");
             if (_savedBytes + source.Length > MaxTotalBytes)
-                throw new InvalidDataException("the attachment images exceed the 300 MB export limit");
+                throw new InvalidDataException(
+                    $"the attachment images exceed the {MaxTotalBytes / (1024 * 1024)} MB export limit");
 
             Directory.CreateDirectory(folder);
             var safe = SanitiseFileName(name);

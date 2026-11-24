@@ -497,11 +497,20 @@ export function createEditorOverlay({
       const p = map.latLngToContainerPoint([nearWpt.lat, nearWpt.lon]);
       const d = Math.hypot(p.x - cursorPt.x, p.y - cursorPt.y);
       if (d <= SNAP_PIXELS) {
-        // If this waypoint sits right on a segment endpoint/track (< 3m), preserve track anchor too.
+        // If this waypoint sits right on a segment endpoint or along a track, preserve its track anchor too.
         let attachedSnap = null;
         const nearEnd = drawEndpointIndex?.nearest({ lat: nearWpt.lat, lon: nearWpt.lon });
         if (nearEnd && distanceMeters(nearWpt, nearEnd) <= 3) {
           attachedSnap = { flatSegIndex: nearEnd.flatSegIndex, ptIndex: nearEnd.ptIndex, segT: 0 };
+        } else {
+          const wptTrackHit = nearestOnTrack(map, getScreenSegments(), { lat: nearWpt.lat, lng: nearWpt.lon });
+          if (wptTrackHit && distanceMeters(nearWpt, wptTrackHit) <= 15) {
+            attachedSnap = {
+              flatSegIndex: wptTrackHit.flatSegIndex,
+              ptIndex: wptTrackHit.segPtIndex,
+              segT: wptTrackHit.segT,
+            };
+          }
         }
         priorityCandidates.push({
           kind: 'marker',
@@ -1516,6 +1525,7 @@ export function createEditorOverlay({
       render();
     },
     setTool(tool, subMode = tool) {
+      if (tool === activeTool && subMode === activeSubMode) return;
       clearBox();
       clearPan();
       clearSplitPreview();
