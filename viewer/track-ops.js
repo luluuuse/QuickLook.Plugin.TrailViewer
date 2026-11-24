@@ -241,10 +241,11 @@ export function sortWaypointsByRoute(parsed) {
         if (closed && along <= 50 && /终点|finish|end/i.test(wpt.name || '')) {
           along = total;
         }
+        return { wpt, index, along, offTrackMeters: Math.sqrt(bestDistSq) };
       } else if (hasSegs) {
         along = 0;
       }
-      return { wpt, index, along };
+      return { wpt, index, along, offTrackMeters: 0 };
     })
     .sort((a, b) => (a.along - b.along) || (a.index - b.index));
   if (parsed) routeSortCache.set(parsed, result);
@@ -1397,4 +1398,306 @@ export function smoothTrackElevation(parsed, { windowSize = 5, spikeThresholdMet
   const afterAscent = segmentAscentMeters(segs);
   if (adjustedCount > 0) clearSummaryMetadata(next);
   return { track: next, beforeAscent, afterAscent, adjustedCount };
+}
+
+function waypointSignature(wpt) {
+  const lat = Number.isFinite(wpt?.lat) ? wpt.lat.toFixed(5) : '0';
+  const lon = Number.isFinite(wpt?.lon) ? wpt.lon.toFixed(5) : '0';
+  const name = String(wpt?.name || '').trim().toLowerCase();
+  return `${lat}|${lon}|${name}`;
+}
+
+/**
+ * Appends tracks/segments and deduplicated waypoints from an external parsed GPX/KML into the current track.
+ * When mergeIntoSingle is true, matches the closest endpoint pair (auto-reversing the incoming track if needed);
+ * if all endpoint pairs are farther than maxMergeGapMeters, keeps segments separate to avoid cross-map straight lines.
+ * @param {import('./types.js').ParsedTrack} currentParsed
+ * @param {import('./types.js').ParsedTrack} incomingParsed
+ * @param {{ mergeIntoSingle?: boolean, mergeWaypoints?: boolean, maxMergeGapMeters?: number }} [options]
+ */
+export function appendExternalTrack(
+  currentParsed,
+  incomingParsed,
+  { mergeIntoSingle = false, mergeWaypoints = true, maxMergeGapMeters = 500 } = {},
+) {
+  const next = cloneParsedTrack(currentParsed);
+  const existingSegs = ensureTracksMutable(next).filter((seg) => seg.length > 0);
+  const incomingCopy = cloneParsedTrack(incomingParsed);
+  const incomingTracks = normalizedTracks(incomingCopy);
+  const incomingSegs = [];
+
+  for (const trk of incomingTracks) {
+    for (const seg of trk.segments || []) {
+      if (seg.length > 0) incomingSegs.push(seg.map(clonePoint));
+    }
+  }
+
+  let addedWaypoints = 0;
+  if (mergeWaypoints && Array.isArray(incomingCopy.waypoints) && incomingCopy.waypoints.length > 0) {
+    const seen = new Set((next.waypoints || []).map(waypointSignature));
+    for (const wpt of incomingCopy.waypoints) {
+      if (!Number.isFinite(wpt?.lat) || !Number.isFinite(wpt?.lon)) continue;
+      const sig = waypointSignature(wpt);
+      if (seen.has(sig)) continue;
+      seen.add(sig);
+      next.waypoints.push(clonePoint(wpt));
+      addedWaypoints += 1;
+    }
+  }
+
+  const addedSegments = incomingSegs.length;
+  if (addedSegments === 0) {
+    if (addedWaypoints > 0) clearSummaryMetadata(next);
+    return {
+      track: next,
+      addedSegments: 0,
+      addedWaypoints,
+      merged: false,
+      reversedIncoming: false,
+      reorderedByTime: false,
+      timestampsCleared: false,
+      maxGapMeters: 0,
+      skippedMergeGapMeters: 0,
+    };
+  }
+
+  if (mergeIntoSingle && existingSegs.length > 0) {
+    const basePts = existingSegs.flat();
+    const incPts = incomingSegs.flat();
+    const curStart = basePts[0];
+    const curEnd = basePts[basePts.length - 1];
+    const incStart = incPts[0];
+    const incEnd = incPts[incPts.length - 1];
+
+    const options = [
+      { kind: 'tail-fwd', gap: distanceMeters(curEnd, incStart) },
+      { kind: 'tail-rev', gap: distanceMeters(curEnd, incEnd) },
+      { kind: 'head-fwd', gap: distanceMeters(incEnd, curStart) },
+      { kind: 'head-rev', gap: distanceMeters(incStart, curStart) },
+    ];
+    options.sort((a, b) => a.gap - b.gap);
+    const best = options[0];
+
+    if (best.gap <= maxMergeGapMeters) {
+      let mergedPts;
+      let reversedIncoming = false;
+      if (best.kind === 'tail-fwd') {
+        mergedPts = [...basePts, ...incPts];
+      } else if (best.kind === 'tail-rev') {
+        reversedIncoming = true;
+        mergedPts = [...basePts, ...[...incPts].reverse()];
+      } else if (best.kind === 'head-fwd') {
+        mergedPts = [...incPts, ...basePts];
+      } else {
+        reversedIncoming = true;
+        mergedPts = [...[...incPts].reverse(), ...basePts];
+      }
+      const timestampsCleared = reversedIncoming
+        ? clearSegmentTimestamps(mergedPts)
+        : false;
+      next.tracks = [{ name: next.tracks[0]?.name ?? next.name ?? null, segments: [mergedPts] }];
+      next.routes = [];
+      clearSummaryMetadata(next);
+      return {
+        track: next,
+        addedSegments,
+        addedWaypoints,
+        merged: true,
+        reversedIncoming,
+        reorderedByTime: best.kind === 'head-fwd' || best.kind === 'head-rev',
+        timestampsCleared,
+        maxGapMeters: Math.round(best.gap),
+        skippedMergeGapMeters: 0,
+      };
+    }
+
+    // Endpoints are too far apart: keep as separate tracks to avoid cross-map straight-line artifacts.
+    for (const trk of incomingTracks) {
+      const validSegs = (trk.segments || []).filter((seg) => seg.length > 0);
+      if (validSegs.length === 0) continue;
+      next.tracks.push({
+        name: trk.name ?? incomingCopy.name ?? null,
+        segments: validSegs.map((seg) => seg.map(clonePoint)),
+      });
+    }
+    clearSummaryMetadata(next);
+    return {
+      track: next,
+      addedSegments,
+      addedWaypoints,
+      merged: false,
+      reversedIncoming: false,
+      reorderedByTime: false,
+      timestampsCleared: false,
+      maxGapMeters: Math.round(best.gap),
+      skippedMergeGapMeters: Math.round(best.gap),
+    };
+  }
+
+  for (const trk of incomingTracks) {
+    const validSegs = (trk.segments || []).filter((seg) => seg.length > 0);
+    if (validSegs.length === 0) continue;
+    next.tracks.push({
+      name: trk.name ?? incomingCopy.name ?? null,
+      segments: validSegs.map((seg) => seg.map(clonePoint)),
+    });
+  }
+  clearSummaryMetadata(next);
+  return {
+    track: next,
+    addedSegments,
+    addedWaypoints,
+    merged: false,
+    reversedIncoming: false,
+    reorderedByTime: false,
+    timestampsCleared: false,
+    maxGapMeters: 0,
+    skippedMergeGapMeters: 0,
+  };
+}
+
+/**
+ * Reorders waypoints along cumulative track distance, placing far off-track waypoints (> offTrackThresholdMeters)
+ * at the end while preserving their relative order.
+ * @param {import('./types.js').ParsedTrack} parsed
+ * @param {{ offTrackThresholdMeters?: number }} [options]
+ */
+export function sortWaypointsAlongTrack(parsed, { offTrackThresholdMeters = 500 } = {}) {
+  const next = cloneParsedTrack(parsed);
+  if (!Array.isArray(next.waypoints) || next.waypoints.length < 2) {
+    return { track: next, changed: false };
+  }
+  const ordered = sortWaypointsByRoute(next);
+  const onTrack = ordered.filter((item) => item.offTrackMeters <= offTrackThresholdMeters);
+  const offTrack = ordered
+    .filter((item) => item.offTrackMeters > offTrackThresholdMeters)
+    .sort((a, b) => a.index - b.index);
+  const combined = [...onTrack, ...offTrack];
+  const changed = combined.some((item, idx) => item.index !== idx);
+  next.waypoints = combined.map((item) => clonePoint(item.wpt));
+  return { track: next, changed };
+}
+
+function waypointRichnessScore(wpt) {
+  let score = 0;
+  if (String(wpt?.name || '').trim()) score += 4;
+  if (String(wpt?.description || '').trim()) score += 3;
+  if (Array.isArray(wpt?.images) && wpt.images.length > 0) score += 5;
+  if (wpt?.icon && wpt.icon !== 'pin') score += 2;
+  if (Number.isFinite(wpt?.ele)) score += 1;
+  return score;
+}
+
+/**
+ * Merges duplicate waypoints within radiusMeters, preferring entries with richer metadata (photos/name/description).
+ * @param {import('./types.js').ParsedTrack} parsed
+ * @param {{ radiusMeters?: number }} [options]
+ */
+export function dedupeWaypoints(parsed, { radiusMeters = 20 } = {}) {
+  const next = cloneParsedTrack(parsed);
+  const wpts = next.waypoints || [];
+  if (wpts.length < 2) return { track: next, removedCount: 0 };
+
+  const radius = Math.max(1, Number(radiusMeters) || 20);
+  const kept = [];
+  let removedCount = 0;
+
+  for (const wpt of wpts) {
+    const matchIdx = kept.findIndex((existing) => distanceMeters(existing, wpt) <= radius);
+    if (matchIdx < 0) {
+      kept.push(wpt);
+    } else {
+      removedCount += 1;
+      if (waypointRichnessScore(wpt) > waypointRichnessScore(kept[matchIdx])) {
+        kept[matchIdx] = wpt;
+      }
+    }
+  }
+
+  next.waypoints = kept;
+  return { track: next, removedCount };
+}
+
+/**
+ * Generates milestone waypoints every intervalKm along the track and optionally a summit waypoint at max elevation.
+ * Skips any candidate within minDistanceMeters of an existing waypoint.
+ * @param {import('./types.js').ParsedTrack} parsed
+ * @param {{
+ *   intervalKm?: number,
+ *   includeSummit?: boolean,
+ *   minDistanceMeters?: number,
+ *   formatKmLabel?: (km: number) => string,
+ *   summitLabel?: string,
+ * }} [options]
+ */
+export function generateMilestoneWaypoints(
+  parsed,
+  {
+    intervalKm = 5,
+    includeSummit = true,
+    minDistanceMeters = 50,
+    formatKmLabel = (km) => `${km} km`,
+    summitLabel = '最高点',
+  } = {},
+) {
+  const next = cloneParsedTrack(parsed);
+  const segs = ensureTracksMutable(next).filter((seg) => seg.length > 0);
+  if (segs.length === 0) return { track: next, addedCount: 0 };
+
+  const stepMeters = Math.max(100, (Number(intervalKm) || 5) * 1000);
+  const minGap = Math.max(0, Number(minDistanceMeters) || 50);
+  const existing = next.waypoints || [];
+  const candidates = [];
+
+  let cumDist = 0;
+  let nextMilestone = stepMeters;
+  let summitPt = null;
+
+  for (const seg of segs) {
+    for (let i = 0; i < seg.length; i += 1) {
+      const pt = seg[i];
+      if (includeSummit && Number.isFinite(pt.ele)) {
+        if (!summitPt || pt.ele > summitPt.ele) summitPt = pt;
+      }
+      if (i === 0) continue;
+      const prev = seg[i - 1];
+      const d = distanceMeters(prev, pt);
+      if (d <= 0) continue;
+      while (cumDist + d >= nextMilestone) {
+        const ratio = (nextMilestone - cumDist) / d;
+        const pos = interpolatePoint(prev, pt, ratio);
+        const km = Math.round((nextMilestone / 1000) * 10) / 10;
+        candidates.push({
+          lat: pos.lat,
+          lon: pos.lon,
+          ...(Number.isFinite(pos.ele) ? { ele: Math.round(pos.ele * 10) / 10 } : {}),
+          name: formatKmLabel(km),
+          icon: 'pin',
+        });
+        nextMilestone += stepMeters;
+      }
+      cumDist += d;
+    }
+  }
+
+  if (includeSummit && summitPt) {
+    candidates.push({
+      lat: summitPt.lat,
+      lon: summitPt.lon,
+      ele: Math.round(summitPt.ele * 10) / 10,
+      name: summitLabel,
+      icon: 'summit',
+    });
+  }
+
+  let addedCount = 0;
+  for (const cand of candidates) {
+    const tooClose = existing.some((wpt) => distanceMeters(wpt, cand) < minGap);
+    if (tooClose) continue;
+    existing.push(cand);
+    addedCount += 1;
+  }
+
+  next.waypoints = existing;
+  return { track: next, addedCount };
 }

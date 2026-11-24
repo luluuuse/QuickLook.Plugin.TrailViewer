@@ -179,3 +179,27 @@ test('probeNode exchanges probe-node and nodeProbeResult messages with host', as
   emitWebMessage(`nodeProbeResult\t${timeoutId}\t0\t10002\ttimeout`);
   assert.deepEqual(await timeoutPromise, { ok: false, ms: 10002, reason: 'timeout' });
 });
+
+test('listSiblingTracks and importExternalTrack exchange host messages safely', async () => {
+  posted.length = 0;
+  webviewListeners.clear();
+  const bridge = createHostBridge();
+  bridge.installViewerMessages({ attachments: { result() {} } }, () => {});
+
+  const listPromise = bridge.listSiblingTracks();
+  const [listCmd, listId] = posted.shift().split('\t');
+  assert.equal(listCmd, 'track-import-list');
+  emitWebMessage(`trackImportList\t${listId}\t${encodeURIComponent(JSON.stringify([{ name: 'day2.gpx', size: 1024 }]))}`);
+  assert.deepEqual(await listPromise, [{ name: 'day2.gpx', size: 1024 }]);
+
+  const importPromise = bridge.importExternalTrack({ mode: 'sibling', name: 'day2.gpx' });
+  const [impCmd, impId, impMode, impName] = posted.shift().split('\t');
+  assert.equal(impCmd, 'track-import-read');
+  assert.equal(impMode, 'sibling');
+  assert.equal(decodeURIComponent(impName), 'day2.gpx');
+  const b64 = globalThis.Buffer.from('<gpx>轨迹</gpx>', 'utf8').toString('base64');
+  emitWebMessage(`trackImportChunk\t${impId}\t0\t2\t${b64.slice(0, 8)}`);
+  emitWebMessage(`trackImportChunk\t${impId}\t1\t2\t${b64.slice(8)}`);
+  emitWebMessage(`trackImportResult\t${impId}\t0\t${encodeURIComponent('day2.gpx')}\t`);
+  assert.deepEqual(await importPromise, { ok: true, cancelled: false, name: 'day2.gpx', text: '<gpx>轨迹</gpx>', detail: '' });
+});

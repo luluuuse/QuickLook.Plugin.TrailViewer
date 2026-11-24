@@ -1,14 +1,19 @@
 import { formatDuration } from './format.js';
 import { iconElement } from './icons.js';
+import { parseGpx } from './gpx.js';
+import { parseKml } from './kml.js';
 import {
   addWaypoint,
+  appendExternalTrack,
   applyDrawnPath,
   cleanAnomalies,
   closeLoop,
   cropTrack,
+  dedupeWaypoints,
   deleteTrackSegment,
   deleteWaypoint,
   detectAnomalyPoints,
+  generateMilestoneWaypoints,
   generateVirtualTimeline,
   isTrackClosedLoop,
   makeOutAndBack,
@@ -18,6 +23,7 @@ import {
   shiftTrackTimestamps,
   simplifyTrack,
   smoothTrackElevation,
+  sortWaypointsAlongTrack,
   sortWaypointsByRoute,
   trackTotalDistance,
   updateWaypoint,
@@ -58,6 +64,7 @@ export function createEditorDrawers(ctx) {
     updateCropStatTexts,
     renderDrawer,
     setCropStatEls,
+    onImportExternalTrack = null,
   } = ctx;
 
   let cachedWptOrderTrack = null;
@@ -75,8 +82,8 @@ export function createEditorDrawers(ctx) {
   function renderCropDrawer() {
     const drawerBody = getDrawerBody();
     const activeSubMode = state.getSubMode();
-    const modeList = el('div', 'editor-mode-list');
-    const cropModeBtn = el('button', `editor-mode-btn${activeSubMode === 'crop' ? ' is-active' : ''}`);
+    const modeList = el('div', 'editor-segmented-tabs is-two');
+    const cropModeBtn = el('button', `editor-segmented-tab${activeSubMode === 'crop' ? ' is-active' : ''}`);
     cropModeBtn.type = 'button';
     cropModeBtn.textContent = t('editor.crop.mode');
     cropModeBtn.addEventListener('click', () => {
@@ -86,7 +93,7 @@ export function createEditorDrawers(ctx) {
       renderDrawer();
     });
 
-    const splitModeBtn = el('button', `editor-mode-btn${activeSubMode === 'split' ? ' is-active' : ''}`);
+    const splitModeBtn = el('button', `editor-segmented-tab${activeSubMode === 'split' ? ' is-active' : ''}`);
     splitModeBtn.type = 'button';
     splitModeBtn.textContent = t('editor.split.mode');
     splitModeBtn.addEventListener('click', () => {
@@ -97,7 +104,7 @@ export function createEditorDrawers(ctx) {
     });
 
     modeList.append(cropModeBtn, splitModeBtn);
-    drawerBody.append(modeList);
+    drawerBody.append(modeList, el('div', 'editor-tab-divider'));
 
     const current = store.getCurrent();
     setCropStatEls(null, null);
@@ -216,28 +223,28 @@ export function createEditorDrawers(ctx) {
 
   function renderCleanDrawer() {
     const drawerBody = getDrawerBody();
-    const modeList = el('div', 'editor-mode-list');
+    const modeList = el('div', 'editor-segmented-tabs');
     const subMode = state.getSubMode();
     const isBox = subMode === 'box-erase';
     const isSmooth = subMode === 'smooth-ele';
     const isAuto = !isBox && !isSmooth;
-    const autoBtn = makeBtn(`editor-mode-btn${isAuto ? ' is-active' : ''}`, 'editor-clean', t('editor.clean.autoMode'), () => {
+    const autoBtn = makeBtn(`editor-segmented-tab${isAuto ? ' is-active' : ''}`, null, t('editor.clean.autoMode'), () => {
       state.setSubMode('clean');
       overlay.setTool('clean', 'clean');
       renderDrawer();
     });
-    const boxBtn = makeBtn(`editor-mode-btn${isBox ? ' is-active' : ''}`, 'editor-box-erase', t('editor.clean.boxMode'), () => {
+    const boxBtn = makeBtn(`editor-segmented-tab${isBox ? ' is-active' : ''}`, null, t('editor.clean.boxMode'), () => {
       state.setSubMode('box-erase');
       overlay.setTool('clean', 'box-erase');
       renderDrawer();
     });
-    const smoothBtn = makeBtn(`editor-mode-btn${isSmooth ? ' is-active' : ''}`, 'editor-simplify', t('editor.clean.smoothTitle'), () => {
+    const smoothBtn = makeBtn(`editor-segmented-tab${isSmooth ? ' is-active' : ''}`, null, t('editor.clean.smoothTitle'), () => {
       state.setSubMode('smooth-ele');
       overlay.setTool('clean', 'smooth-ele');
       renderDrawer();
     });
     modeList.append(autoBtn, boxBtn, smoothBtn);
-    drawerBody.append(modeList);
+    drawerBody.append(modeList, el('div', 'editor-tab-divider'));
 
     if (isBox) {
       drawerBody.append(el('p', 'editor-drawer-hint', t('editor.clean.boxHint')));
@@ -250,10 +257,10 @@ export function createEditorDrawers(ctx) {
       const smoothBox = el('div', 'editor-stat-box');
       const windowSize = state.getSmoothWindow?.() || 5;
       const preview = smoothTrackElevation(current, { windowSize });
-      const levelRow = el('div', 'editor-mode-list');
+      const levelRow = el('div', 'editor-segmented-tabs');
       for (const [win, key] of [[3, 'editor.clean.smoothLight'], [5, 'editor.clean.smoothStandard'], [9, 'editor.clean.smoothStrong']]) {
         const btn = makeBtn(
-          `editor-mode-btn${windowSize === win ? ' is-active' : ''}`,
+          `editor-segmented-tab${windowSize === win ? ' is-active' : ''}`,
           null,
           t(key),
           () => {
@@ -324,6 +331,126 @@ export function createEditorDrawers(ctx) {
   function renderTopologyDrawer() {
     const drawerBody = getDrawerBody();
     const current = store.getCurrent();
+    const subMode = state.getSubMode();
+    const isSimplify = subMode === 'simplify';
+    const isAppend = subMode === 'append';
+    const isLoopStart = subMode === 'loop-start';
+    const isMainTab = !isSimplify && !isAppend;
+
+    const tabs = el('div', 'editor-segmented-tabs');
+    const mainTabBtn = makeBtn(
+      `editor-segmented-tab${isMainTab ? ' is-active' : ''}`,
+      null,
+      t('editor.topology.tabMain'),
+      () => {
+        state.setSubMode('topology');
+        overlay.setTool('topology', 'topology');
+        renderDrawer();
+      },
+    );
+    const simplifyTabBtn = makeBtn(
+      `editor-segmented-tab${isSimplify ? ' is-active' : ''}`,
+      null,
+      t('editor.topology.simplify'),
+      () => {
+        state.setSubMode('simplify');
+        overlay.setTool('topology', 'simplify');
+        renderDrawer();
+      },
+    );
+    const appendTabBtn = makeBtn(
+      `editor-segmented-tab${isAppend ? ' is-active' : ''}`,
+      null,
+      t('editor.topology.appendTitle'),
+      () => {
+        state.setSubMode('append');
+        overlay.setTool('topology', 'append');
+        renderDrawer();
+      },
+    );
+    tabs.append(mainTabBtn, simplifyTabBtn, appendTabBtn);
+    drawerBody.append(tabs, el('div', 'editor-tab-divider'));
+
+    if (isSimplify) {
+      const simplifyBox = el('div', 'editor-stat-box');
+      const tolRow = el('div', 'editor-wpt-row');
+      const tolSelect = el('select');
+      for (const meters of [3, 5, 10, 20]) {
+        const opt = el('option', '', `${meters} m`);
+        opt.value = String(meters);
+        if (meters === 5) opt.selected = true;
+        tolSelect.append(opt);
+      }
+      const simBtn = makeBtn('editor-btn editor-btn-primary', 'editor-simplify', t('editor.topology.simplifyApply'), () => {
+        const tol = Number(tolSelect.value) || 5;
+        const { track, beforeCount, afterCount } = simplifyTrack(store.getCurrent(), tol);
+        if (afterCount < beforeCount) {
+          store.apply('simplify', track);
+          notifyToast(t('editor.topology.simplifyDone', { before: beforeCount, after: afterCount }));
+        } else {
+          notifyToast(t('editor.topology.simplifyNone'));
+        }
+      });
+      tolRow.append(tolSelect, simBtn);
+      simplifyBox.append(tolRow);
+      drawerBody.append(simplifyBox);
+      return;
+    }
+
+    if (isAppend) {
+      const appendBox = el('div', 'editor-stat-box');
+      const mergeRow = el('label', 'editor-list-row');
+      const mergeChk = el('input');
+      mergeChk.type = 'checkbox';
+      mergeChk.checked = Boolean(state.getAppendMergeSingle?.());
+      mergeChk.addEventListener('change', () => {
+        state.setAppendMergeSingle?.(mergeChk.checked);
+      });
+      mergeRow.append(mergeChk, el('span', 'editor-list-row-main', t('editor.topology.appendMerge')));
+
+      let fallbackFileInput = null;
+      if (typeof onImportExternalTrack !== 'function') {
+        fallbackFileInput = el('input');
+        fallbackFileInput.type = 'file';
+        fallbackFileInput.accept = '.gpx,.kml';
+        fallbackFileInput.hidden = true;
+        fallbackFileInput.addEventListener('change', () => {
+          const file = fallbackFileInput.files?.[0];
+          fallbackFileInput.value = '';
+          if (file) void importExternalFile(file);
+        });
+      }
+
+      const appendBtn = makeBtn('editor-btn editor-btn-primary', 'editor-merge', t('editor.topology.appendBtn'), () => {
+        if (typeof onImportExternalTrack === 'function') {
+          void importFromHost({ mode: 'dialog' });
+        } else {
+          fallbackFileInput?.click();
+        }
+      });
+      appendBox.append(mergeRow, appendBtn);
+      if (fallbackFileInput) appendBox.append(fallbackFileInput);
+
+      const siblings = state.getSiblingTracks?.() || [];
+      if (siblings.length > 0 && typeof onImportExternalTrack === 'function') {
+        appendBox.append(el('span', 'editor-drawer-hint', t('editor.topology.appendSiblings')));
+        const sibList = el('div', 'editor-seg-list editor-sibling-list');
+        for (const item of siblings) {
+          const row = el('div', 'editor-list-row');
+          const label = el('span', 'editor-list-row-main', item.name);
+          label.title = item.name;
+          const joinBtn = makeBtn('editor-btn', null, t('editor.topology.appendOne'), () => {
+            void importFromHost({ mode: 'sibling', name: item.name });
+          });
+          row.append(label, joinBtn);
+          sibList.append(row);
+        }
+        appendBox.append(sibList);
+      }
+      drawerBody.append(appendBox);
+      return;
+    }
+
     const strictlyClosed = isTrackClosedLoop(current, 0.5);
     const loopReady = isTrackClosedLoop(current, 50);
     const list = el('div', 'editor-mode-list');
@@ -344,7 +471,6 @@ export function createEditorDrawers(ctx) {
     });
     loopBtn.disabled = strictlyClosed;
 
-    const isLoopStart = state.getSubMode() === 'loop-start';
     const loopStartBtn = makeBtn(
       `editor-mode-btn${isLoopStart ? ' is-active' : ''}`,
       'editor-loop-start',
@@ -363,29 +489,67 @@ export function createEditorDrawers(ctx) {
     if (isLoopStart && loopReady) {
       drawerBody.append(el('p', 'editor-drawer-hint', t('editor.topology.loopStartHint')));
     }
+  }
 
-    const simplifyBox = el('div', 'editor-stat-box');
-    const tolRow = el('div', 'editor-wpt-row');
-    const tolSelect = el('select');
-    for (const meters of [3, 5, 10, 20]) {
-      const opt = el('option', '', `${meters} m`);
-      opt.value = String(meters);
-      if (meters === 5) opt.selected = true;
-      tolSelect.append(opt);
+  function importExternalPayload(name, text) {
+    if (!store.isActive()) return false;
+    const isKml = /\.kml$/i.test(String(name || ''));
+    const isGpx = /\.gpx$/i.test(String(name || ''));
+    if (!isGpx && !isKml) {
+      notifyToast(t('editor.topology.appendUnsupported'), 3000);
+      return false;
     }
-    const simBtn = makeBtn('editor-btn editor-btn-primary', 'editor-simplify', t('editor.topology.simplifyApply'), () => {
-      const tol = Number(tolSelect.value) || 5;
-      const { track, beforeCount, afterCount } = simplifyTrack(store.getCurrent(), tol);
-      if (afterCount < beforeCount) {
-        store.apply('simplify', track);
-        notifyToast(t('editor.topology.simplifyDone', { before: beforeCount, after: afterCount }));
-      } else {
-        notifyToast(t('editor.topology.simplifyNone'));
+    try {
+      const incoming = isKml ? parseKml(text) : parseGpx(text);
+      const mergeIntoSingle = Boolean(state.getAppendMergeSingle?.());
+      const res = appendExternalTrack(store.getCurrent(), incoming, {
+        mergeIntoSingle,
+        mergeWaypoints: true,
+      });
+      if (res.addedSegments === 0 && res.addedWaypoints === 0) {
+        notifyToast(t('editor.topology.appendEmpty'), 3000);
+        return false;
       }
-    });
-    tolRow.append(tolSelect, simBtn);
-    simplifyBox.append(el('span', 'editor-stat-label', t('editor.topology.simplify')), tolRow);
-    drawerBody.append(simplifyBox);
+      store.apply('append-track', res.track);
+      if (res.skippedMergeGapMeters > 0) {
+        notifyToast(t('editor.topology.appendSkippedMerge', {
+          gap: formatDistance(res.skippedMergeGapMeters),
+        }), 3800);
+      } else if (res.merged) {
+        notifyToast(t(res.reversedIncoming ? 'editor.topology.appendMergedRev' : 'editor.topology.appendMerged'));
+      } else {
+        notifyToast(t('editor.topology.appendDone', {
+          segs: res.addedSegments,
+          wpts: res.addedWaypoints,
+        }));
+      }
+      return true;
+    } catch {
+      notifyToast(t('editor.topology.appendFail'), 3200);
+      return false;
+    }
+  }
+
+  async function importFromHost(opts) {
+    if (typeof onImportExternalTrack !== 'function') return false;
+    const res = await onImportExternalTrack(opts);
+    if (!res || res.cancelled) return false;
+    if (!res.ok) {
+      notifyToast(t('editor.topology.appendFail'), 3200);
+      return false;
+    }
+    return importExternalPayload(res.name, res.text);
+  }
+
+  async function importExternalFile(file) {
+    if (!file || !store.isActive()) return false;
+    try {
+      const text = await file.text();
+      return importExternalPayload(file.name, text);
+    } catch {
+      notifyToast(t('editor.topology.appendFail'), 3200);
+      return false;
+    }
   }
 
   function renderVertexDrawer() {
@@ -520,6 +684,103 @@ export function createEditorDrawers(ctx) {
     const drawerBody = getDrawerBody();
     const current = store.getCurrent();
     const wpts = current?.waypoints || [];
+    const batchOpen = Boolean(state.getWptBatchOpen?.());
+
+    const tabs = el('div', 'editor-segmented-tabs is-two');
+    const listTabBtn = makeBtn(
+      `editor-segmented-tab${!batchOpen ? ' is-active' : ''}`,
+      null,
+      t('editor.wpt.listTab'),
+      () => {
+        state.setWptBatchOpen?.(false);
+        renderDrawer();
+      },
+    );
+    const batchTabBtn = makeBtn(
+      `editor-segmented-tab${batchOpen ? ' is-active' : ''}`,
+      null,
+      t('editor.wpt.batchTitle'),
+      () => {
+        state.setWptBatchOpen?.(true);
+        renderDrawer();
+      },
+    );
+    tabs.append(listTabBtn, batchTabBtn);
+    drawerBody.append(tabs, el('div', 'editor-tab-divider'));
+
+    if (batchOpen) {
+      const organizeBox = el('div', 'editor-stat-box');
+      const quickRow = el('div', 'editor-wpt-batch-grid');
+      const sortBtn = makeBtn('editor-btn editor-btn-outline', 'editor-reverse', t('editor.wpt.batchSort'), () => {
+        const res = sortWaypointsAlongTrack(store.getCurrent());
+        if (res.changed) {
+          state.setSelectedWptIndex(-1);
+          overlay.setSelectedWaypoint(-1);
+          store.apply('sort-waypoints', res.track);
+          notifyToast(t('editor.wpt.batchSortDone'));
+        } else {
+          notifyToast(t('editor.wpt.batchSortNone'));
+        }
+      });
+      sortBtn.disabled = wpts.length < 2;
+      const dedupeBtn = makeBtn('editor-btn editor-btn-outline', 'clear', t('editor.wpt.batchDedupe'), () => {
+        const res = dedupeWaypoints(store.getCurrent(), { radiusMeters: 20 });
+        if (res.removedCount > 0) {
+          state.setSelectedWptIndex(-1);
+          overlay.setSelectedWaypoint(-1);
+          store.apply('dedupe-waypoints', res.track);
+          notifyToast(t('editor.wpt.batchDedupeDone', { count: res.removedCount }));
+        } else {
+          notifyToast(t('editor.wpt.batchDedupeNone'));
+        }
+      });
+      dedupeBtn.disabled = wpts.length < 2;
+      quickRow.append(sortBtn, dedupeBtn);
+      organizeBox.append(el('span', 'editor-stat-label', t('editor.wpt.batchOrganize')), quickRow);
+
+      const mileBox = el('div', 'editor-stat-box');
+      const mileRow = el('div', 'editor-wpt-mile-row');
+      const kmSelect = el('select');
+      const selectedKm = state.getMilestoneKm?.() || 5;
+      for (const km of [1, 2, 5, 10]) {
+        const opt = el('option', '', `${km} km`);
+        opt.value = String(km);
+        if (km === selectedKm) opt.selected = true;
+        kmSelect.append(opt);
+      }
+      kmSelect.addEventListener('change', () => {
+        state.setMilestoneKm?.(Number(kmSelect.value) || 5);
+      });
+      const summitLabel = el('label', 'editor-wpt-mile-check');
+      const summitChk = el('input');
+      summitChk.type = 'checkbox';
+      summitChk.checked = state.getMilestoneSummit ? state.getMilestoneSummit() : true;
+      summitChk.addEventListener('change', () => {
+        state.setMilestoneSummit?.(summitChk.checked);
+      });
+      summitLabel.append(summitChk, el('span', null, t('editor.wpt.batchSummit')));
+      mileRow.append(kmSelect, summitLabel);
+
+      const genBtn = makeBtn('editor-btn editor-btn-primary', null, t('editor.wpt.batchGen'), () => {
+        const res = generateMilestoneWaypoints(store.getCurrent(), {
+          intervalKm: Number(kmSelect.value) || 5,
+          includeSummit: summitChk.checked,
+          minDistanceMeters: 50,
+          formatKmLabel: (km) => `${km} km`,
+          summitLabel: t('editor.wpt.summitName'),
+        });
+        if (res.addedCount > 0) {
+          store.apply('milestone-waypoints', res.track);
+          notifyToast(t('editor.wpt.batchGenDone', { count: res.addedCount }));
+        } else {
+          notifyToast(t('editor.wpt.batchGenNone'));
+        }
+      });
+      mileBox.append(el('span', 'editor-stat-label', t('editor.wpt.batchMilestones')), mileRow, genBtn);
+      drawerBody.append(organizeBox, mileBox);
+      return;
+    }
+
     const selectedWptIndex = state.getSelectedWptIndex();
     const pendingWptCoords = state.getPendingWptCoords();
     const wptNoteOpen = state.getWptNoteOpen();
@@ -754,6 +1015,7 @@ export function createEditorDrawers(ctx) {
     renderVertexDrawer,
     renderDrawDrawer,
     commitDrawDraft,
+    importExternalFile,
     renderTimeDrawer,
     renderWaypointDrawer,
   };

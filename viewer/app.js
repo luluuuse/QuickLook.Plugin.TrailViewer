@@ -409,6 +409,8 @@ async function ensureEditorLoaded() {
           isGpxSource: () => /\.gpx$/i.test((ctx.fileName || ctx.src || '').split(/[?#]/)[0]),
           onSaveTrack: ({ id, fileName: outName, xml, overwrite }) =>
             hostBridge.saveTrackGpx({ id, fileName: outName, xml, overwrite }),
+          onListSiblingTracks: hasQuickLookHost ? () => hostBridge.listSiblingTracks() : null,
+          onImportExternalTrack: hasQuickLookHost ? (opts) => hostBridge.importExternalTrack(opts) : null,
           onToggleLayers: () => layerSwitch?.toggle?.(),
           isLayersOpen: () => Boolean(layerSwitch?.isOpen?.()),
           onTogglePins: () => waypointController?.toggle?.(),

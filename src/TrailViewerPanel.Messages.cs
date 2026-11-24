@@ -624,6 +624,8 @@ internal sealed partial class TrailViewerPanel
                 ? "custom-sources ..."
             : message.StartsWith("probe-node\t", StringComparison.Ordinal)
                 ? "probe-node ..."
+            : message.StartsWith("track-import-", StringComparison.Ordinal)
+                ? "track-import ..."
                 : message;
 
     // The overlay arrives as base64 in pieces, because a large PNG is close to the size where one
@@ -823,6 +825,210 @@ internal sealed partial class TrailViewerPanel
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException)
         {
             _ = PostToViewerMessageAsync(ViewerMessages.TrackSaveResult(payload.Id, 1, "", ex.Message));
+        }
+    }
+
+    private const long MaxImportTrackBytes = 16L * 1024 * 1024;
+
+    private async Task ListSiblingTracksAsync(string id)
+    {
+        if (string.IsNullOrWhiteSpace(id) || id.Length > 80)
+            return;
+
+        var sourcePath = _sourcePath;
+        var json = await Task.Run(() =>
+        {
+            if (string.IsNullOrEmpty(sourcePath))
+                return "[]";
+            var folder = Path.GetDirectoryName(sourcePath);
+            if (string.IsNullOrEmpty(folder) || !Directory.Exists(folder))
+                return "[]";
+
+            var items = new System.Collections.Generic.List<System.Collections.Generic.Dictionary<string, object>>();
+            try
+            {
+                var currentFull = Path.GetFullPath(sourcePath);
+                foreach (var file in Directory.EnumerateFiles(folder))
+                {
+                    var ext = Path.GetExtension(file);
+                    if (!string.Equals(ext, ".gpx", StringComparison.OrdinalIgnoreCase)
+                        && !string.Equals(ext, ".kml", StringComparison.OrdinalIgnoreCase))
+                        continue;
+                    if (string.Equals(Path.GetFullPath(file), currentFull, StringComparison.OrdinalIgnoreCase))
+                        continue;
+                    try
+                    {
+                        var info = new FileInfo(file);
+                        if (!info.Exists || (info.Attributes & FileAttributes.Hidden) != 0)
+                            continue;
+                        if (info.Length <= 0 || info.Length > MaxImportTrackBytes)
+                            continue;
+                        items.Add(new System.Collections.Generic.Dictionary<string, object>
+                        {
+                            ["name"] = info.Name,
+                            ["size"] = info.Length,
+                        });
+                    }
+                    catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                    {
+                        // Skip unreadable entries.
+                    }
+                }
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                return "[]";
+            }
+
+            items.Sort((a, b) => string.Compare(
+                (string)a["name"], (string)b["name"], StringComparison.OrdinalIgnoreCase));
+            if (items.Count > 30)
+                items.RemoveRange(30, items.Count - 30);
+
+            var serializer = new System.Web.Script.Serialization.JavaScriptSerializer();
+            return serializer.Serialize(items);
+        }).ConfigureAwait(false);
+
+        if (!_disposed)
+            _ = PostToViewerMessageAsync(ViewerMessages.TrackImportList(id, json));
+    }
+
+    private async Task ImportExternalTrackAsync(string body)
+    {
+        var parts = body.Split(new[] { '\t' }, 3);
+        if (parts.Length < 2)
+            return;
+
+        var id = parts[0];
+        var mode = parts[1];
+        if (string.IsNullOrWhiteSpace(id) || id.Length > 80)
+            return;
+
+        string? targetPath = null;
+        if (string.Equals(mode, "dialog", StringComparison.Ordinal))
+        {
+            await System.Windows.Threading.Dispatcher.Yield(System.Windows.Threading.DispatcherPriority.Normal);
+            if (_disposed)
+                return;
+
+            var initialDir = !string.IsNullOrEmpty(_sourcePath)
+                ? Path.GetDirectoryName(_sourcePath)
+                : null;
+            var owner = Window.GetWindow(this);
+            var english = !string.Equals(
+                System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName,
+                "zh",
+                StringComparison.OrdinalIgnoreCase);
+            var prevTextInput = _textInput;
+            _textInput = true;
+            string? picked;
+            try
+            {
+                picked = TrackPickerDialog.Show(owner, initialDir, _sourcePath, english);
+            }
+            finally
+            {
+                _textInput = prevTextInput;
+            }
+            if (string.IsNullOrWhiteSpace(picked))
+            {
+                if (!_disposed)
+                    _ = PostToViewerMessageAsync(ViewerMessages.TrackImportResult(id, 2, "", "cancelled"));
+                return;
+            }
+            targetPath = picked;
+        }
+        else if (string.Equals(mode, "sibling", StringComparison.Ordinal) && parts.Length >= 3)
+        {
+            string fileName;
+            try
+            {
+                fileName = Uri.UnescapeDataString(parts[2]);
+            }
+            catch (UriFormatException)
+            {
+                if (!_disposed)
+                    _ = PostToViewerMessageAsync(ViewerMessages.TrackImportResult(id, 1, "", "invalid file name"));
+                return;
+            }
+            if (string.IsNullOrWhiteSpace(fileName)
+                || fileName.IndexOfAny(new[] { '\\', '/', ':' }) >= 0
+                || string.IsNullOrEmpty(_sourcePath))
+            {
+                if (!_disposed)
+                    _ = PostToViewerMessageAsync(ViewerMessages.TrackImportResult(id, 1, "", "invalid file name"));
+                return;
+            }
+            var folder = Path.GetDirectoryName(Path.GetFullPath(_sourcePath));
+            if (string.IsNullOrEmpty(folder))
+                return;
+            var candidate = Path.GetFullPath(Path.Combine(folder, fileName));
+            var prefix = folder.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+                + Path.DirectorySeparatorChar;
+            if (!candidate.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) || !File.Exists(candidate))
+            {
+                if (!_disposed)
+                    _ = PostToViewerMessageAsync(ViewerMessages.TrackImportResult(id, 1, "", "file not found"));
+                return;
+            }
+            targetPath = candidate;
+        }
+        else
+        {
+            return;
+        }
+
+        var ext = Path.GetExtension(targetPath);
+        if (!string.Equals(ext, ".gpx", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(ext, ".kml", StringComparison.OrdinalIgnoreCase))
+        {
+            if (!_disposed)
+                _ = PostToViewerMessageAsync(ViewerMessages.TrackImportResult(id, 1, "", "unsupported format"));
+            return;
+        }
+
+        try
+        {
+            var resolved = targetPath;
+            var name = Path.GetFileName(resolved);
+            var bytes = await Task.Run(() =>
+            {
+                var info = new FileInfo(resolved);
+                if (!info.Exists)
+                    throw new FileNotFoundException("file not found");
+                if (info.Length > MaxImportTrackBytes)
+                    throw new InvalidDataException("file exceeds 16 MB limit");
+                return File.ReadAllBytes(resolved);
+            }, _lifecycle.Token).ConfigureAwait(false);
+
+            if (_disposed)
+                return;
+
+            // Stream base64 in 512 KB chunks to avoid .NET 4.6.2 Uri.EscapeDataString 65 KB limit.
+            var base64 = Convert.ToBase64String(bytes);
+            const int chunkSize = 512 * 1024;
+            var totalChunks = Math.Max(1, (base64.Length + chunkSize - 1) / chunkSize);
+            for (var i = 0; i < totalChunks; i++)
+            {
+                if (_disposed)
+                    return;
+                var start = i * chunkSize;
+                var len = Math.Min(chunkSize, base64.Length - start);
+                var slice = len > 0 ? base64.Substring(start, len) : string.Empty;
+                await PostToViewerMessageAsync(ViewerMessages.TrackImportChunk(id, i, totalChunks, slice))
+                    .ConfigureAwait(false);
+            }
+            if (!_disposed)
+                _ = PostToViewerMessageAsync(ViewerMessages.TrackImportResult(id, 0, name, ""));
+        }
+        catch (OperationCanceledException) when (_disposed || _lifecycle.IsCancellationRequested)
+        {
+            // Preview closed while reading.
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException or NotSupportedException)
+        {
+            if (!_disposed)
+                _ = PostToViewerMessageAsync(ViewerMessages.TrackImportResult(id, 1, "", ex.Message));
         }
     }
 }

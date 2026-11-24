@@ -37,6 +37,10 @@ internal sealed class ViewerMessageActions
     internal Action ClearTileCache { get; set; } = () => { };
     internal Func<string, System.Threading.Tasks.Task> ProbeNode { get; set; } =
         _ => System.Threading.Tasks.Task.CompletedTask;
+    internal Func<string, System.Threading.Tasks.Task> ListSiblingTracks { get; set; } =
+        _ => System.Threading.Tasks.Task.CompletedTask;
+    internal Func<string, System.Threading.Tasks.Task> ImportExternalTrack { get; set; } =
+        _ => System.Threading.Tasks.Task.CompletedTask;
 }
 
 internal sealed class ViewerMessageRouter
@@ -99,5 +103,9 @@ internal sealed class ViewerMessageRouter
             _actions.ClearTileCache();
         else if (message.StartsWith("probe-node\t", StringComparison.Ordinal))
             _ = _actions.ProbeNode(message.Substring("probe-node\t".Length));
+        else if (message.StartsWith("track-import-list\t", StringComparison.Ordinal))
+            _ = _actions.ListSiblingTracks(message.Substring("track-import-list\t".Length));
+        else if (message.StartsWith("track-import-read\t", StringComparison.Ordinal))
+            _ = _actions.ImportExternalTrack(message.Substring("track-import-read\t".Length));
     }
 }

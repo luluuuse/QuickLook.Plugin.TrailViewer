@@ -2,14 +2,17 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   addWaypoint,
+  appendExternalTrack,
   applyDrawnPath,
   cleanAnomalies,
   closeLoop,
   cropTrack,
+  dedupeWaypoints,
   deleteTrackSegment,
   deleteTrackVertex,
   deleteWaypoint,
   eraseTrackPointsInBounds,
+  generateMilestoneWaypoints,
   generateVirtualTimeline,
   insertTrackVertex,
   isTrackClosedLoop,
@@ -22,6 +25,7 @@ import {
   shiftTrackTimestamps,
   simplifyTrack,
   smoothTrackElevation,
+  sortWaypointsAlongTrack,
   sortWaypointsByRoute,
   splitTrackAt,
   trackTotalDistance,
@@ -695,4 +699,139 @@ test('applyDrawnPath closes loop instead of erasing track when snapping segment 
   assert.ok(seg[4].ele > 100 && seg[4].ele < 120);
   assert.equal(seg[5].lat, 39.900);
   assert.equal(seg[5].lon, 116.300);
+});
+
+test('appendExternalTrack appends segments and deduplicates waypoints', () => {
+  const base = sampleTrack();
+  const incoming = {
+    name: 'Part 2',
+    tracks: [{
+      name: 'Extra',
+      segments: [[
+        { lat: 39.930, lon: 116.300, ele: 320 },
+        { lat: 39.940, lon: 116.300, ele: 350 },
+      ]],
+    }],
+    routes: [],
+    waypoints: [
+      // Duplicate of existing waypoint in sampleTrack
+      { ...base.waypoints[0] },
+      // Brand new waypoint
+      { lat: 39.935, lon: 116.3, name: 'Camp 2' },
+    ],
+    areas: [],
+  };
+  const res = appendExternalTrack(base, incoming, { mergeIntoSingle: false, mergeWaypoints: true });
+  assert.equal(res.addedSegments, 1);
+  assert.equal(res.addedWaypoints, 1);
+  assert.equal(res.track.tracks.length, 2);
+  assert.equal(res.track.waypoints.length, base.waypoints.length + 1);
+});
+
+test('appendExternalTrack keeps segments separate when endpoints are too far apart and auto-reverses when close', () => {
+  const segA = {
+    name: 'Part A',
+    tracks: [{
+      name: 'A',
+      segments: [[
+        { lat: 39.900, lon: 116.300 },
+        { lat: 39.910, lon: 116.300 },
+      ]],
+    }],
+    routes: [],
+    waypoints: [],
+    areas: [],
+  };
+  // Far away segment (> 500 m): must NOT draw a long straight line across map.
+  const farB = {
+    name: 'Far B',
+    tracks: [{
+      name: 'B',
+      segments: [[
+        { lat: 39.950, lon: 116.300 },
+        { lat: 39.960, lon: 116.300 },
+      ]],
+    }],
+    routes: [],
+    waypoints: [],
+    areas: [],
+  };
+  const farRes = appendExternalTrack(segA, farB, { mergeIntoSingle: true });
+  assert.equal(farRes.merged, false);
+  assert.ok(farRes.skippedMergeGapMeters > 500);
+  assert.equal(farRes.track.tracks.length, 2);
+
+  // Close reversed segment (its end matches A's end within ~110 m): auto-reverses and merges cleanly.
+  const closeRevB = {
+    name: 'Close Rev B',
+    tracks: [{
+      name: 'B2',
+      segments: [[
+        { lat: 39.920, lon: 116.300 },
+        { lat: 39.911, lon: 116.300 },
+      ]],
+    }],
+    routes: [],
+    waypoints: [],
+    areas: [],
+  };
+  const closeRes = appendExternalTrack(segA, closeRevB, { mergeIntoSingle: true });
+  assert.equal(closeRes.merged, true);
+  assert.equal(closeRes.reversedIncoming, true);
+  assert.equal(closeRes.track.tracks.length, 1);
+  const merged = closeRes.track.tracks[0].segments[0];
+  assert.equal(merged.length, 4);
+  assert.equal(merged[2].lat, 39.911);
+  assert.equal(merged[3].lat, 39.920);
+});
+
+test('sortWaypointsAlongTrack sorts on-track waypoints and places far off-track waypoints last', () => {
+  const base = sampleTrack();
+  base.waypoints = [
+    { lat: 39.915, lon: 116.300, name: 'Late' },
+    { lat: 39.950, lon: 116.400, name: 'Far Off' },
+    { lat: 39.902, lon: 116.300, name: 'Early' },
+  ];
+  const res = sortWaypointsAlongTrack(base);
+  assert.equal(res.changed, true);
+  assert.deepEqual(res.track.waypoints.map((w) => w.name), ['Early', 'Late', 'Far Off']);
+});
+
+test('dedupeWaypoints merges nearby duplicates and prefers richer metadata', () => {
+  const base = sampleTrack();
+  base.waypoints = [
+    { lat: 39.90500, lon: 116.30000, name: '' },
+    { lat: 39.90505, lon: 116.30002, name: 'Water Source', description: 'Clean spring' },
+    { lat: 39.91500, lon: 116.30000, name: 'Ridge' },
+  ];
+  const res = dedupeWaypoints(base, { radiusMeters: 20 });
+  assert.equal(res.removedCount, 1);
+  assert.equal(res.track.waypoints.length, 2);
+  assert.equal(res.track.waypoints[0].name, 'Water Source');
+});
+
+test('generateMilestoneWaypoints creates interval and summit waypoints while skipping nearby existing ones', () => {
+  const base = {
+    name: 'long',
+    tracks: [{
+      name: 'Main',
+      segments: [[
+        { lat: 39.900, lon: 116.300, ele: 100 },
+        { lat: 39.920, lon: 116.300, ele: 520 },
+        { lat: 39.940, lon: 116.300, ele: 300 },
+      ]],
+    }],
+    routes: [],
+    waypoints: [
+      // Right on top of the summit so summit candidate should be skipped
+      { lat: 39.920, lon: 116.300, name: 'Existing Peak' },
+    ],
+    areas: [],
+  };
+  const res = generateMilestoneWaypoints(base, { intervalKm: 2, includeSummit: true, minDistanceMeters: 50 });
+  // Track is ~4.45 km -> 2 km and 4 km milestones added, summit skipped due to existing waypoint < 50m.
+  assert.equal(res.addedCount, 2);
+  assert.equal(res.track.waypoints.length, 3);
+  assert.equal(res.track.waypoints[1].name, '2 km');
+  assert.equal(res.track.waypoints[2].name, '4 km');
 });

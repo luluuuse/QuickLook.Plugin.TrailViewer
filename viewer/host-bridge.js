@@ -2,11 +2,14 @@
 export function createHostBridge() {
   let clipboardSequence = 0;
   let probeSequence = 0;
+  let importSequence = 0;
   let clipboardWriting = false;
   let queuedClipboardWrite = null;
   const pendingClipboard = new Map();
   const pendingTrackSaves = new Map();
   const pendingNodeProbes = new Map();
+  const pendingTrackImportLists = new Map();
+  const pendingTrackImports = new Map();
   const hasHost = Boolean(
     window.chrome?.webview?.postMessage && window.chrome.webview.addEventListener,
   );
@@ -184,6 +187,103 @@ export function createHostBridge() {
     });
   }
 
+  function trackImportListResult(id, encodedJson = '') {
+    const pending = pendingTrackImportLists.get(id);
+    if (!pending) return;
+    pendingTrackImportLists.delete(id);
+    clearTimeout(pending.timer);
+    try {
+      const parsed = JSON.parse(decodeMessage(encodedJson) || '[]');
+      pending.resolve(Array.isArray(parsed) ? parsed : []);
+    } catch {
+      pending.resolve([]);
+    }
+  }
+
+  function listSiblingTracks() {
+    if (!hasHost) return Promise.resolve([]);
+    const id = `${Date.now().toString(36)}-${(importSequence += 1).toString(36)}`;
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => {
+        pendingTrackImportLists.delete(id);
+        resolve([]);
+      }, 5000);
+      pendingTrackImportLists.set(id, { resolve, timer });
+      post(`track-import-list\t${id}`);
+    });
+  }
+
+  function decodeBase64Utf8(base64) {
+    if (!base64) return '';
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i += 1) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    return new TextDecoder('utf-8').decode(bytes);
+  }
+
+  function trackImportChunk(id, index, total, chunk = '') {
+    const pending = pendingTrackImports.get(id);
+    if (!pending) return;
+    if (!pending.chunks) pending.chunks = new Array(Math.max(1, total));
+    if (index >= 0 && index < pending.chunks.length) {
+      pending.chunks[index] = chunk;
+    }
+  }
+
+  function trackImportResult(id, statusCode, encodedName = '', encodedDetail = '') {
+    const pending = pendingTrackImports.get(id);
+    if (!pending) return;
+    pendingTrackImports.delete(id);
+    clearTimeout(pending.timer);
+    if (statusCode === 0) {
+      try {
+        const joined = (pending.chunks || []).join('');
+        const text = decodeBase64Utf8(joined);
+        pending.resolve({
+          ok: true,
+          cancelled: false,
+          name: decodeMessage(encodedName),
+          text,
+          detail: '',
+        });
+      } catch {
+        pending.resolve({
+          ok: false,
+          cancelled: false,
+          name: decodeMessage(encodedName),
+          text: '',
+          detail: 'decode failed',
+        });
+      }
+    } else if (statusCode === 2) {
+      pending.resolve({ ok: false, cancelled: true, name: '', text: '', detail: '' });
+    } else {
+      pending.resolve({
+        ok: false,
+        cancelled: false,
+        name: decodeMessage(encodedName),
+        text: '',
+        detail: decodeMessage(encodedDetail),
+      });
+    }
+  }
+
+  function importExternalTrack({ mode = 'dialog', name = '' } = {}) {
+    if (!hasHost) return Promise.resolve(null);
+    const id = `${Date.now().toString(36)}-${(importSequence += 1).toString(36)}`;
+    const timeoutMs = mode === 'dialog' ? 300000 : 15000;
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => {
+        pendingTrackImports.delete(id);
+        resolve({ ok: false, cancelled: false, name: '', text: '', detail: 'import timed out' });
+      }, timeoutMs);
+      pendingTrackImports.set(id, { resolve, timer });
+      post(`track-import-read\t${id}\t${mode}\t${encodeURIComponent(name || '')}`);
+    });
+  }
+
   function installViewerMessages(api, clipboardResultHandler) {
     window.chrome?.webview?.addEventListener('message', (event) => {
       if (typeof event.data !== 'string') return;
@@ -218,6 +318,12 @@ export function createHostBridge() {
         trackSaveResult(parts[1], Number(parts[2]), parts[3], parts[4]);
       } else if (parts[0] === 'nodeProbeResult') {
         nodeProbeResult(parts[1], parts[2] === '1', Number(parts[3]), parts[4]);
+      } else if (parts[0] === 'trackImportList') {
+        trackImportListResult(parts[1], parts[2]);
+      } else if (parts[0] === 'trackImportChunk') {
+        trackImportChunk(parts[1], Number(parts[2]), Number(parts[3]), parts[4]);
+      } else if (parts[0] === 'trackImportResult') {
+        trackImportResult(parts[1], Number(parts[2]), parts[3], parts[4]);
       }
     });
   }
@@ -246,6 +352,8 @@ export function createHostBridge() {
     setEditorDirty,
     saveTrackGpx,
     probeNode,
+    listSiblingTracks,
+    importExternalTrack,
     installViewerMessages,
     installTextInputReporting,
   };

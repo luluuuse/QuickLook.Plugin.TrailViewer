@@ -102,6 +102,8 @@ internal sealed partial class TrailViewerPanel : UserControl, IDisposable
             RequestTileCacheStats = RequestTileCacheStats,
             ClearTileCache = ClearTileCache,
             ProbeNode = ProbeNodeAsync,
+            ListSiblingTracks = ListSiblingTracksAsync,
+            ImportExternalTrack = ImportExternalTrackAsync,
         });
     }
 

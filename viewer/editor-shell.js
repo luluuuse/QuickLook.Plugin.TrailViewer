@@ -56,6 +56,8 @@ export function createEditorShell({
   getProfileState,
   isGpxSource = () => true,
   onSaveTrack,
+  onListSiblingTracks = null,
+  onImportExternalTrack = null,
   onExit,
   onToggleLayers = () => {},
   isLayersOpen = () => false,
@@ -125,6 +127,11 @@ export function createEditorShell({
   let excludedAnomalyTrackRef = null;
   let smoothWindow = 5;
   let gradeAdjusted = true;
+  let appendMergeSingle = false;
+  let wptBatchOpen = false;
+  let milestoneKm = 5;
+  let milestoneSummit = true;
+  let siblingTracks = [];
   let wptListScrollTop = 0;
   let scrollWptIntoView = false;
 
@@ -506,7 +513,17 @@ export function createEditorShell({
       setSmoothWindow: (win) => { smoothWindow = win; },
       getGradeAdjusted: () => gradeAdjusted,
       setGradeAdjusted: (val) => { gradeAdjusted = Boolean(val); },
+      getAppendMergeSingle: () => appendMergeSingle,
+      setAppendMergeSingle: (val) => { appendMergeSingle = Boolean(val); },
+      getWptBatchOpen: () => wptBatchOpen,
+      setWptBatchOpen: (val) => { wptBatchOpen = Boolean(val); },
+      getMilestoneKm: () => milestoneKm,
+      setMilestoneKm: (val) => { milestoneKm = Number(val) || 5; },
+      getMilestoneSummit: () => milestoneSummit,
+      setMilestoneSummit: (val) => { milestoneSummit = Boolean(val); },
+      getSiblingTracks: () => siblingTracks,
     },
+    onImportExternalTrack,
   });
 
   function closeSavePopover() {
@@ -949,6 +966,14 @@ export function createEditorShell({
       updateCropOverlayPositions();
       renderSplitProfileMarkers();
     }, { signal });
+    siblingTracks = [];
+    if (typeof onListSiblingTracks === 'function') {
+      void Promise.resolve(onListSiblingTracks()).then((items) => {
+        if (signal.aborted || !store.isActive()) return;
+        siblingTracks = Array.isArray(items) ? items : [];
+        if (activeTool === 'topology' && drawerOpen) renderDrawer();
+      });
+    }
     requestAnimationFrame(() => window.dispatchEvent(new Event('resize')));
   }
 
@@ -1010,12 +1035,14 @@ export function createEditorShell({
     pickWaypointLocation(loc) {
       pendingWptCoords = loc;
       selectedWptIndex = -1;
+      wptBatchOpen = false;
       overlay.setSelectedWaypoint(-1);
       renderDrawer();
     },
     selectWaypoint(index) {
       pendingWptCoords = null;
       selectedWptIndex = index;
+      wptBatchOpen = false;
       scrollWptIntoView = true;
       if (activeTool !== 'waypoint' || !drawerOpen) {
         activeTool = 'waypoint';

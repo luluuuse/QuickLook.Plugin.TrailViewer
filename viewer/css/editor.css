@@ -406,6 +406,57 @@ body.is-editing #map.editor-cursor-grabbing {
   gap: 4px;
 }
 
+.editor-segmented-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 3px;
+  padding: 3px;
+  border-radius: var(--radius-sm);
+  background: rgba(0, 0, 0, 0.28);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.editor-segmented-tabs.is-two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.editor-segmented-tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 28px;
+  padding: 0 6px;
+  border: 1px solid transparent;
+  border-radius: calc(var(--radius-sm) - 2px);
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  transition: background var(--motion-panel), color var(--motion-panel), border-color var(--motion-panel);
+}
+
+.editor-segmented-tab:hover {
+  color: var(--text-bright);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.editor-segmented-tab.is-active {
+  background: rgba(35, 79, 121, 0.78);
+  border-color: rgba(143, 217, 255, 0.48);
+  color: var(--text-bright);
+  font-weight: 600;
+}
+
+.editor-tab-divider {
+  height: 1px;
+  margin: 2px 0;
+  background: rgba(255, 255, 255, 0.08);
+}
+
 .editor-mode-btn {
   display: flex;
   align-items: center;
@@ -569,12 +620,57 @@ body.is-editing #map.editor-cursor-grabbing {
 }
 
 .editor-wpt-list,
+.editor-btn-outline {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-bright);
+  justify-content: center;
+}
+
+.editor-btn-outline:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(143, 217, 255, 0.36);
+}
+
+.editor-wpt-batch-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.editor-wpt-mile-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.editor-wpt-mile-row select {
+  width: 82px;
+  flex: 0 0 auto;
+}
+
+.editor-wpt-mile-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+  color: var(--text);
+  font-size: 12px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
 .editor-seg-list {
   display: flex;
   flex-direction: column;
   gap: 4px;
   max-height: 180px;
   overflow-y: auto;
+}
+
+.editor-sibling-list {
+  max-height: 122px;
 }
 
 .editor-wpt-list {
@@ -1131,11 +1227,101 @@ body.is-editing #profile {
   }
 }
 
+@keyframes editor-pop-down {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -7px) scale(0.975);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
+}
+
+@keyframes editor-slide-right {
+  from {
+    opacity: 0;
+    transform: translate(-10px, -50%) scale(0.985);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate(0, -50%) scale(1);
+  }
+}
+
+@keyframes editor-menu-pop {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.95);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes editor-content-rise {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.editor-topbar {
+  animation: editor-pop-down 180ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.editor-rail {
+  animation: editor-slide-right 180ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.editor-drawer {
+  animation: editor-slide-right 175ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.editor-drawer-body > * {
+  animation: editor-content-rise 140ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.editor-save-popover,
+.editor-exit-guard {
+  animation: editor-pop-down 155ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.editor-context-menu {
+  transform-origin: top left;
+  animation: editor-menu-pop 130ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.editor-drawer-tooltip {
+  animation: editor-menu-pop 130ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .editor-btn,
   .editor-rail-btn,
   .editor-drawer,
-  .editor-mode-btn {
+  .editor-mode-btn,
+  .editor-segmented-tab {
     transition: none;
+  }
+
+  .editor-topbar,
+  .editor-rail,
+  .editor-drawer,
+  .editor-drawer-body > *,
+  .editor-save-popover,
+  .editor-exit-guard,
+  .editor-context-menu,
+  .editor-drawer-tooltip {
+    animation: none;
   }
 }

@@ -38,5 +38,14 @@ internal static class ViewerMessages
     internal static string NodeProbeResult(string id, bool ok, int elapsedMs, string reason) =>
         $"nodeProbeResult\t{id}\t{(ok ? 1 : 0)}\t{elapsedMs}\t{Encode(reason)}";
 
+    internal static string TrackImportList(string id, string json) =>
+        $"trackImportList\t{id}\t{Encode(json)}";
+
+    internal static string TrackImportChunk(string id, int index, int total, string base64Chunk) =>
+        $"trackImportChunk\t{id}\t{index}\t{total}\t{base64Chunk}";
+
+    internal static string TrackImportResult(string id, int statusCode, string name, string detail) =>
+        $"trackImportResult\t{id}\t{statusCode}\t{Encode(name)}\t{Encode(detail)}";
+
     private static string Encode(string value) => Uri.EscapeDataString(value ?? "");
 }
