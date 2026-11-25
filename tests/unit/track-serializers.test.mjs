@@ -554,3 +554,44 @@ test('serializeKml preserves track timestamps and heartRate via gx:Track, waypoi
   assert.equal(ring[0].lat, ring[ring.length - 1].lat);
   assert.equal(ring[0].lon, ring[ring.length - 1].lon);
 });
+
+test('serializeTcx maps activityType to standard Sport attribute', () => {
+  const baseTrack = {
+    name: 'Sport Test',
+    tracks: [{
+      name: 'Main',
+      segments: [[
+        { lat: 30.5, lon: 114.3, ele: 100, time: new Date('2026-05-01T08:00:00Z') },
+        { lat: 30.51, lon: 114.31, ele: 150, time: new Date('2026-05-01T08:10:00Z') },
+      ]],
+    }],
+    routes: [],
+    waypoints: [],
+  };
+  assert.ok(serializeTcx({ ...baseTrack, activityType: 'running' }).includes('<Activity Sport="Running">'));
+  assert.ok(serializeTcx({ ...baseTrack, activityType: 'trail_running' }).includes('<Activity Sport="Running">'));
+  assert.ok(serializeTcx({ ...baseTrack, activityType: 'cycling' }).includes('<Activity Sport="Biking">'));
+  assert.ok(serializeTcx({ ...baseTrack, activityType: 'biking' }).includes('<Activity Sport="Biking">'));
+  assert.ok(serializeTcx({ ...baseTrack, activityType: 'hiking' }).includes('<Activity Sport="Other">'));
+  assert.ok(serializeTcx({ ...baseTrack, activityType: null }).includes('<Activity Sport="Other">'));
+});
+
+test('serializeKml writes internal icon keys to ExtendedData instead of broken Icon href and round-trips cleanly', () => {
+  const track = {
+    name: 'Icon Keys',
+    tracks: [{ name: 'Main', segments: [[{ lat: 30.5, lon: 114.3 }, { lat: 30.51, lon: 114.31 }]] }],
+    routes: [],
+    waypoints: [
+      { lat: 30.502, lon: 114.302, name: 'Spring', icon: 'water' },
+      { lat: 30.506, lon: 114.306, name: 'Remote Icon', icon: 'https://example.com/pin.png' },
+    ],
+  };
+  const xml = serializeKml(track);
+  assert.ok(!xml.includes('<href>water</href>'));
+  assert.ok(xml.includes('<Data name="icon"><value>water</value></Data>'));
+  assert.ok(xml.includes('<Icon><href>https://example.com/pin.png</href></Icon>'));
+
+  const reparsed = parseKml(xml);
+  assert.equal(reparsed.waypoints.find((w) => w.name === 'Spring')?.icon, 'water');
+  assert.equal(reparsed.waypoints.find((w) => w.name === 'Remote Icon')?.icon, 'https://example.com/pin.png');
+});

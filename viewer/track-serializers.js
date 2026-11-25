@@ -15,6 +15,15 @@ export const EXPORT_FORMATS = Object.freeze([
   { id: 'csv', ext: '.csv', label: 'CSV (.csv)' },
 ]);
 
+const KML_ICON_URL_RE = /^(?:https?:\/\/|[^\s<>"]+\.(?:png|jpe?g|gif|webp|svg|ico)(?:[?#][^\s<>"]*)?$)/i;
+
+function tcxSport(activityType) {
+  const norm = String(activityType || '').trim().toLowerCase().replace(/[\s-]+/g, '_');
+  if (norm === 'running' || norm === 'trail_running' || norm === 'run') return 'Running';
+  if (norm === 'cycling' || norm === 'biking' || norm === 'bike') return 'Biking';
+  return 'Other';
+}
+
 function escapeXml(value) {
   return String(value ?? '')
     .replaceAll('&', '&amp;')
@@ -262,13 +271,22 @@ export function serializeKml(parsed, { includeImages = true } = {}) {
     lines.push('    <Placemark>');
     if (wpt.name) lines.push(`      <name>${escapeXml(wpt.name)}</name>`);
     if (wpt.icon) {
-      lines.push(
-        '      <Style>',
-        '        <IconStyle>',
-        `          <Icon><href>${escapeXml(String(wpt.icon))}</href></Icon>`,
-        '        </IconStyle>',
-        '      </Style>',
-      );
+      const iconStr = String(wpt.icon).trim();
+      if (KML_ICON_URL_RE.test(iconStr)) {
+        lines.push(
+          '      <Style>',
+          '        <IconStyle>',
+          `          <Icon><href>${escapeXml(iconStr)}</href></Icon>`,
+          '        </IconStyle>',
+          '      </Style>',
+        );
+      } else if (iconStr) {
+        lines.push(
+          '      <ExtendedData>',
+          `        <Data name="icon"><value>${escapeXml(iconStr)}</value></Data>`,
+          '      </ExtendedData>',
+        );
+      }
     }
     const images = includeImages && Array.isArray(wpt.images) ? wpt.images.filter(Boolean) : [];
     const desc = wpt.description ? String(wpt.description) : '';
@@ -473,7 +491,7 @@ export function serializeTcx(parsed) {
       if (firstIso) break;
     }
 
-    lines.push('    <Activity Sport="Other">');
+    lines.push(`    <Activity Sport="${tcxSport(parsed?.activityType)}">`);
     if (firstIso) lines.push(`      <Id>${firstIso}</Id>`);
 
     let cumulativeMeters = 0;

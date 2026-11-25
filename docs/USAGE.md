@@ -71,7 +71,7 @@
 ### 4. 航点与照片相册
 
 - **沿线导航与定位**：按 <kbd>←</kbd> <kbd>→</kbd> 或 <kbd>A</kbd> <kbd>D</kbd> 按累计里程顺序切换航点（重合的起终点与航点共享节点），地图自动平滑避让并居中；点击 GPS 异常或数据缺口标签可直接放大查看。
-- **航点速览列表**：点击顶部 **列表** 打开航点速览，支持危险/水源/营地/补给/下撤等本地语义筛选、合并近点与人工修正。
+- **航点速览列表**：点击顶部 **列表** 打开航点速览，支持 **带图片** 及危险/水源/营地/补给/下撤等本地筛选、合并近点与人工修正。
 - **照片卡片与全览灯箱**：
   - 带照片的航点弹出竖幅 4:3 照片卡片，点击照片进入全览灯箱，右下角箭头直接跳至下一处带照片的航点。
   - 全览灯箱右上角显示相对原图像素的真实缩放比例，支持滚轮最高 `800%` 缩放、拖拽平移、点击百分比复原、**在浏览器中打开原图**，并在看图时自动后台预载下一张。
@@ -194,7 +194,7 @@ Click the gear icon in the layer panel header to open **Map settings**:
 ### 4. Waypoints & photo albums
 
 - **Route-ordered navigation:** press <kbd>←</kbd> <kbd>→</kbd> or <kbd>A</kbd> <kbd>D</kbd> to step along cumulative route distance with smooth safe-area recentering; click GPS anomaly or data-gap badges to zoom in.
-- **Waypoint overview:** click **List** to open the overview with local semantic filters (danger/water/camp/supply/exit), nearby-point merging and manual corrections.
+- **Waypoint overview:** click **List** to open the overview with **With photos** and local semantic filters (danger/water/camp/supply/exit), nearby-point merging and manual corrections.
 - **Photo cards & lightbox:**
   - Photo waypoints open a portrait 4:3 photo card; click the photo for the full-size lightbox or use the bottom-right arrow to jump directly to the next photo waypoint.
   - The lightbox shows true source-pixel percentage, supports wheel zoom up to `800%`, drag-to-pan, click-percentage reset, **Open in browser**, and background next-photo preloading.

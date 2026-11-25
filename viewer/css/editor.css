@@ -1347,7 +1347,7 @@ body.is-editing #profile {
   position: absolute;
   top: 0;
   bottom: 0;
-  background: rgba(15, 23, 42, 0.56);
+  background: var(--editor-crop-dim, rgba(15, 23, 42, 0.56));
   pointer-events: none;
 }
 

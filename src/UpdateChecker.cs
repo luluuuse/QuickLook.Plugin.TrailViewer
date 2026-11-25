@@ -78,7 +78,7 @@ internal static class UpdateChecker
         @"^v?(?<major>\d+)\.(?<minor>\d+)\.(?<patch>\d+)(?<pre>-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$",
         RegexOptions.CultureInvariant);
     private static readonly Regex Sha256Pattern = new(
-        @"\b(?<hex>[0-9a-fA-F]{64})\b",
+        @"(?i)(?:sha-?256[^\r\n]{0,24}?|qlplugin(?:\r?\n|[^\r\n]){0,40}?)\b(?<hex>[0-9a-f]{64})\b",
         RegexOptions.CultureInvariant);
 
     private static readonly object StateLock = new();
@@ -490,7 +490,7 @@ internal static class UpdateChecker
         {
             throw;
         }
-        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or InvalidDataException or IOException)
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or InvalidDataException or IOException or ArgumentException or InvalidOperationException)
         {
             return new UpdateStatusInfo
             {
@@ -569,7 +569,7 @@ internal static class UpdateChecker
         {
             throw;
         }
-        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or InvalidDataException or IOException)
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or InvalidDataException or IOException or ArgumentException or InvalidOperationException)
         {
             return null;
         }
@@ -666,6 +666,9 @@ internal static class UpdateChecker
                 .ConfigureAwait(false);
             if (!response.IsSuccessStatusCode)
                 throw new HttpRequestException($"HTTP {(int)response.StatusCode}");
+            var finalUri = response.RequestMessage?.RequestUri?.AbsoluteUri;
+            if (!string.IsNullOrEmpty(finalUri) && !IsAllowedReleaseAssetUrl(finalUri))
+                throw new InvalidDataException("release asset redirect URL is not allowed");
 
             var totalBytes = response.Content.Headers.ContentLength ?? -1L;
             if (totalBytes > MaxPackageBytes)

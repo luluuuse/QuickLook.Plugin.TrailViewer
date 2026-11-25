@@ -274,7 +274,10 @@ function readPlacemark(placemark, out, styles, { skipTime = false, skipElevation
   const inlineStyle = child(placemark, 'Style');
   const inlineIcon = inlineStyle && child(child(inlineStyle, 'IconStyle') || inlineStyle, 'Icon');
   const inlineHref = inlineIcon && child(inlineIcon, 'href');
-  const icon = textOf(inlineHref) || styles.get((styleUrl || '').replace(/^#/, '')) || styleUrl;
+  const icon = textOf(inlineHref)
+    || styles.get((styleUrl || '').replace(/^#/, ''))
+    || styleUrl
+    || readDocumentData(placemark, ['icon']);
 
   const collect = (node) => {
     for (const geometry of node.children) {

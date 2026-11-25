@@ -774,6 +774,10 @@ export function createEditorShell({
     owNote.dataset.saveOption = 'overwrite-kml-note';
     owNote.hidden = true;
 
+    const tcxNote = el('div', 'editor-save-note', t('editor.save.tcxNoTimestampsNote'));
+    tcxNote.dataset.saveOption = 'tcx-no-time-note';
+    tcxNote.hidden = true;
+
     const kmzRemoteRow = el('label', 'editor-check-row');
     kmzRemoteRow.dataset.saveOption = 'kmz-remote';
     const kmzRemoteCheck = el('input');
@@ -802,6 +806,9 @@ export function createEditorShell({
       const showKmlNote = allowOverwrite && overwriteOriginal && (exportFormat === 'kml' || exportFormat === 'kmz');
       owNote.hidden = !showKmlNote;
 
+      const showTcxNote = exportFormat === 'tcx' && !hasTrackTimestamps(store.getCurrent());
+      tcxNote.hidden = !showTcxNote;
+
       kmzRemoteRow.hidden = !isKmzFmt;
       kmzRemoteCheck.checked = packRemoteImages;
     };
@@ -817,7 +824,7 @@ export function createEditorShell({
     });
     syncSavePopoverState();
 
-    savePopover.append(fmtRow, wfRow, owRow, owNote, kmzRemoteRow);
+    savePopover.append(fmtRow, tcxNote, wfRow, owRow, owNote, kmzRemoteRow);
   }
 
   function renderDrawer({ preserveWptScroll = false } = {}) {

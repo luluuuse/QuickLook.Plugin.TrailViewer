@@ -1252,6 +1252,40 @@ internal static class SelfTests
             WriteEntry(archive, "readme.txt", Encoding.UTF8.GetBytes("nope"));
         ExpectInvalidData("update checker rejects .qlplugin archive missing metadata config", () =>
             UpdateChecker.VerifyPluginPackage(invalidPkg));
+
+        var htmlFallbackState = Path.Combine(temporary, "html-fallback-state.json");
+        var htmlFallback = UpdateChecker.CheckLatestAsync(
+            force: true,
+            CancellationToken.None,
+            statePath: htmlFallbackState,
+            currentVersion: "1.30.1",
+            fetcher: _ => System.Threading.Tasks.Task.FromResult("<html><body>Captive Portal Login</body></html>"),
+            mirrorFetcher: _ => System.Threading.Tasks.Task.FromResult(gitcodeListJson))
+            .GetAwaiter().GetResult();
+        Check("update checker falls back to mirror when primary returns HTML captive portal",
+            htmlFallback.Status == "available" && htmlFallback.LatestVersion == "1.31.0" && htmlFallback.Source == "gitcode");
+
+        var bothHtmlState = Path.Combine(temporary, "both-html-state.json");
+        var bothHtml = UpdateChecker.CheckLatestAsync(
+            force: true,
+            CancellationToken.None,
+            statePath: bothHtmlState,
+            currentVersion: "1.30.1",
+            fetcher: _ => System.Threading.Tasks.Task.FromResult("<html>portal 1</html>"),
+            mirrorFetcher: _ => System.Threading.Tasks.Task.FromResult("<html>portal 2</html>"))
+            .GetAwaiter().GetResult();
+        Check("update checker returns error status cleanly when both sources return HTML",
+            bothHtml.Status == "error" && !bothHtml.HasUpdate);
+
+        var decoyHash = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+        var realHash = "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210";
+        var releaseBody = $"Commit: {decoyHash}\n\nSHA256: `{realHash}`";
+        Check("update checker extracts SHA256 near marker and ignores unrelated 64-hex strings",
+            UpdateChecker.ExtractSha256(releaseBody) == realHash.ToUpperInvariant());
+        Check("update checker extracts SHA256 when separated by English words like checksum",
+            UpdateChecker.ExtractSha256($"SHA-256 checksum: `{realHash}`") == realHash.ToUpperInvariant());
+        Check("update checker ignores standalone 64-hex string without SHA256 or qlplugin context",
+            UpdateChecker.ExtractSha256($"Reference commit {decoyHash}") == string.Empty);
     }
 
     private static string FindRepositoryRoot()

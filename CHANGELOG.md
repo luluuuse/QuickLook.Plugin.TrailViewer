@@ -17,45 +17,57 @@ Added / Changed / Deprecated / Removed / Fixed / Security 分类；没有内容�
 
 None yet.
 
-## 1.31.1 — 2026-11-25
+## 1.31.2 — 2026-11-26
 
 ### 中文
 
 #### 新增
 
-- **三套手动主题体系**：新增 **瑞士纸镜**（默认）、**冷岩墨** 与 **基础深色** 三套手工调校主题，可在工具箱底栏通过微缩主题色卡一键切换，并由宿主持久保存偏好，不再随底图自动跳变。
-- **瑞士测绘视觉精装与实时比例尺**：纸镜与岩墨主题采用建筑直角浮层、朱红顶线、四角定位刻度、四段交替比例尺及实时 `1 : N` 比例尺分母；同步升级白边朱红轨迹、海拔极值测绘三角标与无底图双尺度测绘网格。
-- **全新瑞士山岳品牌图标**：内置无边框「精雕山岳标本 + 炭墨盘山小径 + 白底墨框红心」矢量图标，融入工具箱底栏与检查更新卡片，并配以克制的地形晕染与等高线暗纹。
-- **叠加图瑞士风格墨色**：叠加图导出新增 **瑞士** 墨色预设（炭墨文字、暖白渐变衬底与白边朱红轨迹）。
+- **航点列表带图片筛选**：航点速览筛选菜单新增「带图片」类型，按需展示含照片航点数量并支持中英文切换。
+- **轨迹基础信息编辑**：编辑模式顶栏标题支持点击展开「轨迹信息」浮层，可修改轨迹标题、活动类型与轨迹简介并接入撤销/导出；信息卡展开详情后支持长简介 4 行折叠与限高滚动。
 
 #### 变更
 
-- **工具箱底栏与检查更新卡片重排**：将主题色卡收进工具箱底栏，品牌区采用「TrailViewer + 版本号」双行排版；检查更新卡片同步升级图标与右对齐状态提示；三套主题的工具箱功能图标各自配备独立配色（纸镜松林绿、岩墨高山暖金、基础电光蓝）。
-- **海拔剖面交互浮条适配**：刷选统计浮条、裁切与关闭按钮及主坡段/心率胶囊全面适配三套主题色彩与对比度。
+- **海拔平滑算法升级**：去尖刺纳入首尾点以修正开表瞬间气压漂移，滑动平均改为按空间距离加权避免原地停顿点簇权重失衡。
+- **TCX 运动类型映射与导出提醒**：TCX 导出按活动类型映射标准 `Sport` 属性；无时间戳轨迹选择 TCX 导出时在保存浮层给出明确提醒。
+- **瑞士纸镜裁剪遮罩适配**：海拔剖面裁剪遮罩接入主题变量，浅色纸镜主题下采用柔和冷灰半透明遮罩。
 
 #### 修复
 
-- **修复初始加载竞态**：修正首次打开轨迹时航点、公里标及缩放适配偶发漏显或延迟的问题。
-- **修复图层列表与单色图标显示异常**：修正未选图源文字色调不一致的问题，以及浅色主题下单色轨迹切换图标对比度过低难以辨认的问题。
+- **更新器异常兜底与安全校验**：捕获代理或认证页返回非 JSON 导致的解析异常并支持双源平稳回退；复验下载重定向落地域名并收紧 SHA256 提取正则。
+- **KML 航点图标与简介换行兼容**：内部航点符号键改为写入 `ExtendedData` 并支持回读，避免第三方地图软件显示破图；保留 KML 轨迹简介原有段落换行。
 
 ### English
 
 #### Added
 
-- **Three Manual Interface Themes**: Introduced **Swiss Paper** (default), **Slate Dark**, and **Classic Dark** themes with miniature card swatches in the Toolbox footer and persistent host-side preference storage, never auto-switching when basemaps change.
-- **Swisstopo Cartographic Styling & Live Scale Ratio**: Added architectural panel geometry, Swiss vermilion top accent rules, four-corner micro registration ticks, a four-segment alternating scale bar with live `1 : N` cartographic scale ratio, white-cased vermilion tracks, elevation extremum survey triangles, and a dual-scale no-map survey grid for Swiss Paper and Slate Dark.
-- **New Alpine Specimen Brand Icon**: Added a borderless sculpted four-biome alpine peak icon with a winding charcoal switchback trail and Swiss survey summit mark across the Toolbox footer and Update card, paired with subtle terrain-tinted contour backgrounds.
-- **Swiss Ink Preset for Overlay Export**: Added a **Swiss** ink option for PNG route overlays featuring charcoal typography, warm ivory backing wash, and white-cased vermilion route lines.
+- **Photo Filter in Waypoint Overview**: Added a "With photos" filter option in the waypoint overview menu with dynamic counts and full localization.
+- **Track Metadata Editing**: Clicking the track title in the editor topbar opens a Track Info popover to edit title, activity type, and description with undo/redo and multi-format export support; long descriptions collapse to 4 lines in the info card and scroll within a bounded height when expanded.
 
 #### Changed
 
-- **Redesigned Toolbox Footer & Update Card**: Moved the miniature theme swatches into the Toolbox footer with two-line `TrailViewer` + version lockups and right-aligned status text in the Update card; gave each theme distinct Toolbox action-icon palettes (alpine green for Swiss Paper, warm gold for Slate Dark, electric blue for Classic Dark).
-- **Theme-Aware Elevation Profile Controls**: Updated the range brush readout bar, crop/close controls, and ClimbPro / heart-rate chips to adapt cleanly across all three themes.
+- **Distance-Weighted Elevation Smoothing**: Extended median despiking to track endpoints to catch startup barometer spikes, and switched the moving average from index weights to spatial distance weights.
+- **TCX Sport Mapping & Timestamp Notice**: Mapped track `activityType` to standard TCX `Sport` values and added an explicit notice in the save popover when exporting timestamp-free tracks to TCX.
+- **Theme-Aware Crop Mask**: Extracted the elevation profile crop dim overlay to a theme token with a softer cool-gray wash under the Swiss Paper light theme.
 
 #### Fixed
 
-- **Fixed Initial Load Race Conditions**: Resolved sporadic missing waypoints, kilometre labels, or delayed initial zoom fits on first track load.
-- **Fixed Layer Menu & Single-Color Icon Contrast**: Fixed inconsistent dimmed text styling on unselected layer providers and low-contrast single-color track mode icons on light themes.
+- **Updater Resilience & Security Hardening**: Caught non-JSON parse exceptions from captive portals or proxies for graceful dual-source fallback, re-validated final redirect hosts on package downloads, and tightened SHA256 extraction.
+- **KML Waypoint Icon & Description Formatting**: Stored internal waypoint icon keys in `ExtendedData` with round-trip parsing instead of writing invalid `<Icon><href>` URLs, and preserved paragraph line breaks in KML document descriptions.
+
+## 1.31.1 — 2026-11-25
+
+### 中文
+
+#### 修复
+
+- **对齐底栏品牌图标尺寸测试**：同步工具箱底栏新山岳品牌图标的尺寸断言，确保发布流水线自动化测试通过。
+
+### English
+
+#### Fixed
+
+- **Aligned Footer Brand Icon Size Test**: Updated the toolbox footer brand icon dimension assertion to match the sculpted alpine specimen icon so release verification passes cleanly.
 
 ## 1.31.0 — 2026-11-25
 

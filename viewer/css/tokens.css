@@ -115,6 +115,7 @@
   --editor-danger-text: #b42318;
   --editor-save-bg: #18212b;
   --editor-save-hover: #263445;
+  --editor-crop-dim: rgba(24, 34, 46, 0.24);
   /* Map & Profile semantic tokens */
   --km-bg: rgba(250, 248, 243, 0.94);
   --km-text: #18212b;
@@ -273,6 +274,7 @@
   --editor-danger-text: #fca5a5;
   --editor-save-bg: #297bb8;
   --editor-save-hover: #3590d4;
+  --editor-crop-dim: rgba(15, 23, 42, 0.56);
   --km-bg: rgba(25, 32, 41, 0.90);
   --km-text: #f1f5f9;
   --km-border: rgba(218, 230, 244, 0.42);
@@ -417,6 +419,7 @@
   --editor-danger-text: #fca5a5;
   --editor-save-bg: #0369a1;
   --editor-save-hover: #0284c7;
+  --editor-crop-dim: rgba(15, 23, 42, 0.56);
   --km-bg: rgba(24, 24, 24, 0.78);
   --km-text: #ffffff;
   --km-border: rgba(255, 255, 255, 0.2);

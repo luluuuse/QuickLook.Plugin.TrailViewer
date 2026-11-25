@@ -905,3 +905,47 @@ test('generateMilestoneWaypoints respects minDistanceMeters: 0', () => {
   assert.ok(withZero.addedCount >= withDefault.addedCount);
   assert.equal(withZero.addedCount, 2);
 });
+
+test('smoothTrackElevation despikes endpoint barometer glitches and uses spatial distance weights', () => {
+  const endpointTrack = {
+    tracks: [{
+      name: 'Endpoints',
+      segments: [[
+        { lat: 30.000, lon: 114.0, ele: 950 }, // startup spike
+        { lat: 30.001, lon: 114.0, ele: 100 },
+        { lat: 30.002, lon: 114.0, ele: 102 },
+        { lat: 30.003, lon: 114.0, ele: 104 },
+        { lat: 30.004, lon: 114.0, ele: 106 },
+        { lat: 30.005, lon: 114.0, ele: 0 }, // end zero dropout
+      ]],
+    }],
+    routes: [],
+    waypoints: [],
+  };
+  const despiked = smoothTrackElevation(endpointTrack, { windowSize: 5, spikeThresholdMeters: 30 });
+  const seg = despiked.track.tracks[0].segments[0];
+  assert.ok(seg[0].ele < 120, `expected start spike fixed, got ${seg[0].ele}`);
+  assert.ok(seg[5].ele > 90, `expected end zero dropout fixed, got ${seg[5].ele}`);
+
+  // Pause cluster at 100m near index 1..2, then a 500m jump to a 200m ridge at index 3, then 10m to 200m at index 4.
+  const uneven = {
+    tracks: [{
+      name: 'Uneven',
+      segments: [[
+        { lat: 30.0000, lon: 114.0, ele: 100 },
+        { lat: 30.0001, lon: 114.0, ele: 100 },
+        { lat: 30.0002, lon: 114.0, ele: 100 },
+        { lat: 30.0050, lon: 114.0, ele: 200 },
+        { lat: 30.0051, lon: 114.0, ele: 200 },
+        { lat: 30.0052, lon: 114.0, ele: 200 },
+      ]],
+    }],
+    routes: [],
+    waypoints: [],
+  };
+  const smoothed = smoothTrackElevation(uneven, { windowSize: 5, spikeThresholdMeters: 300 });
+  // Point 3 is spatially right next to points 4 & 5 (200m) and ~530m away from points 1 & 2 (100m),
+  // so distance weighting must keep point 3 much closer to 200m than index weighting (~155m) would.
+  const ridgeEle = smoothed.track.tracks[0].segments[0][3].ele;
+  assert.ok(ridgeEle > 180, `expected distance-weighted ridge elevation > 180, got ${ridgeEle}`);
+});
