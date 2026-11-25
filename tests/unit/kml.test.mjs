@@ -354,3 +354,16 @@ test('parseKml does not backfill waypoint time on route networks', () => {
   assert.equal(kml.waypoints[0].time, undefined);
   assert.equal(kml.waypoints[0].description, undefined);
 });
+
+test('parseKml preserves paragraph line breaks in document description', () => {
+  const xml = `<?xml version="1.0" encoding="utf-8"?>
+  <kml xmlns="http://www.opengis.net/kml/2.2">
+    <Document>
+      <name>Ridge</name>
+      <description><![CDATA[<p>Line 1</p><p>Line 2<br/>Line 3</p>]]></description>
+      <Placemark><LineString><coordinates>114.3,30.5 114.31,30.51</coordinates></LineString></Placemark>
+    </Document>
+  </kml>`;
+  const kml = parseKml(xml);
+  assert.equal(kml.description, 'Line 1\nLine 2\nLine 3');
+});

@@ -196,16 +196,27 @@ export function createWaypointOverview({ el, onSelect, onLayoutChange, onOpen })
     document.body.append(panel);
   }
 
+  function filterLabel(choice) {
+    const key = choice.key === 'all' ? 'overview.all'
+      : choice.key === 'important' ? 'overview.important'
+      : choice.key === 'photos' ? 'overview.photos'
+      : `insight.${choice.key}`;
+    return `${t(key)} ${choice.count}`;
+  }
+
   function renderFilters() {
     const counts = Object.fromEntries(INSIGHT_KEYS.map((key) => [key, 0]));
     let important = 0;
+    let photos = 0;
     for (const item of currentItems) {
       const insight = insightOf(item);
       if (insight.important) important += 1;
+      if (item.stop.photos.length > 0) photos += 1;
       for (const category of insight.categories) counts[category.key] += 1;
     }
     const choices = [{ key: 'all', count: currentItems.length }];
     if (important > 0) choices.push({ key: 'important', count: important });
+    if (photos > 0) choices.push({ key: 'photos', count: photos });
     for (const key of INSIGHT_KEYS) {
       if (counts[key] > 0) choices.push({ key, count: counts[key] });
     }
@@ -217,8 +228,7 @@ export function createWaypointOverview({ el, onSelect, onLayoutChange, onOpen })
     }
     filterTrigger.hidden = false;
     const current = choices.find((choice) => choice.key === activeFilter);
-    const currentLabel = `${t(current.key === 'all' ? 'overview.all' : current.key === 'important'
-      ? 'overview.important' : `insight.${current.key}`)} ${current.count}`;
+    const currentLabel = filterLabel(current);
     filterTrigger.replaceChildren(
       el('span', 'waypoint-filter-label', `${t('overview.filter')} · ${currentLabel}`),
       iconElement('chevron-down', { size: 12, className: 'waypoint-filter-chevron' }),
@@ -231,8 +241,7 @@ export function createWaypointOverview({ el, onSelect, onLayoutChange, onOpen })
       button.type = 'button';
       button.dataset.filter = choice.key;
       button.setAttribute('role', 'menuitemradio');
-      button.textContent = `${t(choice.key === 'all' ? 'overview.all' : choice.key === 'important'
-        ? 'overview.important' : `insight.${choice.key}`)} ${choice.count}`;
+      button.textContent = filterLabel(choice);
       button.classList.toggle('active', activeFilter === choice.key);
       button.setAttribute('aria-checked', String(activeFilter === choice.key));
       button.addEventListener('click', () => {
@@ -265,6 +274,7 @@ export function createWaypointOverview({ el, onSelect, onLayoutChange, onOpen })
       const insight = insightOf(item);
       if (activeFilter === 'all') return true;
       if (activeFilter === 'important') return insight.important;
+      if (activeFilter === 'photos') return item.stop.photos.length > 0;
       return insight.categories.some((category) => category.key === activeFilter);
     });
     const selectedItem = currentItems.find((item) =>

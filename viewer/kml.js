@@ -327,6 +327,35 @@ function readPlacemark(placemark, out, styles, { skipTime = false, skipElevation
   collect(placemark);
 }
 
+function readDocumentData(container, names) {
+  if (!container) return null;
+  const extended = child(container, 'ExtendedData');
+  if (!extended) return null;
+  const lowered = new Set(names.map((n) => n.toLowerCase()));
+  for (const data of children(extended, 'Data')) {
+    const key = (data.getAttribute('name') || '').toLowerCase();
+    if (!lowered.has(key)) continue;
+    const val = childText(data, 'value');
+    if (val) return val;
+  }
+  return null;
+}
+
+function cleanDocumentDescription(raw) {
+  if (!raw) return null;
+  const text = String(raw)
+    .replace(/\r\n?/g, '\n')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/(?:p|div|li|h[1-6]|tr)>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .split('\n')
+    .map((line) => line.replace(/[ \t]+/g, ' ').trim())
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+  return text || null;
+}
+
 /** Parses an already parsed KML document. Throws KmlError with a readable message. */
 /** @returns {ParsedTrack} */
 export function parseKmlDocument(doc) {
@@ -334,7 +363,10 @@ export function parseKmlDocument(doc) {
   if (!root || root.localName !== 'kml') throw new KmlError(t('error.notKml'));
   const documentNode = child(root, 'Document');
   const documentName = documentNode ? childText(documentNode, 'name') : null;
+  const rawDocDesc = documentNode ? childText(documentNode, 'description') : null;
+  const documentDescription = cleanDocumentDescription(rawDocDesc);
   const extended = documentNode || root;
+  const activityType = readDocumentData(extended, ['activityType', 'activity_type', 'sport', 'type']);
   const segmentCount = metricNumber(extended, 'segment_count');
   const durationSeconds = metricNumber(extended, 'duration_seconds');
   const namedDistance = metricNumber(extended, 'distance_meters');
@@ -376,6 +408,8 @@ export function parseKmlDocument(doc) {
     name: documentName
       || (tracks.length === 1 && areas.length === 0 ? tracks[0].name : null)
       || null,
+    description: documentDescription,
+    activityType,
     tracks,
     routes: [],
     waypoints,

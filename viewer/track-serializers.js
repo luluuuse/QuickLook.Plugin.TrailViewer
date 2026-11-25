@@ -204,8 +204,20 @@ export function serializeKml(parsed, { includeImages = true } = {}) {
   ];
 
   const docName = parsed?.name ? String(parsed.name).trim() : '';
+  const docDesc = parsed?.description ? String(parsed.description).trim() : '';
+  const activityType = parsed?.activityType ? String(parsed.activityType).trim() : '';
   if (docName) {
     lines.push(`    <name>${escapeXml(docName)}</name>`);
+  }
+  if (docDesc) {
+    lines.push(`    <description>${escapeXml(docDesc)}</description>`);
+  }
+  if (activityType) {
+    lines.push(
+      '    <ExtendedData>',
+      `      <Data name="activityType"><value>${escapeXml(activityType)}</value></Data>`,
+      '    </ExtendedData>',
+    );
   }
 
   const tracksToWrite = collectTracks(parsed);
@@ -419,9 +431,13 @@ export function serializeGeoJson(parsed) {
   }
 
   const docName = parsed?.name ? String(parsed.name).trim() : '';
+  const docDesc = parsed?.description ? String(parsed.description).trim() : '';
+  const activityType = parsed?.activityType ? String(parsed.activityType).trim() : '';
   const collection = {
     type: 'FeatureCollection',
     ...(docName ? { name: docName } : {}),
+    ...(docDesc ? { description: docDesc } : {}),
+    ...(activityType ? { activityType } : {}),
     features,
   };
   return `${JSON.stringify(collection, null, 2)}\n`;

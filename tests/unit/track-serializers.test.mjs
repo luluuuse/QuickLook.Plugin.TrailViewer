@@ -279,6 +279,37 @@ test('serializeKml outputs valid KML 2.2 with gx:Track/LineString/MultiGeometry 
   assert.equal(reparsed.waypoints[1].description, 'Plain ridge & camp note');
 });
 
+test('serializeKml and serializeGeoJson round-trip track description and activityType', () => {
+  const track = {
+    name: 'Alpine Loop',
+    description: 'Snow traverse with water at 3200m',
+    activityType: 'mountaineering',
+    tracks: [{
+      name: 'Main',
+      segments: [[
+        { lat: 30.5, lon: 114.3, ele: 100 },
+        { lat: 30.51, lon: 114.31, ele: 200 },
+      ]],
+    }],
+    routes: [],
+    waypoints: [],
+    areas: [],
+  };
+
+  const kml = serializeKml(track);
+  assert.ok(kml.includes('<description>Snow traverse with water at 3200m</description>'));
+  assert.ok(kml.includes('<Data name="activityType"><value>mountaineering</value></Data>'));
+  const reparsed = parseKml(kml);
+  assert.equal(reparsed.name, 'Alpine Loop');
+  assert.equal(reparsed.description, 'Snow traverse with water at 3200m');
+  assert.equal(reparsed.activityType, 'mountaineering');
+
+  const geo = JSON.parse(serializeGeoJson(track));
+  assert.equal(geo.name, 'Alpine Loop');
+  assert.equal(geo.description, 'Snow traverse with water at 3200m');
+  assert.equal(geo.activityType, 'mountaineering');
+});
+
 test('serializeGeoJson outputs valid RFC 7946 FeatureCollection with 3D/2D coords and filters invalid points', () => {
   const jsonText = serializeGeoJson({
     name: 'Geo Test',

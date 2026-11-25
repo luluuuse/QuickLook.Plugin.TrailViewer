@@ -137,6 +137,8 @@ export function cloneParsedTrack(parsed) {
   return {
     version: parsed?.version ?? null,
     name: parsed?.name ?? null,
+    description: parsed?.description ?? null,
+    activityType: parsed?.activityType ?? null,
     tracks: (parsed?.tracks || []).map((t) => ({
       name: t.name ?? null,
       segments: (t.segments || []).map((seg) => seg.map(clonePoint)),
@@ -154,6 +156,46 @@ export function cloneParsedTrack(parsed) {
     pauseSeconds: parsed?.pauseSeconds,
     network: Boolean(parsed?.network),
   };
+}
+
+/** Common outdoor activity type presets (stored as canonical keys; custom free text is also accepted). */
+export const ACTIVITY_TYPE_PRESETS = Object.freeze([
+  'hiking',
+  'mountaineering',
+  'trail_running',
+  'cycling',
+  'camping',
+  'other',
+]);
+
+/**
+ * Returns the canonical preset key if value matches a known activity preset, otherwise null.
+ * @param {string | null | undefined} value
+ * @returns {string | null}
+ */
+export function matchActivityPreset(value) {
+  if (!value) return null;
+  const normalized = String(value).trim().toLowerCase().replace(/[\s-]+/g, '_');
+  return ACTIVITY_TYPE_PRESETS.includes(normalized) ? normalized : null;
+}
+
+/**
+ * Updates document-level track metadata (name, description, activityType) immutably.
+ * @param {import('./types.js').ParsedTrack} parsed
+ * @param {{ name?: string | null, description?: string | null, activityType?: string | null }} patch
+ * @returns {import('./types.js').ParsedTrack}
+ */
+export function updateTrackMetadata(parsed, patch = {}) {
+  const next = cloneParsedTrack(parsed);
+  const normalize = (value) => {
+    if (value == null) return null;
+    const trimmed = String(value).trim();
+    return trimmed || null;
+  };
+  if ('name' in patch) next.name = normalize(patch.name);
+  if ('description' in patch) next.description = normalize(patch.description);
+  if ('activityType' in patch) next.activityType = normalize(patch.activityType);
+  return next;
 }
 
 function interpolatePoint(a, b, ratio) {

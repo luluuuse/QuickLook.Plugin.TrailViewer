@@ -85,8 +85,15 @@ export function serializeGpx(parsed, {
   ];
 
   const docName = parsed?.name ? String(parsed.name).trim() : '';
-  if (docName) {
+  const docDesc = parsed?.description ? String(parsed.description).trim() : '';
+  const activityType = parsed?.activityType ? String(parsed.activityType).trim() : '';
+  if (docName && !docDesc) {
     lines.push(`  <metadata><name>${escapeXml(docName)}</name></metadata>`);
+  } else if (docName || docDesc) {
+    lines.push('  <metadata>');
+    if (docName) lines.push(`    <name>${escapeXml(docName)}</name>`);
+    if (docDesc) lines.push(`    <desc>${escapeXml(docDesc)}</desc>`);
+    lines.push('  </metadata>');
   }
 
   for (const wpt of parsed?.waypoints || []) {
@@ -119,6 +126,7 @@ export function serializeGpx(parsed, {
     if (segs.length === 0) continue;
     lines.push('  <trk>');
     if (track.name) lines.push(`    <name>${escapeXml(track.name)}</name>`);
+    if (activityType) lines.push(`    <type>${escapeXml(activityType)}</type>`);
     for (const seg of segs) {
       lines.push('    <trkseg>');
       for (const pt of seg) {

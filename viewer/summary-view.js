@@ -8,6 +8,13 @@ import {
 } from './format.js';
 import { setIcon } from './icons.js';
 import { readStored, writeStored } from './storage.js';
+import { matchActivityPreset } from './track-ops.js';
+
+function formatActivityType(value) {
+  if (!value) return '';
+  const preset = matchActivityPreset(value);
+  return preset ? t(`activity.${preset}`) : String(value).trim();
+}
 
 const DETAILS_KEY = 'infoDetails';
 
@@ -18,6 +25,9 @@ function savedDetailsMode() {
 /** Plain text for the share action. Missing values are omitted instead of turning into misleading placeholders. */
 export function trackSummaryText(gpx, summary, elevations, fileName) {
   const lines = [gpx.name || fileName];
+  if (gpx.activityType) {
+    lines.push(`${t('info.activityType')}: ${formatActivityType(gpx.activityType)}`);
+  }
   if (summary.segments > 0 || summary.routes > 0) {
     lines.push(`${t(!summary.network && summary.segments > 0 ? 'info.distance' : 'info.routeLength')}: `
       + formatDistance(summary.distanceMeters));
@@ -51,6 +61,7 @@ export function trackSummaryText(gpx, summary, elevations, fileName) {
     lines.push(`${t('summary.peak')}: ${formatElevation(elevations.max)}`);
   }
   if (summary.points > 0) lines.push(`${t('info.points')}: ${summary.points.toLocaleString()}`);
+  if (gpx.description) lines.push(`${t('info.description')}: ${gpx.description}`);
   return lines.join('\n');
 }
 
@@ -58,9 +69,11 @@ export function createSummaryView({
   el, fileName, photosOf, onCopySummary, onLayoutChange,
 }) {
   let detailsMode = savedDetailsMode();
+  let descriptionExpanded = false;
   let narrowExpanded = false;
   let desktopCollapsed = false;
   let activeSyncPill = null;
+  let activeSyncDescLimit = null;
   const isNarrow = () => window.innerWidth <= 720 || window.innerHeight <= 520;
 
   if (typeof window !== 'undefined') {
@@ -68,6 +81,7 @@ export function createSummaryView({
       if (!activeSyncPill) return;
       const wasCompact = document.body.classList.contains('info-compact');
       activeSyncPill();
+      activeSyncDescLimit?.();
       if (document.body.classList.contains('info-compact') !== wasCompact) {
         onLayoutChange?.();
       }
@@ -237,11 +251,15 @@ export function createSummaryView({
     if (stats.childElementCount > 0) box.append(stats);
 
     if (detailsMode !== 'full') {
+      activeSyncDescLimit = null;
       box.hidden = false;
       return;
     }
 
     const rows = [];
+    if (gpx.activityType) {
+      rows.push([t('info.activityType'), formatActivityType(gpx.activityType)]);
+    }
     const range = formatRange(summary.start, summary.end);
     if (range) rows.push([t('info.date'), range]);
     const anomalyParts = el('span', 'anomaly-values');
@@ -290,6 +308,48 @@ export function createSummaryView({
         pins: units(photoPins.length, 'pin'),
       })]);
     }
+    let descEl = null;
+    let descToggle = null;
+    if (gpx.description) {
+      const descWrap = el('div', 'info-description-wrap');
+      descEl = el('div', `info-description${descriptionExpanded ? ' is-expanded' : ''}`, gpx.description);
+      descToggle = el('button', 'info-description-toggle',
+        t(descriptionExpanded ? 'info.descriptionCollapse' : 'info.descriptionExpand'));
+      descToggle.type = 'button';
+      descToggle.setAttribute('aria-expanded', String(descriptionExpanded));
+      descToggle.hidden = !descriptionExpanded;
+      descToggle.addEventListener('click', () => {
+        descriptionExpanded = !descriptionExpanded;
+        descEl.classList.toggle('is-expanded', descriptionExpanded);
+        descToggle.textContent = t(descriptionExpanded ? 'info.descriptionCollapse' : 'info.descriptionExpand');
+        descToggle.setAttribute('aria-expanded', String(descriptionExpanded));
+        syncDescLimit();
+        onLayoutChange?.();
+      });
+      descWrap.append(descEl, descToggle);
+      rows.push([t('info.description'), descWrap]);
+    }
+
+    function syncDescLimit() {
+      if (!descEl || !descEl.isConnected) return;
+      if (!descriptionExpanded) {
+        descEl.style.maxHeight = '';
+        if (descToggle) {
+          descToggle.hidden = descEl.scrollHeight <= descEl.clientHeight + 2;
+        }
+        return;
+      }
+      if (descToggle) descToggle.hidden = false;
+      const profile = document.getElementById('profile');
+      const profileRect = profile && !profile.hidden ? profile.getBoundingClientRect() : null;
+      const bottomLimit = profileRect && profileRect.height > 0 ? profileRect.top : window.innerHeight;
+      const splits = document.getElementById('splits');
+      const splitsReserve = splits && !splits.hidden ? 52 : 12;
+      const descTop = descEl.getBoundingClientRect().top;
+      const available = Math.max(76, Math.floor(bottomLimit - splitsReserve - descTop - 28));
+      descEl.style.maxHeight = `${Math.min(available, 280)}px`;
+    }
+    activeSyncDescLimit = descEl ? syncDescLimit : null;
 
     const table = el('dl', 'facts');
     for (const [key, value, title] of rows) {
@@ -304,5 +364,11 @@ export function createSummaryView({
     if (rows.length > 0) box.append(table);
     if (parts.length === 0) box.append(el('p', 'empty', t('info.empty')));
     box.hidden = false;
+    if (descEl) {
+      requestAnimationFrame(() => {
+        syncDescLimit();
+        onLayoutChange?.();
+      });
+    }
   };
 }

@@ -42,3 +42,23 @@ test('findGarminWaypointWarnings detects >15 char names and truncated collisions
   assert.equal(result.tooLongCount, 2);
   assert.equal(result.collisionCount, 1);
 });
+
+test('serializeGpx writes metadata desc and track activity type when provided', () => {
+  const xml = serializeGpx({
+    name: 'Ridge Loop',
+    description: 'Steep granite ridge & camp',
+    activityType: 'hiking',
+    tracks: [{
+      name: 'Main',
+      segments: [[
+        { lat: 39.9, lon: 116.3, ele: 100 },
+        { lat: 39.91, lon: 116.31, ele: 200 },
+      ]],
+    }],
+    routes: [],
+    waypoints: [],
+  });
+  assert.ok(xml.includes('<name>Ridge Loop</name>'));
+  assert.ok(xml.includes('<desc>Steep granite ridge &amp; camp</desc>'));
+  assert.ok(xml.includes('<type>hiking</type>'));
+});

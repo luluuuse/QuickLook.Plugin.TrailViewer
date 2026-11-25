@@ -4,14 +4,17 @@ import { findGarminWaypointWarnings } from './gpx-serializer.js';
 import { iconElement } from './icons.js';
 import { EXPORT_FORMATS, hasTrackTimestamps, serializeTrack } from './track-serializers.js';
 import {
+  ACTIVITY_TYPE_PRESETS,
   cloneParsedTrack,
   createSegmentColorResolver,
   deleteTrackVertex,
   deleteWaypoint,
+  matchActivityPreset,
   normalizedTracks,
   sortWaypointsByRoute,
   splitTrackAt,
   trackTotalDistance,
+  updateTrackMetadata,
 } from './track-ops.js';
 
 const RAIL_TOOLS = [
@@ -88,7 +91,9 @@ export function createEditorShell({
   const notifyToast = showToast;
   let root = null;
   let topbar = null;
+  let titleBtn = null;
   let nameEl = null;
+  let metaPopover = null;
   let diffEl = null;
   let undoBtn = null;
   let redoBtn = null;
@@ -494,7 +499,13 @@ export function createEditorShell({
     if (!topbar || !store.isActive()) return;
     const snap = store.snapshot();
     topbar.classList.toggle('is-dirty', snap.dirty);
-    nameEl.textContent = getTrackName() || t('file.untitled');
+    const current = store.getCurrent();
+    const displayName = current?.name || getTrackName() || t('file.untitled');
+    nameEl.textContent = displayName;
+    if (titleBtn) {
+      titleBtn.title = `${displayName} · ${t('editor.meta.editTitle')}`;
+      titleBtn.setAttribute('aria-label', `${t('editor.meta.editTitle')}: ${displayName}`);
+    }
     undoBtn.disabled = !snap.canUndo;
     redoBtn.disabled = !snap.canRedo;
     resetBtn.disabled = !snap.dirty && !snap.canUndo;
@@ -611,6 +622,124 @@ export function createEditorShell({
   function closeSavePopover() {
     if (savePopover) savePopover.hidden = true;
     saveOptsBtn?.setAttribute('aria-expanded', 'false');
+  }
+
+  function closeMetaPopover() {
+    if (metaPopover) metaPopover.hidden = true;
+    titleBtn?.setAttribute('aria-expanded', 'false');
+  }
+
+  function resolveActivityInput(rawValue) {
+    const trimmed = String(rawValue || '').trim();
+    if (!trimmed) return null;
+    const direct = matchActivityPreset(trimmed);
+    if (direct) return direct;
+    const lowered = trimmed.toLowerCase();
+    for (const preset of ACTIVITY_TYPE_PRESETS) {
+      if (t(`activity.${preset}`).trim().toLowerCase() === lowered) return preset;
+    }
+    return trimmed;
+  }
+
+  function buildMetaPopoverContent() {
+    if (!metaPopover) return;
+    metaPopover.textContent = '';
+    const current = store.getCurrent();
+    const initialName = current?.name || '';
+    const initialDesc = current?.description || '';
+    const initialActivity = current?.activityType || '';
+    const initialPreset = matchActivityPreset(initialActivity);
+
+    const head = el('div', 'editor-meta-header');
+    head.append(el('strong', 'editor-meta-title', t('editor.meta.title')));
+    metaPopover.append(head);
+
+    const nameField = el('label', 'editor-meta-field');
+    nameField.append(el('span', 'editor-meta-label', t('editor.meta.name')));
+    const nameInput = el('input', 'editor-input');
+    nameInput.type = 'text';
+    nameInput.dataset.metaField = 'name';
+    nameInput.value = initialName;
+    nameInput.placeholder = getTrackName() || t('editor.meta.namePlaceholder');
+    nameField.append(nameInput);
+    metaPopover.append(nameField);
+
+    const actField = el('div', 'editor-meta-field');
+    actField.append(el('span', 'editor-meta-label', t('editor.meta.activityType')));
+    const presetRow = el('div', 'editor-meta-presets');
+    const actInput = el('input', 'editor-input');
+    actInput.type = 'text';
+    actInput.dataset.metaField = 'activityType';
+    actInput.value = initialPreset ? t(`activity.${initialPreset}`) : initialActivity;
+    actInput.placeholder = t('editor.meta.activityPlaceholder');
+
+    const presetBtns = new Map();
+    const syncPresetChips = () => {
+      const matched = resolveActivityInput(actInput.value);
+      for (const [key, btn] of presetBtns.entries()) {
+        const active = matched === key;
+        btn.classList.toggle('is-active', active);
+        btn.setAttribute('aria-pressed', String(active));
+      }
+    };
+    for (const preset of ACTIVITY_TYPE_PRESETS) {
+      const chip = el('button', 'editor-meta-preset', t(`activity.${preset}`));
+      chip.type = 'button';
+      chip.dataset.activityPreset = preset;
+      chip.setAttribute('aria-pressed', String(initialPreset === preset));
+      chip.classList.toggle('is-active', initialPreset === preset);
+      chip.addEventListener('click', () => {
+        const currentResolved = resolveActivityInput(actInput.value);
+        actInput.value = currentResolved === preset ? '' : t(`activity.${preset}`);
+        syncPresetChips();
+      });
+      presetBtns.set(preset, chip);
+      presetRow.append(chip);
+    }
+    actInput.addEventListener('input', syncPresetChips);
+    actField.append(presetRow, actInput);
+    metaPopover.append(actField);
+
+    const descField = el('label', 'editor-meta-field');
+    descField.append(el('span', 'editor-meta-label', t('editor.meta.description')));
+    const descInput = el('textarea', 'editor-input editor-meta-textarea');
+    descInput.rows = 3;
+    descInput.dataset.metaField = 'description';
+    descInput.value = initialDesc;
+    descInput.placeholder = t('editor.meta.descriptionPlaceholder');
+    descField.append(descInput);
+    metaPopover.append(descField);
+
+    const applyChanges = () => {
+      const nextName = nameInput.value.trim() || null;
+      const nextDesc = descInput.value.trim() || null;
+      const nextActivity = resolveActivityInput(actInput.value);
+      const cur = store.getCurrent();
+      const unchanged = (cur?.name || null) === nextName
+        && (cur?.description || null) === nextDesc
+        && (cur?.activityType || null) === nextActivity;
+      if (!unchanged) {
+        store.apply('metadata', updateTrackMetadata(cur, {
+          name: nextName,
+          description: nextDesc,
+          activityType: nextActivity,
+        }));
+      }
+      closeMetaPopover();
+      titleBtn?.focus({ preventScroll: true });
+    };
+
+    const actions = el('div', 'editor-meta-actions');
+    const cancelBtn = makeBtn('editor-btn', null, t('editor.cancel'), () => {
+      closeMetaPopover();
+      titleBtn?.focus({ preventScroll: true });
+    });
+    const applyBtn = makeBtn('editor-btn editor-btn-primary', null, t('editor.meta.apply'), applyChanges);
+    applyBtn.dataset.metaAction = 'apply';
+    actions.append(cancelBtn, applyBtn);
+    metaPopover.append(actions);
+
+    requestAnimationFrame(() => nameInput.focus({ preventScroll: true }));
   }
 
   function buildSavePopoverContent() {
@@ -821,6 +950,7 @@ export function createEditorShell({
   function requestExit() {
     if (!store.isActive() || isSaving) return;
     closeSavePopover();
+    closeMetaPopover();
     setSaveProgressUi(null);
     closeContextMenu();
     if (!store.isDirty()) {
@@ -837,10 +967,27 @@ export function createEditorShell({
 
     topbar = el('div', 'editor-topbar');
     topbar.id = 'editor-topbar';
-    const titleWrap = el('div', 'editor-topbar-title');
-    titleWrap.append(el('span', 'editor-dirty-dot'));
+    titleBtn = el('button', 'editor-topbar-title editor-topbar-title-btn');
+    titleBtn.type = 'button';
+    titleBtn.dataset.editorControl = 'metadata';
+    titleBtn.setAttribute('aria-haspopup', 'dialog');
+    titleBtn.setAttribute('aria-expanded', 'false');
+    titleBtn.append(el('span', 'editor-dirty-dot'));
     nameEl = el('span', 'editor-topbar-name');
-    titleWrap.append(nameEl);
+    titleBtn.append(nameEl, iconElement('edit', { size: 12, className: 'editor-topbar-edit-icon' }));
+    titleBtn.addEventListener('click', () => {
+      if (!metaPopover) return;
+      const nextOpen = metaPopover.hidden;
+      closeSavePopover();
+      if (nextOpen) {
+        buildMetaPopoverContent();
+        const rect = titleBtn.getBoundingClientRect();
+        metaPopover.style.left = `${Math.min(innerWidth - 312, Math.max(8, rect.left))}px`;
+        metaPopover.style.transform = 'none';
+      }
+      metaPopover.hidden = !nextOpen;
+      titleBtn.setAttribute('aria-expanded', String(nextOpen));
+    });
 
     diffEl = el('span', 'editor-diff-pill');
     undoBtn = makeBtn('editor-btn', 'undo', t('editor.undo'), () => store.undo());
@@ -864,6 +1011,7 @@ export function createEditorShell({
     saveOptsBtn = makeBtn('editor-btn editor-save-opts-btn', 'settings', null, () => {
       if (!savePopover) return;
       const nextOpen = savePopover.hidden;
+      closeMetaPopover();
       if (nextOpen) {
         buildSavePopoverContent();
         const rect = saveOptsBtn.getBoundingClientRect();
@@ -877,7 +1025,7 @@ export function createEditorShell({
     exitBtn = makeBtn('editor-btn', 'close', t('editor.exit'), requestExit);
 
     topbar.append(
-      titleWrap,
+      titleBtn,
       diffEl,
       el('span', 'editor-topbar-sep'),
       undoBtn,
@@ -891,6 +1039,11 @@ export function createEditorShell({
       saveOptsBtn,
       exitBtn,
     );
+
+    metaPopover = el('div', 'editor-meta-popover');
+    metaPopover.hidden = true;
+    metaPopover.setAttribute('role', 'dialog');
+    metaPopover.setAttribute('aria-modal', 'false');
 
     savePopover = el('div', 'editor-save-popover');
     savePopover.hidden = true;
@@ -1001,7 +1154,7 @@ export function createEditorShell({
     contextMenu = el('div', 'editor-context-menu');
     contextMenu.hidden = true;
 
-    root.append(topbar, savePopover, saveProgress, exitGuard, rail, drawer, drawerTooltip, contextMenu);
+    root.append(topbar, metaPopover, savePopover, saveProgress, exitGuard, rail, drawer, drawerTooltip, contextMenu);
     document.body.append(root);
   }
 
@@ -1155,6 +1308,7 @@ export function createEditorShell({
     root.hidden = false;
     hideExitGuard();
     closeSavePopover();
+    closeMetaPopover();
     setSaveProgressUi(null);
     closeContextMenu();
 
@@ -1177,6 +1331,10 @@ export function createEditorShell({
       if (savePopover && !savePopover.hidden && event.target instanceof Node
         && !savePopover.contains(event.target) && !saveOptsBtn?.contains(event.target)) {
         closeSavePopover();
+      }
+      if (metaPopover && !metaPopover.hidden && event.target instanceof Node
+        && !metaPopover.contains(event.target) && !titleBtn?.contains(event.target)) {
+        closeMetaPopover();
       }
       requestAnimationFrame(syncTopbarMapControls);
     }, { signal, capture: true });
@@ -1207,6 +1365,7 @@ export function createEditorShell({
     cropResizeObserver?.disconnect();
     cropResizeObserver = null;
     closeSavePopover();
+    closeMetaPopover();
     setSaveProgressUi(null);
     closeContextMenu();
     if (cropOverlay) cropOverlay.hidden = true;

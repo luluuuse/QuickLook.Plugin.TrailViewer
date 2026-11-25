@@ -54,6 +54,7 @@ body.is-editing #map.editor-cursor-grabbing {
 .editor-drawer[hidden],
 .editor-context-menu[hidden],
 .editor-exit-guard[hidden],
+.editor-meta-popover[hidden],
 .editor-save-popover[hidden],
 .editor-save-progress[hidden],
 .editor-save-note[hidden] {
@@ -193,6 +194,122 @@ body.is-editing #map.editor-cursor-grabbing {
   min-width: 0;
   font-weight: 600;
   color: var(--text-bright);
+}
+
+.editor-topbar-title-btn {
+  height: 26px;
+  padding: 0 7px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  font: inherit;
+  font-weight: 600;
+  color: var(--text-bright);
+  cursor: pointer;
+}
+
+.editor-topbar-title-btn:hover,
+.editor-topbar-title-btn[aria-expanded="true"] {
+  background: var(--surface-control-hover, rgba(128, 128, 128, 0.14));
+  border-color: var(--border-control);
+}
+
+.editor-topbar-edit-icon {
+  flex: 0 0 auto;
+  opacity: 0.65;
+}
+
+.editor-topbar-title-btn:hover .editor-topbar-edit-icon,
+.editor-topbar-title-btn[aria-expanded="true"] .editor-topbar-edit-icon {
+  opacity: 1;
+}
+
+.editor-meta-popover {
+  position: fixed;
+  top: 52px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: var(--z-editor-topbar);
+  box-sizing: border-box;
+  width: min(304px, calc(100vw - 16px));
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border-radius: var(--radius-md);
+  background: var(--editor-surface);
+  backdrop-filter: var(--toolbar-blur);
+  box-shadow: var(--hud-shadow);
+  border: 1px solid var(--border-control);
+  color: var(--text);
+  font-size: 12px;
+}
+
+.editor-meta-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.editor-meta-title {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-bright);
+}
+
+.editor-meta-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.editor-meta-label {
+  font-size: 11.5px;
+  color: var(--muted);
+}
+
+.editor-meta-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.editor-meta-preset {
+  height: 22px;
+  padding: 0 7px;
+  border-radius: 999px;
+  border: 1px solid var(--border-control);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.editor-meta-preset:hover {
+  border-color: var(--border-muted);
+  color: var(--text-bright);
+}
+
+.editor-meta-preset.is-active {
+  background: var(--editor-active-bg);
+  border-color: var(--editor-active-border);
+  color: var(--editor-active-fg);
+}
+
+.editor-meta-textarea {
+  height: auto;
+  min-height: 60px;
+  padding: 6px 8px;
+  resize: vertical;
+  line-height: 1.4;
+}
+
+.editor-meta-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-top: 2px;
 }
 
 .editor-topbar-name {

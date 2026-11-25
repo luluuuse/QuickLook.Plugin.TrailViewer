@@ -431,6 +431,47 @@ async function run() {
     await page.click('#editor-drawer .editor-btn-success');
     const timeDirty = await page.evaluate(() => document.getElementById('editor-topbar')?.classList.contains('is-dirty'));
     check('timeline generator marks track dirty after generating virtual timestamps', Boolean(timeDirty));
+
+    // 13. Topbar track info popover (Scheme A): edit title, activity type and description with undo support
+    await page.click('[data-editor-control="metadata"]');
+    const metaOpen = await page.evaluate(() => {
+      const pop = document.querySelector('.editor-meta-popover');
+      const btn = document.querySelector('[data-editor-control="metadata"]');
+      return Boolean(pop && !pop.hidden && btn?.getAttribute('aria-expanded') === 'true');
+    });
+    check('clicking topbar title opens track info popover', metaOpen);
+
+    await page.fill('.editor-meta-popover [data-meta-field="name"]', 'Custom Alpine Loop');
+    await page.click('.editor-meta-popover [data-activity-preset="hiking"]');
+    await page.fill('.editor-meta-popover [data-meta-field="description"]', 'Ridge traverse with spring water');
+    await page.click('.editor-meta-popover [data-meta-action="apply"]');
+    const metaApplied = await page.evaluate(() => ({
+      hidden: document.querySelector('.editor-meta-popover')?.hidden === true,
+      topbarName: document.querySelector('.editor-topbar-name')?.textContent || '',
+    }));
+    check('applying track info updates topbar title and closes popover',
+      metaApplied.hidden && metaApplied.topbarName === 'Custom Alpine Loop',
+      JSON.stringify(metaApplied));
+
+    // Reopen popover to verify persisted values, then undo and verify rollback
+    await page.click('[data-editor-control="metadata"]');
+    const metaPersisted = await page.evaluate(() => ({
+      name: document.querySelector('.editor-meta-popover [data-meta-field="name"]')?.value || '',
+      desc: document.querySelector('.editor-meta-popover [data-meta-field="description"]')?.value || '',
+      hikingActive: document.querySelector('.editor-meta-popover [data-activity-preset="hiking"]')
+        ?.classList.contains('is-active') === true,
+    }));
+    check('reopening track info popover preserves updated name, activity preset and description',
+      metaPersisted.name === 'Custom Alpine Loop'
+        && metaPersisted.desc === 'Ridge traverse with spring water'
+        && metaPersisted.hikingActive,
+      JSON.stringify(metaPersisted));
+
+    await page.click('[data-editor-control="metadata"]');
+    await page.keyboard.press('Control+z');
+    const metaUndone = await page.evaluate(() =>
+      document.querySelector('.editor-topbar-name')?.textContent || '');
+    check('undo restores previous track title', metaUndone !== 'Custom Alpine Loop', metaUndone);
   } finally {
     await browser.close();
     server.close();

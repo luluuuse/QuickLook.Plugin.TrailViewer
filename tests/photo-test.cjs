@@ -10,6 +10,7 @@ const path = require('path');
 const {
   launchBrowser,
   settlePopup,
+  switchLanguage,
   waitForFocus,
   waitForLayout,
   waitForMapIdle,
@@ -625,6 +626,36 @@ async function main() {
       && overviewRows.find((r) => r.name === 'Turnoff')?.description === null
       && overviewRows.find((r) => r.name === 'Lookout')?.description === 'Ridge fork ahead',
     JSON.stringify(overviewRows));
+
+  await page.locator('.waypoint-filter-trigger').click();
+  const photoFilterMenu = await page.evaluate(() =>
+    [...document.querySelectorAll('.insight-filter')].map((node) => ({
+      filter: node.dataset.filter,
+      text: node.textContent,
+    })));
+  check('waypoint overview filter exposes the photo filter with count',
+    photoFilterMenu.some((item) => item.filter === 'photos' && item.text === 'With photos 1'),
+    JSON.stringify(photoFilterMenu));
+
+  await page.locator('.insight-filter[data-filter="photos"]').click();
+  const photoFiltered = await page.evaluate(() => ({
+    names: [...document.querySelectorAll('.waypoint-overview-item .heading strong')]
+      .map((node) => node.textContent),
+    trigger: document.querySelector('.waypoint-filter-trigger')?.textContent || '',
+  }));
+  check('photo filter keeps only waypoints with photos',
+    photoFiltered.names.join('|') === 'Lookout' && /With photos 1/.test(photoFiltered.trigger),
+    JSON.stringify(photoFiltered));
+
+  await switchLanguage(page, 'zh');
+  const photoFilteredZh = await page.evaluate(() => ({
+    trigger: document.querySelector('.waypoint-filter-trigger')?.textContent || '',
+    names: [...document.querySelectorAll('.waypoint-overview-item .heading strong')]
+      .map((node) => node.textContent),
+  }));
+  check('photo filter translates and survives a language switch',
+    /带图片 1/.test(photoFilteredZh.trigger) && photoFilteredZh.names.join('|') === 'Lookout',
+    JSON.stringify(photoFilteredZh));
 
   check('no page errors', pageErrors.length === 0, pageErrors.join('; '));
   check('no CSP violations', cspViolations.length === 0, cspViolations.join('; ').slice(0, 300));

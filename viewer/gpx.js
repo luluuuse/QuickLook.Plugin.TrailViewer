@@ -148,12 +148,28 @@ export function parseGpxDocument(doc) {
   const metadata = children(root, 'metadata')[0];
   const tracks = children(root, 'trk').map((trk) => ({
     name: childText(trk, 'name'),
+    description: childText(trk, 'desc'),
+    type: childText(trk, 'type'),
     segments: children(trk, 'trkseg').map((seg) => readPoints(seg, 'trkpt')).filter((pts) => pts.length > 0),
   }));
   const routes = children(root, 'rte')
-    .map((rte) => ({ name: childText(rte, 'name'), points: readPoints(rte, 'rtept') }))
+    .map((rte) => ({
+      name: childText(rte, 'name'),
+      description: childText(rte, 'desc'),
+      type: childText(rte, 'type'),
+      points: readPoints(rte, 'rtept'),
+    }))
     .filter((rte) => rte.points.length > 0);
   const waypoints = readPoints(root, 'wpt');
+
+  const description = (metadata && childText(metadata, 'desc'))
+    || childText(root, 'desc')
+    || (tracks.length === 1 && routes.length === 0 ? tracks[0].description : null)
+    || (routes.length === 1 && tracks.length === 0 ? routes[0].description : null)
+    || null;
+  const activityType = tracks.find((trk) => trk.type)?.type
+    || routes.find((rte) => rte.type)?.type
+    || null;
 
   return {
     version: root.getAttribute('version'),
@@ -161,8 +177,10 @@ export function parseGpxDocument(doc) {
     name: (metadata && childText(metadata, 'name')) || childText(root, 'name')
       || (tracks.length === 1 && routes.length === 0 ? tracks[0].name : null)
       || (routes.length === 1 && tracks.length === 0 ? routes[0].name : null),
-    tracks,
-    routes,
+    description,
+    activityType,
+    tracks: tracks.map(({ name, segments }) => ({ name, segments })),
+    routes: routes.map(({ name, points }) => ({ name, points })),
     waypoints,
   };
 }

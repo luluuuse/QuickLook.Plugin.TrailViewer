@@ -391,6 +391,53 @@
   overflow-wrap: anywhere;
 }
 
+#info .info-description-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  min-width: 0;
+}
+
+#info .info-description {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  overflow: hidden;
+  width: 100%;
+  white-space: pre-wrap;
+  line-height: 1.45;
+}
+
+#info .info-description.is-expanded {
+  display: block;
+  -webkit-line-clamp: unset;
+  max-height: clamp(84px, calc(100vh - 380px), 280px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 4px;
+  scrollbar-width: thin;
+}
+
+#info .info-description-toggle {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-size: 11px;
+  line-height: 1.3;
+  cursor: pointer;
+}
+
+#info .info-description-toggle:hover {
+  text-decoration: underline;
+}
+
+#info .info-description-toggle[hidden] {
+  display: none;
+}
+
 #info .anomaly-values {
   display: grid;
   gap: 1px;
