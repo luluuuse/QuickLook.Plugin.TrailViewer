@@ -5,21 +5,40 @@
 Preview GPX, KML, KMZ and FIT tracks directly in QuickLook on Windows. Press <kbd>Space</kbd> on a track file
 in Explorer to see the route, waypoints, photos and elevation profile without opening a map application.
 
-| ClimbPro climbs & topo basemap | Per-km splits & heart-rate overlay |
-| :---: | :---: |
-| ![ClimbPro major climb highlighting on a custom topographic basemap](docs/screenshot-climbpro.png) | ![Detailed per-kilometre splits with dual-axis elevation and heart-rate profile](docs/screenshot-splits-hr.png) |
-
-| Waypoint photos & semantic overview | Minimal view & satellite imagery |
-| :---: | :---: |
-| ![Portrait waypoint photo card and supply-filtered waypoint overview](docs/screenshot-waypoints.png) | ![Collapsed elevation profile over full-bleed swisstopo satellite imagery](docs/screenshot-minimal.png) |
-
-| Non-destructive track editor | Map layers & outdoor overlays |
-| :---: | :---: |
-| ![Non-destructive track editor with segment splitting and tool rail](docs/screenshot-editor.png) | ![Four basemap categories and transparent outdoor overlays](docs/screenshot-layers.png) |
-
-| Map settings & node probing | Unified toolbox |
-| :---: | :---: |
-| ![Local tile cache and multi-node connectivity probing](docs/screenshot-map-settings.png) | ![Unified toolbox with edit, measure, export, weather and updater](docs/screenshot-toolbox.png) |
+<table>
+  <tr>
+    <th width="50%" align="center">ClimbPro climbs &amp; topo basemap</th>
+    <th width="50%" align="center">Per-km splits &amp; heart-rate overlay</th>
+  </tr>
+  <tr>
+    <td width="50%" align="center"><img src="docs/screenshot-climbpro.png" alt="ClimbPro major climb highlighting on a custom topographic basemap" width="100%"></td>
+    <td width="50%" align="center"><img src="docs/screenshot-splits-hr.png" alt="Detailed per-kilometre splits with dual-axis elevation and heart-rate profile" width="100%"></td>
+  </tr>
+  <tr>
+    <th width="50%" align="center">Waypoint photos &amp; semantic overview</th>
+    <th width="50%" align="center">Minimal view &amp; satellite imagery</th>
+  </tr>
+  <tr>
+    <td width="50%" align="center"><img src="docs/screenshot-waypoints.png" alt="Portrait waypoint photo card and supply-filtered waypoint overview" width="100%"></td>
+    <td width="50%" align="center"><img src="docs/screenshot-minimal.png" alt="Collapsed elevation profile over full-bleed swisstopo satellite imagery" width="100%"></td>
+  </tr>
+  <tr>
+    <th width="50%" align="center">Non-destructive track editor</th>
+    <th width="50%" align="center">Map layers &amp; outdoor overlays</th>
+  </tr>
+  <tr>
+    <td width="50%" align="center"><img src="docs/screenshot-editor.png" alt="Non-destructive track editor with segment splitting and tool rail" width="100%"></td>
+    <td width="50%" align="center"><img src="docs/screenshot-layers.png" alt="Four basemap categories and transparent outdoor overlays" width="100%"></td>
+  </tr>
+  <tr>
+    <th width="50%" align="center">Map settings &amp; node probing</th>
+    <th width="50%" align="center">Unified toolbox</th>
+  </tr>
+  <tr>
+    <td width="50%" align="center"><img src="docs/screenshot-map-settings.png" alt="Local tile cache and multi-node connectivity probing" width="100%"></td>
+    <td width="50%" align="center"><img src="docs/screenshot-toolbox.png" alt="Unified toolbox with edit, measure, export, weather and updater" width="100%"></td>
+  </tr>
+</table>
 
 ## Quick start
 
