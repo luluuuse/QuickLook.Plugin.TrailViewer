@@ -285,6 +285,13 @@ async function main() {
     { ink: 'white', scrim: 'soft' });
   check('the backing goes dark behind white ink', paleBacking.shade > 20, `alpha ${paleBacking.shade}`);
 
+  // Swiss Topo Craft ink: charcoal typography, Swiss vermilion route and warm ivory backing wash.
+  const swiss = await overlayOf(page, base, '2026-02-01-alpine-snow-traverse-1793781751910.gpx',
+    { ink: 'swiss', scrim: 'soft', profile: 'ele' });
+  check('swiss ink renders dark charcoal type with parchment wash and transparent corners',
+    swiss.dark > 800 && swiss.shade > 40 && swiss.corners.every((a) => a === 0),
+    JSON.stringify({ dark: swiss.dark, shade: swiss.shade, corners: swiss.corners }));
+
   // GPX accepts +/-90 degrees although Web Mercator does not. A valid polar point must not poison the
   // whole export, and a route crossing the date line must use the short way around the globe.
   const projection = await page.evaluate(async () => {
@@ -364,8 +371,9 @@ async function main() {
     shapeHints.join(' | '));
   const inkHints = await page.locator('.toolbox-export-settings .pick').nth(1).locator('.option')
     .evaluateAll((nodes) => nodes.map((node) => node.title));
-  check('ink choices explain when to use each colour',
-    /明亮|浅色/.test(inkHints[0]) && /深色|较暗/.test(inkHints[1]), inkHints.join(' | '));
+  check('ink choices explain when to use each colour including swiss style',
+    /明亮|浅色/.test(inkHints[0]) && /深色|较暗/.test(inkHints[1]) && /瑞士/.test(inkHints[2]),
+    inkHints.join(' | '));
   const scrimHints = await page.locator('.toolbox-export-settings .pick').nth(2).locator('.option')
     .evaluateAll((nodes) => nodes.map((node) => node.title));
   check('backing choices explain transparency and readability',

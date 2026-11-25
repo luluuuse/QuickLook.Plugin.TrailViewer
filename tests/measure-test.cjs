@@ -67,9 +67,9 @@ async function main() {
     return { background: style.backgroundColor, filter: style.backdropFilter };
   });
   check('the toolbox uses the shared translucent tool surface',
-    toolboxSurface.background === 'rgba(24, 24, 24, 0.78)'
+    toolboxSurface.background === 'rgba(250, 248, 243, 0.93)'
       && toolboxSurface.filter.includes('blur(14px)')
-      && toolboxSurface.filter.includes('saturate(0.9)'),
+      && toolboxSurface.filter.includes('saturate(1.08)'),
     JSON.stringify(toolboxSurface));
   const iconGeometry = await page.evaluate(() => {
     const icon = (tool) => document.querySelector(
@@ -249,8 +249,8 @@ async function main() {
   });
   check('track snapping uses the standardized cross reticle and lightweight label surface',
     trackSnapStyle.symbol === 'snap-track'
-      && trackSnapStyle.background === 'rgba(7, 20, 26, 0.74)'
-      && trackSnapStyle.border === 'rgba(255, 242, 168, 0.55)',
+      && trackSnapStyle.background === 'rgba(24, 33, 43, 0.9)'
+      && trackSnapStyle.border === 'rgba(223, 43, 29, 0.55)',
     JSON.stringify(trackSnapStyle));
 
   await page.mouse.click(visibleTrackPoint.x + 5, visibleTrackPoint.y);
@@ -372,7 +372,7 @@ async function main() {
   });
   check('distance labels are translucent enough to keep the route visible',
     distanceLabelSurface.background === 'rgba(7, 20, 26, 0.58)'
-      && distanceLabelSurface.border === 'rgb(255, 242, 168)'
+      && distanceLabelSurface.border === 'rgb(223, 43, 29)'
       && distanceLabelSurface.shadow.includes('0.22'),
     JSON.stringify(distanceLabelSurface));
 

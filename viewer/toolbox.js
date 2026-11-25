@@ -39,6 +39,9 @@ export function createToolbox({
   onOpenUpdateRelease,
   lang = () => 'zh',
   setLang = () => false,
+  theme = () => 'swiss',
+  setTheme = /** @type {(next: string) => boolean} */ (() => false),
+  themeModes = [],
   onOpen,
   onLayoutChange,
 }) {
@@ -49,6 +52,10 @@ export function createToolbox({
   const readLang = lang;
   /** @type {(next: string) => boolean} */
   const writeLang = setLang;
+  /** @type {() => string} */
+  const readTheme = theme;
+  /** @type {(next: string) => boolean} */
+  const writeTheme = setTheme;
   let open = false;
   let button = null;
   let panel = null;
@@ -147,6 +154,9 @@ export function createToolbox({
     weatherAvailable,
     weatherHasElevation,
     weatherModes,
+    theme: readTheme,
+    setTheme: writeTheme,
+    themeModes,
     currentVersion,
     onMeasure: () => startMeasure(),
     onCoordinates: () => {
@@ -435,6 +445,7 @@ export function createToolbox({
     applyUpdateStatus: updateTool.applyStatus,
     applyUpdateProgress: updateTool.applyProgress,
     applyUpdateDownloadResult: updateTool.applyDownloadResult,
+    refreshTheme: () => render(),
     destroy() {
       lifecycle.abort();
       coordinates.destroy();

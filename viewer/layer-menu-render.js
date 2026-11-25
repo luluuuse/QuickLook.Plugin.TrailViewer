@@ -56,7 +56,7 @@ export function renderLayerMenu({
   for (const [key, button] of Object.entries(providerButtons)) {
     const visible = providers[key].category === currentCategory;
     button.hidden = !visible;
-    const locked = visible && providers[key].provider.requiresKey && !keyReady;
+    const locked = Boolean(visible && providers[key].provider.requiresKey && !keyReady);
     button.classList.toggle('locked', locked);
     button.dataset.locked = String(locked);
     button.removeAttribute('aria-disabled');

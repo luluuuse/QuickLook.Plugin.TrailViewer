@@ -7,6 +7,8 @@ import { KmlError, parseKmlDocument } from './kml.js';
 import { FitError, isFit, parseFit } from './fit.js';
 import { createRouteModel } from './route-model.js';
 import { getLang, isChinese, onLangChange, setLang, t, units } from './i18n.js';
+import { THEMES, getTheme, initTheme, onThemeChange, setTheme } from './theme.js';
+import { attachSwissScaleRatio } from './swiss-scale.js';
 import { installSpaceGuard } from './focus.js';
 import { createPhotoViewer } from './photo-viewer.js';
 import { createProfileController } from './profile-controller.js';
@@ -605,6 +607,7 @@ function syncPreferences(layerOverride = null) {
     : (layerSwitch?.current() || savedLayer(params));
   const values = new URLSearchParams({
     lang: getLang(),
+    theme: getTheme(),
     layer: activeLayer,
     pins: waypointController.visible() ? '1' : '0',
     exportSize: settings.size,
@@ -633,6 +636,7 @@ function distanceLog(meters) {
 
 async function main() {
   const started = performance.now();
+  initTheme(params);
   applyPageLanguage();
   if (!src) {
     showError(t('error.noFile'));
@@ -737,8 +741,9 @@ async function main() {
   map.getContainer().tabIndex = -1;
   installLeafletIcons(map, { closeLabel: () => t('tool.close') });
   map.attributionControl.setPrefix('<a href="https://leafletjs.com" target="_blank">Leaflet</a>');
-  L.control.scale({ imperial: false, position: 'bottomleft' }).addTo(map);
+  const scaleControl = L.control.scale({ imperial: false, position: 'bottomleft' }).addTo(map);
   mapViewController = createMapView({ map, isChromeHidden: uiFeedback.isHidden });
+  const swissScaleRatio = attachSwissScaleRatio(map, scaleControl);
   const tracks = trackLayer.draw(map, gpx, routeModel);
   activeTrackLayer = tracks;
   const waypointBounds = waypointController.draw(
@@ -747,8 +752,6 @@ async function main() {
   tracks.bounds.extend(waypointBounds);
   const bounds = tracks.bounds;
   mapViewController.setRoute(bounds);
-  tracks.refreshDistanceMarks();
-  waypointController.refreshMapMarks();
   tracks.setAnnotationMarkersVisible(waypointController.visible());
   overlayExport = createOverlayExport({
     el,
@@ -847,6 +850,9 @@ async function main() {
     weatherHasElevation: () => availableTargets(liveState.gpx).includes('highest'),
     lang: getLang,
     setLang,
+    theme: getTheme,
+    setTheme,
+    themeModes: [...THEMES],
     editAvailable: () => Boolean(liveState.gpx && !liveState.gpx.network),
     onEdit: () => openTrackEditor({ initialTool: 'crop' }),
     currentVersion: appVersion,
@@ -931,6 +937,8 @@ async function main() {
   waypointController.createControl(map);
   mapViewController.observeControls();
   mapViewController.fit();
+  tracks.refreshDistanceMarks();
+  waypointController.refreshMapMarks();
   document.fonts?.ready.then(() => mapViewController.refreshControls());
   const scrub = profile ? profileController.attach(map, profile) : null;
   activeScrub = scrub;
@@ -1000,6 +1008,10 @@ async function main() {
     // question -- and the card may not have changed width at all, leaving the observer silent.
     requestAnimationFrame(() => mapViewController.refreshControls());
   });
+  onThemeChange(() => {
+    syncPreferences();
+    toolboxController?.refreshTheme?.();
+  });
   const api = createTestApi({
     gpx, summary, map, scrub, photoViewer, hikeEstimate, tracks, timing, loadSplitsData,
     localizedNodes, splitController, elevations, waypointController, switcher,
@@ -1012,9 +1024,11 @@ async function main() {
     warnTiandituTemporarily, rejectTiandituKey, mapViewController, pressKey, overlayExport,
     toolboxController, showToast, t, fileName, clipboardResult, copyText, photoAttachments,
     attachmentExporter, decodeMessage, measurement,
+    theme: { get: getTheme, set: setTheme, modes: [...THEMES] },
   });
   window.trailViewer = api;
   window.addEventListener('pagehide', () => {
+    swissScaleRatio?.destroy?.();
     toolboxController?.destroy();
     layerSwitch?.destroy();
     trackColorControl?.destroy();

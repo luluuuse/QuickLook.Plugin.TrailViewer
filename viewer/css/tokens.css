@@ -1,60 +1,97 @@
-/* Design tokens and shared primitives. */
+/* Design tokens and shared primitives.
+ * Three user-selectable themes (never auto-switched by map layer):
+ *   - swiss   (default): Swiss Parchment cartographic paper UI derived from the 2B swisstopo icon
+ *   - slate   : Alpine Slate dark instrument UI derived from the 2B SE rock shadow face
+ *   - classic : Original dark-charcoal + electric-blue UI preserved for legacy preference
+ */
 
-:root {
-  --bg: #181818;
-  --panel: rgba(24, 24, 24, 0.86);
-  --hud-shadow: 0 0 0 1px rgba(0, 0, 0, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 4px 14px rgba(0, 0, 0, 0.42);
-  --text: #e6e6e6;
-  --muted: #aeb8c4;
-  --accent: #2f9bff;
-  /* Shared surface for task panels: translucent enough to keep map context, with a readable blur. */
-  --tool-panel-background: rgba(24, 24, 24, 0.78);
-  --tool-panel-filter: blur(14px) saturate(0.9);
-  --surface-raised: #2a2a2a;
-  --surface-card: #303030;
-  --surface-control: #252525;
-  --surface-muted: #242424;
-  --surface-input: #262626;
-  --surface-row: #292929;
-  --surface-hover: #383838;
-  --border-subtle: #3c3c3c;
-  --border-control: #444444;
-  --border-strong: #4a4a4a;
-  --border-focus: #555555;
-  --border-muted: #777777;
-  --text-bright: #ffffff;
-  --accent-muted: #356d9d;
-  --accent-tint: rgba(47, 155, 255, 0.18);
-  --radius-sm: 4px;
+:root,
+:root[data-theme="swiss"] {
+  color-scheme: light;
+  --bg: #eceae2;
+  --panel: rgba(250, 248, 243, 0.92);
+  --panel-solid: #faf8f3;
+  --hud-shadow: 0 0 0 1px rgba(24, 34, 46, 0.24), inset 0 0 0 2px rgba(250, 248, 243, 0.88), inset 0 0 0 3px rgba(24, 34, 46, 0.08), 0 6px 18px rgba(18, 28, 40, 0.12);
+  --hud-shadow-swiss-top: 0 0 0 1px rgba(24, 34, 46, 0.26), inset 0 2px 0 #df2b1d, inset 0 0 0 3px rgba(24, 34, 46, 0.06), 0 6px 18px rgba(18, 28, 40, 0.13);
+  --swiss-corner-ticks:
+    linear-gradient(90deg, rgba(24, 34, 46, 0.24), rgba(24, 34, 46, 0.24)) 5px 6px / 5px 1px no-repeat,
+    linear-gradient(0deg, rgba(24, 34, 46, 0.24), rgba(24, 34, 46, 0.24)) 5px 6px / 1px 5px no-repeat,
+    linear-gradient(90deg, rgba(24, 34, 46, 0.24), rgba(24, 34, 46, 0.24)) calc(100% - 5px) 6px / 5px 1px no-repeat,
+    linear-gradient(0deg, rgba(24, 34, 46, 0.24), rgba(24, 34, 46, 0.24)) calc(100% - 5px) 6px / 1px 5px no-repeat,
+    linear-gradient(90deg, rgba(24, 34, 46, 0.24), rgba(24, 34, 46, 0.24)) 5px calc(100% - 5px) / 5px 1px no-repeat,
+    linear-gradient(0deg, rgba(24, 34, 46, 0.24), rgba(24, 34, 46, 0.24)) 5px calc(100% - 5px) / 1px 5px no-repeat,
+    linear-gradient(90deg, rgba(24, 34, 46, 0.24), rgba(24, 34, 46, 0.24)) calc(100% - 5px) calc(100% - 5px) / 5px 1px no-repeat,
+    linear-gradient(0deg, rgba(24, 34, 46, 0.24), rgba(24, 34, 46, 0.24)) calc(100% - 5px) calc(100% - 5px) / 1px 5px no-repeat;
+  --graticule-line: rgba(28, 38, 50, 0.16);
+  --track-casing: rgba(255, 255, 255, 0.85);
+  --no-map-bg: #f1eee5;
+  --no-map-grid:
+    linear-gradient(90deg, rgba(28, 38, 50, 0.085) 1px, transparent 1px) 0 0 / 120px 120px,
+    linear-gradient(0deg, rgba(28, 38, 50, 0.085) 1px, transparent 1px) 0 0 / 120px 120px,
+    linear-gradient(90deg, rgba(28, 38, 50, 0.035) 1px, transparent 1px) 0 0 / 24px 24px,
+    linear-gradient(0deg, rgba(28, 38, 50, 0.035) 1px, transparent 1px) 0 0 / 24px 24px;
+  --text: #1c2632;
+  --text-bright: #121a22;
+  --muted: #5a6776;
+  --on-accent: #ffffff;
+  --accent: #df2b1d;
+  --accent-hover: #c52216;
+  --accent-muted: rgba(223, 43, 29, 0.42);
+  --accent-tint: rgba(223, 43, 29, 0.10);
+  --secondary-accent: #297bb8;
+  --secondary-accent-tint: rgba(41, 123, 184, 0.12);
+  --secondary-accent-border: rgba(41, 123, 184, 0.42);
+  --tool-panel-background: rgba(250, 248, 243, 0.93);
+  --tool-panel-filter: blur(14px) saturate(1.08);
+  --surface-raised: #ffffff;
+  --surface-card: rgba(255, 255, 255, 0.84);
+  --surface-control: rgba(255, 255, 255, 0.76);
+  --surface-muted: #f2efe7;
+  --surface-input: #ffffff;
+  --surface-row: #f3f0e8;
+  --surface-hover: #ece8de;
+  --surface-inset: rgba(24, 34, 46, 0.045);
+  --border-hairline: rgba(24, 34, 46, 0.10);
+  --border-subtle: rgba(24, 34, 46, 0.14);
+  --border-control: rgba(24, 34, 46, 0.20);
+  --border-strong: rgba(24, 34, 46, 0.24);
+  --border-focus: rgba(24, 34, 46, 0.36);
+  --border-muted: rgba(24, 34, 46, 0.42);
+  --panel-radius: 3px;
+  --control-radius: 3px;
+  --radius-sm: 2px;
   --radius-md: 8px;
-  --radius-lg: 10px;
+  --radius-lg: 4px;
   --radius-pill: 999px;
   --motion-panel: 120ms cubic-bezier(0.2, 0, 0, 1);
   --icon-size: 16px;
   --icon-size-compact: 12px;
   --icon-stroke: 1.75;
-  --icon-color: #e6e6e6;
-  --icon-hover: #ffffff;
-  --icon-disabled: #666666;
-  --icon-active: #8fd9ff;
-  --icon-active-background: #234f79;
-  --icon-active-line: #2f9bff;
-  /* Standardized snap indicator palette and lightweight label surface shared by all map-snapping tools. */
-  --snap-accent: #fff2a8;
-  --snap-text: #fff6c2;
-  --snap-casing: #07141a;
-  --snap-border: rgba(255, 242, 168, 0.55);
-  --snap-label-background: rgba(7, 20, 26, 0.74);
-  --snap-label-shadow: 0 1px 3px rgba(0, 0, 0, 0.28);
+  --icon-color: #1c2632;
+  --icon-hover: #121a22;
+  --icon-disabled: #9aa5b2;
+  --icon-active: #df2b1d;
+  --icon-active-background: #ffffff;
+  --icon-active-line: #df2b1d;
+  --focus-ring: #297bb8;
+  --kbd-bg: #efeae0;
+  --kbd-border: rgba(24, 34, 46, 0.22);
+  --kbd-text: #4a5766;
+  --snap-accent: #df2b1d;
+  --snap-text: #ffffff;
+  --snap-casing: #ffffff;
+  --snap-border: rgba(223, 43, 29, 0.55);
+  --snap-label-background: rgba(24, 33, 43, 0.90);
+  --snap-label-shadow: 0 2px 6px rgba(18, 28, 40, 0.24);
   --snap-motion: 120ms cubic-bezier(0.2, 0.8, 0.2, 1);
   --toolbar-height: 32px;
-  --toolbar-radius: 8px;
-  --toolbar-gap: 8px;
-  --toolbar-surface: rgba(24, 24, 24, 0.78);
-  --toolbar-hover-tint: rgba(255, 255, 255, 0.09);
-  --toolbar-surface-hover: rgba(50, 50, 50, 0.80);
+  --toolbar-radius: 3px;
+  --toolbar-gap: 7px;
+  --toolbar-surface: rgba(250, 248, 243, 0.92);
+  --toolbar-hover-tint: rgba(24, 34, 46, 0.06);
+  --toolbar-surface-hover: #ffffff;
   --toolbar-blur: blur(12px);
-  --toolbar-shadow: 0 0 0 1px rgba(0, 0, 0, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 3px 10px rgba(0, 0, 0, 0.38);
+  --toolbar-shadow: 0 0 0 1px rgba(24, 34, 46, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.78), 0 3px 10px rgba(18, 28, 40, 0.10);
   --floating-panel-top: 54px;
   --floating-panel-header-height: 40px;
   --z-map-ui: 900;
@@ -68,8 +105,311 @@
   --z-overlay: 1200;
   --z-tool-panel: 1400;
   --z-photo-modal: 3000;
+  --editor-surface: rgba(250, 248, 243, 0.94);
+  --editor-active-bg: rgba(223, 43, 29, 0.10);
+  --editor-active-border: rgba(223, 43, 29, 0.42);
+  --editor-active-fg: #df2b1d;
+  --editor-keep: #df2b1d;
+  --editor-cut: #64748b;
+  --editor-danger: #d92d20;
+  --editor-danger-text: #b42318;
+  --editor-save-bg: #18212b;
+  --editor-save-hover: #263445;
+  /* Map & Profile semantic tokens */
+  --km-bg: rgba(250, 248, 243, 0.94);
+  --km-text: #18212b;
+  --km-border: #18212b;
+  --scale-bg: rgba(250, 248, 243, 0.92);
+  --scale-border: #18212b;
+  --attrib-bg: rgba(250, 248, 243, 0.86);
+  --pin-fill: #ffffff;
+  --pin-stroke: #18212b;
+  --pin-core: #d98a1c;
+  --profile-area-opacity: 0.54;
+  --profile-line: #18212b;
+  --profile-grid: rgba(24, 34, 46, 0.11);
+  --profile-guide: rgba(223, 43, 29, 0.82);
+  --profile-dot-bg: #df2b1d;
+  --profile-dot-ring: #18212b;
+  --profile-readout-bg: rgba(24, 33, 43, 0.62);
+  --profile-readout-text: #ffffff;
+  --profile-readout-meta: #c4d0dd;
+  --profile-extremum-bg: rgba(250, 248, 243, 0.92);
+  --profile-extremum-high: #b8321a;
+  --profile-extremum-low: #1d6ca8;
+  --profile-split-dim: rgba(24, 34, 46, 0.10);
+  --profile-split-band: rgba(41, 123, 184, 0.14);
+  --profile-split-edge: #297bb8;
+  --profile-pin-bg: #ffffff;
+  --profile-pin-border: #18212b;
+  --profile-pin-photo-ring: #df2b1d;
+  --toast-bg: rgba(24, 33, 43, 0.92);
+  --coord-label-bg: rgba(24, 33, 43, 0.68);
+  --toast-text: #ffffff;
+  --btn-primary-bg: #df2b1d;
+  --btn-primary-hover: #c52216;
+  --btn-primary-border: #c52216;
+  --btn-primary-text: #ffffff;
+  --highlight-fg: #1d6ca8;
+  --highlight-tint: rgba(41, 123, 184, 0.12);
+  --highlight-border: rgba(41, 123, 184, 0.48);
+  --brush-bar-bg: rgba(250, 248, 243, 0.96);
+  --brush-bar-text: #1c2632;
+  --brush-bar-border: rgba(41, 123, 184, 0.56);
+  --brush-bar-shadow: 0 0 0 1px rgba(24, 34, 46, 0.14), 0 4px 12px rgba(18, 28, 40, 0.14);
+  --brush-crop-bg: rgba(41, 123, 184, 0.12);
+  --brush-crop-border: rgba(41, 123, 184, 0.48);
+  --brush-crop-fg: #1d6ca8;
+  --brush-crop-hover-bg: #297bb8;
+  --brush-crop-hover-fg: #ffffff;
+  --brush-close-fg: #5a6776;
+  --brush-close-hover-bg: rgba(24, 34, 46, 0.08);
+  --brush-close-hover-fg: #121a22;
+  --toolbox-footer-ring-gap: #f3f2eb;
+  --toolbox-footer-bg:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 286 44' fill='none'%3E%3Cpath d='M-8 36 C 48 26, 92 40, 154 24 C 206 11, 244 26, 294 14' stroke='%235b4a34' stroke-opacity='0.09' stroke-width='1'/%3E%3Cpath d='M-8 24 C 54 14, 98 30, 162 15 C 216 2, 250 16, 294 5' stroke='%23297bb8' stroke-opacity='0.08' stroke-width='1'/%3E%3Cpath d='M-8 44 C 66 36, 120 46, 188 33 C 236 24, 266 34, 294 28' stroke='%235b4a34' stroke-opacity='0.07' stroke-width='1'/%3E%3C/svg%3E") center / cover no-repeat,
+    linear-gradient(105deg, rgba(132, 184, 106, 0.11) 0%, rgba(214, 192, 146, 0.08) 42%, rgba(84, 162, 214, 0.11) 100%);
+  --toolbox-footer-btn-bg: rgba(255, 255, 255, 0.44);
+  --toolbox-tool-icon: #2b7a4b;
+  --toolbox-tool-icon-bg: rgba(43, 122, 75, 0.12);
+  --heart-fg: #c92a42;
+  --heart-tint: rgba(201, 42, 66, 0.11);
+  --heart-border: rgba(201, 42, 66, 0.55);
+  --fastest-fg: #c92a2a;
+  --danger-text: #b42318;
+  --danger-tint: rgba(217, 45, 32, 0.10);
+  --danger-border: rgba(217, 45, 32, 0.42);
+  --success-text: #15803d;
+  --success-tint: rgba(21, 128, 61, 0.10);
+  --success-border: rgba(21, 128, 61, 0.42);
+  --scrollbar-thumb: rgba(24, 34, 46, 0.28);
+  --ink-muted: var(--muted);
+  font: 13px/1.4 "Segoe UI", system-ui, sans-serif;
+}
+
+:root[data-theme="slate"] {
+  color-scheme: dark;
+  --bg: #141a22;
+  --panel: rgba(25, 32, 41, 0.90);
+  --panel-solid: #192029;
+  --hud-shadow: 0 0 0 1px rgba(218, 230, 244, 0.18), inset 0 0 0 3px rgba(218, 230, 244, 0.045), 0 6px 22px rgba(0, 0, 0, 0.48);
+  --hud-shadow-swiss-top: 0 0 0 1px rgba(218, 230, 244, 0.20), inset 0 2px 0 #f04234, inset 0 0 0 3px rgba(218, 230, 244, 0.045), 0 6px 22px rgba(0, 0, 0, 0.50);
+  --panel-radius: 3px;
+  --control-radius: 3px;
+  --toolbar-radius: 3px;
+  --radius-sm: 2px;
+  --radius-lg: 4px;
+  --swiss-corner-ticks:
+    linear-gradient(90deg, rgba(218, 230, 244, 0.20), rgba(218, 230, 244, 0.20)) 5px 6px / 5px 1px no-repeat,
+    linear-gradient(0deg, rgba(218, 230, 244, 0.20), rgba(218, 230, 244, 0.20)) 5px 6px / 1px 5px no-repeat,
+    linear-gradient(90deg, rgba(218, 230, 244, 0.20), rgba(218, 230, 244, 0.20)) calc(100% - 5px) 6px / 5px 1px no-repeat,
+    linear-gradient(0deg, rgba(218, 230, 244, 0.20), rgba(218, 230, 244, 0.20)) calc(100% - 5px) 6px / 1px 5px no-repeat,
+    linear-gradient(90deg, rgba(218, 230, 244, 0.20), rgba(218, 230, 244, 0.20)) 5px calc(100% - 5px) / 5px 1px no-repeat,
+    linear-gradient(0deg, rgba(218, 230, 244, 0.20), rgba(218, 230, 244, 0.20)) 5px calc(100% - 5px) / 1px 5px no-repeat,
+    linear-gradient(90deg, rgba(218, 230, 244, 0.20), rgba(218, 230, 244, 0.20)) calc(100% - 5px) calc(100% - 5px) / 5px 1px no-repeat,
+    linear-gradient(0deg, rgba(218, 230, 244, 0.20), rgba(218, 230, 244, 0.20)) calc(100% - 5px) calc(100% - 5px) / 1px 5px no-repeat;
+  --graticule-line: rgba(218, 230, 244, 0.15);
+  --track-casing: rgba(14, 20, 28, 0.78);
+  --no-map-bg: #141a22;
+  --no-map-grid:
+    linear-gradient(90deg, rgba(218, 230, 244, 0.08) 1px, transparent 1px) 0 0 / 120px 120px,
+    linear-gradient(0deg, rgba(218, 230, 244, 0.08) 1px, transparent 1px) 0 0 / 120px 120px,
+    linear-gradient(90deg, rgba(218, 230, 244, 0.03) 1px, transparent 1px) 0 0 / 24px 24px,
+    linear-gradient(0deg, rgba(218, 230, 244, 0.03) 1px, transparent 1px) 0 0 / 24px 24px;
+  --text: #e6edf5;
+  --text-bright: #ffffff;
+  --muted: #93a3b5;
+  --on-accent: #ffffff;
+  --accent: #f04234;
+  --accent-hover: #ff5547;
+  --accent-muted: rgba(240, 66, 52, 0.48);
+  --accent-tint: rgba(240, 66, 52, 0.16);
+  --secondary-accent: #58aeed;
+  --secondary-accent-tint: rgba(88, 174, 237, 0.16);
+  --secondary-accent-border: rgba(88, 174, 237, 0.48);
+  --tool-panel-background: rgba(25, 32, 41, 0.88);
+  --tool-panel-filter: blur(14px) saturate(1.05);
+  --surface-raised: #222c38;
+  --surface-card: #25303d;
+  --surface-control: #1f2935;
+  --surface-muted: #1d2631;
+  --surface-input: #1c2530;
+  --surface-row: #222c38;
+  --surface-hover: #2d3a4a;
+  --surface-inset: rgba(0, 0, 0, 0.24);
+  --border-hairline: rgba(218, 230, 244, 0.09);
+  --border-subtle: rgba(218, 230, 244, 0.14);
+  --border-control: rgba(218, 230, 244, 0.20);
+  --border-strong: rgba(218, 230, 244, 0.24);
+  --border-focus: rgba(218, 230, 244, 0.34);
+  --border-muted: rgba(218, 230, 244, 0.42);
+  --icon-color: #e6edf5;
+  --icon-hover: #ffffff;
+  --icon-disabled: #5f6e80;
+  --icon-active: #ff857a;
+  --icon-active-background: rgba(240, 66, 52, 0.20);
+  --icon-active-line: #f04234;
+  --focus-ring: #58aeed;
+  --kbd-bg: rgba(15, 22, 30, 0.65);
+  --kbd-border: rgba(218, 230, 244, 0.22);
+  --kbd-text: #b7c4d4;
+  --snap-accent: #fff2a8;
+  --snap-text: #fff6c2;
+  --snap-casing: #0d141c;
+  --snap-border: rgba(255, 242, 168, 0.55);
+  --snap-label-background: rgba(13, 20, 28, 0.84);
+  --snap-label-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+  --toolbar-surface: rgba(25, 32, 41, 0.88);
+  --toolbar-hover-tint: rgba(255, 255, 255, 0.09);
+  --toolbar-surface-hover: rgba(45, 58, 74, 0.90);
+  --toolbar-shadow: 0 0 0 1px rgba(218, 230, 244, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 4px 14px rgba(0, 0, 0, 0.42);
+  --editor-surface: rgba(25, 32, 41, 0.92);
+  --editor-active-bg: rgba(240, 66, 52, 0.22);
+  --editor-active-border: rgba(240, 66, 52, 0.52);
+  --editor-active-fg: #ff9187;
+  --editor-keep: #f97316;
+  --editor-cut: #64748b;
+  --editor-danger: #ef4444;
+  --editor-danger-text: #fca5a5;
+  --editor-save-bg: #297bb8;
+  --editor-save-hover: #3590d4;
+  --km-bg: rgba(25, 32, 41, 0.90);
+  --km-text: #f1f5f9;
+  --km-border: rgba(218, 230, 244, 0.42);
+  --scale-bg: rgba(25, 32, 41, 0.84);
+  --scale-border: #b8c6d6;
+  --attrib-bg: rgba(25, 32, 41, 0.80);
+  --pin-fill: #ffffff;
+  --pin-stroke: #151d26;
+  --pin-core: #f0a429;
+  --profile-area-opacity: 0.72;
+  --profile-line: rgba(241, 245, 249, 0.88);
+  --profile-grid: rgba(218, 230, 244, 0.11);
+  --profile-guide: rgba(240, 66, 52, 0.85);
+  --profile-dot-bg: #f04234;
+  --profile-dot-ring: #ffffff;
+  --profile-readout-bg: rgba(16, 22, 29, 0.62);
+  --profile-readout-text: #f1f5f9;
+  --profile-readout-meta: #aebcc9;
+  --profile-extremum-bg: rgba(20, 26, 34, 0.78);
+  --profile-extremum-high: #ffd166;
+  --profile-extremum-low: #8fd4ff;
+  --profile-split-dim: rgba(10, 15, 22, 0.46);
+  --profile-split-band: rgba(88, 174, 237, 0.16);
+  --profile-split-edge: #58aeed;
+  --profile-pin-bg: #ffffff;
+  --profile-pin-border: #151d26;
+  --profile-pin-photo-ring: #f04234;
+  --toast-bg: rgba(19, 26, 34, 0.94);
+  --coord-label-bg: rgba(19, 26, 34, 0.68);
+  --toast-text: #f1f5f9;
+  --btn-primary-bg: #297bb8;
+  --btn-primary-hover: #3590d4;
+  --btn-primary-border: #3d92cf;
+  --btn-primary-text: #ffffff;
+  --highlight-fg: #7dd3fc;
+  --highlight-tint: rgba(88, 174, 237, 0.16);
+  --highlight-border: rgba(88, 174, 237, 0.52);
+  --brush-bar-bg: rgba(25, 32, 41, 0.94);
+  --brush-bar-text: #e6edf5;
+  --brush-bar-border: rgba(88, 174, 237, 0.52);
+  --brush-bar-shadow: 0 0 0 1px rgba(218, 230, 244, 0.12), 0 4px 14px rgba(0, 0, 0, 0.45);
+  --brush-crop-bg: rgba(88, 174, 237, 0.16);
+  --brush-crop-border: rgba(88, 174, 237, 0.48);
+  --brush-crop-fg: #7dd3fc;
+  --brush-crop-hover-bg: #297bb8;
+  --brush-crop-hover-fg: #ffffff;
+  --brush-close-fg: #93a3b5;
+  --brush-close-hover-bg: rgba(255, 255, 255, 0.12);
+  --brush-close-hover-fg: #ffffff;
+  --toolbox-footer-ring-gap: #1c2633;
+  --toolbox-footer-bg:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 286 44' fill='none'%3E%3Cpath d='M-8 36 C 48 26, 92 40, 154 24 C 206 11, 244 26, 294 14' stroke='%23d9e8f5' stroke-opacity='0.08' stroke-width='1'/%3E%3Cpath d='M-8 24 C 54 14, 98 30, 162 15 C 216 2, 250 16, 294 5' stroke='%2368b4e4' stroke-opacity='0.09' stroke-width='1'/%3E%3Cpath d='M-8 44 C 66 36, 120 46, 188 33 C 236 24, 266 34, 294 28' stroke='%23d9e8f5' stroke-opacity='0.06' stroke-width='1'/%3E%3C/svg%3E") center / cover no-repeat,
+    linear-gradient(105deg, rgba(110, 168, 92, 0.10) 0%, rgba(44, 62, 82, 0.24) 44%, rgba(72, 152, 210, 0.14) 100%);
+  --toolbox-footer-btn-bg: rgba(15, 22, 30, 0.36);
+  --toolbox-tool-icon: #e5a84b;
+  --toolbox-tool-icon-bg: rgba(229, 168, 75, 0.15);
+  --heart-fg: #ff9aa4;
+  --heart-tint: rgba(255, 118, 132, 0.16);
+  --heart-border: rgba(255, 118, 132, 0.65);
+  --fastest-fg: #ff7a84;
+  --danger-text: #fca5a5;
+  --danger-tint: rgba(239, 68, 68, 0.18);
+  --danger-border: rgba(239, 68, 68, 0.48);
+  --success-text: #7ee787;
+  --success-tint: rgba(34, 197, 94, 0.16);
+  --success-border: rgba(74, 222, 128, 0.48);
+  --scrollbar-thumb: #4b5d73;
+  --ink-muted: var(--muted);
+}
+
+:root[data-theme="classic"] {
+  color-scheme: dark;
+  --bg: #181818;
+  --panel: rgba(24, 24, 24, 0.86);
+  --panel-solid: #1e1e1e;
+  --hud-shadow: 0 0 0 1px rgba(0, 0, 0, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 4px 14px rgba(0, 0, 0, 0.42);
+  --hud-shadow-swiss-top: var(--hud-shadow);
+  --panel-radius: 6px;
+  --control-radius: 8px;
+  --toolbar-radius: 8px;
+  --radius-sm: 4px;
+  --radius-lg: 10px;
+  --swiss-corner-ticks: none;
+  --graticule-line: rgba(255, 255, 255, 0.12);
+  --track-casing: transparent;
+  --no-map-bg: #181818;
+  --no-map-grid: none;
+  --text: #e6e6e6;
+  --text-bright: #ffffff;
+  --muted: #aeb8c4;
+  --on-accent: #ffffff;
+  --accent: #2f9bff;
+  --accent-hover: #4aa8ff;
+  --accent-muted: #356d9d;
+  --accent-tint: rgba(47, 155, 255, 0.18);
+  --secondary-accent: #2f9bff;
+  --secondary-accent-tint: rgba(47, 155, 255, 0.18);
+  --secondary-accent-border: rgba(47, 155, 255, 0.55);
+  --tool-panel-background: rgba(24, 24, 24, 0.78);
+  --tool-panel-filter: blur(14px) saturate(0.9);
+  --surface-raised: #2a2a2a;
+  --surface-card: #303030;
+  --surface-control: #252525;
+  --surface-muted: #242424;
+  --surface-input: #262626;
+  --surface-row: #292929;
+  --surface-hover: #383838;
+  --surface-inset: rgba(0, 0, 0, 0.18);
+  --border-hairline: rgba(255, 255, 255, 0.08);
+  --border-subtle: #3c3c3c;
+  --border-control: #444444;
+  --border-strong: #4a4a4a;
+  --border-focus: #555555;
+  --border-muted: #777777;
+  --icon-color: #e6e6e6;
+  --icon-hover: #ffffff;
+  --icon-disabled: #666666;
+  --icon-active: #8fd9ff;
+  --icon-active-background: #234f79;
+  --icon-active-line: #2f9bff;
+  --focus-ring: #8fc7ff;
+  --kbd-bg: rgba(15, 23, 42, 0.55);
+  --kbd-border: #4b5563;
+  --kbd-text: #b8c3cf;
+  --snap-accent: #fff2a8;
+  --snap-text: #fff6c2;
+  --snap-casing: #07141a;
+  --snap-border: rgba(255, 242, 168, 0.55);
+  --snap-label-background: rgba(7, 20, 26, 0.74);
+  --snap-label-shadow: 0 1px 3px rgba(0, 0, 0, 0.28);
+  --toolbar-surface: rgba(24, 24, 24, 0.78);
+  --toolbar-hover-tint: rgba(255, 255, 255, 0.09);
+  --toolbar-surface-hover: rgba(50, 50, 50, 0.80);
+  --toolbar-shadow: 0 0 0 1px rgba(0, 0, 0, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 3px 10px rgba(0, 0, 0, 0.38);
   --editor-surface: rgba(24, 24, 24, 0.88);
   --editor-active-bg: #234f79;
+  --editor-active-border: rgba(143, 217, 255, 0.45);
   --editor-active-fg: #8fd9ff;
   --editor-keep: #f97316;
   --editor-cut: #64748b;
@@ -77,8 +417,74 @@
   --editor-danger-text: #fca5a5;
   --editor-save-bg: #0369a1;
   --editor-save-hover: #0284c7;
-  font: 13px/1.4 "Segoe UI", system-ui, sans-serif;
-  color-scheme: dark;
+  --km-bg: rgba(24, 24, 24, 0.78);
+  --km-text: #ffffff;
+  --km-border: rgba(255, 255, 255, 0.2);
+  --scale-bg: rgba(24, 24, 24, 0.7);
+  --scale-border: #bbbbbb;
+  --attrib-bg: rgba(24, 24, 24, 0.7);
+  --pin-fill: #f5c400;
+  --pin-stroke: #1b1b1b;
+  --pin-core: #1b1b1b;
+  --profile-area-opacity: 0.85;
+  --profile-line: rgba(255, 255, 255, 0.82);
+  --profile-grid: rgba(255, 255, 255, 0.1);
+  --profile-guide: rgba(255, 255, 255, 0.65);
+  --profile-dot-bg: #ffffff;
+  --profile-dot-ring: rgba(24, 24, 24, 0.55);
+  --profile-readout-bg: rgba(16, 16, 16, 0.65);
+  --profile-readout-text: #e6e6e6;
+  --profile-readout-meta: #cfcfcf;
+  --profile-extremum-bg: rgba(16, 16, 16, 0.58);
+  --profile-extremum-high: #ffd166;
+  --profile-extremum-low: #8fd4ff;
+  --profile-split-dim: rgba(10, 14, 18, 0.44);
+  --profile-split-band: rgba(114, 231, 255, 0.14);
+  --profile-split-edge: rgba(114, 231, 255, 0.92);
+  --profile-pin-bg: #f5c400;
+  --profile-pin-border: #1b1b1b;
+  --profile-pin-photo-ring: rgba(255, 255, 255, 0.82);
+  --toast-bg: rgba(16, 16, 16, 0.9);
+  --coord-label-bg: rgba(24, 24, 24, 0.68);
+  --toast-text: #e6e6e6;
+  --btn-primary-bg: #234f79;
+  --btn-primary-hover: #2a5f90;
+  --btn-primary-border: #356d9d;
+  --btn-primary-text: #ffffff;
+  --highlight-fg: #72e7ff;
+  --highlight-tint: rgba(114, 231, 255, 0.14);
+  --highlight-border: rgba(114, 231, 255, 0.62);
+  --brush-bar-bg: rgba(16, 16, 16, 0.84);
+  --brush-bar-text: #e6e6e6;
+  --brush-bar-border: rgba(114, 231, 255, 0.62);
+  --brush-bar-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  --brush-crop-bg: rgba(88, 174, 237, 0.18);
+  --brush-crop-border: rgba(88, 174, 237, 0.45);
+  --brush-crop-fg: #8fd4ff;
+  --brush-crop-hover-bg: rgba(88, 174, 237, 0.32);
+  --brush-crop-hover-fg: #ffffff;
+  --brush-close-fg: #cfcfcf;
+  --brush-close-hover-bg: rgba(255, 255, 255, 0.16);
+  --brush-close-hover-fg: #ffffff;
+  --toolbox-footer-ring-gap: #202327;
+  --toolbox-footer-bg:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 286 44' fill='none'%3E%3Cpath d='M-8 36 C 48 26, 92 40, 154 24 C 206 11, 244 26, 294 14' stroke='%23e2e8f0' stroke-opacity='0.07' stroke-width='1'/%3E%3Cpath d='M-8 24 C 54 14, 98 30, 162 15 C 216 2, 250 16, 294 5' stroke='%232f9bff' stroke-opacity='0.09' stroke-width='1'/%3E%3Cpath d='M-8 44 C 66 36, 120 46, 188 33 C 236 24, 266 34, 294 28' stroke='%23e2e8f0' stroke-opacity='0.05' stroke-width='1'/%3E%3C/svg%3E") center / cover no-repeat,
+    linear-gradient(105deg, rgba(110, 168, 92, 0.08) 0%, rgba(42, 46, 52, 0.28) 44%, rgba(47, 155, 255, 0.12) 100%);
+  --toolbox-footer-btn-bg: rgba(18, 18, 18, 0.40);
+  --toolbox-tool-icon: #58aeed;
+  --toolbox-tool-icon-bg: rgba(47, 155, 255, 0.18);
+  --heart-fg: #ffb3bb;
+  --heart-tint: rgba(255, 118, 132, 0.16);
+  --heart-border: rgba(255, 118, 132, 0.75);
+  --fastest-fg: #ff626d;
+  --danger-text: #e39a9a;
+  --danger-tint: rgba(227, 138, 138, 0.16);
+  --danger-border: rgba(227, 138, 138, 0.55);
+  --success-text: #86efac;
+  --success-tint: rgba(34, 197, 94, 0.14);
+  --success-border: rgba(74, 222, 128, 0.45);
+  --scrollbar-thumb: #555555;
+  --ink-muted: var(--muted);
 }
 
 html, body {
@@ -98,7 +504,7 @@ html, body {
 button:focus-visible,
 a:focus-visible,
 [role="button"]:focus-visible {
-  outline: 2px solid #8fc7ff;
+  outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
 
@@ -131,20 +537,20 @@ a:focus-visible,
 
 .data-symbol .symbol-fill {
   fill: currentColor;
-  stroke: #1b1b1b;
+  stroke: var(--pin-stroke);
   stroke-width: 1.5;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
 
 .data-symbol .symbol-hole {
-  fill: #1b1b1b;
+  fill: var(--pin-core);
   stroke: none;
 }
 
 .data-symbol .symbol-detail {
   fill: none;
-  stroke: #1b1b1b;
+  stroke: var(--pin-stroke);
   stroke-width: 1.5;
   stroke-linecap: round;
   stroke-linejoin: round;
@@ -153,10 +559,10 @@ a:focus-visible,
 .control-key {
   min-width: 18px;
   padding: 1px 4px;
-  border: 1px solid #4b5563;
+  border: 1px solid var(--kbd-border);
   border-radius: var(--radius-sm);
-  background: rgba(15, 23, 42, 0.55);
-  color: #b8c3cf;
+  background: var(--kbd-bg);
+  color: var(--kbd-text);
   font: 600 9px/1.35 "Segoe UI", system-ui, sans-serif;
   text-align: center;
   white-space: nowrap;
@@ -231,3 +637,6 @@ body.is-map-dragging .waypoint-overview {
 }
 
 body.no-map #map {
+  background-color: var(--no-map-bg);
+  background-image: var(--no-map-grid);
+}

@@ -172,11 +172,11 @@ async function main() {
       && cells.filter((c) => c.borderLeft !== '0px').length === 2,
     JSON.stringify(cells.map((c) => `${c.label}:border=${c.borderLeft}`)));
   check('the accented values keep their typographic tier',
-    cells[0].valueColor === 'rgb(255, 255, 255)' && cells[0].valueSize === '15px'
+    cells[0].valueColor === 'rgb(18, 26, 34)' && cells[0].valueSize === '15px'
       && cells[0].valueWeight === '600'
-      && cells[3].valueColor === 'rgb(207, 214, 223)' && cells[3].valueSize === '13px'
+      && cells[3].valueColor === 'rgb(28, 38, 50)' && cells[3].valueSize === '13px'
       && cells[3].valueWeight === '500'
-      && cells[4].valueColor === 'rgb(207, 214, 223)' && cells[4].valueSize === '13px',
+      && cells[4].valueColor === 'rgb(28, 38, 50)' && cells[4].valueSize === '13px',
     JSON.stringify(cells.slice(0, 1).concat(cells.slice(3, 5)).map((c) => ({
       label: c.label,
       color: c.valueColor,

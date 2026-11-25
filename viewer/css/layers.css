@@ -90,11 +90,12 @@
   flex-direction: column;
   padding: 10px;
   border: 1px solid var(--border-control);
-  border-radius: 5px;
-  background: var(--tool-panel-background);
+  border-radius: var(--panel-radius);
+  background-color: var(--tool-panel-background);
+  background-image: var(--swiss-corner-ticks);
   -webkit-backdrop-filter: var(--tool-panel-filter);
   backdrop-filter: var(--tool-panel-filter);
-  box-shadow: var(--hud-shadow);
+  box-shadow: var(--hud-shadow-swiss-top);
 }
 
 .layer-source-menu[hidden] {
@@ -145,7 +146,7 @@
 
 .layer-menu-icon-button:hover {
   background: var(--surface-hover);
-  color: #fff;
+  color: var(--text-bright);
 }
 
 .layer-menu-icon-button[hidden] {
@@ -178,7 +179,7 @@
 .layer-section-label {
   display: block;
   padding: 0 3px 6px;
-  color: #aaa;
+  color: var(--muted);
   font-size: 11px;
   letter-spacing: 0.04em;
 }
@@ -209,8 +210,8 @@
 }
 
 .layer-switch .layer-source-menu .layer-custom-manage:hover {
-  background: rgba(143, 217, 255, 0.1);
-  color: #fff;
+  background: var(--accent-tint);
+  color: var(--text-bright);
 }
 
 .layer-switch .layer-source-menu .layer-custom-manage:focus-visible {
@@ -334,7 +335,7 @@
 }
 
 .layer-switch .layer-source-menu button.locked:not(.selected) {
-  color: #999;
+  color: var(--icon-disabled);
 }
 
 .layer-source-empty {
@@ -413,7 +414,7 @@
   justify-content: space-between;
   gap: 8px;
   padding: 8px 9px;
-  border: 1px solid #454545;
+  border: 1px solid var(--border-control);
   border-radius: 5px;
   background: var(--surface-input);
 }
@@ -465,12 +466,12 @@
 
 .layer-settings-view .layer-key-action:hover {
   background: var(--surface-hover);
-  color: #fff;
+  color: var(--text-bright);
 }
 
 .layer-settings-view .layer-key-action.danger:hover {
-  background: rgba(227, 138, 138, 0.14);
-  color: #e39a9a;
+  background: var(--danger-tint);
+  color: var(--danger-text);
 }
 
 .layer-cache-section {
@@ -508,7 +509,7 @@
 .layer-switch .layer-source-menu .layer-cache-toggle:hover {
   border-color: var(--border-muted);
   background: var(--surface-hover);
-  color: #fff;
+  color: var(--text-bright);
 }
 
 .layer-switch .layer-source-menu .layer-cache-toggle.active {
@@ -519,9 +520,9 @@
 }
 
 .layer-switch .layer-source-menu .layer-cache-toggle.active:hover {
-  border-color: #60b4ff;
-  background: #2c6296;
-  color: #fff;
+  border-color: var(--accent-hover);
+  background: var(--accent-tint);
+  color: var(--icon-active);
 }
 
 .layer-switch .layer-source-menu .layer-cache-toggle:active {
@@ -562,7 +563,7 @@
 .layer-switch .layer-source-menu .layer-nodes-check:hover:not(:disabled) {
   border-color: var(--border-muted);
   background: var(--surface-hover);
-  color: #fff;
+  color: var(--text-bright);
 }
 
 .layer-switch .layer-source-menu .layer-nodes-check:disabled {
@@ -615,7 +616,7 @@
 .layer-switch .layer-source-menu .layer-node-choice:hover {
   border-color: var(--border-muted);
   background: var(--surface-hover);
-  color: #fff;
+  color: var(--text-bright);
 }
 
 .layer-switch .layer-source-menu .layer-node-choice.active {
@@ -632,7 +633,7 @@
   padding: 3px 7px;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--surface-inset);
   color: var(--muted);
   font-size: 11px;
   line-height: 1.25;
@@ -667,7 +668,7 @@
 }
 
 .layer-node-choice.active .layer-node-metric {
-  color: rgba(255, 255, 255, 0.78);
+  color: var(--muted);
 }
 
 .layer-overlays-section {
@@ -698,7 +699,7 @@
 .layer-switch .layer-source-menu .layer-overlay-chip:hover {
   border-color: var(--border-muted);
   background: var(--surface-hover);
-  color: #fff;
+  color: var(--text-bright);
 }
 
 .layer-switch .layer-source-menu .layer-overlay-chip.active {
@@ -798,7 +799,7 @@
 
 .layer-switch .layer-source-menu .layer-cache-clear:hover:not(:disabled) {
   background: var(--surface-hover);
-  color: #fff;
+  color: var(--text-bright);
 }
 
 .layer-switch .layer-source-menu .layer-cache-clear:disabled {
@@ -807,9 +808,9 @@
 }
 
 .layer-switch .layer-source-menu .layer-cache-clear.confirm {
-  border-color: rgba(227, 138, 138, 0.55);
-  background: rgba(227, 138, 138, 0.16);
-  color: #f4b2b2;
+  border-color: var(--danger-border);
+  background: var(--danger-tint);
+  color: var(--danger-text);
   font-weight: 600;
 }
 
@@ -862,14 +863,14 @@
   align-items: center;
   gap: 3px;
   padding: 2px;
-  border: 1px solid #414141;
+  border: 1px solid var(--border-control);
   border-radius: 5px;
-  background: #292929;
+  background: var(--surface-row);
 }
 
 .layer-custom-row.active {
   border-color: var(--accent-muted);
-  background: rgba(35, 79, 121, 0.55);
+  background: var(--accent-tint);
 }
 
 .layer-custom-select {
@@ -890,7 +891,7 @@
 }
 
 .layer-custom-select:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--toolbar-hover-tint);
 }
 
 .layer-custom-select:focus-visible {
@@ -903,7 +904,7 @@
   width: 16px;
   height: 16px;
   place-items: center;
-  border: 1px solid #5a5a5a;
+  border: 1px solid var(--border-muted);
   border-radius: 50%;
   color: #fff;
 }
@@ -1005,17 +1006,17 @@
 }
 
 .layer-custom-action:hover {
-  background: #3a3a3a;
-  color: #fff;
+  background: var(--surface-hover);
+  color: var(--text-bright);
 }
 
 .layer-custom-action.danger:hover {
-  color: #e39a9a;
+  color: var(--danger-text);
 }
 
 .layer-custom-action.confirm {
-  background: rgba(160, 45, 45, 0.34);
-  color: #ffc4c4;
+  background: var(--danger-tint);
+  color: var(--danger-text);
 }
 
 .layer-custom-empty {
@@ -1024,7 +1025,7 @@
   padding: 18px 12px;
   flex-direction: column;
   gap: 7px;
-  border: 1px dashed #4b4b4b;
+  border: 1px dashed var(--border-control);
   border-radius: 5px;
   text-align: center;
 }
@@ -1040,7 +1041,7 @@
   height: 34px;
   place-items: center;
   border-radius: 5px;
-  background: #222;
+  background: var(--surface-muted);
   color: var(--icon-active);
 }
 
@@ -1052,18 +1053,18 @@
 
 .layer-custom-empty-action {
   padding: 6px 12px;
-  border: 1px solid var(--accent-muted);
+  border: 1px solid var(--btn-primary-border);
   border-radius: var(--radius-sm);
-  background: var(--icon-active-background);
-  color: #fff;
+  background: var(--btn-primary-bg);
+  color: var(--btn-primary-text);
   cursor: pointer;
   font: inherit;
   font-size: 11px;
 }
 
 .layer-custom-empty-action:hover {
-  border-color: #4aa8ff;
-  background: #2b6395;
+  border-color: var(--btn-primary-hover);
+  background: var(--btn-primary-hover);
 }
 
 .layer-custom-form {
@@ -1085,7 +1086,7 @@
   margin: 2px -10px -10px;
   padding: 10px;
   border-top: 1px solid var(--border-subtle);
-  background: #202020;
+  background: var(--panel-solid);
 }
 
 .layer-custom-basics {
@@ -1101,7 +1102,7 @@
   padding: 6px 10px;
   border: 1px solid var(--border-strong);
   border-radius: 5px;
-  color: #c7c7c7;
+  color: var(--text);
   text-align: center;
   cursor: pointer;
   font: inherit;
@@ -1113,21 +1114,21 @@
 }
 
 .layer-switch .layer-source-menu .layer-custom-save {
-  border-color: var(--accent);
-  background: var(--icon-active-background);
-  color: #fff;
+  border-color: var(--btn-primary-border);
+  background: var(--btn-primary-bg);
+  color: var(--btn-primary-text);
   font-weight: 600;
 }
 
 .layer-switch .layer-source-menu .layer-custom-cancel:hover {
   border-color: var(--border-muted);
-  background: var(--surface-card);
-  color: #fff;
+  background: var(--surface-hover);
+  color: var(--text-bright);
 }
 
 .layer-switch .layer-source-menu .layer-custom-save:hover {
-  border-color: #4aa8ff;
-  background: #2b6395;
+  border-color: var(--btn-primary-hover);
+  background: var(--btn-primary-hover);
 }
 
 .layer-switch .layer-source-menu .layer-custom-cancel:focus-visible,
@@ -1165,7 +1166,7 @@
 }
 
 .layer-custom-advanced-summary:hover {
-  color: #fff;
+  color: var(--text-bright);
 }
 
 .layer-custom-advanced-body {
@@ -1201,7 +1202,7 @@
   padding: 5px 7px;
   border: 1px solid var(--border-strong);
   border-radius: 3px;
-  background: #1f1f1f;
+  background: var(--surface-input);
   color: var(--text);
   font: inherit;
   font-size: 11.5px;
@@ -1393,7 +1394,7 @@
 }
 
 .pins-switch button:not(.active):hover {
-  color: #fff;
+  color: var(--text-bright);
 }
 
 /* A waypoint list lets the whole route be scanned before opening any one pin. It occupies the right side on a
@@ -1406,7 +1407,7 @@
 }
 
 .waypoint-overview-switch.joined-right {
-  border-left: 1px solid rgba(255, 255, 255, 0.12);
+  border-left: 1px solid var(--border-subtle);
   border-radius: 0 var(--toolbar-radius) var(--toolbar-radius) 0;
 }
 
@@ -1434,9 +1435,12 @@
   overflow: hidden;
   padding: 10px 10px 0;
   border: 1px solid var(--border-control);
-  border-radius: 5px;
-  background: var(--panel);
-  box-shadow: 0 3px 16px rgba(0, 0, 0, 0.55);
+  border-radius: var(--panel-radius);
+  background-color: var(--tool-panel-background);
+  background-image: var(--swiss-corner-ticks);
+  -webkit-backdrop-filter: var(--tool-panel-filter);
+  backdrop-filter: var(--tool-panel-filter);
+  box-shadow: var(--hud-shadow-swiss-top);
 }
 
 .waypoint-overview[hidden] {
@@ -1452,7 +1456,7 @@
   justify-content: space-between;
   gap: 8px;
   padding: 9px 10px 8px 12px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .waypoint-overview-header strong {
@@ -1483,7 +1487,7 @@
 
 .waypoint-overview-header .close:hover {
   background: var(--surface-hover);
-  color: #fff;
+  color: var(--text-bright);
 }
 
 .waypoint-filter-trigger {
@@ -1495,7 +1499,7 @@
   padding: 3px 6px;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
-  background: #222;
+  background: var(--surface-control);
   color: var(--muted);
   cursor: pointer;
   font: inherit;
@@ -1505,7 +1509,7 @@
 .waypoint-filter-trigger:hover,
 .waypoint-filter-trigger[aria-expanded="true"] {
   border-color: var(--border-muted);
-  color: #fff;
+  color: var(--text-bright);
 }
 
 .waypoint-filter-trigger[aria-expanded="true"] {
@@ -1541,9 +1545,9 @@
   box-sizing: border-box;
   padding: 7px;
   border: 1px solid var(--border-focus);
-  border-radius: 5px;
-  background: #202020;
-  box-shadow: 0 5px 20px rgba(0, 0, 0, 0.65);
+  border-radius: 6px;
+  background: var(--panel-solid);
+  box-shadow: var(--hud-shadow);
 }
 
 .waypoint-popover[hidden] {
@@ -1586,15 +1590,16 @@
 }
 
 .insight-filter:hover {
-  color: #fff;
+  color: var(--text-bright);
   border-color: var(--border-muted);
 }
 
 .insight-filter.active,
 .waypoint-correct-option.selected {
   border-color: var(--accent);
-  background: rgba(47, 155, 255, 0.2);
-  color: #fff;
+  background: var(--accent-tint);
+  color: var(--text-bright);
+  font-weight: 600;
 }
 
 .waypoint-correct-option {
@@ -1615,7 +1620,7 @@
 
 .waypoint-correct-option:hover {
   border-color: var(--border-muted);
-  background: #343434;
+  background: var(--surface-hover);
 }
 
 .waypoint-overview-list {
@@ -1629,7 +1634,7 @@
   box-sizing: border-box;
   padding: 8px 11px 9px;
   border: 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  border-bottom: 1px solid var(--border-hairline);
   background: transparent;
   color: var(--text);
   cursor: pointer;
@@ -1643,7 +1648,7 @@
 }
 
 .waypoint-overview-item:hover {
-  background: rgba(255, 255, 255, 0.07);
+  background: var(--toolbar-hover-tint);
 }
 
 .waypoint-overview-item.insight-danger {
@@ -1710,13 +1715,14 @@
   position: sticky;
   top: 0;
   z-index: 1;
-  border-bottom-color: rgba(47, 155, 255, 0.45);
+  border-bottom-color: var(--accent-muted);
+  background: var(--panel-solid);
 }
 
 .waypoint-current-label {
   display: block;
   margin-top: 2px;
-  color: #8fc7ff;
+  color: var(--accent);
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.04em;
@@ -1784,7 +1790,7 @@
   min-width: 18px;
   padding: 1px 4px;
   border-radius: var(--radius-md);
-  background: #3a3a3a;
+  background: var(--surface-muted);
   color: var(--muted);
   font-size: 11px;
   text-align: center;
@@ -1807,8 +1813,8 @@
 .waypoint-correct-button:hover,
 .waypoint-correct-button[aria-expanded="true"] {
   border-color: var(--border-focus);
-  background: #343434;
-  color: #fff;
+  background: var(--surface-hover);
+  color: var(--text-bright);
 }
 
 .waypoint-correct-button[aria-expanded="true"] {
@@ -1843,7 +1849,7 @@
   padding: 1px 6px;
   border: 1px solid currentColor;
   border-radius: var(--radius-pill);
-  color: #ddd;
+  color: var(--text);
   font-size: 11px;
   line-height: 1.4;
 }
@@ -1853,49 +1859,40 @@
   opacity: 0.78;
 }
 
-.waypoint-insight-badge.insight-danger {
-  color: #ff8c8c;
-}
+.waypoint-insight-badge.insight-danger { color: #b91c1c; }
+.waypoint-insight-badge.insight-water { color: #1d6ca8; }
+.waypoint-insight-badge.insight-camp { color: #157a49; }
+.waypoint-insight-badge.insight-rescue { color: #a8206f; }
+.waypoint-insight-badge.insight-exit { color: #b85312; }
+.waypoint-insight-badge.insight-supply { color: #547a1c; }
+.waypoint-insight-badge.insight-crossing { color: #15778c; }
+.waypoint-insight-badge.insight-junction { color: #9c6f0b; }
+.waypoint-insight-badge.insight-summit { color: #6d3fb5; }
+.waypoint-insight-badge.insight-access { color: #476085; }
+.waypoint-insight-badge.insight-viewpoint { color: #267569; }
 
-.waypoint-insight-badge.insight-water {
-  color: #75b5ff;
-}
-
-.waypoint-insight-badge.insight-camp {
-  color: #6fd49a;
-}
-
-.waypoint-insight-badge.insight-rescue {
-  color: #f18bc4;
-}
-
-.waypoint-insight-badge.insight-exit {
-  color: #f5a36b;
-}
-
-.waypoint-insight-badge.insight-supply {
-  color: #b3d879;
-}
-
-.waypoint-insight-badge.insight-crossing {
-  color: #73d0e3;
-}
-
-.waypoint-insight-badge.insight-junction {
-  color: #e5bd5b;
-}
-
-.waypoint-insight-badge.insight-summit {
-  color: #c49aef;
-}
-
-.waypoint-insight-badge.insight-access {
-  color: #a9bddc;
-}
-
-.waypoint-insight-badge.insight-viewpoint {
-  color: #81cabe;
-}
+:root[data-theme="slate"] .waypoint-insight-badge.insight-danger,
+:root[data-theme="classic"] .waypoint-insight-badge.insight-danger { color: #ff8c8c; }
+:root[data-theme="slate"] .waypoint-insight-badge.insight-water,
+:root[data-theme="classic"] .waypoint-insight-badge.insight-water { color: #75b5ff; }
+:root[data-theme="slate"] .waypoint-insight-badge.insight-camp,
+:root[data-theme="classic"] .waypoint-insight-badge.insight-camp { color: #6fd49a; }
+:root[data-theme="slate"] .waypoint-insight-badge.insight-rescue,
+:root[data-theme="classic"] .waypoint-insight-badge.insight-rescue { color: #f18bc4; }
+:root[data-theme="slate"] .waypoint-insight-badge.insight-exit,
+:root[data-theme="classic"] .waypoint-insight-badge.insight-exit { color: #f5a36b; }
+:root[data-theme="slate"] .waypoint-insight-badge.insight-supply,
+:root[data-theme="classic"] .waypoint-insight-badge.insight-supply { color: #b3d879; }
+:root[data-theme="slate"] .waypoint-insight-badge.insight-crossing,
+:root[data-theme="classic"] .waypoint-insight-badge.insight-crossing { color: #73d0e3; }
+:root[data-theme="slate"] .waypoint-insight-badge.insight-junction,
+:root[data-theme="classic"] .waypoint-insight-badge.insight-junction { color: #e5bd5b; }
+:root[data-theme="slate"] .waypoint-insight-badge.insight-summit,
+:root[data-theme="classic"] .waypoint-insight-badge.insight-summit { color: #c49aef; }
+:root[data-theme="slate"] .waypoint-insight-badge.insight-access,
+:root[data-theme="classic"] .waypoint-insight-badge.insight-access { color: #a9bddc; }
+:root[data-theme="slate"] .waypoint-insight-badge.insight-viewpoint,
+:root[data-theme="classic"] .waypoint-insight-badge.insight-viewpoint { color: #81cabe; }
 
 .waypoint-overview-empty {
   margin: 0;

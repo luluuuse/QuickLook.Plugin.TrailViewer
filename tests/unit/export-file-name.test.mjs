@@ -30,4 +30,8 @@ test('overlay file names keep every visual option distinct', () => {
     overlayFileName('track.gpx', '4:3', 'white', 'none', 'track', { content: 'track', profile: 'ele' }),
     'track-track-4x3-white-none-bare-ele.png',
   );
+  assert.equal(
+    overlayFileName('track.gpx', '9:16', 'swiss', 'soft', 'track', { content: 'full', profile: 'ele' }),
+    'track-track-9x16-swiss-soft-ele.png',
+  );
 });

@@ -22,10 +22,10 @@ function pinIcon(L, withPhoto) {
         ? symbolMarkup('camera', { width: 11, height: 11, className: 'data-symbol pin-camera' })
         : '')
       + '</span>',
-    // The 24x32 pin silhouette scales into 24x27 with its horizontal centre at x=12 and geometric tip at
-    // y=27.84, so anchoring at [12, 28] aligns the pin tip dead-centre on the coordinate and snap reticle.
+    // The 24x32 slender diamond survey pin scales into 24x27 with its horizontal centre at x=12 and
+    // bottom needle tip at y=26.58, so anchoring at [12, 27] aligns the tip dead-centre on the coordinate.
     iconSize: [24, 27],
-    iconAnchor: [12, 28],
+    iconAnchor: [12, 27],
     popupAnchor: [0, -26],
   });
 }

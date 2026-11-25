@@ -1,9 +1,10 @@
 import { iconMarkup, weatherMarkMarkup } from './icons.js';
 
-/** Main toolbox menu: quick actions, keyboard hints and route weather card. */
+/** Main toolbox menu: quick actions, theme switcher, keyboard hints and route weather card. */
 export function createToolboxMain({
   el, t, exportAvailable, editAvailable = () => true, weatherAvailable, weatherHasElevation,
-  weatherModes, currentVersion = '', onMeasure, onCoordinates, onExport, onAttachments,
+  weatherModes, theme = () => 'swiss', setTheme = /** @type {(next: string) => boolean} */ (() => false), themeModes = [],
+  currentVersion = '', onMeasure, onCoordinates, onExport, onAttachments,
   onWeather, onEdit, onUpdate, onClose,
 }) {
   let weatherMode = weatherModes[0] || 'start';
@@ -15,6 +16,7 @@ export function createToolboxMain({
   let weatherButton;
   let weatherPicker;
   let quickGrid;
+  let themePick;
   let versionBar;
   let versionLabel;
   let updateButton;
@@ -109,17 +111,54 @@ export function createToolboxMain({
     weatherRow.append(weatherButton, weatherPicker);
     quickGrid.append(measureButton, coordinateButton, exportButton, attachmentButton);
 
+    themePick = el('div', 'toolbox-theme-pick');
+    themePick.setAttribute('role', 'group');
+    themePick.setAttribute('aria-label', t('theme.label'));
+    for (const mode of themeModes) {
+      const option = el('button', 'toolbox-theme-option');
+      option.type = 'button';
+      option.dataset.themeOption = mode;
+      const label = t(`theme.${mode}`);
+      option.title = label;
+      option.setAttribute('aria-label', label);
+      option.setAttribute('aria-pressed', String(theme() === mode));
+      option.addEventListener('click', () => {
+        setTheme(mode);
+        renderThemeState();
+      });
+      themePick.append(option);
+    }
+    themePick.hidden = themeModes.length === 0;
+
     versionBar = el('div', 'toolbox-version-bar');
-    versionLabel = el('span', 'toolbox-version-text', currentVersion ? `v${currentVersion}` : 'TrailViewer');
+    const versionBrand = el('span', 'toolbox-version-brand');
+    const brandIcon = el('img', 'toolbox-brand-icon');
+    brandIcon.src = 'assets/trailviewer-icon.svg';
+    brandIcon.alt = '';
+    brandIcon.setAttribute('aria-hidden', 'true');
+    const brandCopy = el('span', 'toolbox-brand-copy');
+    const brandName = el('span', 'toolbox-brand-name', 'TrailViewer');
+    versionLabel = el('span', 'toolbox-version-text', currentVersion ? `v${currentVersion}` : '');
+    versionLabel.hidden = !currentVersion;
+    brandCopy.append(brandName, versionLabel);
+    versionBrand.append(brandIcon, brandCopy);
     updateButton = el('button', 'toolbox-version-btn');
     updateButton.type = 'button';
     updateButton.dataset.tool = 'update';
     updateButton.textContent = t('update.checkNow');
     updateButton.addEventListener('click', () => onUpdate?.());
-    versionBar.append(versionLabel, updateButton);
+    versionBar.append(versionBrand, themePick, updateButton);
 
     view.append(editButton, quickGrid, weatherRow, versionBar);
     return view;
+  }
+
+  function renderThemeState() {
+    if (!themePick) return;
+    const current = theme();
+    for (const option of themePick.querySelectorAll('[data-theme-option]')) {
+      option.setAttribute('aria-pressed', String(option.dataset.themeOption === current));
+    }
   }
 
   const view = build();
@@ -146,8 +185,10 @@ export function createToolboxMain({
       option.disabled = Boolean(option.dataset.weatherMode === 'highest' && !weatherHasElevation());
     }
     weatherPicker.hidden = !weatherAvailable() || weatherModes.length === 0;
+    renderThemeState();
     const ver = updateState?.currentVersion || currentVersion;
-    versionLabel.textContent = ver ? `v${ver}` : 'TrailViewer';
+    versionLabel.textContent = ver ? `v${ver}` : '';
+    versionLabel.hidden = !ver;
     const hasNew = Boolean(updateState?.hasUpdate && updateState?.latestVersion);
     updateButton.classList.toggle('has-update', hasNew);
     updateButton.textContent = hasNew
@@ -172,6 +213,16 @@ export function createToolboxMain({
     for (const option of weatherPicker.querySelectorAll('[data-weather-mode]')) {
       option.querySelector('.toolbox-weather-mode-label').textContent =
         t(`weather.mode.${option.dataset.weatherMode}`);
+    }
+    if (themePick) {
+      themePick.setAttribute('aria-label', t('theme.label'));
+      for (const option of themePick.querySelectorAll('[data-theme-option]')) {
+        const mode = option.dataset.themeOption;
+        const label = t(`theme.${mode}`);
+        option.title = label;
+        option.setAttribute('aria-label', label);
+      }
+      renderThemeState();
     }
   }
 

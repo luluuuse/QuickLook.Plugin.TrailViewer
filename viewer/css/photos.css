@@ -26,7 +26,7 @@
 }
 
 .gpx-pin.selected .pin-symbol-wrap svg {
-  filter: drop-shadow(0 0 4px rgba(255, 242, 168, 0.72));
+  filter: drop-shadow(0 0 4px var(--snap-border));
 }
 
 .gpx-start.selected,
@@ -221,10 +221,21 @@
   cursor: pointer;
 }
 
-.photo-card-close:hover,
-.place-card-close:hover {
+.photo-card-close:hover {
   border-color: rgba(255, 255, 255, 0.5);
   background: rgba(18, 18, 18, 0.95);
+}
+
+.place-card-close {
+  border-color: var(--border-control);
+  background: var(--surface-control);
+  color: var(--muted);
+}
+
+.place-card-close:hover {
+  border-color: var(--border-muted);
+  background: var(--surface-hover);
+  color: var(--text-bright);
 }
 
 /* One round arrow instead of a text button: it costs no horizontal room, so a long placemark name can use the
@@ -298,6 +309,7 @@
   display: flex;
   flex-direction: column;
   background: rgba(11, 11, 12, 0.42);
+  color: #f1f5f9;
 }
 
 /* Kept explicit: "display: flex" above would otherwise win over the hidden attribute. */
@@ -317,6 +329,7 @@
 .photo-titles {
   flex: 1 1 auto;
   min-width: 0;
+  color: #ffffff;
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.92);
 }
 
@@ -327,7 +340,7 @@
 
 .photo-meta {
   overflow: hidden;
-  color: var(--muted);
+  color: rgba(241, 245, 249, 0.78);
   font-size: 12px;
   white-space: nowrap;
   text-overflow: ellipsis;
@@ -338,8 +351,8 @@
   flex: 0 0 auto;
   padding: 2px 9px;
   border-radius: var(--radius-lg);
-  background: rgba(255, 255, 255, 0.09);
-  color: var(--text);
+  background: rgba(18, 22, 28, 0.72);
+  color: #f1f5f9;
   font: 12px Consolas, monospace;
 }
 
@@ -364,12 +377,12 @@
   border: 0;
   border-radius: var(--radius-sm);
   background: none;
-  color: var(--text);
+  color: #f1f5f9;
   cursor: pointer;
 }
 
 .photo-close:hover {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.14);
   color: #fff;
 }
 
@@ -435,10 +448,10 @@
 .photo-open-external {
   margin-top: 4px;
   padding: 5px 12px;
-  border: 1px solid rgba(255, 255, 255, 0.24);
+  border: 1px solid rgba(255, 255, 255, 0.28);
   border-radius: var(--radius-pill);
-  background: rgba(255, 255, 255, 0.08);
-  color: var(--text);
+  background: rgba(18, 22, 28, 0.72);
+  color: #f1f5f9;
   font: inherit;
   font-size: 12px;
   cursor: pointer;
@@ -447,7 +460,7 @@
 .photo-open-external:hover,
 .photo-open-external:focus-visible {
   border-color: var(--accent);
-  color: var(--accent);
+  color: #ffffff;
 }
 
 .photo-arrow {
@@ -457,16 +470,16 @@
   place-items: center;
   width: 40px;
   height: 40px;
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.24);
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.09);
-  color: var(--text);
+  background: rgba(18, 22, 28, 0.65);
+  color: #ffffff;
   cursor: pointer;
   transform: translateY(-50%);
 }
 
 .photo-arrow:hover {
-  background: rgba(255, 255, 255, 0.18);
+  background: rgba(18, 22, 28, 0.85);
 }
 
 .photo-arrow.prev {

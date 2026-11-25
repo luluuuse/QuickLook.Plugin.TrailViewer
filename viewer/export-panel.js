@@ -71,6 +71,7 @@ export function createExportPanel({
   const inkRow = picker('ink', 'export.ink', [
     { key: 'black', label: () => t('export.inkBlack'), hint: 'export.inkBlackHint' },
     { key: 'white', label: () => t('export.inkWhite'), hint: 'export.inkWhiteHint' },
+    { key: 'swiss', label: () => t('export.inkSwiss'), hint: 'export.inkSwissHint' },
   ], settings.ink);
   const scrimRow = picker('scrim', 'export.scrim', [
     { key: 'none', label: () => t('export.scrimNone'), hint: 'export.scrimNoneHint' },

@@ -89,9 +89,9 @@ async function main() {
     return { background: style.backgroundColor, filter: style.backdropFilter };
   });
   check('the map layer panel uses the shared translucent tool surface',
-    layerSurface.background === 'rgba(24, 24, 24, 0.78)'
+    layerSurface.background === 'rgba(250, 248, 243, 0.93)'
       && layerSurface.filter.includes('blur(14px)')
-      && layerSurface.filter.includes('saturate(0.9)'),
+      && layerSurface.filter.includes('saturate(1.08)'),
     JSON.stringify(layerSurface));
   const categoryLabels = await page.$$eval('.layer-category-button', (nodes) => nodes.map((node) => node.textContent));
   check('the layer panel exposes four map types', categoryLabels.length === 4, categoryLabels.join('/'));
@@ -242,10 +242,10 @@ async function main() {
       shadow: style.boxShadow,
     };
   });
-  check('the active no-map icon uses the shared blue active state',
-    noMapActiveStyle.background === 'rgb(35, 79, 121)'
-      && noMapActiveStyle.color === 'rgb(143, 217, 255)'
-      && noMapActiveStyle.shadow.includes('rgb(47, 155, 255)'),
+  check('the active no-map icon uses the shared accent active state',
+    noMapActiveStyle.background === 'rgb(255, 255, 255)'
+      && noMapActiveStyle.color === 'rgb(223, 43, 29)'
+      && noMapActiveStyle.shadow.includes('rgb(223, 43, 29)'),
     JSON.stringify(noMapActiveStyle));
   check('no-map mode does not repeat itself as a provider row',
     await page.locator('.layer-main-view .layer-menu-section').nth(1)

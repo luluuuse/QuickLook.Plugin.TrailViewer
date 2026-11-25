@@ -109,7 +109,7 @@ body.is-editing #map.editor-cursor-grabbing {
   padding: 0 8px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border-control);
-  background: rgba(15, 23, 42, 0.85);
+  background: var(--surface-input);
   color: var(--text-bright);
   font: inherit;
   font-size: 12px;
@@ -147,7 +147,7 @@ body.is-editing #map.editor-cursor-grabbing {
   width: 100%;
   height: 4px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.14);
+  background: var(--border-subtle);
   overflow: hidden;
 }
 
@@ -218,7 +218,7 @@ body.is-editing #map.editor-cursor-grabbing {
 .editor-diff-pill {
   padding: 2px 8px;
   border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--editor-active-bg);
   color: var(--editor-active-fg);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -228,7 +228,7 @@ body.is-editing #map.editor-cursor-grabbing {
 .editor-topbar-sep {
   width: 1px;
   height: 16px;
-  background: rgba(255, 255, 255, 0.14);
+  background: var(--border-subtle);
   flex: 0 0 auto;
 }
 
@@ -274,24 +274,26 @@ body.is-editing #map.editor-cursor-grabbing {
 
 .editor-btn-primary {
   background: var(--editor-save-bg);
-  color: var(--text-bright);
+  color: var(--on-accent);
   font-weight: 600;
   padding: 0 10px;
 }
 
 .editor-btn-primary:hover:not(:disabled) {
   background: var(--editor-save-hover);
+  color: var(--on-accent);
 }
 
 .editor-btn-success {
   background: #15803d;
-  color: var(--text-bright);
+  color: var(--on-accent);
   font-weight: 600;
   padding: 0 10px;
 }
 
 .editor-btn-success:hover:not(:disabled) {
   background: #16a34a;
+  color: var(--on-accent);
 }
 
 .editor-btn-danger {
@@ -299,8 +301,8 @@ body.is-editing #map.editor-cursor-grabbing {
 }
 
 .editor-btn-danger:hover:not(:disabled) {
-  background: rgba(239, 68, 68, 0.22);
-  color: #fecaca;
+  background: var(--danger-tint);
+  color: var(--editor-danger-text);
 }
 
 /* Exit dirty guard inline strip inside topbar */
@@ -381,7 +383,7 @@ body.is-editing #map.editor-cursor-grabbing {
   width: 22px;
   height: 1px;
   margin: 2px 0;
-  background: rgba(255, 255, 255, 0.14);
+  background: var(--border-subtle);
   flex: 0 0 auto;
 }
 
@@ -412,7 +414,7 @@ body.is-editing #map.editor-cursor-grabbing {
   gap: 8px;
   padding-bottom: 8px;
   margin-bottom: 10px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .editor-drawer-title {
@@ -434,8 +436,8 @@ body.is-editing #map.editor-cursor-grabbing {
   height: 20px;
   padding: 0;
   border-radius: 50%;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border-control);
+  background: var(--surface-control);
   color: var(--muted);
   font-size: 11px;
   font-weight: 600;
@@ -448,7 +450,7 @@ body.is-editing #map.editor-cursor-grabbing {
 .editor-drawer-help:focus-visible {
   color: var(--text-bright);
   border-color: var(--accent);
-  background: rgba(56, 189, 248, 0.16);
+  background: var(--accent-tint);
 }
 
 .editor-drawer-tooltip {
@@ -457,10 +459,10 @@ body.is-editing #map.editor-cursor-grabbing {
   max-width: 220px;
   padding: 7px 9px;
   border-radius: 7px;
-  background: rgba(13, 18, 24, 0.96);
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.55);
-  color: var(--text);
+  background: var(--toast-bg);
+  border: 1px solid var(--border-control);
+  box-shadow: var(--hud-shadow);
+  color: var(--toast-text);
   font-size: 11.5px;
   line-height: 1.45;
   pointer-events: none;
@@ -495,8 +497,8 @@ body.is-editing #map.editor-cursor-grabbing {
   gap: 3px;
   padding: 3px;
   border-radius: var(--radius-sm);
-  background: rgba(0, 0, 0, 0.28);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--surface-inset);
+  border: 1px solid var(--border-hairline);
 }
 
 .editor-segmented-tabs.is-two {
@@ -524,20 +526,20 @@ body.is-editing #map.editor-cursor-grabbing {
 
 .editor-segmented-tab:hover {
   color: var(--text-bright);
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--toolbar-hover-tint);
 }
 
 .editor-segmented-tab.is-active {
-  background: rgba(35, 79, 121, 0.78);
-  border-color: rgba(143, 217, 255, 0.48);
-  color: var(--text-bright);
+  background: var(--editor-active-bg);
+  border-color: var(--editor-active-border);
+  color: var(--editor-active-fg);
   font-weight: 600;
 }
 
 .editor-tab-divider {
   height: 1px;
   margin: 2px 0;
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--border-hairline);
 }
 
 .editor-mode-btn {
@@ -548,7 +550,7 @@ body.is-editing #map.editor-cursor-grabbing {
   padding: 7px 8px;
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--surface-control);
   color: var(--text);
   font: inherit;
   font-size: 12.5px;
@@ -569,15 +571,15 @@ body.is-editing #map.editor-cursor-grabbing {
 
 .editor-mode-btn.is-active,
 .editor-mode-btn.is-active:hover:not(:disabled) {
-  background: rgba(35, 79, 121, 0.55);
-  border-color: rgba(143, 217, 255, 0.45);
-  color: var(--text-bright);
+  background: var(--editor-active-bg);
+  border-color: var(--editor-active-border);
+  color: var(--editor-active-fg);
 }
 
 .editor-stat-box {
   padding: 8px;
   border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--surface-inset);
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -691,7 +693,7 @@ body.is-editing #map.editor-cursor-grabbing {
 
 .editor-wpt-note-toggle:hover {
   color: var(--text-bright);
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--toolbar-hover-tint);
 }
 
 .editor-wpt-spacer {
@@ -704,15 +706,15 @@ body.is-editing #map.editor-cursor-grabbing {
 
 .editor-wpt-list,
 .editor-btn-outline {
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border-control);
+  background: var(--surface-control);
   color: var(--text-bright);
   justify-content: center;
 }
 
 .editor-btn-outline:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.12);
-  border-color: rgba(143, 217, 255, 0.36);
+  background: var(--surface-hover);
+  border-color: var(--border-muted);
 }
 
 .editor-wpt-batch-grid {
@@ -759,9 +761,9 @@ body.is-editing #map.editor-cursor-grabbing {
 .editor-wpt-list {
   gap: 0;
   max-height: 118px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--border-subtle);
   border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.025);
+  background: var(--surface-inset);
 }
 
 .editor-list-row {
@@ -772,7 +774,7 @@ body.is-editing #map.editor-cursor-grabbing {
   padding: 5px 7px;
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--surface-control);
   font-size: 12px;
   transition: background var(--motion-panel), border-color var(--motion-panel);
 }
@@ -787,15 +789,15 @@ body.is-editing #map.editor-cursor-grabbing {
 }
 
 .editor-wpt-list .editor-list-row.is-wpt-default .editor-list-row-main {
-  color: #7e8da1;
+  color: var(--muted);
 }
 
 .editor-wpt-list .editor-list-row.is-wpt-custom {
-  box-shadow: inset 2px 0 0 rgba(56, 189, 248, 0.72);
+  box-shadow: inset 2px 0 0 var(--secondary-accent);
 }
 
 .editor-wpt-list .editor-list-row.is-wpt-note {
-  box-shadow: inset 2px 0 0 #f59e0b;
+  box-shadow: inset 2px 0 0 #d98a1c;
 }
 
 .editor-wpt-list .editor-list-row.is-wpt-photo {
@@ -803,11 +805,11 @@ body.is-editing #map.editor-cursor-grabbing {
 }
 
 .editor-wpt-list .editor-list-row + .editor-list-row {
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  border-top: 1px solid var(--border-hairline);
 }
 
 .editor-wpt-list .editor-list-row:hover {
-  background: rgba(255, 255, 255, 0.07);
+  background: var(--toolbar-hover-tint);
 }
 
 .editor-wpt-row-left {
@@ -863,13 +865,13 @@ body.is-editing #map.editor-cursor-grabbing {
 
 .editor-list-row.is-selected,
 .editor-wpt-list .editor-list-row.is-selected {
-  background: rgba(35, 79, 121, 0.58);
-  border-color: rgba(143, 217, 255, 0.45);
+  background: var(--editor-active-bg);
+  border-color: var(--editor-active-border);
   color: var(--text-bright);
 }
 
 .editor-wpt-list .editor-list-row.is-selected:hover {
-  background: rgba(35, 79, 121, 0.74);
+  background: var(--editor-active-bg);
 }
 
 .editor-wpt-list .editor-list-row.is-wpt-default.is-selected {
@@ -1330,7 +1332,7 @@ body.is-editing #profile {
 
 .editor-context-item.is-danger {
   color: var(--editor-danger-text);
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  border-top: 1px solid var(--border-subtle);
   margin-top: 2px;
   padding-top: 2px;
 }

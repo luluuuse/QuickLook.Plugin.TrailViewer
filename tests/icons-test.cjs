@@ -138,12 +138,29 @@ async function main() {
   const active = await page.evaluate(() => {
     const button = document.querySelector('.toolbox-switch > button');
     const style = getComputedStyle(button);
-    return { background: style.backgroundColor, color: style.color, shadow: style.boxShadow };
+    return {
+      theme: document.documentElement.dataset.theme,
+      background: style.backgroundColor,
+      color: style.color,
+      shadow: style.boxShadow,
+    };
   });
-  check('active controls use the shared blue surface and underline',
-    active.background === 'rgb(35, 79, 121)' && active.color === 'rgb(143, 217, 255)'
-      && active.shadow.includes('inset'),
+  check('default swiss theme uses ivory active surface with vermilion accent and underline',
+    active.theme === 'swiss' && active.background === 'rgb(255, 255, 255)'
+      && active.color === 'rgb(223, 43, 29)' && active.shadow.includes('inset'),
     JSON.stringify(active));
+
+  const brandIcon = await page.evaluate(() => {
+    const icon = document.querySelector('.toolbox-version-bar .toolbox-brand-icon');
+    return {
+      inSummary: document.querySelectorAll('#info .info-brand-icon').length,
+      src: icon?.getAttribute('src') || null,
+      width: icon ? getComputedStyle(icon).width : null,
+    };
+  });
+  check('toolbox footer renders the 24 px 2B brand icon and keeps the summary header clean',
+    brandIcon.inSummary === 0 && brandIcon.src === 'assets/trailviewer-icon.svg' && brandIcon.width === '24px',
+    JSON.stringify(brandIcon));
 
   const symbols = await page.evaluate(() => {
     const pinFill = document.querySelector('.pin-symbol .symbol-fill');
@@ -162,13 +179,41 @@ async function main() {
       profileShadow: profile ? getComputedStyle(profile).boxShadow : '',
     };
   });
-  check('waypoint and photo symbols use semantic fills with dark outlines',
-    symbols.pin === 'waypoint' && symbols.pinFill === 'rgb(245, 196, 0)'
+  check('waypoint and photo symbols use semantic fills with dark outlines in swiss theme',
+    symbols.pin === 'waypoint' && symbols.pinFill === 'rgb(255, 255, 255)'
       && symbols.pinStroke === '1.5px' && symbols.camera === 'camera', JSON.stringify(symbols));
   check('start, end and profile data symbols follow the data-symbol stroke policy',
     symbols.startStroke === '1.5' && symbols.endStroke === '1.5'
-      && symbols.profileBackground === 'rgb(245, 196, 0)' && /1.5px/.test(symbols.profileShadow),
+      && symbols.profileBackground === 'rgb(255, 255, 255)' && /1\.4px/.test(symbols.profileShadow),
     JSON.stringify(symbols));
+
+  // Verify manual switching to slate and classic themes (classic preserves legacy blue/yellow palette).
+  await page.evaluate(() => window.trailViewer.theme.set('slate'));
+  const slateTheme = await page.evaluate(() => document.documentElement.dataset.theme);
+  await page.evaluate(() => window.trailViewer.theme.set('classic'));
+  await page.waitForFunction(() =>
+    getComputedStyle(document.querySelector('.toolbox-switch > button')).backgroundColor === 'rgb(35, 79, 121)');
+  const themeCheck = await page.evaluate(() => {
+    const button = document.querySelector('.toolbox-switch > button');
+    const btnStyle = getComputedStyle(button);
+    const pinFill = document.querySelector('.pin-symbol .symbol-fill');
+    const profile = document.querySelector('#profile .pin');
+    const res = {
+      classicTheme: document.documentElement.dataset.theme,
+      classicBg: btnStyle.backgroundColor,
+      classicColor: btnStyle.color,
+      classicPinFill: pinFill ? getComputedStyle(pinFill).fill : '',
+      classicProfileBg: profile ? getComputedStyle(profile).backgroundColor : '',
+    };
+    window.trailViewer.theme.set('swiss');
+    return res;
+  });
+  check('manual theme switching supports slate and preserves classic dark palette',
+    slateTheme === 'slate' && themeCheck.classicTheme === 'classic'
+      && themeCheck.classicBg === 'rgb(35, 79, 121)' && themeCheck.classicColor === 'rgb(143, 217, 255)'
+      && themeCheck.classicPinFill === 'rgb(245, 196, 0)'
+      && themeCheck.classicProfileBg === 'rgb(245, 196, 0)',
+    JSON.stringify({ slateTheme, ...themeCheck }));
 
   await page.click('.waypoint-overview-switch button');
   const overview = await page.evaluate(() => ({

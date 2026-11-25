@@ -186,8 +186,8 @@ async function main() {
     card.contentScroll === false && card.inlineMaxHeight === '',
     JSON.stringify({ scroll: card.contentScroll, inline: card.inlineMaxHeight }));
   check('the attachment card matches the waypoint-list transparency',
-    card.background === 'rgba(24, 24, 24, 0.86)'
-      && card.tipBackground === 'rgba(24, 24, 24, 0.86)',
+    card.background === 'rgba(250, 248, 243, 0.92)'
+      && card.tipBackground === 'rgba(250, 248, 243, 0.92)',
     `${card.background} / ${card.tipBackground}`);
 
   // 4. The thumbnail opens the original, and the card gets out of the way.
@@ -526,7 +526,7 @@ async function main() {
   // The wrapper paints --panel once, the same translucent surface the waypoint list uses. Painting the card
   // too stacked two 0.86 layers into an almost solid block.
   check('the plain card is as transparent as the waypoint list',
-    plain.cardBg === 'rgba(0, 0, 0, 0)' && plain.wrapperBg === 'rgba(24, 24, 24, 0.86)',
+    plain.cardBg === 'rgba(0, 0, 0, 0)' && plain.wrapperBg === 'rgba(250, 248, 243, 0.92)',
     `${plain.cardBg} / ${plain.wrapperBg}`);
   await page.locator('.place-popup .place-card-close').click();
   await settlePopup(page, '.place-popup', 0);

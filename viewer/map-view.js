@@ -416,7 +416,7 @@ export function createMapView({ map, isChromeHidden }) {
     layoutFrame = 0;
     if (signature === layoutSignature) return;
     layoutSignature = signature;
-    if (fitInitialRoute && bounds?.isValid()) fit();
+    if (fitInitialRoute && atHome && bounds?.isValid()) fit();
     else if (!atHome && lastFocus && shouldRevealFocus) scheduleReveal();
     else if (shouldRefitHome && atHome && signature !== lastFittedSignature) {
       fit();
@@ -578,6 +578,10 @@ export function createMapView({ map, isChromeHidden }) {
         scheduleRefresh({ refitHome: false, revealFocus: !toolboxOnly });
       });
       observeLayoutNodes();
+      placeControls(readLayoutSnapshot());
+      const refined = refineDependentVariables(readLayoutSnapshot());
+      safeRect = measureSafeRect(refined);
+      layoutSignature = currentSignature();
       addEventListener('resize', () => scheduleRefresh({ refitHome: true }));
       scheduleRefresh({ refitHome: true });
     },

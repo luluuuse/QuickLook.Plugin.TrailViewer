@@ -8,10 +8,10 @@ export function createTestApi({
   getRuntimeTiandituKey, setRuntimeTiandituKey, clearTiandituFlags,
   warnTiandituTemporarily, rejectTiandituKey, mapViewController, pressKey, overlayExport,
   toolboxController, showToast, t, fileName, clipboardResult, copyText, photoAttachments,
-  attachmentExporter, decodeMessage, measurement,
+  attachmentExporter, decodeMessage, measurement, theme,
 }) {
   return {
-    gpx, summary, map, scrub, photos: photoViewer, hikeEstimate,
+    gpx, summary, map, scrub, photos: photoViewer, hikeEstimate, theme,
     trackStats: tracks.networkStats,
     performance: () => ({ ...timing }),
     get splits() { return loadSplitsData(); },

@@ -17,6 +17,46 @@ Added / Changed / Deprecated / Removed / Fixed / Security 分类；没有内容�
 
 None yet.
 
+## 1.31.0 — 2026-11-25
+
+### 中文
+
+#### 新增
+
+- **三套手动主题体系**：新增 **瑞士纸镜**（默认）、**冷岩墨** 与 **基础深色** 三套手工调校主题，可在工具箱底栏通过微缩主题色卡一键切换，并由宿主持久保存偏好，不再随底图自动跳变。
+- **瑞士测绘视觉精装与实时比例尺**：纸镜与岩墨主题采用建筑直角浮层、朱红顶线、四角定位刻度、四段交替比例尺及实时 `1 : N` 比例尺分母；同步升级白边朱红轨迹、海拔极值测绘三角标与无底图双尺度测绘网格。
+- **全新瑞士山岳品牌图标**：内置无边框「精雕山岳标本 + 炭墨盘山小径 + 白底墨框红心」矢量图标，融入工具箱底栏与检查更新卡片，并配以克制的地形晕染与等高线暗纹。
+- **叠加图瑞士风格墨色**：叠加图导出新增 **瑞士** 墨色预设（炭墨文字、暖白渐变衬底与白边朱红轨迹）。
+
+#### 变更
+
+- **工具箱底栏与检查更新卡片重排**：将主题色卡收进工具箱底栏，品牌区采用「TrailViewer + 版本号」双行排版；检查更新卡片同步升级图标与右对齐状态提示；三套主题的工具箱功能图标各自配备独立配色（纸镜松林绿、岩墨高山暖金、基础电光蓝）。
+- **海拔剖面交互浮条适配**：刷选统计浮条、裁切与关闭按钮及主坡段/心率胶囊全面适配三套主题色彩与对比度。
+
+#### 修复
+
+- **修复初始加载竞态**：修正首次打开轨迹时航点、公里标及缩放适配偶发漏显或延迟的问题。
+- **修复图层列表与单色图标显示异常**：修正未选图源文字色调不一致的问题，以及浅色主题下单色轨迹切换图标对比度过低难以辨认的问题。
+
+### English
+
+#### Added
+
+- **Three Manual Interface Themes**: Introduced **Swiss Paper** (default), **Slate Dark**, and **Classic Dark** themes with miniature card swatches in the Toolbox footer and persistent host-side preference storage, never auto-switching when basemaps change.
+- **Swisstopo Cartographic Styling & Live Scale Ratio**: Added architectural panel geometry, Swiss vermilion top accent rules, four-corner micro registration ticks, a four-segment alternating scale bar with live `1 : N` cartographic scale ratio, white-cased vermilion tracks, elevation extremum survey triangles, and a dual-scale no-map survey grid for Swiss Paper and Slate Dark.
+- **New Alpine Specimen Brand Icon**: Added a borderless sculpted four-biome alpine peak icon with a winding charcoal switchback trail and Swiss survey summit mark across the Toolbox footer and Update card, paired with subtle terrain-tinted contour backgrounds.
+- **Swiss Ink Preset for Overlay Export**: Added a **Swiss** ink option for PNG route overlays featuring charcoal typography, warm ivory backing wash, and white-cased vermilion route lines.
+
+#### Changed
+
+- **Redesigned Toolbox Footer & Update Card**: Moved the miniature theme swatches into the Toolbox footer with two-line `TrailViewer` + version lockups and right-aligned status text in the Update card; gave each theme distinct Toolbox action-icon palettes (alpine green for Swiss Paper, warm gold for Slate Dark, electric blue for Classic Dark).
+- **Theme-Aware Elevation Profile Controls**: Updated the range brush readout bar, crop/close controls, and ClimbPro / heart-rate chips to adapt cleanly across all three themes.
+
+#### Fixed
+
+- **Fixed Initial Load Race Conditions**: Resolved sporadic missing waypoints, kilometre labels, or delayed initial zoom fits on first track load.
+- **Fixed Layer Menu & Single-Color Icon Contrast**: Fixed inconsistent dimmed text styling on unselected layer providers and low-contrast single-color track mode icons on light themes.
+
 ## 1.30.2 — 2026-11-25
 
 ### 中文

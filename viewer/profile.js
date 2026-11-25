@@ -370,10 +370,10 @@ const SCALE_STOPS = [
   [0, [64, 128, 102]], // level: muted pine
   [0.04, [99, 145, 96]], // most of a real route lives between here and eight percent
   [0.08, [154, 156, 92]], // soft moss turning toward ochre
-  [0.12, [190, 154, 74]], // warm amber
-  [0.17, [189, 118, 67]], // the steep threshold: caramel orange
-  [0.21, [164, 74, 62]], // walking pace: burnt crimson
-  [SLOPE_FULL, [126, 48, 53]], // the end of the scale: dark oxblood
+  [0.12, [196, 152, 66]], // warm amber
+  [0.17, [206, 108, 54]], // the steep threshold: alpine ochre-orange
+  [0.21, [202, 54, 42]], // walking pace: Swiss vermilion
+  [SLOPE_FULL, [152, 32, 26]], // the end of the scale: deep alpine crimson
 ];
 
 /** @returns {[number, number, number]} */

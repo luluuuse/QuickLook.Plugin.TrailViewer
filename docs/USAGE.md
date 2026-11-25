@@ -109,7 +109,7 @@
 #### 叠加图导出
 
 - 导出透明背景 PNG 到源轨迹同级目录，支持 **方版（1536×1536）**、**竖版（1080×1920）** 和 **横版（2048×1536）**，提供实时低分辨率预览。
-- 可选黑/白墨色、底衬、**仅轨迹**（隐藏文字与统计，文件名追加 `-bare`）与 **海拔轮廓**（底部绘制海拔剪影，文件名追加 `-ele`）；不同组合自动生成独立文件名，不互相覆盖。
+- 可选黑/白/瑞士三套墨色、底衬、**仅轨迹**（隐藏文字与统计，文件名追加 `-bare`）与 **海拔轮廓**（底部绘制海拔剪影，文件名追加 `-ele`）；不同组合自动生成独立文件名，不互相覆盖。
 
 #### 附件图片导出
 
@@ -122,6 +122,7 @@
 
 ### 7. 语言、快捷键、更新与隐私
 
+- **界面主题**：点击工具箱底栏的三枚微缩色卡可在 **瑞士纸镜**（默认）、**冷岩墨** 与 **基础深色** 之间手动切换并持久保存，不会随底图切换自动变更。
 - **界面语言**：点击工具箱标题栏的地球按钮（`中` / `EN`）就地切换中英文，不重载预览并自动记住选择（未手动选择时跟随系统语言）。
 - **快捷键速查**：点击工具箱标题栏右侧 **?** 查看两列快捷键表（`W / S / A D / Q E / C / M / T` 等），文本框获焦时自动暂停全局快捷键。
 - **内置检查更新**：工具箱底部显示当前版本与 **检查更新** 入口，后台每 24 小时最多静默竞速检测一次 **GitHub Releases + GitCode 国内镜像**（自动回退）。发现正式新版时，顶部显示柔和青蓝微光提示点、底部显示翠绿胶囊（`↑ vX.Y.Z`）；支持查看双语日志、忽略此版本，以及一键下载安装包（核对 **SHA256 哈希** 与插件清单完整性）并调起 QuickLook 原生安装。
@@ -231,7 +232,7 @@ Listed in Toolbox menu order:
 #### Export overlay
 
 - Writes transparent PNG overlays beside the source track in **Square (1536×1536)**, **Portrait (1080×1920)** and **Landscape (2048×1536)** with a live low-resolution preview.
-- Offers black/white ink, backing choices, **Track only** (`-bare` suffix, hides text and stats) and **Elevation silhouette** (`-ele` suffix, bottom curve); distinct style combinations write separate file names without overwriting one another.
+- Offers black/white/Swiss ink, backing choices, **Track only** (`-bare` suffix, hides text and stats) and **Elevation silhouette** (`-ele` suffix, bottom curve); distinct style combinations write separate file names without overwriting one another.
 
 #### Export attachment photos
 
@@ -244,6 +245,7 @@ Listed in Toolbox menu order:
 
 ### 7. Language, shortcuts, updates & privacy
 
+- **Interface themes:** click the three miniature theme cards in the Toolbox footer to switch between **Swiss Paper** (default), **Slate Dark**, and **Classic Dark**; stored persistently and never auto-switched by basemaps.
 - **Interface language:** click the globe button (`中` / `EN`) in the Toolbox header to switch in place without reloading; saved automatically (defaults to system language).
 - **Keyboard reference:** click **?** in the Toolbox header to open the two-column shortcut table (`W / S / A D / Q E / C / M / T`, etc.); global shortcuts pause automatically while typing in text inputs.
 - **Built-in update checker:** the Toolbox footer displays the installed version and **Check updates**, quietly racing **GitHub Releases + GitCode mirror** at most once every 24 hours with automatic failover. New stable releases show a subtle cyan glow dot on the Toolbox toggle and an emerald footer pill (`↑ vX.Y.Z`), with bilingual release notes, version muting, **SHA256 checksum & manifest verification**, and native QuickLook installer handoff.

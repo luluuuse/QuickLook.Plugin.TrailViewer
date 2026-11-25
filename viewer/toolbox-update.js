@@ -101,9 +101,18 @@ export function createUpdateTool({
 
   const title = el('h2', 'toolbox-subtitle', t('update.title'));
   const versionCard = el('div', 'toolbox-update-card');
+  const brandRow = el('div', 'toolbox-update-brand');
+  const brandIcon = el('img', 'toolbox-update-brand-icon');
+  brandIcon.src = 'assets/trailviewer-icon.svg';
+  brandIcon.alt = '';
+  brandIcon.setAttribute('aria-hidden', 'true');
+  const versionMeta = el('div', 'toolbox-update-meta');
+  const appName = el('div', 'toolbox-update-app-name', 'TrailViewer');
   const versionLine = el('div', 'toolbox-update-versions');
+  versionMeta.append(appName, versionLine);
+  brandRow.append(brandIcon, versionMeta);
   const statusLine = el('p', 'toolbox-subhint toolbox-update-status');
-  versionCard.append(versionLine, statusLine);
+  versionCard.append(brandRow, statusLine);
 
   const progressWrap = el('div', 'toolbox-update-progress');
   progressWrap.hidden = true;

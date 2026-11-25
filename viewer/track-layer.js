@@ -16,7 +16,7 @@ import {
   trackColorRange,
 } from './track-color.js';
 
-const COLORS = ['#ff5a36', '#2f9bff', '#f5c400', '#c23cff', '#18c964', '#ff3d9a', '#00c2c7', '#ff9f1a'];
+const COLORS = ['#df2b1d', '#297bb8', '#d98a1c', '#9c3ce6', '#249e58', '#d9367a', '#0c9ea8', '#e67e22'];
 const ROUTE_COLOR = '#ffffff';
 const NETWORK_LOD_PIXELS = 0.75;
 const NETWORK_VIEW_PADDING = 0.25;
@@ -547,8 +547,16 @@ export function createTrackLayer({ L, el, localized, t, pointPopup, onFocusBound
                 : null,
             });
           } else {
+            const latLngs = points.map((point) => [point.lat, point.lon]);
+            L.polyline(latLngs, {
+              color: '#ffffff',
+              weight: 6.5,
+              opacity: 0.82,
+              interactive: false,
+              className: 'gpx-track-casing',
+            }).addTo(singleLineLayer);
             const tooltipNode = title ? localized(el('span'), () => title(segmentIndex + 1)) : null;
-            const polyline = L.polyline(points.map((point) => [point.lat, point.lon]), {
+            const polyline = L.polyline(latLngs, {
               color,
               weight: 4,
               opacity: 0.9,
@@ -572,10 +580,10 @@ export function createTrackLayer({ L, el, localized, t, pointPopup, onFocusBound
         const last = lastLine?.points[lastLine.points.length - 1];
         if (last && showEnds) {
           const marker = L.circleMarker([last.lat, last.lon], {
-            radius: 8,
-            color: '#1b1b1b',
+            radius: 7.5,
+            color: '#18212b',
             weight: 1.5,
-            fillColor: '#e5243b',
+            fillColor: '#df2b1d',
             fillOpacity: 1,
             className: 'gpx-end',
           }).bindPopup(() => pointPopup(last, t('label.end'))).addTo(baseLayer);
@@ -583,10 +591,10 @@ export function createTrackLayer({ L, el, localized, t, pointPopup, onFocusBound
         }
         if (first && showEnds) {
           const marker = L.circleMarker([first.lat, first.lon], {
-            radius: 5,
-            color: '#1b1b1b',
+            radius: 5.5,
+            color: '#18212b',
             weight: 1.5,
-            fillColor: '#18c964',
+            fillColor: '#249e58',
             fillOpacity: 1,
             className: 'gpx-start',
           }).bindPopup(() => pointPopup(first, t('label.start'))).addTo(baseLayer);

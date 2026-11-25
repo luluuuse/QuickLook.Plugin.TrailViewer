@@ -70,6 +70,7 @@ internal static class ViewerPreferences
     private static readonly Dictionary<string, string[]> Allowed = new(StringComparer.Ordinal)
     {
         ["lang"] = new[] { "en", "zh" },
+        ["theme"] = new[] { "swiss", "slate", "classic" },
         ["layer"] = new[]
         {
             // Legacy category values remain readable so an upgrade keeps the user's selected background.
@@ -80,7 +81,7 @@ internal static class ViewerPreferences
         },
         ["pins"] = new[] { "0", "1" },
         ["exportSize"] = new[] { "1:1", "9:16", "4:3" },
-        ["exportInk"] = new[] { "black", "white" },
+        ["exportInk"] = new[] { "black", "white", "swiss" },
         ["exportScrim"] = new[] { "none", "soft" },
         ["exportContent"] = new[] { "full", "track" },
         ["exportProfile"] = new[] { "off", "ele" },

@@ -35,13 +35,14 @@ const PRESETS = [
 ];
 const DEFAULT_SIZE = '9:16';
 const DEFAULT_INK = 'black';
-export const INKS = ['black', 'white'];
+export const INKS = ['black', 'white', 'swiss'];
 
 const FONT = '"Segoe UI", "Microsoft YaHei", sans-serif';
 
 // Everything the type and the rules are drawn with, per ink. The shadow is the one that is not symmetric: white
 // type on a bright photo needs a dark edge to hold it, black type needs nothing at all -- a halo behind it only
-// greys the strokes.
+// greys the strokes. Swiss ink adds swisstopo cartographic craftsmanship (charcoal ink, vermilion trail and
+// warm ivory backing wash).
 const PENS = {
   black: {
     text: '#000000',
@@ -49,9 +50,11 @@ const PENS = {
     faint: 'rgba(0, 0, 0, 0.55)',
     rule: 'rgba(0, 0, 0, 0.45)',
     hair: 'rgba(0, 0, 0, 0.30)',
+    accent: null,
     shadow: null,
     wash: ['rgba(255, 255, 255, 0)', 'rgba(255, 255, 255, 0.26)', 'rgba(255, 255, 255, 0.52)'],
     silhouette: ['rgba(0, 0, 0, 0.26)', 'rgba(0, 0, 0, 0.02)'],
+    routeStyle: 'elevation',
   },
   white: {
     text: '#ffffff',
@@ -59,9 +62,23 @@ const PENS = {
     faint: 'rgba(255, 255, 255, 0.74)',
     rule: 'rgba(255, 255, 255, 0.45)',
     hair: 'rgba(255, 255, 255, 0.28)',
+    accent: null,
     shadow: 'rgba(0, 0, 0, 0.45)',
     wash: ['rgba(0, 0, 0, 0)', 'rgba(0, 0, 0, 0.22)', 'rgba(0, 0, 0, 0.44)'],
     silhouette: ['rgba(255, 255, 255, 0.34)', 'rgba(255, 255, 255, 0.03)'],
+    routeStyle: 'elevation',
+  },
+  swiss: {
+    text: '#18212b',
+    label: '#556272',
+    faint: '#5a6776',
+    rule: '#18212b',
+    hair: 'rgba(24, 33, 43, 0.22)',
+    accent: '#df2b1d',
+    shadow: null,
+    wash: ['rgba(250, 248, 243, 0)', 'rgba(250, 248, 243, 0.52)', 'rgba(250, 248, 243, 0.84)'],
+    silhouette: ['rgba(41, 123, 184, 0.28)', 'rgba(41, 123, 184, 0.03)'],
+    routeStyle: 'swiss',
   },
 };
 
@@ -275,7 +292,21 @@ function strokeRun(ctx, points, from, to) {
  * Colours a route by height: one stroke per colour band, each run of a band drawn as a single path. Adjacent
  * runs repeat the point where they meet, so round caps close the seam instead of leaving a notch.
  */
-function paintRoute(ctx, lines, minEle, maxEle, flat) {
+function paintRoute(ctx, lines, minEle, maxEle, flat, pen) {
+  if (pen?.routeStyle === 'swiss') {
+    for (const line of lines) {
+      const points = line.map((p) => p.xy);
+      if (points.length <= 1) continue;
+      ctx.lineWidth = 20;
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.92)';
+      strokeRun(ctx, points, 0, points.length - 1);
+      ctx.lineWidth = 10;
+      ctx.strokeStyle = '#df2b1d';
+      strokeRun(ctx, points, 0, points.length - 1);
+    }
+    return;
+  }
+
   const span = maxEle - minEle;
   const bandOf = (p) => {
     if (flat || p.ele === undefined || span <= 0) return 0;
@@ -388,12 +419,17 @@ function heading(ctx, title, meta, box, pen) {
   ctx.textAlign = 'left';
 }
 
-function badge(ctx, [x, y], fill, text) {
+function badge(ctx, [x, y], fill, text, pen) {
   ctx.beginPath();
   ctx.arc(x, y, 16, 0, Math.PI * 2);
   ctx.fillStyle = fill;
   ctx.fill();
-  ctx.fillStyle = '#000000';
+  if (pen?.routeStyle === 'swiss') {
+    ctx.lineWidth = 3.5;
+    ctx.strokeStyle = '#ffffff';
+    ctx.stroke();
+  }
+  ctx.fillStyle = pen?.routeStyle === 'swiss' ? '#ffffff' : '#000000';
   ctx.font = `600 15px ${FONT}`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
@@ -508,11 +544,16 @@ function column(ctx, rows, box, pen) {
   }
 
   ctx.strokeStyle = pen.rule;
-  ctx.lineWidth = 1;
+  ctx.lineWidth = pen.accent ? 1.5 : 1;
   ctx.beginPath();
   ctx.moveTo(rule, columnTop);
   ctx.lineTo(rule, columnBottom);
   ctx.stroke();
+
+  if (pen.accent && rows.length > 0) {
+    ctx.fillStyle = pen.accent;
+    ctx.fillRect(rule - 2, columnTop, 4, rowHeight * 0.72);
+  }
 
   rows.forEach((row, i) => {
     const big = i === 0;
@@ -564,6 +605,10 @@ function figures(ctx, rows, box, pen) {
   const room = box.columnWidth;
   const wide = ctx.measureText(head.value).width + (head.unit ? size * 0.14 + box.unitSize : 0);
   if (wide > room) size = Math.floor(size * (room / wide));
+  if (pen.accent) {
+    ctx.fillStyle = pen.accent;
+    ctx.fillRect(pad - 14, box.distanceTop + size * 0.08, 4, size * 0.74);
+  }
   leftPair(ctx, head, size, box.unitSize, box.distanceTop + size * 0.78, pad, pen);
 
   // One size for the whole grid, set by the widest of the four: a clock is eight characters and would
@@ -681,6 +726,22 @@ function paintSilhouette(ctx, samples, band, pen) {
   ctx.strokeStyle = pen.text;
   ctx.lineWidth = 4;
   ctx.stroke();
+
+  if (pen.accent) {
+    let peak = points[0];
+    for (const point of points) {
+      if (point.ele > peak.ele) peak = point;
+    }
+    const px = xOf(peak.along);
+    const py = yOf(peak.ele) - 10;
+    ctx.fillStyle = pen.accent;
+    ctx.beginPath();
+    ctx.moveTo(px, py - 9);
+    ctx.lineTo(px + 7.5, py + 4);
+    ctx.lineTo(px - 7.5, py + 4);
+    ctx.closePath();
+    ctx.fill();
+  }
   ctx.restore();
   return true;
 }
@@ -746,13 +807,15 @@ export function drawOverlay({
     const placed = lines
       .map((line) => simplifyPath(line.map((p) => ({ ...p, xy: to(p) }))))
       .filter((line) => line.length > 0);
-    paintRoute(ctx, placed, minEle, maxEle, flat);
+    paintRoute(ctx, placed, minEle, maxEle, flat, pen);
     const firstLine = placed[0].map((p) => p.xy);
     const lastLine = placed[placed.length - 1].map((p) => p.xy);
     if (ends) {
       const [start, end] = separate(badgeAt(firstLine, false), badgeAt(lastLine, true), 40);
-      badge(ctx, start, '#2ecc40', ends.start);
-      badge(ctx, end, '#ff2d00', ends.end);
+      const startColor = pen.routeStyle === 'swiss' ? '#249e58' : '#2ecc40';
+      const endColor = pen.routeStyle === 'swiss' ? '#df2b1d' : '#ff2d00';
+      badge(ctx, start, startColor, ends.start, pen);
+      badge(ctx, end, endColor, ends.end, pen);
     }
   }
 

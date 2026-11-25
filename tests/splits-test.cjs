@@ -209,7 +209,7 @@ async function main() {
   check('the rows scroll under a fixed table header',
     state.scrollable && state.stickyHeader === 'sticky', JSON.stringify(state));
   check('the fastest moving split is highlighted',
-    state.fastestRows === 1 && state.fastestSpeedColour === 'rgb(255, 98, 109)',
+    state.fastestRows === 1 && state.fastestSpeedColour === 'rgb(201, 42, 42)',
     `${state.fastestRows}/${state.fastestSpeedColour}`);
   check('total and moving time sit at the bottom of the opened panel',
     state.totals.length === 2 && state.totals[0].value === '1:00:00'

@@ -82,8 +82,8 @@ async function main() {
   });
   check('cancel and save use clearly different primary/secondary styles',
     formActions.cancel.background !== formActions.save.background
-      && formActions.save.background === 'rgb(35, 79, 121)'
-      && formActions.save.border === 'rgb(47, 155, 255)'
+      && formActions.save.background === 'rgb(223, 43, 29)'
+      && formActions.save.border === 'rgb(197, 34, 22)'
       && formActions.save.weight === '600'
       && formActions.save.width > formActions.cancel.width,
     JSON.stringify(formActions));

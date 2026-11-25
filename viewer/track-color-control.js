@@ -7,7 +7,7 @@ import {
 const STORAGE_KEY = 'trackColor';
 
 const MODE_VISUALS = Object.freeze({
-  single: { stroke: '#e6e6e6', start: '#e6e6e6', end: '#e6e6e6', stops: null },
+  single: { stroke: 'currentColor', start: 'currentColor', end: 'currentColor', stops: null },
   elevation: {
     stroke: 'url(#track-color-grad-elevation)',
     start: '#2ecc71',

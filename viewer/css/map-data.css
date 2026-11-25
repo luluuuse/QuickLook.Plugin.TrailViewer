@@ -1,18 +1,87 @@
 /* Map controls, attachments, pins and measurement graphics. */
 
 .leaflet-container .leaflet-control-attribution {
-  background: rgba(24, 24, 24, 0.7);
+  background: var(--attrib-bg);
   color: var(--muted);
 }
 
 .leaflet-container .leaflet-control-attribution a {
-  color: #bbb;
+  color: var(--text);
 }
 
 .leaflet-control-scale-line {
-  background: rgba(24, 24, 24, 0.7);
+  background: var(--scale-bg);
   color: var(--text);
-  border-color: #bbb;
+  border-color: var(--scale-border);
+  font-weight: 600;
+  text-shadow: none;
+}
+
+:root:not([data-theme="classic"]) .leaflet-control-scale {
+  display: inline-flex;
+  align-items: stretch;
+  gap: 4px;
+}
+
+/* Swiss topographic 4-segment alternating scale bar paired with live 1 : N cartographic ratio. */
+:root:not([data-theme="classic"]) .leaflet-control-scale-line {
+  padding: 1px 5px 5px;
+  border: 1px solid var(--scale-border);
+  border-radius: 1px;
+  background-color: var(--scale-bg);
+  background-image: linear-gradient(
+    90deg,
+    var(--scale-border) 0 25%,
+    transparent 25% 50%,
+    var(--scale-border) 50% 75%,
+    transparent 75% 100%
+  );
+  background-size: 100% 3px;
+  background-position: left bottom;
+  background-repeat: no-repeat;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.15;
+}
+
+.swiss-scale-ratio {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 5px;
+  border: 1px solid var(--scale-border);
+  border-radius: 1px;
+  background: var(--scale-bg);
+  color: var(--text);
+  font-size: 10px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.swiss-scale-ratio[hidden],
+:root[data-theme="classic"] .swiss-scale-ratio {
+  display: none;
+}
+
+@media (max-width: 419px) {
+  .swiss-scale-ratio {
+    display: none;
+  }
+}
+
+.gpx-track-casing {
+  stroke: var(--track-casing);
+  pointer-events: none;
+}
+
+:root[data-theme="classic"] .gpx-track-casing {
+  display: none;
+}
+
+.no-map-graticule {
+  stroke: var(--graticule-line);
+  stroke-opacity: 1;
 }
 
 .leaflet-popup-content-wrapper, .leaflet-popup-tip, .leaflet-tooltip {
@@ -42,7 +111,7 @@
 }
 
 .pin-symbol {
-  color: #f5c400;
+  color: var(--pin-fill);
 }
 
 .pin-camera {
@@ -53,7 +122,7 @@
 }
 
 .pin-camera .symbol-detail {
-  stroke: #1b1b1b;
+  stroke: var(--pin-stroke);
 }
 
 /* Measurement graphics sit above the recorded route but never take pointers, so panning and right-click
@@ -190,15 +259,26 @@ body.measuring #map.leaflet-container {
   position: absolute;
   top: 24px;
   left: 50%;
-  padding: 1px 3px;
+  padding: 1px 4px;
+  border: 1.25px solid var(--km-border);
   border-radius: 3px;
-  background: rgba(24, 24, 24, 0.78);
-  color: #fff;
-  font-size: 11px;
+  background: var(--km-bg);
+  color: var(--km-text);
+  font-size: 10.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
   line-height: 1.2;
   white-space: nowrap;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.28);
   transform: translateX(-50%);
+}
+
+:root:not([data-theme="classic"]) .gpx-km {
+  padding: 1px 5px 1px 4px;
+  border: 1px solid var(--km-border);
+  border-left: 2.5px solid var(--accent);
+  border-radius: 2px;
+  letter-spacing: 0.01em;
 }
 
 /* A break in the recording is not joined as if it were walked ground: the connector is dashed and the warning

@@ -149,9 +149,8 @@ export function weatherMarkElement(name, options = {}) {
 const DATA_SYMBOLS = Object.freeze({
   waypoint: {
     viewBox: '0 0 24 32',
-    body: '<path class="symbol-fill" d="M12 1C6 1 1.5 5.6 1.5 11.5 1.5 19.5 12 33 12 33'
-      + 's10.5-13.5 10.5-21.5C22.5 5.6 18 1 12 1Z"/>'
-      + '<circle class="symbol-hole" cx="12" cy="11.5" r="4"/>',
+    body: '<path class="symbol-fill" d="M12 1.5 20.5 11.5 12 31.5 3.5 11.5Z"/>'
+      + '<circle class="symbol-hole" cx="12" cy="11.5" r="3.4"/>',
   },
   camera: {
     viewBox: '0 0 24 24',
