@@ -5,13 +5,13 @@
 Preview GPX, KML, KMZ and FIT tracks directly in QuickLook on Windows. Press <kbd>Space</kbd> on a track file
 in Explorer to see the route, waypoints, photos and elevation profile without opening a map application.
 
-| ClimbPro climbs & topo basemap | Per-km splits & heart-rate overlay |
-| :---: | :---: |
-| ![ClimbPro major climb highlighting on a custom topographic basemap](docs/screenshot-climbpro.png) | ![Detailed per-kilometre splits with dual-axis elevation and heart-rate profile](docs/screenshot-splits-hr.png) |
+| ClimbPro climbs | Splits & heart rate | Waypoints & photos | Minimal satellite |
+| :---: | :---: | :---: | :---: |
+| ![ClimbPro major climb highlighting on a custom topographic basemap](docs/screenshot-climbpro.png) | ![Detailed per-kilometre splits with dual-axis elevation and heart-rate profile](docs/screenshot-splits-hr.png) | ![Portrait waypoint photo card and supply-filtered waypoint overview](docs/screenshot-waypoints.png) | ![Collapsed elevation profile over full-bleed swisstopo satellite imagery](docs/screenshot-minimal.png) |
 
-| Waypoint photos & semantic overview | Minimal view & satellite imagery |
-| :---: | :---: |
-| ![Portrait waypoint photo card and supply-filtered waypoint overview](docs/screenshot-waypoints.png) | ![Collapsed elevation profile over full-bleed swisstopo satellite imagery](docs/screenshot-minimal.png) |
+| Track editor | Layers & overlays | Map settings & nodes | Toolbox |
+| :---: | :---: | :---: | :---: |
+| ![Non-destructive track editor with segment splitting and tool rail](docs/screenshot-editor.png) | ![Four basemap categories and transparent outdoor overlays](docs/screenshot-layers.png) | ![Local tile cache and multi-node connectivity probing](docs/screenshot-map-settings.png) | ![Unified toolbox with edit, measure, export, weather and updater](docs/screenshot-toolbox.png) |
 
 ## Quick start
 
