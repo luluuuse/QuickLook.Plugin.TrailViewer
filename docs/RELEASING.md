@@ -79,8 +79,8 @@ git push origin main
 git push origin v1.18.0
 ```
 
-`.github/workflows/release.yml` 会检查 annotated tag 与版本源一致，执行全量测试、打包、生成 SHA256 并创建
-GitHub Release。预发布 tag 自动标记为 prerelease。
+`.github/workflows/release.yml` 会检查 tag 与版本源一致，执行全量测试、打包、生成 SHA256 并创建
+GitHub Release，随后通过 `scripts/sync-gitcode-release.cjs` 自动同步发布说明、`.qlplugin` 与 `.sha256` 到 GitCode 国内镜像（供内置更新器双源竞速与回退使用）。预发布 tag 自动标记为 prerelease。
 
 已推送的 tag 不移动、不覆盖。若发布失败，修复后按 SemVer 创建下一个 PATCH 版本。
 

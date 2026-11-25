@@ -12,7 +12,7 @@
 FIT 读取活动和路线中的 GPS 记录、时间、海拔、心率、会话用时及 `course_point` 路线点。简要模式聚焦
 路线基础数据；步频、功率、温度、训练步骤和完整设备指标暂不展示。
 
-单个轨迹文件最大为 64 MB；GPX、KML、KMZ 和 FIT 超限时会在启动 WebView 前直接显示错误，避免内存耗尽。
+GPX、KML 和 FIT 单个轨迹文件上限为 `64 MB`；压缩包 `.kmz` 总上限为 `1088 MB`（内含 `.kml` 文档上限 `64 MB`，内嵌图片上限 `1000 张 / 1 GB`）。超限时会在启动 WebView 前直接显示错误，避免内存耗尽。
 
 ### 地图与航点
 
@@ -80,7 +80,7 @@ swisstopo 地形与航拍、Google 卫星）及 4 套专业户外预设（Traces
   备注，同时把缺失的时间回填回卡片顶栏。
 - 进入全览后，右上角显示当前显示尺寸相对原图像素的真实百分比，例如原图为 2560 px 宽、窗口中显示
   640 px 时显示 `25%`。滚轮按绝对比例缩放，最高 800%；点击百分比恢复适应窗口，放大后可拖拽平移，
-  切换照片时会重新适应窗口。
+  切换照片时会重新适应窗口。灯箱支持 **在浏览器中打开** 查看原图或外链图片，并在看图时自动后台预载下一张。
 - 被选中的航点与起终点共用标准化双描边准星（航点为菱形、起终点为十字），精确锚定在图钉尖端坐标上，
   并与图钉本体的暖金色轮廓微光配合。
 
@@ -115,8 +115,7 @@ swisstopo 地形与航拍、Google 卫星）及 4 套专业户外预设（Traces
 
 - <kbd>M</kbd> 可直接开始测距；测距中再次按 <kbd>M</kbd> 结束测距。
 - 测距页面固定贴近窗口右侧；叠加图导出等其他工具页复用同一工具箱窗口。
-- 页面顶部的 **返回** 回到工具箱主菜单，测距状态和已打的点都保留：去看别的工具再回来，
-  可以接着量同一段，不会因为翻页被打断。
+- 页面顶部的 **返回** 会自动结束当前测距打点并回到工具箱主菜单，同时保留地图上已测得的线条与距离，避免切回其他工具后右键误打点。
 - 右键在地图上添加测距点；左键仍用于拖动地图，滚轮按当前位置缩放。
 - <kbd>Ctrl</kbd>+<kbd>Z</kbd> 撤回最后一个操作，
   <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> 重做。
@@ -164,7 +163,7 @@ swisstopo 地形与航拍、Google 卫星）及 4 套专业户外预设（Traces
   原轨迹文件被修改后旧清单自动失效。结果会显示新增、跳过已完成和失败数量。
 - 只接受公开 HTTPS 图片，HTTP、带凭据、回环、私网、多播、保留网段和链路本地地址会被拒绝；返回内容
   还必须匹配支持的图片文件头。
-- 单张图片限制 30 MB，整批最多 200 张、300 MB；界面显示进度、成功/失败数量和最终目录。
+- 单张图片限制 `30 MB`，整批最多 `1000 张`、`1 GB`；界面显示进度、成功/失败数量和最终目录。
 
 ### 轨迹天气
 
@@ -192,10 +191,10 @@ swisstopo 地形与航拍、Google 卫星）及 4 套专业户外预设（Traces
 - 每公里统计在第一次展开时才计算，收起时不会遍历全部轨迹点。
 - 测距吸附索引在第一次吸附或开始测距时才创建，普通地图浏览不会承担测距索引的初始化开销。
 - 大路网只绘制当前视野附近的路线，并按缩放级别简化显示细节；标注点、照片和测距仍使用完整数据。
-- 表底汇总总时间与运动时间，最快分段的速度使用强调色显示。
+- 表底汇总总时间与运动时间，最快分段的速度使用强调色显示；点击任意列头可按降序/升序/默认顺序循环排序。
+- 数值单元格内嵌极淡比例条；运动速度、垂直速度与单公里时间三列自动按四分位距识别坐车/长休等离群极值，保持正常徒步段对比清晰，超限异常段以满格斜纹与侧边竖条标识。
 - 长路线在固定高度表格内滚动，表头和底部汇总保持可见。
-- 使用 `Tab` 将焦点移到某一圈时会立即选中并定位；也可以直接点击某一圈。地图会缩放到对应轨迹范围，
-  并用青色覆盖强调；再次点击同一圈或收起面板可清除强调。`Enter` / `Space` 不是本功能的快捷键。
+- 使用 `Tab` 将焦点移到某一圈时会立即选中并定位；也可以直接点击某一圈。地图会缩放到对应轨迹范围并用青色覆盖强调，同时底部海拔剖面图同步高光聚焦该公里区间；再次点击同一圈或收起面板可清除强调。`Enter` / `Space` 不是本功能的快捷键。
 - 标题栏默认显示“详细”切换键。点击后增加累计时间、累计爬升/下降、平均心率、运动速度和垂直速度；
   文件没有有效心率数据时，平均心率列完全隐藏。平均心率为该公里内有效点读数的算术平均值，与全程
   平均心率口径一致。
@@ -222,7 +221,7 @@ Canvas 绘制路线，并跳过普通轨迹点圆点、公里数字和路网级�
 - 预览画布带明暗双层边界，可直接辨认方版、竖版和横版的实际比例。
 - 墨色按钮说明适合明亮或深色背景，底衬按钮说明完全透明或增加文字可读性的区别。
 
-导出文件写在源轨迹同一目录，PNG 透明；可选黑/白墨色和底衬。图片会写入路线名称和日期，普通轨迹按
+导出文件写在源轨迹同一目录，PNG 透明；可选黑/白墨色、底衬，以及 **仅轨迹**（隐藏标题、日期、遮罩与统计，文件名追加 `-bare`）与 **海拔轮廓**（底部绘制极简海拔剪影曲线，文件名追加 `-ele`，无高程时自动禁用）。图片会写入路线名称和日期，普通轨迹按
 距离、总用时、累计爬升、最高海拔、运动均速排序。文件名包含版式、墨色和底衬，例如
 `路线-轨迹-1x1-white-soft.png`，同版式的不同样式不会互相覆盖。
 点击导出后设置页保持打开，可以继续切换版式、墨色或底衬并再次导出。
@@ -237,7 +236,7 @@ Canvas 绘制路线，并跳过普通轨迹点圆点、公里数字和路网级�
   - **剪辑拼接与清洗优化**：支持剖面双柄裁剪、点击拆分删段、导入本地或同目录 GPX / KML 拼接合并、漂移点清洗、海拔平滑（轻度/标准/强力）与轨迹抽稀。
   - **路线方向与绘制修点**：支持反转方向、往返倍增、闭合环线、手绘补线（支持自动替换区段/闭合/续画）、顶点微调、框选擦除实时计数与坡度估算虚拟时间轴。
   - **航点管理**：支持点击轨迹吸附落点、`Alt+点击` 自由落点、序号化航点列表、沿轨重排、20 米去重与批量生成里程/最高点航点。
-- **检查更新**：工具箱底部显示当前版本号与「检查更新」按钮；后台每 24 小时最多静默检查一次 GitHub Releases，发现正式新版时在工具箱图标右上角显示小红点，可在更新详情页查看双语日志、忽略该版本或一键下载并交由 QuickLook 原生安装。
+- **检查更新**：工具箱底部显示当前版本号与「检查更新」按钮；后台每 24 小时最多静默竞速检查一次 **GitHub Releases 与 GitCode 国内镜像**（单边超时或不可达时自动回退）。发现正式新版时，顶部工具箱图标亮起柔和青蓝微光提示点、底部显示翠绿新版胶囊（`↑ vX.Y.Z`）；可在更新详情页查看双语日志、忽略该版本，或一键下载安装包（自动核对 **SHA256 哈希** 与插件清单完整性，失败自动切换备用镜像）并交由 QuickLook 原生安装。
 
 ### 大文件与隐私
 
@@ -254,8 +253,7 @@ The first FIT version reads GPS records, time, elevation, heart rate, session to
 from activities and courses. Laps, cadence, power, temperature, workout steps and the full device metric set are
 not displayed yet.
 
-Each track file is limited to 64 MB. Oversized GPX, KML, KMZ and FIT files show an error before WebView starts,
-so malformed or padded files cannot exhaust memory.
+Single GPX, KML and FIT files are limited to `64 MB`; zipped `.kmz` archives allow up to `1088 MB` total (`64 MB` inner `.kml` document, `1000 images / 1 GB` embedded media). Oversized files show an error before WebView starts so malformed or padded files cannot exhaust memory.
 
 ### Map and waypoints
 
@@ -335,7 +333,8 @@ is used.
   while preserving user notes and recovering missing timestamps for the card header.
 - In the full-size viewer, the top-right percentage is the displayed width divided by the source width: a
   2560 px photo shown at 640 px reads 25%, and 100% means 1:1 pixels. Use the wheel to zoom up to 800%, drag a
-  zoomed photo to pan, click the percentage to fit the window again, or change photos to start over.
+  zoomed photo to pan, click the percentage to fit the window again, or change photos to start over. The
+  lightbox also provides **Open in browser** and preloads the next photo in the background.
 - The selected pin is marked by the standardized double-stroked selection reticle (diamond for waypoints, cross for
   start/end track anchors) centred on the pin tip together with a subtle warm accent glow on the pin itself.
 - The first-click attachment card reuses the waypoint list's unblurred translucent background. The full-size
@@ -381,8 +380,7 @@ Open **Toolbox** in the upper-right corner and choose **Measure distance**:
 - <kbd>M</kbd> starts measuring directly; press it again while measuring to finish.
 - The measurement page stays against the right edge. Overlay export and the other tool pages reuse the same
   toolbox window.
-- **Back** at the top of the page returns to the toolbox menu and keeps both the measuring state and the points
-  already placed, so looking at another tool does not interrupt a measurement.
+- **Back** at the top of the page stops active point collection and returns to the toolbox menu while keeping existing measured lines visible on the map.
 - Right-click adds a point. Left-drag still pans the map, and the wheel zooms at the pointer.
 - <kbd>Ctrl</kbd>+<kbd>Z</kbd> undoes the last change;
   <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> redoes it.
@@ -443,7 +441,7 @@ directory.
   added, already-completed and failed counts.
 - Only public HTTPS images are accepted. HTTP, credentials, loopback, private, multicast, reserved and
   link-local destinations are rejected, and the response must carry a supported image signature.
-- Each image is limited to 30 MB; a batch is limited to 200 images and 300 MB. The panel reports progress,
+- Each image is limited to `30 MB`; a batch is limited to `1000 images` and `1 GB`. The panel reports progress,
   success/failure counts and the destination folder.
 
 ### Route weather
@@ -471,12 +469,9 @@ it lands on:
 
 Timed routes show an independent **Splits** entry below the route summary. It starts collapsed and renders no
 rows until clicked. The expanded table contains distance, elapsed time and moving speed; the last row holds the
-remaining partial kilometre. Total and moving time are summarized at the bottom, the fastest split is
-emphasized, and long tables scroll while their headers and totals remain visible.
+remaining partial kilometre. Total and moving time are summarized at the bottom, the fastest split is emphasized, and long tables scroll while their headers and totals remain visible. Click any column header to cycle descending, ascending and default sort order; numeric cells render subtle inline proportion bars, with IQR-based outlier capping (marked by diagonal hatch and edge bar) so isolated car-ride or long-rest spikes do not crush normal hiking splits.
 
-Tab onto a split to select and focus it immediately, or click it directly. The selected range is emphasized in
-cyan; clicking it again or collapsing the panel clears the emphasis. Enter/Space are not shortcuts for this
-action.
+Tab onto a split to select and focus it immediately, or click it directly. The selected range is emphasized in cyan on the map and spotlighted on the elevation profile; clicking it again or collapsing the panel clears the emphasis. Enter/Space are not shortcuts for this action.
 
 The header's **Details** control adds cumulative time, cumulative ascent/descent, average heart rate, moving
 speed and vertical speed. When the file has no valid heart-rate data, that column is omitted entirely.
@@ -486,9 +481,7 @@ The active header surface spans the full panel width, and metric column headers 
 
 Open **Toolbox → Export overlay**. It is a page in the shared toolbox and uses the same header, translucent
 surface, Back control and close button as the other tools; there is no separate export window or shortcut.
-Square, portrait and landscape PNGs are written beside the source track with transparent backgrounds and
-optional ink and backing. The image includes the route name and date. Standard tracks order statistics as
-distance, elapsed time, ascent, maximum elevation and moving speed.
+Square, portrait and landscape PNGs are written beside the source track with transparent backgrounds, selectable ink and backing, plus **Track only** (hides title, date, scrim and stats with `-bare` suffix) and **Elevation silhouette** (renders a minimalist bottom elevation curve with `-ele` suffix, disabled when elevation is unavailable). The image includes the route name and date. Standard tracks order statistics as distance, elapsed time, ascent, maximum elevation and moving speed.
 
 Route networks show the document name, total route length and segment count without drawing invented start/end
 points or displaying elapsed time, speed and elevation. Hover each shape choice for its dimensions and intended
@@ -508,7 +501,7 @@ export so another style can be produced immediately.
   - **Clip & Merge / Clean & Optimize:** profile range crop, click-to-split, local/sibling GPX & KML append with auto-merge, drift spike cleanup, three-level elevation smoothing, and simplification.
   - **Route Direction / Draw & Refine:** reverse, out-and-back, close loop, hand-drawn path splicing, vertex editing, live-count box erase, and Naismith grade-adjusted virtual timelines.
   - **Waypoints:** snap onto the track or `Alt+Click` to place freely, sort along track, dedupe within 20 m, and batch-generate distance milestone and summit waypoints.
-- **Check for updates:** the Toolbox footer shows the installed version and a **Check updates** button; background checks run quietly at most once every 24 hours against GitHub Releases and light a small dot on the Toolbox icon when a newer stable release is available, with bilingual release notes, version muting, and one-click verified `.qlplugin` download into QuickLook's native installer.
+- **Check for updates:** the Toolbox footer shows the installed version and a **Check updates** button; background checks race **GitHub Releases and the GitCode mirror** quietly at most once every 24 hours with automatic failover, lighting a subtle cyan glow dot on the Toolbox toggle and an emerald pill (`↑ vX.Y.Z`) in the footer when a newer stable release is available, with bilingual release notes, version muting, **SHA256 checksum & manifest verification**, and one-click `.qlplugin` handoff to QuickLook's native installer.
 
 ### Large files and privacy
 

@@ -5,7 +5,13 @@
 Preview GPX, KML, KMZ and FIT tracks directly in QuickLook on Windows. Press <kbd>Space</kbd> on a track file
 in Explorer to see the route, waypoints, photos and elevation profile without opening a map application.
 
-![Current route summary, split entry, map tools and elevation profile](docs/screenshot-map.png)
+| ClimbPro climbs & topo basemap | Per-km splits & heart-rate overlay |
+| :---: | :---: |
+| ![ClimbPro major climb highlighting on a custom topographic basemap](docs/screenshot-climbpro.png) | ![Detailed per-kilometre splits with dual-axis elevation and heart-rate profile](docs/screenshot-splits-hr.png) |
+
+| Waypoint photos & semantic overview | Minimal view & satellite imagery |
+| :---: | :---: |
+| ![Portrait waypoint photo card and supply-filtered waypoint overview](docs/screenshot-waypoints.png) | ![Collapsed elevation profile over full-bleed swisstopo satellite imagery](docs/screenshot-minimal.png) |
 
 ## Quick start
 
@@ -13,77 +19,72 @@ in Explorer to see the route, waypoints, photos and elevation profile without op
 2. Open the package, install it, and restart QuickLook from the tray.
 3. Select a `.gpx`, `.kml`, `.kmz` or `.fit` file in Explorer and press <kbd>Space</kbd>.
 
-Common controls:
+### Common controls
 
-| Action | Control |
-|---|---|
-| Move between waypoints | <kbd>←</kbd> <kbd>→</kbd> or <kbd>A</kbd> <kbd>D</kbd> |
-| Fit the complete route | <kbd>C</kbd> |
-| Show/hide map markers | <kbd>W</kbd> |
-| Change map layer | <kbd>Q</kbd> / <kbd>E</kbd> |
-| Hide interface chrome | <kbd>S</kbd> |
-| Start/finish measuring | <kbd>M</kbd> |
-| Measuring undo / redo | <kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> |
-| Open/close toolbox | <kbd>T</kbd> |
-| Cycle track coloring | <kbd>L</kbd> |
-| Collapse/expand profile | <kbd>P</kbd> |
-| Non-destructive track editor | Toolbox → Edit track |
-| Save / export in edit mode | <kbd>Ctrl</kbd>+<kbd>S</kbd> |
-| Export overlay image | Toolbox → Export overlay |
-| Open route weather | Toolbox → Route weather |
+| Category | Action | Shortcut / Entry |
+|---|---|---|
+| **View & basemaps** | Switch basemap / Fit complete route | <kbd>Q</kbd> <kbd>E</kbd> / <kbd>C</kbd> |
+| | Cycle track coloring | <kbd>L</kbd> |
+| | Collapse or expand profile / Hide UI chrome | <kbd>P</kbd> / <kbd>S</kbd> |
+| **Waypoints & measure** | Move between waypoints / Show or hide waypoints | <kbd>←</kbd> <kbd>→</kbd> (or <kbd>A</kbd> <kbd>D</kbd>) / <kbd>W</kbd> |
+| | Start or finish measuring | <kbd>M</kbd> |
+| | Undo / Redo (measure & editor) | <kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> |
+| **Toolbox & editor** | Open or close toolbox | <kbd>T</kbd> |
+| | Non-destructive track editor / Save or export | Toolbox → Edit track / <kbd>Ctrl</kbd>+<kbd>S</kbd> |
+| | Export overlay image / Route weather | Toolbox → Export overlay / Route weather |
 
 ## Highlights
 
-- **Non-destructive track editor & multi-format export:** enter the four-zone editor from the Toolbox hero card for **Clip & Merge** (profile crop, click split, external GPX/KML append), **Clean & Optimize** (drift cleanup, elevation smoothing, simplify), **Route Direction** (reverse, out-and-back, close loop, loop start), **Draw & Refine** (hand-drawn path, vertex editing, box erase), and **Waypoint Batch Tools** (sort, dedupe, milestone generation); export to GPX, KML, KMZ (with optional offline remote photo packing and time/HR preservation), GeoJSON, TCX, or CSV, with same-format overwrite + `.bak` backup for GPX / KML / KMZ.
-- **Built-in update checker:** the Toolbox footer displays the installed version and checks GitHub Releases quietly at most once every 24 hours (showing a subtle dot on the Toolbox button when a newer stable release exists), with bilingual release notes, version muting, and verified `.qlplugin` download handed off to QuickLook's native installer.
-- **Track rendering & coloring:** GPX tracks, KML LineStrings and `gx:Track`, plus FIT activity/course records, each segment in its own colour, with adaptive direction arrows and distance labels; press <kbd>L</kbd> or click the trail-color button beside the Toolbox to cycle **Single / Elevation / Speed / Heart rate** modes.
-- **Route intelligence:** moving time, recording gaps, implausible GPS jumps and a grade-aware time estimate
-  using Naismith, Langmuir descents and a steep-uphill correction.
-- **Per-kilometre splits & responsive compact stack:** an independent entry below the route summary supports sortable headers, inline proportion bars, and synchronized elevation-profile spotlighting; at `≤ 720 px` width or `≤ 520 px` height, the summary pill, per-km micro-badge, and `26×26` zoom/locate controls collapse cleanly into a unified left-column stack.
-- **Route networks:** merged networks are detected and rendered as independent routes instead of one trip;
-  global speed, split and combined-profile calculations are skipped for faster loading and lower memory use.
-- **Waypoints and photos:** route-ordered navigation, photo albums with portrait 4:3 cards, true source-pixel
-  percentages, wheel zoom up to 800% and drag-to-pan, scrollable plain waypoint cards, and a searchable
-  overview with local danger/water/camp/exit insight labels.
-- **Elevation profile & ClimbPro:** gradient-coloured terrain, quartile distance ticks, horizontal range brush stats (`Esc` to clear), automatic ClimbPro major climb chips, <kbd>P</kbd> shortcut collapse, scrub readout, and optional per-point heart rate overlaid on its own scale with a whole-route average line.
-- **Manual measurement:** multi-section point-to-point distance measurement on the map. Right-click adds a
-  point while left-drag pans and the wheel zooms; nearby waypoints, previously placed measurement points, and
-  recorded track samples snap automatically. Section subtotals and overall distance update live.
-- **Copy and attachment export:** copy a shareable summary from the track card, copy WGS-84 coordinates for
-  the start, end, peak, map centre or any picked point (with nearby marker snapping and elevation notes), and
-  export embedded, Data URI and HTTPS-linked photos beside the source track—either embedded-only or all images
-  concurrently with automatic resume.
-- **Map sources & outdoor overlays:** 10 built-in basemaps across Road (OpenStreetMap, Esri Light/Dark Gray, Tianditu), Terrain (CyclOSM, OpenHikingMap, OpenTopoMap, Esri World Topo) and Satellite (Esri Imagery, Tianditu), with multi-node switching and live connectivity checks, 3 toggleable transparent outdoor overlays (Waymarked Hiking/Cycling and OpenSnowMap Pistes), local tile caching, offline Grid (no-map) mode, and persistent HTTPS custom sources with 11 one-click presets (Japan GSI, Taiwan RudyMap, US USGS, Swiss swisstopo, Google Satellite, and 4 pro outdoor API-key presets).
-- **Overlay export:** export transparent square, portrait and landscape PNG route overlays with a live preview,
-  selectable ink and backing, route name, date and trip statistics (or route-network length and segment counts).
-- **Route weather:** opens Windy in your browser on the cloud layer with hourly forecasts expanded for the
-  route's start, end or peak (when reliable elevation is available), without embedding third-party maps.
-- **Bilingual interface:** switch in place between English and Chinese without reloading the preview, with
-  persistent map, marker and export preferences.
+### Maps and basemaps
+
+- **Built-in basemaps & outdoor overlays:** 10 built-in basemaps across Road (OpenStreetMap, Esri Light/Dark Gray, Tianditu), Terrain (CyclOSM, OpenHikingMap, OpenTopoMap, Esri World Topo) and Satellite (Esri Imagery, Tianditu), with multi-node switching, direct host network probing, 3 toggleable transparent outdoor overlays (Waymarked Hiking/Cycling and OpenSnowMap Pistes), and local disk tile caching.
+- **Custom sources & offline grid:** 11 one-click custom source presets (Japan GSI, Taiwan RudyMap, US USGS, Swiss swisstopo, Google Satellite, and 4 pro outdoor API-key presets), 512 px tile support, 2bulu placeholder auto-conversion, and an offline Grid (no-map) mode.
+
+### Track analysis and browsing
+
+- **Track coloring & route networks:** Per-segment coloring with adaptive direction arrows and distance labels, plus **Single / Elevation / Speed / Heart rate** coloring; merged multi-route networks are detected automatically and skip global speed, splits and combined-profile calculations for fast loading.
+- **Route intelligence & per-km splits:** Moving time, recording gaps, GPS jump detection, and Naismith / Langmuir / steep-uphill time estimates; sortable per-kilometre splits with outlier-resistant proportion bars, synchronized profile spotlighting, and a unified compact left-column stack at `≤ 720 px` width or `≤ 520 px` height.
+- **Elevation profile & ClimbPro:** Gradient-colored terrain, quartile distance ticks, horizontal range brush stats (`Esc` to clear), automatic ClimbPro major climb chips, optional heart-rate overlay with whole-route average line, and <kbd>P</kbd> collapse.
+- **Waypoints and photo albums:** Route-ordered navigation, portrait 4:3 photo cards, full-screen lightbox (true source-pixel percentages, wheel zoom up to 800%, drag-to-pan, next-photo preloading, and open-in-browser), scrollable plain cards, and local danger/water/camp/exit insight labels.
+
+### Editing and export
+
+- **Non-destructive track editor:** Enter from the Toolbox hero card for **Clip & Merge** (profile crop, click split, segment merge, external GPX/KML append), **Clean & Optimize** (drift cleanup, elevation smoothing, simplify), **Route Direction** (reverse, out-and-back, close loop, loop start), **Draw & Refine** (hand-drawn path, vertex editing, box erase), **Timeline** (timestamp shift, grade-adjusted virtual timeline), and **Waypoint Batch Tools** (sort, dedupe, milestone generation), all backed by multi-step undo/redo.
+- **Multi-format export & offline KMZ:** Export to GPX, KML, KMZ (with optional offline remote photo packing and full time/heart-rate preservation), GeoJSON, TCX, or CSV, with same-format overwrite + `.bak` backup for GPX / KML / KMZ.
+- **Overlay & attachment export:** Export transparent square, portrait and landscape PNG route overlays (with live preview, ink/backing choices, Track-only mode, and bottom elevation silhouette), plus concurrent resumable export of embedded, Data URI and HTTPS-linked photos.
+
+### Utilities and experience
+
+- **Manual measurement & coordinates:** Multi-section right-click distance measurement with waypoint/point/track snapping and live totals; one-click copy of shareable route summaries and WGS-84 coordinates (with elevation notes) for start, end, peak, map center, or any picked point.
+- **Route weather:** Opens Windy in your browser on the cloud layer with hourly forecasts expanded for the selected start, end or peak, without embedding third-party maps.
+- **Dual-source updater & bilingual UI:** Quiet 24-hour background checks racing **GitHub Releases + GitCode mirror** with automatic failover (subtle cyan glow dot on the Toolbox toggle and emerald pill in the footer), bilingual release notes, version muting, **SHA256 package verification**, and native QuickLook installer handoff; switch in place between English and Chinese with persistent preferences.
 
 Detailed behaviour, advanced controls and export examples are in [docs/USAGE.md](docs/USAGE.md).
 
 ## Compatibility
 
-Supported inputs:
+**Supported preview inputs:**
 
-- GPX 1.0 and 1.1
-- KML 2.2, including `gx:Track` and `MultiGeometry`
-- Zipped `.kmz` archives
-- FIT activities and courses with GPS records, compressed timestamps, elevation and course points
+- **GPX 1.0 / 1.1:** tracks, waypoints, heart-rate extensions, and linked photos
+- **KML 2.2:** `LineString`, `gx:Track`, `MultiGeometry`, closed `LinearRing` polygons, and `gx:SimpleArrayData` heart-rate arrays
+- **KMZ:** zipped archives with embedded and remote photos, up to `1088 MB` total archive size (`1000 images / 1 GB` media cap, `64 MB` inner `.kml` limit)
+- **FIT:** activities and courses with GPS records, compressed timestamps, elevation, heart rate, and course points (brief mode focuses on route data; laps, cadence, power, temperature and workout steps are not shown)
 
-FIT previews focus on route data. Recorded heart rate can be overlaid on the profile. Laps, cadence, power,
-temperature and workout steps are not shown in the first version.
+**Supported editor exports:**
 
-Long tracks render continuously with route lines, endpoints and sampled waypoints, skipping individual per-sample markers to stay smooth while panning and zooming. Invalid XML produces an explicit error page with the parser message.
-Each input file is limited to 64 MB.
+- Export edited tracks to **GPX, KML, KMZ, GeoJSON, TCX, or CSV**; GPX, KML and KMZ support same-format overwrite with an automatic `.bak` backup.
+
+**Size & rendering boundaries:**
+
+- Single GPX, KML and FIT files are limited to `64 MB`. Long tracks render continuously with route lines, endpoints and viewport-sampled waypoints—skipping per-sample markers to stay smooth while panning and zooming. Invalid XML produces an explicit error page with the parser message.
 
 ## Privacy
 
 The plugin sends no track data to a server. Opening a file reads that file locally. Online basemaps contact
 their tile providers when selected, and custom sources contact the addresses you configure. **No-map mode**
-renders the route on a local grid. Route weather sends the selected point to Windy. Preferences are stored in
-the user's local application data and are not tied to the versioned WebView cache.
+renders the route on a local grid. Route weather sends the selected point to Windy. Update checks contact
+GitHub / GitCode to fetch release metadata and verify `.qlplugin` SHA256 checksums without uploading any track
+data. Preferences are stored in the user's local application data and are not tied to the versioned WebView cache.
 
 ## Troubleshooting
 

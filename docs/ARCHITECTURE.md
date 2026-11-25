@@ -49,12 +49,14 @@ QuickLook
 | `viewer/toolbox-attachments.js` | 附件导出入口、进度和结果状态 |
 | `viewer/toolbox-main.js` | 编辑轨迹置顶通栏、2×2 快捷格、天气入口和工具箱主页面 |
 | `viewer/toolbox-measure.js` | 测距总览、分段列表和操作按钮 |
-| `viewer/editor-shell.js` | 四区无损轨迹编辑器的顶栏（含集成图层/航点图标）、工具轨、抽屉与快捷键 |
-| `viewer/editor-overlay.js` | 编辑态高精度轨迹、剖面裁剪预览、吸附落点与航点右键交互图层 |
-| `viewer/track-ops.js` | 纯函数轨迹裁剪、拆分删段、漂移清洗、反转/往返/闭合与航点编辑 |
+| `viewer/editor-shell.js`, `viewer/editor-drawers.js` | 四区无损轨迹编辑器的顶栏（含集成图层/航点图标）、工具轨、六类抽屉模块与快捷键 |
+| `viewer/editor-overlay.js` | 编辑态高精度轨迹、剖面裁剪预览、手绘补线、顶点微调、框选擦除与航点右键交互图层 |
+| `viewer/track-ops.js` | 纯函数轨迹裁剪、拆分删段、分段合并、外部拼接、漂移清洗、海拔平滑、抽稀、方向变换、时间轴与航点批量工具 |
 | `viewer/track-editor-store.js` | 无损编辑状态栈（多步撤销/重做、复原与里程差值快照） |
-| `viewer/gpx-serializer.js` | UTF-8 GPX 1.1 序列化、手表友好去重与佳明航点重名检查 |
-| `src/TrackSaveService.cs` | 宿主端 GPX 另存为弹窗、原子写入与覆盖原文件自动备份服务 |
+| `viewer/gpx-serializer.js`, `viewer/track-serializers.js` | UTF-8 GPX 1.1、KML/KMZ（含 `<gx:Track>` 时间与心率数组）、GeoJSON、TCX 与 CSV 多格式序列化 |
+| `viewer/toolbox-update.js` | 工具箱内置双源检查更新入口、双语日志子页与下载进度展示 |
+| `src/TrackSaveService.cs`, `src/TrackPickerDialog.cs` | 宿主端多格式另存为弹窗、KMZ 离线照片后台打包、同格式覆盖自动备份与外部轨迹拼接选择器 |
+| `src/UpdateChecker.cs` | GitHub + GitCode 双源竞速更新检测、自动回退下载、SHA256 强校验与 QuickLook 原生安装唤起 |
 | `viewer/host-bridge.js` | WebView2 消息、剪贴板和定制图源持久化桥接 |
 | `viewer/test-api.js` | 浏览器测试与 Harness 诊断 API 装配 |
 | `viewer/weather.js` | 起点、终点、顶点的目标点计算、海拔可用性判断、Windy 外链生成和外链打开 |
@@ -161,8 +163,7 @@ DNS 校验只缓存成功结果，瞬时失败会从缓存移除。下载完成�
 `NodeProber.cs` 在显式启用 TLS 1.2 / 1.3 后直接向白名单图源发起无缓存探测；`TileCache.cs` 仅对已注册的内置与定制图源域名注册 WebView2 图片拦截，不干扰本地 KMZ 照片和外部航点图片加载。
 `ViewerMessageRouter.cs` 统一分发 18 路页面消息，`TrailViewerPanel` 的 WebView 生命周期和消息处理位于
 单独 partial 文件，主文件只保留加载、状态和清理编排。
-宿主保留原始输入路径用于导出定位，KMZ 解包路径只供页面预览；所有输入类型在创建 WebView 前统一检查
-64 MB 上限。
+宿主保留原始输入路径用于导出定位，KMZ 解包路径只供页面预览；创建 WebView 前统一校验文件体积上限：GPX / KML / FIT 单文件上限 `64 MB`，`.kmz` 压缩包总上限 `1088 MB`（内含 `.kml` 文档上限 `64 MB`，内嵌图片上限 `1000 张 / 1 GB`）。
 WebView2 共享环境在插件初始化时预热；每个面板仍拥有自己的文档、生命周期取消源和消息订阅。KMZ 解包、
 附件复制、续传和落盘在后台执行，关闭只结束当前预览。
 `TiandituKeyStore.cs` 使用当前 Windows 用户的 DPAPI 保存天地图密钥。宿主在页面创建前注入当前预览的
@@ -247,7 +248,7 @@ Leaflet Canvas 命中。拖动过程中按动画帧增量更新当前视口，�
 测距的轨迹吸附 k-d tree 不在文件打开时创建，而是在首次吸附或开始测距时按需构建。航点吸附复用航点
 控制器已有的视口空间索引，同一批标注点不会为测距再建第二份索引。
 
-心率只使用源文件中的逐点读数：FIT `record.heart_rate` 和常见 GPX TrackPointExtension。剖面控制器按缺失点
+心率只使用源文件中的逐点读数：FIT `record.heart_rate`、常见 GPX TrackPointExtension 以及 KML `gx:SimpleArrayData` 心率数组。剖面控制器按缺失点
 和轨迹分段拆成连续序列；开启开关后使用独立 bpm 纵轴绘制，不改变海拔数值与坡度颜色。全程平均值为所有
 有效读数的算术平均值，用横虚线标出；每公里平均心率使用同一算术平均口径。
 

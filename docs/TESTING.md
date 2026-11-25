@@ -86,9 +86,9 @@ Build workflow 使用声明的最低 Node 20，Release workflow 使用 Node 22�
 - `tests/unit/attachments.test.mjs`：内置/Data URI/外链分类、URL 去重、外链 3 路并发、清单续传和纯内置
   导出跳过外链。
 - `tools/Harness/SelfTests.cs`：消息路由分发、宿主消息格式、失败布尔值、剪贴板占用重试、关闭取消、DNS/SSRF 范围、
-  TUN 假地址例外、图片文件头、异步附件路径、共享原子文本/字节写入、清单续传和本地回退路径。
-- `tests/editor-test.cjs`：四区无损轨迹编辑器、剖面剪与点击拆、清洗/拓扑、航点增删改与 `?` 外侧浮层/序号列表、`Ctrl+Z` / `Ctrl+S`、窄窗顶栏集成图层/航点图标与缩放避让、右键航点菜单边界及覆盖保存刷新。
-- `tests/unit/track-ops.test.mjs`、`tests/unit/track-editor-store.test.mjs`、`tests/unit/gpx-serializer.test.mjs`：裁剪/拆分/清洗/拓扑纯函数、编辑状态撤销重做栈与 GPX 1.1 序列化及佳明航点重名检查单元测试。
+  TUN 假地址例外、图片文件头、异步附件路径、共享原子文本/字节写入、清单续传、本地回退路径，以及双源更新校验与 SHA256 核对。
+- `tests/editor-test.cjs`：四区无损轨迹编辑器、剖面剪与点击拆、清洗/拓扑、手绘补线、外部拼接、航点增删改与批量工具、`Ctrl+Z` / `Ctrl+S` 多格式导出、窄窗顶栏集成图层/航点图标与缩放避让、右键航点菜单边界及覆盖保存刷新。
+- `tests/unit/track-ops.test.mjs`、`tests/unit/track-editor-store.test.mjs`、`tests/unit/gpx-serializer.test.mjs`、`tests/unit/track-serializers.test.mjs`、`tests/unit/climb-analysis.test.mjs`、`tests/unit/layer-nodes.test.mjs` 与 `tests/unit/track-color.test.mjs`：裁剪/拆分/拼接/平滑/清洗/拓扑纯函数、编辑状态撤销重做栈、GPX/KML/KMZ/GeoJSON/TCX/CSV 多格式序列化（含时间与心率回环）、ClimbPro 爬坡识别、图源多节点解析与热力着彩单元测试。
 - `tests/profile-test.cjs`：单路径/单渐变填充、无遮罩合成层、摘要两行六项（里程/上升/下降 + 总用时/运动均速/
   点数）与里程、总用时的蓝色竖线、可选心率开关/双轴/缺口、
   变换式悬停读数和窄窗布局。
