@@ -8,7 +8,7 @@ in Explorer to see the route, waypoints, photos and elevation profile without op
 <table>
   <tr>
     <th width="50%" align="center">ClimbPro climbs &amp; topo basemap</th>
-    <th width="50%" align="center">Per-km splits &amp; heart-rate overlay</th>
+    <th width="50%" align="center">♥️</th>
   </tr>
   <tr>
     <td width="50%" align="center"><img src="docs/screenshot-climbpro.png" alt="ClimbPro major climb highlighting on a custom topographic basemap" width="100%"></td>

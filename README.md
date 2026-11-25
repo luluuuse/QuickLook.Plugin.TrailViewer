@@ -8,7 +8,7 @@
 <table>
   <tr>
     <th width="50%" align="center">ClimbPro 主坡段与地形底图</th>
-    <th width="50%" align="center">每公里分段与心率叠加</th>
+    <th width="50%" align="center">♥️</th>
   </tr>
   <tr>
     <td width="50%" align="center"><img src="docs/screenshot-climbpro.png" alt="ClimbPro 主坡段识别与自定义地形底图" width="100%"></td>
