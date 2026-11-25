@@ -158,8 +158,8 @@ async function main() {
       width: icon ? getComputedStyle(icon).width : null,
     };
   });
-  check('toolbox footer renders the 24 px 2B brand icon and keeps the summary header clean',
-    brandIcon.inSummary === 0 && brandIcon.src === 'assets/trailviewer-icon.svg' && brandIcon.width === '24px',
+  check('toolbox footer renders the 26 px brand icon and keeps the summary header clean',
+    brandIcon.inSummary === 0 && brandIcon.src === 'assets/trailviewer-icon.svg' && brandIcon.width === '26px',
     JSON.stringify(brandIcon));
 
   const symbols = await page.evaluate(() => {
