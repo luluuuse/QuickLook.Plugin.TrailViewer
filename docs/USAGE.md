@@ -1,509 +1,250 @@
 # 使用说明 / Usage
 
-本文承接 README，说明地图、航点、剖面、测距和导出功能。
+[中文](#中文) | [English](#english)
+
+本文承接 [README](../README.md)，按功能场景说明底图、浏览分析、航点照片、轨迹编辑及工具箱的详细用法。
 
 ## 中文
 
-### 打开文件
+### 1. 打开文件与兼容边界
 
-在资源管理器中选中 `.gpx`、`.kml`、`.kmz` 或 `.fit`，按 <kbd>Space</kbd>。在线底图需要网络；选择
-“网格”（无底图模式）时轨迹直接绘制在本地网格上。
+- 在资源管理器中选中 `.gpx`、`.kml`、`.kmz` 或 `.fit` 文件，按 <kbd>Space</kbd> 即可预览。
+- **格式范围**：支持 GPX 1.0/1.1、KML 2.2（含 `gx:Track`、`MultiGeometry`、`LinearRing` 多边形及 `gx:SimpleArrayData` 心率）、压缩 `.kmz` 及 FIT 活动/路线。
+- **FIT 简要模式**：读取 GPS、时间、海拔、心率、会话用时与 `course_point` 路线点；步频、功率、温度、训练步骤等设备指标暂不展示。
+- **体积与渲染上限**：GPX / KML / FIT 单文件上限 `64 MB`；`.kmz` 总上限 `1088 MB`（内含 `.kml` 文档上限 `64 MB`，照片上限 `1000 张 / 1 GB`）。超限时直接提示错误，长轨迹按视口抽样航点以保持拖动流畅。
 
-FIT 读取活动和路线中的 GPS 记录、时间、海拔、心率、会话用时及 `course_point` 路线点。简要模式聚焦
-路线基础数据；步频、功率、温度、训练步骤和完整设备指标暂不展示。
+### 2. 底图、叠加层与定制图源
 
-GPX、KML 和 FIT 单个轨迹文件上限为 `64 MB`；压缩包 `.kmz` 总上限为 `1088 MB`（内含 `.kml` 文档上限 `64 MB`，内嵌图片上限 `1000 张 / 1 GB`）。超限时会在启动 WebView 前直接显示错误，避免内存耗尽。
+#### 内置底图与透明叠加层
 
-### 地图与航点
+- **四大底图分类**：顶部图层入口按 **路网 / 地形 / 卫星 / 定制** 分组，按 <kbd>Q</kbd> / <kbd>E</kbd> 循环切换分类，切回某分类时自动恢复上次所选图源：
+  - **路网**：OpenStreetMap、Esri 浅灰、Esri 深灰、天地图
+  - **地形**：CyclOSM、OpenHikingMap、OpenTopoMap、Esri 世界地形图
+  - **卫星**：Esri 世界影像、天地图
+- **户外专题叠加层**：图层面板底部可自由开关 3 套透明叠加层（**徒步路网**、**骑行路网**、**滑雪雪道**），可叠加于任意底图并共用本地瓦片缓存。
+- **无底图网格模式**：点击图层标题栏中的网格图标开启，仅在本地网格上显示轨迹与测距，不请求在线瓦片；再次点击或切换底图分类即恢复原底图。
+- **面板互斥**：工具箱、图层面板与航点列表互斥，打开其一会自动关闭另外两个。
 
-- 顶部“图层”入口的文字显示当前 **路网 / 地形 / 卫星 / 定制** 类别，图标同步使用该类别的地图结构图标；
-  具体图源名称保留在悬停提示中。面板中分为这四类，
-  每类带路线节点、等高线、地球或配置滑杆图标及悬停说明；下方只列出当前类型对应的图源。
-  <kbd>Q</kbd> / <kbd>E</kbd> 可直接循环切换类型。
-- **无底图模式**使用图层面板标题栏中的空白网格图标，位于设置齿轮左侧。开启后只显示轨迹、测距和坐标网格，
-  不下载在线瓦片；顶部入口显示“网格”。关闭或按背景切换键会恢复上次使用的地图图源。图标提供悬停说明和
-  蓝色激活态。
-- 图层面板使用与工具箱一致的半透明背景和背景模糊，不完全遮断下方地图。
-- 工具箱、图层面板和航点列表使用相同的顶部位置与标题栏高度；三者互斥，打开一个会自动关闭另外两个。
-- 路网内置 OpenStreetMap、Esri 浅灰底图、Esri 深灰底图与天地图；地形内置 CyclOSM、OpenHikingMap、OpenTopoMap 与 Esri 世界地形图；卫星内置 Esri 世界影像与天地图。再次进入某一类别时会恢复该类别上次选择的图源。
-- **户外路线叠加层**：图层面板底部可自由开关 3 套透明叠加层（Waymarked 徒步路线、Waymarked 骑行路线、OpenSnowMap 雪道），可与任意底图组合使用并走本地瓦片缓存。
-- **节点切换与测速**：在图层面板右上角齿轮打开的 **地图设置** 页中，可为 OpenStreetMap（官方 CDN / HOT / 德国节点）、OpenTopoMap（官方 / OpenMaps 镜像）和 Esri 影像（Server / Services）切换节点并按需发起单节点连通性检测。
-- 路网和卫星菜单提供天地图。首次选择时按提示配置天地图开发者密钥；密钥由当前 Windows 用户凭据加密，
-  后续打开无需再次输入。
-- 天地图密钥管理位于 **地图设置** 页；已配置时提供 **更换密钥** 和
-  **移除密钥** 图标操作，主图层列表只显示地图类型和图源。密钥状态压缩为“尚未配置 / 已配置”，不再展示
-  技术加密说明。
+#### 地图设置
 
-### 定制图源
+点击图层面板右上角齿轮进入 **地图设置**：
 
-图层面板最多保存 20 个定制图源。没有图源时，单击 **定制** 类别会直接打开管理页空状态；至少保存
-一个图源后，单击该类别或重新打开图层面板会显示常规图源选择列表，用于直接切换底图。需要添加、编辑或
-删除时，点击“地图图源”标题旁的 **管理图源** 进入管理页。
+- **天地图密钥**：首次选用天地图时按提示配置个人开发者密钥（使用当前 Windows 用户凭据加密保存），后续可在地图设置中更换或移除。
+- **本地瓦片缓存**：默认开启，支持配置容量上限（`256 MB / 512 MB / 2 GB / 不限`）与保留时长（`7 天 / 30 天 / 90 天 / 永久`），可查看已用容量与瓦片数并二次确认清空；断网或刷新超时时优先回退展示已缓存旧瓦片。
+- **图源节点与测速**：支持为 OpenStreetMap（官方主站 / HOT / 德国镜像）、OpenTopoMap（官方主站 / OpenMaps 镜像）和 Esri 系列（Server / Services）切换节点，并支持宿主直连网络的实时连通性探测（区分超时与不可达）。
 
-管理页标题栏右侧的 **+** 用于添加；点击列表行切换图源，右侧铅笔和删除按钮分别编辑、删除。删除需要再次
-点击确认，避免误操作。编辑与添加使用独立子页，保存后回到管理列表并立即应用当前图源。新增表单顶部提供
-11 套一键预设：7 套免费区域/全球图源（日本 GSI 地形、台湾鲁地图、美国 USGS 新版与经典镜像、瑞士
-swisstopo 地形与航拍、Google 卫星）及 4 套专业户外预设（Tracestrack、Thunderforest、Stadia Stamen
-512 px、MapTiler，填入个人 API Key 即可使用）。
+#### 定制图源
 
-- **名称**：显示在图源列表和顶部入口的悬停提示中。
-- **瓦片地址**：必须包含 `{z}`、`{x}`、`{y}` 占位符，可选 `{s}`；只接受 HTTPS 地址。
-  例如 `https://example.com/tiles/{z}/{x}/{y}.png`。也可直接粘贴两步路格式的 `{$x}`、`{$y}`、`{$z}`，
-  保存前会自动转换为 Leaflet 占位符。
-- **瓦片大小**：256 或 512。地址含 `@2x` 或 `%402x` 时会自动选择 512；512 图源同时使用 512 CSS 像素
-  尺寸和负的缩放偏移，避免瓦片被压缩或放大。
-- **缩放级别**：最小与最大级别，默认 1–19。
-- **高级选项**：默认折叠。子域在地址里用了 `{s}` 时必须填写，例如 `abc`；署名作为纯文本显示在地图
-  右下角的版权行；仅当服务使用 TMS 的 Y 轴方向时勾选翻转 Y。
+- 最多保存 **20 个** HTTPS 定制图源，持久保存在本机应用数据目录（覆盖升级不丢失）。首次点击 **定制** 进入管理页，有图源后常规展示选择列表，点击标题旁 **管理图源** 进行增删改（删除需二次确认）。
+- **11 套一键预设**：新增表单顶部内置 7 套免 Key 区域/全球预设（日本 GSI 地形、台湾鲁地图、美国 USGS 新版与经典镜像、瑞士 swisstopo 地形与航拍、Google 卫星）及 4 套专业户外预设（Tracestrack、Thunderforest、Stadia Stamen 512 px、MapTiler，填入个人 API Key 即可使用）。
+- **配置字段**：
+  - **瓦片地址**：仅接受 HTTPS，须包含 `{z}`、`{x}`、`{y}`（可选 `{s}`）；直接粘贴两步路 `{$x}`、`{$y}`、`{$z}` 会自动转换。
+  - **瓦片大小**：`256` 或 `512`（地址含 `@2x` / `%402x` 自动选 512）。
+  - **缩放级别与高级选项**：默认 `1–19`；使用 `{s}` 时填写子域（如 `abc`），TMS 坐标服务勾选“翻转 Y”，可填写纯文本署名。
+- 加载状态显示为 **加载中 / 已加载 / 部分可用 / 不可用**；不可用时仅提示排查地址或服务限制，不会静默切回其他底图。
 
-保存后图源会出现在 **定制** 列表，选中即渲染。列表状态依次为 **加载中**、**已加载**、**部分可用**
-或 **不可用**；失败时只提示，**不会**自动切换回其他底图，避免把配置问题误判为服务故障。
+### 3. 轨迹浏览、剖面与分段
 
-定制图源由宿主保存在本机应用数据目录，不再依赖会随版本变化的 WebView 存储域名；正常覆盖安装新版本后
-仍会保留。首次使用这一存储方式时，旧页面存储中的图源会自动迁移。
+#### 轨迹摘要与热力着彩
 
-#### 航点
-
-- <kbd>←</kbd> <kbd>→</kbd> 或 <kbd>A</kbd> <kbd>D</kbd> 按累计里程顺序切换航点。
-- 绿色起点、红色终点与重合的黄色图钉共享同一导航节点。
-- 图钉靠近窗口边缘、信息卡、工具栏或剖面时，地图会平滑回中。
-- 顶部地图工具保持统一高度；航点与列表组成一个工具组。极窄窗口中的图层入口显示图标、当前类型短标签
-  和下拉箭头，完整名称仍可通过悬停提示和无障碍标签读取。
-- `列表` 打开航点速览；支持语义筛选、合并近点和人工纠正。
-- 点击或键盘 `Enter` 可放大 GPS 异常和数据缺口标签。
-- 带照片的航点点击后显示一张卡片，**整张卡片就是照片**（竖幅 4:3，即高:宽 = 4:3，与手机竖拍一致）：名称和“时间 · 海拔”压在底部的
-  渐隐层上，右上角是关闭，右下角是圆形箭头和 `2/9` 位置进度。**点照片任意处**即进入全览；圆形箭头
-  跳到下一处带照片的航点并就地打开它的卡片，只有一处带照片时不显示箭头。
-- 没有照片的航点卡片与它同属一套：同样的 224 px 宽度、圆角和右上角关闭，名称与“时间 · 海拔”两行
-  字级一致；描述较长时在卡片内滚动，卡片本身不会长长地压住地图。卡片不再显示经纬度，图钉已经标出位置；
-  若部分轨迹 App 把经纬度、海拔或时间自动写入航点备注，打开时会自动过滤这些重复遥测文字并保留用户手写
-  备注，同时把缺失的时间回填回卡片顶栏。
-- 进入全览后，右上角显示当前显示尺寸相对原图像素的真实百分比，例如原图为 2560 px 宽、窗口中显示
-  640 px 时显示 `25%`。滚轮按绝对比例缩放，最高 800%；点击百分比恢复适应窗口，放大后可拖拽平移，
-  切换照片时会重新适应窗口。灯箱支持 **在浏览器中打开** 查看原图或外链图片，并在看图时自动后台预载下一张。
-- 被选中的航点与起终点共用标准化双描边准星（航点为菱形、起终点为十字），精确锚定在图钉尖端坐标上，
-  并与图钉本体的暖金色轮廓微光配合。
-
-### 海拔剖面
-
-剖面按坡度着色，最高点和最低点直接标在曲线上。鼠标沿曲线移动可查看海拔、里程和时间；点击可固定光标。
-剖面会参与地图安全区域计算，被选中的地图点不会被剖面遮住。轨迹含逐点心率时，标题右侧会出现 **心率**
-开关，默认关闭；打开后增加红色心率曲线、独立 bpm 范围，悬停读数同时显示当前心率。缺失心率的位置会断开
-曲线，不进行插值。横贯剖面的红色虚线表示全部有效心率读数的算术平均值。
-
-### 轨迹摘要复制
-
-轨迹摘要标题栏中的复制图标会把当前文件整理成可直接粘贴到聊天或攻略中的纯文本。内容根据文件实际数据
-生成，可包含名称、里程、日期、总用时、运动时间、运动均速、累计爬升/下降、顶点海拔和点数；缺失字段会
-省略。路网文件只复制里程、路线/分段数量和航点数量，不伪造全网用时、均速或海拔。
-
-摘要卡分两行六项：第一行里程、上升、下降，第二行总用时、运动均速、点数。里程和总用时左侧带蓝色竖线，
-作为最常被先读的两个数值；其余四项用字号、字重和颜色保持次级层级。工具箱标题栏右侧的
-`?` 打开快捷键速查页，以两列表格列出 `W` 航点、`S` 隐藏界面、`A` / `D` 切换点位或照片、`Q` / `E` 切换
-地图图源、`C` 全轨迹、`M` 测距、`T` 开关工具箱；常用按钮的悬停提示仍保留对应键位。
-
-### 界面语言
-
-工具箱标题栏里只有一个语言按钮：左边是地球图标，右边是当前语言（`中` 或 `EN`），点击即在中文与英文之间
-切换；悬停提示直接给出可切换到的语言——中文界面显示 `English`，英文界面显示 `中文`。整页就地重绘，
-地图视野、已展开的面板和测距结果都保持原样，不会重新加载预览。选择会被记住，下次打开同一种语言；
-没有手动选择时跟随系统语言。
-
-### 距离测量
-
-打开右上角 **工具箱**，选择 **距离测量**：
-
-- <kbd>M</kbd> 可直接开始测距；测距中再次按 <kbd>M</kbd> 结束测距。
-- 测距页面固定贴近窗口右侧；叠加图导出等其他工具页复用同一工具箱窗口。
-- 页面顶部的 **返回** 会自动结束当前测距打点并回到工具箱主菜单，同时保留地图上已测得的线条与距离，避免切回其他工具后右键误打点。
-- 右键在地图上添加测距点；左键仍用于拖动地图，滚轮按当前位置缩放。
-- <kbd>Ctrl</kbd>+<kbd>Z</kbd> 撤回最后一个操作，
-  <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> 重做。
-- 在 14 px 屏幕半径内，靠近航点、先前手动打下的测距点（自动排除当前活动段末点以防自吸死锁）或轨迹
-  采样点时会自动吸附到精确坐标。同像素平手时遵循 `航点 > 测距点 > 轨迹点` 优先级；悬停时以标准化
-  双描边准星区分目标类型（航点菱形、测距点方块、轨迹点十字），并搭配轻量化悬浮标签。
-- **结束本段** 后，下一次右键从新一段开始。工具箱分别显示每段距离、点数与全部路线总距离。
-- **撤销打点** 删除最后一个点，**清空** 删除全部测距线；**结束测距** 退出打点状态但保留当前结果。
-- **在地图中心打点** 提供不依赖右键的键盘操作路径。
-- 地图上的段距离标签使用半透明底色，避免遮住测距线、轨迹和底图道路。
-
-测距结果仅保存在当前预览的内存中，不会写回轨迹文件，也不会随叠加图导出。
-
-### 点位坐标
-
-工具箱 **点位坐标** 打开后立即进入连续地图拾取；面板内固定一行提供起点、终点、顶点和中心：
-
-- 起点、终点使用轨迹或路线的首末记录点；顶点沿用可靠海拔判断。
-- 点击起点、终点或顶点会复制坐标、自动聚焦该点，并在地图上显示脉冲标记和坐标标签。
-- 打开工具即关闭当前图钉弹窗并进入十字准星状态。任意位置都可单击取点；靠近航点 14 px 内会显示
-  标准化菱形吸附准星与轻量标签，单击后精确吸附到航点，离开吸附范围后保持用户实际点击的位置。拾取可
-  连续进行，左键拖动和滚轮缩放不变；关闭坐标窗口即可结束。
-- **中心** 复制当前地图中心坐标，并提供悬停说明。
-
-所有结果按 `纬度, 经度` 六位小数复制，面板说明当前使用 WGS-84，不静默转换为 GCJ-02。
-面板同时显示 **坐标类型：WGS-84**。
-地图强提示和 **最近复制的坐标** 卡片会备注点位海拔；吸附到航点或轨迹点时读取源数据海拔，
-自由地图点和地图中心没有可靠海拔时显示 **海拔：无数据**。海拔只用于界面说明，不会写入复制文本。
-最近一次复制结果下方提供 **该点天气**，使用与轨迹天气相同的 Windy 链接直接打开该坐标。
-
-### 附件图片导出
-
-工具箱 **附件图片导出** 会统计当前文件的图片：内置相对路径、Data URI 和 HTTPS 外链。
-面板提供两个入口：
-
-- **导出全部图片**：云图标，包含内置图片、Data URI 和 HTTPS 外链。
-- **导出内置图片**：文件夹图标，只导出本地内置图片，不等待任何外网请求。
-
-图片写入源轨迹同级的 `<文件名>-photos` 目录；KMZ 使用压缩包所在目录。
-
-- 文件名包含航点名称和序号，重名时追加 `-2`、`-3`，不覆盖已有图片。
-- 内置图片由宿主直接复制，不再经过页面 Base64 和分块消息。
-- 外链只在选择全部导出后请求，最多 3 张并发；同一域名只做一次安全检查，单张超时或失败不会阻塞其他图片。
-- 导出目录内的隐藏清单记录已完成图片；关闭窗口后重新打开同一轨迹会跳过已完成项，只补导缺失或失败图片。
-  原轨迹文件被修改后旧清单自动失效。结果会显示新增、跳过已完成和失败数量。
-- 只接受公开 HTTPS 图片，HTTP、带凭据、回环、私网、多播、保留网段和链路本地地址会被拒绝；返回内容
-  还必须匹配支持的图片文件头。
-- 单张图片限制 `30 MB`，整批最多 `1000 张`、`1 GB`；界面显示进度、成功/失败数量和最终目录。
-
-### 轨迹天气
-
-工具箱中的 **轨迹天气** 会在系统默认浏览器中打开 [Windy](https://www.windy.com/)，并**直接展开该点的逐小时
-天气预报面板**（温度、体感、降雨、风、阵风、风向），不需要再自己在 Windy 里找位置。按钮下方的分段选择
-决定定位到哪个点：
-
-- **起点 / 终点**：第一个或最后一个记录点，固定 14 级街道视角。
-- **顶点**：全程海拔最大的记录点，同样 14 级。文件没有可靠海拔，或全程高差不足 1 米（例如全 0 的
-  平坦导出），该分段会禁用，不会拿一个任意点冒充峰顶。
-- 三个点位使用统一地图图钉轮廓：绿色播放箭头表示起点、红色方框表示终点、琥珀色山峰表示顶点。
-- 打开后默认显示**云层**，便于判断日照与雾况；需要风、降水或温度时在 Windy 内切换图层。
-- 预览页不内嵌第三方地图，也不需要 Windy API 密钥；点击该入口前不会发起任何外部请求。
-- 没有坐标的文件（例如无 GPS 的训练文件）会禁用该入口和分段选择，悬停提示会说明原因。
-- 选定点的坐标会随链接发送给 Windy；如果不想让坐标离开本机，请不要使用该入口。
-
-### 每公里分段
-
-带时间戳的轨迹会在简介下方显示独立的“每公里”折叠项。文件打开时默认收起，不显示具体行；点击后才
-展开分段表，再次点击可收起：
-
-- **距离**：完整分段为 1.00 km，最后一段为剩余里程。
-- **时间**：从该公里起点到终点的实际经过时间。
-- **运动速度**：按运动时间计算；文件提供暂停总量时优先使用文件计时，否则根据移动速度排除停顿。
-- 每公里统计在第一次展开时才计算，收起时不会遍历全部轨迹点。
-- 测距吸附索引在第一次吸附或开始测距时才创建，普通地图浏览不会承担测距索引的初始化开销。
-- 大路网只绘制当前视野附近的路线，并按缩放级别简化显示细节；标注点、照片和测距仍使用完整数据。
-- 表底汇总总时间与运动时间，最快分段的速度使用强调色显示；点击任意列头可按降序/升序/默认顺序循环排序。
-- 数值单元格内嵌极淡比例条；运动速度、垂直速度与单公里时间三列自动按四分位距识别坐车/长休等离群极值，保持正常徒步段对比清晰，超限异常段以满格斜纹与侧边竖条标识。
-- 长路线在固定高度表格内滚动，表头和底部汇总保持可见。
-- 使用 `Tab` 将焦点移到某一圈时会立即选中并定位；也可以直接点击某一圈。地图会缩放到对应轨迹范围并用青色覆盖强调，同时底部海拔剖面图同步高光聚焦该公里区间；再次点击同一圈或收起面板可清除强调。`Enter` / `Space` 不是本功能的快捷键。
-- 标题栏默认显示“详细”切换键。点击后增加累计时间、累计爬升/下降、平均心率、运动速度和垂直速度；
-  文件没有有效心率数据时，平均心率列完全隐藏。平均心率为该公里内有效点读数的算术平均值，与全程
-  平均心率口径一致。
-- 展开时蓝色激活背景覆盖完整标题栏；各数据列头保持纯文字，不增加装饰图标。
-
-### 路网轨迹
-
-由大量独立路线合并出的两步路路网 KML 会自动进入路网模式。路网会显示全部路线和标注点，但不显示
-全路网运动均速、休息时间、每公里表或合并海拔剖面，因为这些数据不属于同一次连续行程。地图使用
-Canvas 绘制路线，并跳过普通轨迹点圆点、公里数字和路网级异常标记，以降低大文件的内存和交互开销。
-标注点、照片、测距和叠加图导出仍可使用。路网叠加图显示文件名称、路线总长和轨迹段数，不绘制起终点，
-也不显示用时、均速或海拔，避免把多条独立路线误示为一次连续行程。
-
-### 导出叠加图
-
-从 **工具箱 → 叠加图导出** 打开设置。该页面与测距、坐标和附件导出共用标题栏、半透明背景、返回键和
-关闭键；不再使用单独的导出窗口或快捷键。
-
-- 方版：1536×1536
-- 竖版：1080×1920
-- 横版：2048×1536
-- 三个版式按钮的悬停提示会说明尺寸和适用场景。
-- 设置页内提供低分辨率实时预览；改变版式、墨色或底衬后立即刷新。
-- 预览画布带明暗双层边界，可直接辨认方版、竖版和横版的实际比例。
-- 墨色按钮说明适合明亮或深色背景，底衬按钮说明完全透明或增加文字可读性的区别。
-
-导出文件写在源轨迹同一目录，PNG 透明；可选黑/白墨色、底衬，以及 **仅轨迹**（隐藏标题、日期、遮罩与统计，文件名追加 `-bare`）与 **海拔轮廓**（底部绘制极简海拔剪影曲线，文件名追加 `-ele`，无高程时自动禁用）。图片会写入路线名称和日期，普通轨迹按
-距离、总用时、累计爬升、最高海拔、运动均速排序。文件名包含版式、墨色和底衬，例如
-`路线-轨迹-1x1-white-soft.png`，同版式的不同样式不会互相覆盖。
-点击导出后设置页保持打开，可以继续切换版式、墨色或底衬并再次导出。
-
-### 轨迹着彩、剖面分析与无损编辑
-
+- **摘要复制**：点击左上角轨迹摘要标题栏的复制图标，生成适用于聊天或攻略的纯文本摘要（含名称、里程、日期、用时、运动均速、爬升/下降、顶点海拔与点数，缺失字段自动省略）。
 - **多维热力着彩**：点击工具箱左侧的轨迹图标或按 <kbd>L</kbd>，循环切换 **单色 / 海拔 / 配速 / 心率**（缺失对应字段时自动跳过）。
-- **海拔剖面交互**：水平拖拽剖面绘图区可框选任意区间查看里程、爬升/下降、坡度、用时与均速（按 `Esc` 清除）；支持自动识别 ClimbPro 主坡段、点击或按 <kbd>P</kbd> 一键折叠剖面，以及四等份里程刻度参考线。
-- **窄窗与矮窗联动精简**：窗口宽度 `≤ 720 px` 或高度 `≤ 520 px` 时，轨迹摘要、每公里分段微胶囊与 `26×26` 缩放/回到轨迹控件同步进入紧凑左列栈。
-- **四区无损轨迹编辑**：点击工具箱顶部的 **编辑轨迹** 进入离线编辑工作区：
-  - **顶部主控条**：显示文件名、修改状态圆点、里程增减徽标、撤销/重做（<kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd>）、复原、集成的图层/航点图标，以及 **保存**（<kbd>Ctrl</kbd>+<kbd>S</kbd>，支持导出 GPX / KML / KMZ / GeoJSON / TCX / CSV，支持离线 KMZ 外链照片打包与 GPX / KML / KMZ 同格式覆盖自动备份）。
-  - **剪辑拼接与清洗优化**：支持剖面双柄裁剪、点击拆分删段、导入本地或同目录 GPX / KML 拼接合并、漂移点清洗、海拔平滑（轻度/标准/强力）与轨迹抽稀。
-  - **路线方向与绘制修点**：支持反转方向、往返倍增、闭合环线、手绘补线（支持自动替换区段/闭合/续画）、顶点微调、框选擦除实时计数与坡度估算虚拟时间轴。
-  - **航点管理**：支持点击轨迹吸附落点、`Alt+点击` 自由落点、序号化航点列表、沿轨重排、20 米去重与批量生成里程/最高点航点。
-- **检查更新**：工具箱底部显示当前版本号与「检查更新」按钮；后台每 24 小时最多静默竞速检查一次 **GitHub Releases 与 GitCode 国内镜像**（单边超时或不可达时自动回退）。发现正式新版时，顶部工具箱图标亮起柔和青蓝微光提示点、底部显示翠绿新版胶囊（`↑ vX.Y.Z`）；可在更新详情页查看双语日志、忽略该版本，或一键下载安装包（自动核对 **SHA256 哈希** 与插件清单完整性，失败自动切换备用镜像）并交由 QuickLook 原生安装。
+- **窄窗联动精简**：窗口宽度 `≤ 720 px` 或高度 `≤ 520 px` 时，轨迹摘要、每公里入口与缩放/定位控件自动收拢为紧凑左列栈。
 
-### 大文件与隐私
+#### 海拔剖面与 ClimbPro
 
-长轨迹仅绘制路线线条、起终点以及按视口抽样的航点，不再为每个原始采样点单独创建圆点标记，避免缩放或拖动时点位重叠与刷新卡顿。轨迹数据不发送到服务器；在线瓦片请求由所选底图触发。
+- **坡度与游标**：曲线按坡度着色并标注最高/最低点，底部带 25% / 50% / 75% 里程刻度；悬停查看海拔、里程与时间，点击可固定游标。
+- **区间刷选分析**：在剖面绘图区水平拖拽框选任意区间，实时统计里程、爬升/下降、平均坡度、用时、均速与平均心率，并同步高亮地图轨迹（点击关闭按钮或画布空白处清除）。
+- **ClimbPro 主坡段**：自动识别主要爬坡段并在标题栏展示横滑列表，点击任一坡段同步聚焦地图与剖面。
+- **心率叠加与一键折叠**：含逐点心率时可点击 **心率** 开关叠加独立纵轴曲线与全程平均心率虚线（缺失点断开不插值）；点击折叠按钮或按 <kbd>P</kbd> 可收起/展开剖面。
+
+#### 每公里分段
+
+- 带时间戳的轨迹在摘要下方提供独立的 **每公里** 折叠表（默认收起），点击展开查看各公里耗时、运动速度与表底总计；点击 **详细** 可展开累计时间、爬升/下降、平均心率与垂直速度。
+- **排序与抗极值比例条**：点击任意列头循环切换降序 / 升序 / 默认顺序；数值单元格内嵌比例条，运动速度、垂直速度与单公里时间自动识别坐车/长休等异常极值（以满格斜纹与侧边竖条标识），保持正常徒步段对比清晰。
+- **地图与剖面联动**：点击或 `Tab` 选中某一公里，地图与海拔剖面图同步青色高亮该区间；再次点击或收起表格清除高亮。
+
+#### 路网轨迹
+
+- 自动识别由多条独立路线合并而成的路网 KML，完整渲染路线与航点，跳过全局用时、均速、每公里分段和合并海拔剖面。航点、照片、测距与叠加图导出（仅显示总长与段数）仍可正常使用。
+
+### 4. 航点与照片相册
+
+- **沿线导航与定位**：按 <kbd>←</kbd> <kbd>→</kbd> 或 <kbd>A</kbd> <kbd>D</kbd> 按累计里程顺序切换航点（重合的起终点与航点共享节点），地图自动平滑避让并居中；点击 GPS 异常或数据缺口标签可直接放大查看。
+- **航点速览列表**：点击顶部 **列表** 打开航点速览，支持危险/水源/营地/补给/下撤等本地语义筛选、合并近点与人工修正。
+- **照片卡片与全览灯箱**：
+  - 带照片的航点弹出竖幅 4:3 照片卡片，点击照片进入全览灯箱，右下角箭头直接跳至下一处带照片的航点。
+  - 全览灯箱右上角显示相对原图像素的真实缩放比例，支持滚轮最高 `800%` 缩放、拖拽平移、点击百分比复原、**在浏览器中打开原图**，并在看图时自动后台预载下一张。
+- **普通航点卡片**：长描述在卡片内滚动；打开时自动过滤部分 App 写入描述中的重复经纬度/海拔/时间遥测模板（保留用户手写备注），并回填缺失时间到顶栏。
+
+### 5. 无损轨迹编辑与多格式导出
+
+点击工具箱顶部 **编辑轨迹** 进入离线无损编辑工作区：
+
+- **顶部控制条**：显示文件名、修改标记、里程增减徽标、撤销/重做（<kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd>）、一键复原、图层与航点快捷开关及 **保存**（<kbd>Ctrl</kbd>+<kbd>S</kbd>）。
+- **六大工具模块**：
+  - **剪辑拼接**：剖面双柄区间裁剪、地图或剖面点击拆分删段、多段一键合并、导入本地或同目录 GPX / KML 拼接。
+  - **清洗优化**：异常漂移点逐条勾选定位与清洗、轻度/标准/强力三档海拔平滑（实时预览爬升变化）、容差抽稀。
+  - **路线方向**：反转方向、往返倍增、闭合环线、环线点击重设起点。
+  - **绘制修点**：手绘补线（自动识别区段替换/闭合/续画/追加）、放大至 15 级以上顶点精修（拖拽/中点插点/右键删除）、框选擦除（实时统计待删点数与航点数）。
+  - **时间轴**：整体时间平移、按坡度（Naismith 规则）或配速生成虚拟时间轴。
+  - **航点管理**：点击轨迹吸附落点或 `Alt+点击` 自由落点，支持沿轨重排、20 米内去重及按里程间隔批量生成里程/最高点航点。
+- **保存与多格式导出**：支持导出 **GPX / KML / KMZ / GeoJSON / TCX / CSV** 六种格式；导出 KML / KMZ 自动保留时间与心率，KMZ 可选下载并离线打包外链照片；GPX / KML / KMZ 支持同格式覆盖原文件并在首次覆盖前自动留存 `.bak` 备份（跨格式禁止覆盖以防损坏原文件）。
+
+### 6. 工具箱实用工具
+
+按工具箱内顺序排列：
+
+#### 距离测量
+
+- 按 <kbd>M</kbd> 开始或结束测距；右键在地图上打点，左键拖动地图、滚轮缩放，也可点击 **在地图中心打点**。
+- 靠近航点、已有测距点或轨迹点（14 px 内）时自动吸附并显示对应准星，优先级为 `航点 > 测距点 > 轨迹点`。
+- 支持 **结束本段** 开启新分段、**撤销打点** / <kbd>Ctrl</kbd>+<kbd>Z</kbd> 与 <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> 重做、**清空**；点击顶部 **返回** 自动结束打点并保留当前测距线在地图上。测距仅保存在内存中，不修改源文件。
+
+#### 点位坐标
+
+- 打开即进入连续地图拾取（左键拖动与滚轮缩放不变），面板固定提供 **起点 / 终点 / 顶点 / 地图中心** 一键复制。
+- 所有结果按 6 位小数 `纬度, 经度`（WGS-84，不转换 GCJ-02）复制；拾取靠近航点自动吸附，并在面板备注点位海拔（不写入剪贴板）。结果下方提供 **该点天气** 快捷入口。
+
+#### 叠加图导出
+
+- 导出透明背景 PNG 到源轨迹同级目录，支持 **方版（1536×1536）**、**竖版（1080×1920）** 和 **横版（2048×1536）**，提供实时低分辨率预览。
+- 可选黑/白墨色、底衬、**仅轨迹**（隐藏文字与统计，文件名追加 `-bare`）与 **海拔轮廓**（底部绘制海拔剪影，文件名追加 `-ele`）；不同组合自动生成独立文件名，不互相覆盖。
+
+#### 附件图片导出
+
+- 统计当前文件中的内置图片、Data URI 与 HTTPS 外链，提供 **导出全部图片** 与 **导出内置图片**（不访问外网）两个入口，输出到源轨迹同级 `<文件名>-photos` 目录。
+- 外链最多 3 路并发下载，仅接受公开 HTTPS 图片并校验图片文件头；目录内隐藏清单支持断点续传（源文件修改后自动失效）。单图上限 `30 MB`，整批上限 `1000 张 / 1 GB`，重名自动追加 `-2`、`-3`。
+
+#### 轨迹天气
+
+- 在系统默认浏览器中打开 [Windy](https://www.windy.com/)（默认云层）并直接展开所选 **起点 / 终点 / 顶点** 的逐小时预报面板（温度、降雨、风速与阵风）。无坐标或无有效高差（< 1 米）时自动禁用对应选项。
+
+### 7. 语言、快捷键、更新与隐私
+
+- **界面语言**：点击工具箱标题栏的地球按钮（`中` / `EN`）就地切换中英文，不重载预览并自动记住选择（未手动选择时跟随系统语言）。
+- **快捷键速查**：点击工具箱标题栏右侧 **?** 查看两列快捷键表（`W / S / A D / Q E / C / M / T` 等），文本框获焦时自动暂停全局快捷键。
+- **内置检查更新**：工具箱底部显示当前版本与 **检查更新** 入口，后台每 24 小时最多静默竞速检测一次 **GitHub Releases + GitCode 国内镜像**（自动回退）。发现正式新版时，顶部显示柔和青蓝微光提示点、底部显示翠绿胶囊（`↑ vX.Y.Z`）；支持查看双语日志、忽略此版本，以及一键下载安装包（核对 **SHA256 哈希** 与插件清单完整性）并调起 QuickLook 原生安装。
+- **隐私边界**：轨迹文件只在本地读取，从不上传服务器。在线底图仅向所选瓦片服务请求地图，轨迹天气仅把选定点坐标随链接发送给 Windy，检查更新仅从 GitHub / GitCode 拉取版本信息与安装包。
+
+---
 
 ## English
 
-### Open a file
+### 1. Opening files & limits
 
-Select a `.gpx`, `.kml`, `.kmz` or `.fit` file in Explorer and press <kbd>Space</kbd>. Online basemaps require
-network access; **Grid** (No-map mode) renders the route on a local grid.
+- Select a `.gpx`, `.kml`, `.kmz` or `.fit` file in Explorer and press <kbd>Space</kbd> to preview.
+- **Supported formats:** GPX 1.0/1.1, KML 2.2 (including `gx:Track`, `MultiGeometry`, closed `LinearRing` polygons and `gx:SimpleArrayData` heart-rate arrays), zipped `.kmz` archives, and FIT activities/courses.
+- **FIT brief mode:** reads GPS records, timestamps, elevation, heart rate, session totals and `course_point` markers; laps, cadence, power, temperature and workout steps are not shown.
+- **Size & rendering limits:** single GPX, KML and FIT files are limited to `64 MB`; `.kmz` archives allow up to `1088 MB` total (`64 MB` inner `.kml`, `1000 images / 1 GB` embedded media). Oversized files report an error before WebView starts, and long tracks sample waypoints by viewport to stay responsive.
 
-The first FIT version reads GPS records, time, elevation, heart rate, session totals and `course_point` markers
-from activities and courses. Laps, cadence, power, temperature, workout steps and the full device metric set are
-not displayed yet.
+### 2. Basemaps, overlays & custom sources
 
-Single GPX, KML and FIT files are limited to `64 MB`; zipped `.kmz` archives allow up to `1088 MB` total (`64 MB` inner `.kml` document, `1000 images / 1 GB` embedded media). Oversized files show an error before WebView starts so malformed or padded files cannot exhaust memory.
+#### Built-in basemaps & outdoor overlays
 
-### Map and waypoints
+- **Four basemap categories:** the top layer menu groups sources into **Road**, **Terrain**, **Satellite** and **Custom** (<kbd>Q</kbd> / <kbd>E</kbd> cycles categories and restores each category's last selected provider):
+  - **Road:** OpenStreetMap, Esri Light Gray, Esri Dark Gray, Tianditu
+  - **Terrain:** CyclOSM, OpenHikingMap, OpenTopoMap, Esri World Topo
+  - **Satellite:** Esri World Imagery, Tianditu
+- **Transparent outdoor overlays:** toggle 3 overlays at the bottom of the layer panel (**Waymarked Hiking**, **Waymarked Cycling**, **OpenSnowMap Pistes**) over any basemap, backed by the local tile cache.
+- **No-map Grid mode:** click the grid icon in the layer header to render routes and measurements on a local coordinate grid without fetching online tiles; click again or switch categories to restore the previous basemap.
+- **Mutual exclusion:** the Toolbox, Layer panel and Waypoint list are mutually exclusive—opening one closes the others.
 
-- Basemaps are grouped into **Road**, **Terrain**, **Satellite** and **Custom**;
-  <kbd>Q</kbd> / <kbd>E</kbd> switches category.
-- The top layer entry keeps the current Road, Terrain, Satellite or Custom label and matching category icon;
-  the active source name is shown in the tooltip.
-- **No-map mode** uses the blank-grid icon in the layer-panel title bar, immediately before Map settings. It
-  shows only the route, measurement and coordinate grid without downloading tiles; turning it off or pressing
-  a background key restores the last map source. The top entry reads Grid. The icon has a tooltip and a blue
-  active state.
-- The source list contains only providers for the active category, and the panel uses the shared translucent,
-  blurred tool surface.
-- The toolbox, layer panel and waypoint list share one top position and header height. They are mutually
-  exclusive: opening one closes the other two.
-- Road includes OpenStreetMap, Esri Light Gray, Esri Dark Gray and Tianditu; Terrain includes CyclOSM,
-  OpenHikingMap, OpenTopoMap and Esri World Topo; Satellite includes Esri World Imagery and Tianditu. Returning
-  to a category restores the source last selected there.
-- **Outdoor overlays:** toggle 3 transparent overlays at the bottom of the layer panel (Waymarked Hiking,
-  Waymarked Cycling and OpenSnowMap Pistes) on top of any basemap, backed by the local tile cache.
-- **Node switcher & connectivity probe:** open **Map settings** from the gear icon to switch nodes and run
-  on-demand per-node connectivity checks for OpenStreetMap (Official CDN / HOT / DE), OpenTopoMap (Official /
-  OpenMaps mirror) and Esri Imagery (Server / Services).
-- The Road and Satellite menus offer Tianditu. Enter a user-owned developer key when first prompted; it is
-  encrypted for the current Windows user and does not need to be entered for later previews.
-- With a key configured, **Map settings** offers **Change key** and **Remove key** icon actions. The status reads
-  only Not configured or Configured, without technical encryption copy.
+#### Map settings
 
-### Custom sources
+Click the gear icon in the layer panel header to open **Map settings**:
 
-The layer panel stores up to 20 custom raster sources. With no sources, clicking **Custom** opens the empty
-manager. Once at least one source is saved, clicking the category or reopening the layer panel shows the regular
-source picker for switching basemaps. Use **Manage sources** beside the source heading to add, edit or delete
-entries.
+- **Tianditu key:** prompted on first selection and stored encrypted for the current Windows user; can be changed or removed later in Map settings.
+- **Local tile cache:** enabled by default with configurable size caps (`256 MB / 512 MB / 2 GB / Unlimited`) and retention (`7 d / 30 d / 90 d / Forever`), live usage stats, two-step clear, and automatic stale-tile fallback when offline or timed out.
+- **Node switcher & probing:** switch nodes for OpenStreetMap (Official CDN / HOT / DE), OpenTopoMap (Official / OpenMaps mirror) and Esri (Server / Services), and run direct host connectivity probes distinguishing timeouts from unreachable hosts.
 
-In the manager, use **+** in the title bar to add a source; click a row to select it, and use the pencil or delete
-buttons to edit or remove it. Deletion needs a second confirmation click. Adding and editing use a separate page,
-and saving returns to the manager list and applies the source immediately. The add form provides 11 one-click
-presets at the top: 7 free regional/global sources (Japan GSI, Taiwan RudyMap, US USGS New & Classic Esri mirror,
-Swiss swisstopo Topo & Imagery, Google Satellite) and 4 pro outdoor presets (Tracestrack, Thunderforest, Stadia
-Stamen 512 px and MapTiler, requiring your own API key).
+#### Custom sources
 
-- **Name** — shown in the source list and the top-entry tooltip.
-- **Tile URL** — must contain `{z}`, `{x}` and `{y}`; `{s}` is optional. Only HTTPS addresses are
-  accepted, for example `https://example.com/tiles/{z}/{x}/{y}.png`. Two-step `{$x}`, `{$y}` and `{$z}`
-  placeholders can also be pasted and are converted to Leaflet placeholders before saving.
-- **Tile size** — 256 or 512. An address containing `@2x` or `%402x` selects 512 automatically. A 512 px
-  source uses the correct 512 CSS-pixel size together with a negative zoom offset so tiles are neither
-  compressed nor enlarged.
-- **Zoom range** — minimum and maximum level, 1–19 by default.
-- **Advanced options** — collapsed by default. Fill in subdomains when the URL uses `{s}`, for example `abc`;
-  attribution is printed as plain text in the map credit line; enable Flip Y only for a TMS source.
+- Stores up to **20** HTTPS custom raster sources in local application data (preserved across upgrades). Click **Manage sources** to add, edit or delete entries (deletion requires a second confirmation).
+- **11 one-click presets:** the Add form includes 7 free regional/global presets (Japan GSI, Taiwan RudyMap, US USGS New & Classic mirror, Swiss swisstopo Topo & Imagery, Google Satellite) and 4 pro outdoor presets (Tracestrack, Thunderforest, Stadia Stamen 512 px, MapTiler—supply your own API key).
+- **Fields:** HTTPS URL with `{z}`, `{x}`, `{y}` (optional `{s}`; 2bulu `{$x}`/`{$y}`/`{$z}` placeholders convert automatically), tile size `256` or `512` (`@2x`/`%402x` auto-selects 512), zoom range (`1–19` default), plus optional subdomains, attribution and Flip Y for TMS sources.
+- Status reads **Loading / Ready / Partially available / Unavailable**; failures warn without silently falling back to another basemap.
 
-A saved source appears in the **Custom** list and renders as soon as it is selected. Its state reads **Loading**,
-**Ready**, **Partially available** or **Unavailable**. If tiles fail, the viewer only warns you to check the
-address and the service's restrictions; it does **not** silently fall back to another basemap.
+### 3. Track browsing, profile & splits
 
-The host stores custom sources in local application data rather than the versioned WebView origin, so normal
-overwrite upgrades retain them. Sources in the old page storage are migrated the first time the durable store
-is used.
+#### Track summary & coloring
 
-#### Waypoints
+- **Summary copy:** click the copy icon in the route summary header to copy a plain-text summary (name, distance, date, duration, moving speed, ascent/descent, peak elevation and point count; missing fields are omitted).
+- **Multi-dimensional track coloring:** click the trail icon beside the Toolbox or press <kbd>L</kbd> to cycle **Single / Elevation / Speed / Heart rate** (unavailable modes are skipped automatically).
+- **Responsive compact stack:** at `≤ 720 px` width or `≤ 520 px` height, the summary pill, per-km entry and zoom/locate controls collapse into a unified compact left column.
 
-- <kbd>←</kbd> <kbd>→</kbd> or <kbd>A</kbd> <kbd>D</kbd> navigate by cumulative route distance.
-- Green starts and red ends share one navigation node with coincident yellow pins.
-- The map recentres when the selected pin approaches an edge, the summary, toolbars or the profile.
-- **List** opens the waypoint overview with filters, nearby-point merging and local manual corrections.
-- Click or press Enter on a GPS anomaly or data-gap label to zoom to it.
-- A pin with photos opens a card that **is** the photo (portrait 4:3, height : width): the name and "time · elevation" sit on a bottom
-  scrim, with close at the top right and a round next arrow plus a `2/9` position counter at the bottom right.
-  Click anywhere on the photo for the full-size viewer; the arrow jumps to the next pin that has photos and opens
-  its card in place, and is not shown when this is the only one.
-- A pin without photos opens the same card family: the same 224 px width, corner radius and top-right close, the
-  name and "time · elevation" at the same two type sizes. A longer description scrolls inside the card instead of
-  stretching it down the map. Coordinates are no longer shown -- the pin already marks the spot, and
-  exporter-injected coordinate, elevation or timestamp boilerplate in waypoint descriptions is automatically stripped
-  while preserving user notes and recovering missing timestamps for the card header.
-- In the full-size viewer, the top-right percentage is the displayed width divided by the source width: a
-  2560 px photo shown at 640 px reads 25%, and 100% means 1:1 pixels. Use the wheel to zoom up to 800%, drag a
-  zoomed photo to pan, click the percentage to fit the window again, or change photos to start over. The
-  lightbox also provides **Open in browser** and preloads the next photo in the background.
-- The selected pin is marked by the standardized double-stroked selection reticle (diamond for waypoints, cross for
-  start/end track anchors) centred on the pin tip together with a subtle warm accent glow on the pin itself.
-- The first-click attachment card reuses the waypoint list's unblurred translucent background. The full-size
-  viewer also keeps its dark semi-transparent surround, with duplicate panels and controls hidden.
+#### Elevation profile & ClimbPro
 
-### Elevation profile
+- **Gradient & scrub:** gradient-colored terrain with high/low labels and 25% / 50% / 75% distance ticks; hover for live readout or click to pin the cursor.
+- **Range brush analysis:** drag horizontally across the chart to inspect distance, ascent/descent, average grade, duration, average speed and average heart rate while highlighting the matching map segment (clear via the close button or clicking outside the chart).
+- **ClimbPro major climbs:** automatically detects major climbs in a scrollable header strip; click any climb chip to focus both map and profile.
+- **Heart-rate overlay & collapse:** toggle **Heart rate** when per-point data is available to plot a dual-axis curve with a whole-route average line (gaps stay broken, never interpolated); click the collapse toggle or press <kbd>P</kbd> to fold/expand the profile.
 
-The profile is coloured by gradient and labels its highest and lowest points. Move over the chart for elevation,
-distance and time; click to pin the scrubber. Its height participates in the map's safe-area calculation.
-When the track contains per-point heart rate, a **Heart rate** button appears above the chart. It starts off;
-turning it on adds a red line, its own bpm range and the current reading to the hover/touch readout. Missing
-readings split the line rather than inventing values. A dashed horizontal line marks the arithmetic average of
-all valid heart-rate readings.
+#### Per-kilometre splits
 
-### Track summary copy
+- Timed routes show a collapsible **Splits** table below the summary with distance, elapsed time, moving speed and bottom totals; toggle **Details** for cumulative time, ascent/descent, average heart rate and vertical speed.
+- **Sorting & outlier-resistant bars:** click any column header to cycle descending, ascending and default order; inline proportion bars use IQR-based outlier capping (diagonal hatch and edge bar) so isolated car-ride or long-rest spikes do not crush normal hiking splits.
+- **Map & profile sync:** click or `Tab` onto a split row to spotlight that kilometre in cyan on both map and elevation profile; click again or collapse to clear.
 
-The copy icon in the track-summary heading copies a plain-text summary suitable for chat notes or route
-descriptions. It includes only values the file actually provides: name, distance, date, elapsed and moving
-time, moving average, ascent/descent, peak elevation and point count. Route networks copy distance, route/
-segment counts and waypoint count without inventing whole-network duration, speed or elevation.
+#### Route networks
 
-The summary card is two rows of three: distance, ascent and descent, then total time, moving average speed
-and points. Distance and total time carry a blue rule on their left edge as the two values read first; the
-other four stay on the secondary tier by size, weight and colour.
+- Merged multi-route networks are detected automatically and render all routes and waypoints while skipping whole-network duration, speed, per-km splits and combined profiles. Waypoints, photos, measurement and overlay export (showing total length and segment count) remain available.
 
-The `?` control in the toolbox header opens one two-column keyboard reference: `W` markers, `S` hide
-interface, `A` / `D` previous or next point or photo, `Q` / `E` switch map source, `C` whole route, `M` measure,
-`T` open or close the toolbox. Native control tooltips keep the relevant key without repeating shortcut
-badges throughout the toolbox.
+### 4. Waypoints & photo albums
 
-### Interface language
+- **Route-ordered navigation:** press <kbd>←</kbd> <kbd>→</kbd> or <kbd>A</kbd> <kbd>D</kbd> to step along cumulative route distance with smooth safe-area recentering; click GPS anomaly or data-gap badges to zoom in.
+- **Waypoint overview:** click **List** to open the overview with local semantic filters (danger/water/camp/supply/exit), nearby-point merging and manual corrections.
+- **Photo cards & lightbox:**
+  - Photo waypoints open a portrait 4:3 photo card; click the photo for the full-size lightbox or use the bottom-right arrow to jump directly to the next photo waypoint.
+  - The lightbox shows true source-pixel percentage, supports wheel zoom up to `800%`, drag-to-pan, click-percentage reset, **Open in browser**, and background next-photo preloading.
+- **Plain waypoint cards:** long descriptions scroll inside the card; exporter-injected coordinate, elevation or timestamp boilerplate is stripped automatically while preserving user notes and recovering missing timestamps.
 
-The toolbox header carries a single language button: a globe icon beside the language in use (`中` or `EN`),
-and one click flips between Chinese and English. The tooltip names the language the click gives you, in that
-language's own words — `English` on a Chinese page, `中文` on an English one. The page repaints in place, so
-the map view, open panels and any measurement survive the switch and the preview is never reloaded. The choice
-is remembered for the next file; without a manual choice the interface follows the system language.
+### 5. Non-destructive track editor & multi-format export
 
-### Distance measurement
+Click **Edit track** at the top of the Toolbox to open the offline editor:
 
-Open **Toolbox** in the upper-right corner and choose **Measure distance**:
+- **Top bar:** displays track name, modified indicator, distance delta pill, Undo/Redo (<kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd>), Reset, Layers/Pins toggles and **Save** (<kbd>Ctrl</kbd>+<kbd>S</kbd>).
+- **Six tool modules:**
+  - **Clip & Merge:** dual-handle profile crop, click-to-split on map or profile with segment deletion, segment merge, and local/sibling GPX & KML append.
+  - **Clean & Optimize:** checkable GPS drift list with map focus, three-level elevation smoothing (live ascent preview), and simplification.
+  - **Route Direction:** reverse, out-and-back, close loop, and click-to-rotate loop start.
+  - **Draw & Refine:** hand-drawn path splicing (replace span, close loop, extend or append), zoom `>= 15` vertex editing (drag, midpoint insert, right-click delete), and live-count box erase.
+  - **Timeline:** timestamp shifting and grade-adjusted (Naismith) or pace-based virtual timeline generation.
+  - **Waypoints:** snap onto the track or `Alt+Click` to place freely, sort along track, dedupe within 20 m, and batch-generate distance milestone or summit waypoints.
+- **Save & multi-format export:** export to **GPX, KML, KMZ, GeoJSON, TCX or CSV**; KML/KMZ exports preserve timestamps and heart rate, and KMZ optionally downloads and packs remote HTTPS photos offline. GPX, KML and KMZ support same-format overwrite with an automatic `.bak` backup on first overwrite (cross-format overwrites are blocked).
 
-- <kbd>M</kbd> starts measuring directly; press it again while measuring to finish.
-- The measurement page stays against the right edge. Overlay export and the other tool pages reuse the same
-  toolbox window.
-- **Back** at the top of the page stops active point collection and returns to the toolbox menu while keeping existing measured lines visible on the map.
-- Right-click adds a point. Left-drag still pans the map, and the wheel zooms at the pointer.
-- <kbd>Ctrl</kbd>+<kbd>Z</kbd> undoes the last change;
-  <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> redoes it.
-- Nearby waypoints, previously placed manual measurement points (excluding the active section's last vertex so
-  it cannot self-snap), and recorded track samples snap to their exact coordinates within a 14 px screen radius.
-  Exact ties favour `marker > measured point > track point`. While hovering, a standardized double-stroked
-  reticle distinguishes the target type (diamond for waypoints, square for measured points, cross for track
-  samples) alongside a lightweight snap label.
-- **End section** finishes the current line, and the next right-click starts a separate section. The toolbox
-  shows every section subtotal, its point count and the overall distance.
-- **Undo point** removes the last point, **Clear** removes all measurements, and **Finish measuring** leaves
-  the current result visible while turning off point collection.
-- **Add at map centre** provides a keyboard-operable alternative to right-click.
-- Section-distance labels use a translucent backing so the measured line, recorded track and basemap remain
-  visible underneath.
+### 6. Toolbox utilities
 
-Measurements stay in memory for the current preview. They are not written into the track file or included in
-the overlay export.
+Listed in Toolbox menu order:
 
-### Point coordinates
+#### Measure distance
 
-Opening **Toolbox → Point coordinates** starts continuous map picking immediately. Its fixed
-single-row controls offer start, end, peak and map centre:
+- Press <kbd>M</kbd> to start or finish measuring; right-click adds points while left-drag pans and the wheel zooms (or use **Add at map centre**).
+- Snaps automatically within 14 px with priority `waypoint > measured point > track point`.
+- Supports **End section**, **Undo point** / <kbd>Ctrl</kbd>+<kbd>Z</kbd> & <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> redo, and **Clear**. Clicking **Back** stops active point collection while keeping measured lines on the map. Measurements remain in memory only.
 
-- Start and end are the first and last recorded route points; Peak uses the same reliable-elevation test as
-  route weather.
-- Start, end and peak copy the coordinate, focus the map and show a pulsing point with a coordinate label.
-- Opening the tool closes the current pin popup and changes the cursor to a crosshair. Any position can be
-  picked repeatedly; hovering within 14 px of a marker shows the standardized diamond snap reticle and label,
-  and clicking snaps to its exact coordinate while points outside the snap radius stay where clicked. Left-drag
-  and wheel zoom remain unchanged; closing the coordinate window ends picking.
-- **Centre** copies the current map-centre coordinate and has its own hover explanation.
+#### Point coordinates
 
-Coordinates copy as six-decimal `latitude, longitude`; the panel identifies WGS-84 and never silently converts
-to GCJ-02 and shows **Coordinate type: WGS-84**. **Weather here** below the latest result uses the same Windy
-link builder as route weather. The map highlight and latest-coordinate card also note point elevation from the
-snapped marker or track sample. Free points and the map centre explicitly say when elevation is unavailable.
-Elevation is display-only and is not included in the clipboard text.
+- Enters continuous map picking immediately (pan and zoom stay active), with one-click copy buttons for **Start**, **End**, **Peak** and **Map centre**.
+- Copies six-decimal `latitude, longitude` (WGS-84, never silently converted to GCJ-02), snaps to nearby waypoints, and displays elevation notes (display-only, excluded from clipboard) plus a **Weather here** shortcut.
 
-### Attachment photo export
+#### Export overlay
 
-**Toolbox → Export attachment photos** counts embedded relative files, Data URIs and HTTPS
-links and offers two entries:
+- Writes transparent PNG overlays beside the source track in **Square (1536×1536)**, **Portrait (1080×1920)** and **Landscape (2048×1536)** with a live low-resolution preview.
+- Offers black/white ink, backing choices, **Track only** (`-bare` suffix, hides text and stats) and **Elevation silhouette** (`-ele` suffix, bottom curve); distinct style combinations write separate file names without overwriting one another.
 
-- **Export all photos** uses the cloud icon and includes embedded files, Data URIs and HTTPS links.
-- **Export embedded photos** uses the folder icon, skips all network work and copies only embedded images.
+#### Export attachment photos
 
-Files are written to a `<file name>-photos` folder beside the source track; KMZ files use the archive's own
-directory.
+- Counts embedded files, Data URIs and HTTPS links, offering **Export all photos** and **Export embedded photos** (no network requests) into `<file name>-photos` beside the source track.
+- Downloads up to 3 HTTPS images concurrently with public-host and image-signature checks; a hidden manifest enables resumable export (invalidated if the source track changes). Limited to `30 MB` per image and `1000 images / 1 GB` per batch; duplicate names receive `-2`, `-3`.
 
-- Names contain the marker name and sequence. Duplicate names receive `-2`, `-3` and never overwrite an
-  existing photo.
-- Embedded files are copied directly by the host without page-side Base64 or chunk messages.
-- External links run with at most three workers. Host validation is cached per domain, and one timeout or
-  failure does not block the remaining batch.
-- A hidden manifest records completed images. Reopening the same unchanged track skips those files and retries
-  only missing or failed images; editing the source track invalidates the old manifest. The result reports
-  added, already-completed and failed counts.
-- Only public HTTPS images are accepted. HTTP, credentials, loopback, private, multicast, reserved and
-  link-local destinations are rejected, and the response must carry a supported image signature.
-- Each image is limited to `30 MB`; a batch is limited to `1000 images` and `1 GB`. The panel reports progress,
-  success/failure counts and the destination folder.
+#### Route weather
 
-### Route weather
+- Opens [Windy](https://www.windy.com/) in your default browser on the cloud layer with the hourly forecast panel expanded for **Start**, **End** or **Peak**. Disabled when coordinates or reliable elevation relief (`>= 1 m`) are unavailable.
 
-**Route weather** in the toolbox opens [Windy](https://www.windy.com/) in the default browser **with that
-point's hourly forecast panel already expanded** (temperature, feels-like, rain, wind, gusts, direction), so the
-place does not have to be found again inside Windy. The segmented picker under the action decides which point
-it lands on:
+### 7. Language, shortcuts, updates & privacy
 
-- **Start** and **End** jump straight to the first or last recorded point at level 14.
-- **Peak** is the recorded point with the greatest elevation, also at level 14. The segment is disabled when
-  the file has no elevation or less than a metre of relief across the whole route (a flat all-zero export),
-  so an arbitrary sample is never presented as the peak.
-- All three points use one map-pin silhouette: green play arrow for start, red square for end and amber mountain
-  for peak.
-- Windy opens on the **cloud** layer, which is the quickest read on sun versus fog; wind, rain and temperature
-  are one click away inside Windy.
-- The preview embeds no third-party map and needs no Windy API key; no external request happens before the
-  entry is used.
-- Files without coordinates (a GPS-free workout, for example) disable both the entry and the picker, and the
-  tooltip explains why.
-- The chosen point travels with the link to Windy. Do not use the entry if the coordinates must stay local.
-
-### Per-kilometre splits
-
-Timed routes show an independent **Splits** entry below the route summary. It starts collapsed and renders no
-rows until clicked. The expanded table contains distance, elapsed time and moving speed; the last row holds the
-remaining partial kilometre. Total and moving time are summarized at the bottom, the fastest split is emphasized, and long tables scroll while their headers and totals remain visible. Click any column header to cycle descending, ascending and default sort order; numeric cells render subtle inline proportion bars, with IQR-based outlier capping (marked by diagonal hatch and edge bar) so isolated car-ride or long-rest spikes do not crush normal hiking splits.
-
-Tab onto a split to select and focus it immediately, or click it directly. The selected range is emphasized in cyan on the map and spotlighted on the elevation profile; clicking it again or collapsing the panel clears the emphasis. Enter/Space are not shortcuts for this action.
-
-The header's **Details** control adds cumulative time, cumulative ascent/descent, average heart rate, moving
-speed and vertical speed. When the file has no valid heart-rate data, that column is omitted entirely.
-The active header surface spans the full panel width, and metric column headers remain text-only.
-
-### Overlay export
-
-Open **Toolbox → Export overlay**. It is a page in the shared toolbox and uses the same header, translucent
-surface, Back control and close button as the other tools; there is no separate export window or shortcut.
-Square, portrait and landscape PNGs are written beside the source track with transparent backgrounds, selectable ink and backing, plus **Track only** (hides title, date, scrim and stats with `-bare` suffix) and **Elevation silhouette** (renders a minimalist bottom elevation curve with `-ele` suffix, disabled when elevation is unavailable). The image includes the route name and date. Standard tracks order statistics as distance, elapsed time, ascent, maximum elevation and moving speed.
-
-Route networks show the document name, total route length and segment count without drawing invented start/end
-points or displaying elapsed time, speed and elevation. Hover each shape choice for its dimensions and intended
-use. A live low-resolution preview updates with the shape, ink and backing. Ink choices explain which photo
-contrast they suit, and backing choices explain the transparency/readability tradeoff. File names include shape,
-ink and backing, for example `east-west-traverse-track-1x1-white-soft.png`, so different styles do not
-overwrite one another. The preview frame shows the exact canvas boundary, and the settings remain open after an
-export so another style can be produced immediately.
-
-### Track coloring, profile analysis & non-destructive editing
-
-- **Multi-dimensional track coloring:** click the trail icon to the left of the Toolbox or press <kbd>L</kbd> to cycle **Single / Elevation / Speed / Heart rate** (automatically skipping unavailable fields).
-- **Elevation profile analysis:** drag horizontally across the plot to inspect range distance, ascent/descent, grade, duration and average speed (`Esc` to clear); includes automatic ClimbPro major climb chips, quartile distance ticks and <kbd>P</kbd> shortcut collapse.
-- **Responsive compact left stack:** at `≤ 720 px` width or `≤ 520 px` height, the summary pill, per-km micro-badge and `26×26` zoom/locate controls collapse together into a compact left column.
-- **Four-zone non-destructive track editor:** open **Toolbox → Edit track** to edit and export routes offline:
-  - **Top bar:** shows track name, dirty indicator, distance delta pill, Undo/Redo (<kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd>), Reset, integrated Layers & Pins icon toggles, and **Save** (<kbd>Ctrl</kbd>+<kbd>S</kbd>) with GPX / KML / KMZ / GeoJSON / TCX / CSV export, optional offline KMZ remote photo packing, and same-format overwrite + `.bak` backup for GPX / KML / KMZ.
-  - **Clip & Merge / Clean & Optimize:** profile range crop, click-to-split, local/sibling GPX & KML append with auto-merge, drift spike cleanup, three-level elevation smoothing, and simplification.
-  - **Route Direction / Draw & Refine:** reverse, out-and-back, close loop, hand-drawn path splicing, vertex editing, live-count box erase, and Naismith grade-adjusted virtual timelines.
-  - **Waypoints:** snap onto the track or `Alt+Click` to place freely, sort along track, dedupe within 20 m, and batch-generate distance milestone and summit waypoints.
-- **Check for updates:** the Toolbox footer shows the installed version and a **Check updates** button; background checks race **GitHub Releases and the GitCode mirror** quietly at most once every 24 hours with automatic failover, lighting a subtle cyan glow dot on the Toolbox toggle and an emerald pill (`↑ vX.Y.Z`) in the footer when a newer stable release is available, with bilingual release notes, version muting, **SHA256 checksum & manifest verification**, and one-click `.qlplugin` handoff to QuickLook's native installer.
-
-### Large files and privacy
-
-Long tracks keep the full route line, endpoints and viewport-sampled waypoints without creating per-sample markers, keeping pan and zoom responsive.
-Track data is not sent to a server; selecting an online basemap triggers requests to that tile provider.
+- **Interface language:** click the globe button (`中` / `EN`) in the Toolbox header to switch in place without reloading; saved automatically (defaults to system language).
+- **Keyboard reference:** click **?** in the Toolbox header to open the two-column shortcut table (`W / S / A D / Q E / C / M / T`, etc.); global shortcuts pause automatically while typing in text inputs.
+- **Built-in update checker:** the Toolbox footer displays the installed version and **Check updates**, quietly racing **GitHub Releases + GitCode mirror** at most once every 24 hours with automatic failover. New stable releases show a subtle cyan glow dot on the Toolbox toggle and an emerald footer pill (`↑ vX.Y.Z`), with bilingual release notes, version muting, **SHA256 checksum & manifest verification**, and native QuickLook installer handoff.
+- **Privacy:** track files are read locally and never uploaded. Online basemaps contact only their tile providers, route weather sends only the chosen point coordinate to Windy, and update checks contact GitHub / GitCode solely for release metadata and verified packages.

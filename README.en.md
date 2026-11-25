@@ -71,7 +71,7 @@ in Explorer to see the route, waypoints, photos and elevation profile without op
 
 - **Track coloring & route networks:** Per-segment coloring with adaptive direction arrows and distance labels, plus **Single / Elevation / Speed / Heart rate** coloring; merged multi-route networks are detected automatically and skip global speed, splits and combined-profile calculations for fast loading.
 - **Route intelligence & per-km splits:** Moving time, recording gaps, GPS jump detection, and Naismith / Langmuir / steep-uphill time estimates; sortable per-kilometre splits with outlier-resistant proportion bars, synchronized profile spotlighting, and a unified compact left-column stack at `≤ 720 px` width or `≤ 520 px` height.
-- **Elevation profile & ClimbPro:** Gradient-colored terrain, quartile distance ticks, horizontal range brush stats (`Esc` to clear), automatic ClimbPro major climb chips, optional heart-rate overlay with whole-route average line, and <kbd>P</kbd> collapse.
+- **Elevation profile & ClimbPro:** Gradient-colored terrain, quartile distance ticks, horizontal range brush stats, automatic ClimbPro major climb chips, optional heart-rate overlay with whole-route average line, and <kbd>P</kbd> collapse.
 - **Waypoints and photo albums:** Route-ordered navigation, portrait 4:3 photo cards, full-screen lightbox (true source-pixel percentages, wheel zoom up to 800%, drag-to-pan, next-photo preloading, and open-in-browser), scrollable plain cards, and local danger/water/camp/exit insight labels.
 
 ### Editing and export
@@ -118,7 +118,7 @@ data. Preferences are stored in the user's local application data and are not ti
 - If the preview still looks like the selected file as XML text, confirm the plugin is installed and enabled.
 - If an upgrade does not appear, exit QuickLook from the tray completely and start it again.
 - If online tiles are blank, check network access or enable **Grid** (No-map mode).
-- Esc closes QuickLook previews; use the preview close button when needed.
+- <kbd>Esc</kbd> and <kbd>Enter</kbd> are reserved by QuickLook and close the preview window; use in-page close buttons to dismiss panels or selections.
 
 More diagnostic details are in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) and
 [docs/TESTING.md](docs/TESTING.md).
