@@ -5,13 +5,21 @@
 在 Windows 上直接用 QuickLook 预览 GPX、KML、KMZ 和 FIT 轨迹。在资源管理器中选中轨迹文件并按
 <kbd>Space</kbd>，无需打开地图软件即可查看路线、航点、照片和海拔剖面。
 
-| ClimbPro 主坡段 | 每公里与心率 | 航点与照片 | 极简卫星视野 |
-| :---: | :---: | :---: | :---: |
-| ![ClimbPro 主坡段识别与自定义地形底图](docs/screenshot-climbpro.png) | ![每公里详细分段表与海拔心率双轴剖面](docs/screenshot-splits-hr.png) | ![航点竖幅照片卡片与补给语义筛选列表](docs/screenshot-waypoints.png) | ![折叠剖面后的极简全视野与瑞士航拍底图](docs/screenshot-minimal.png) |
+| ClimbPro 主坡段与地形底图 | 每公里分段与心率叠加 |
+| :---: | :---: |
+| ![ClimbPro 主坡段识别与自定义地形底图](docs/screenshot-climbpro.png) | ![每公里详细分段表与海拔心率双轴剖面](docs/screenshot-splits-hr.png) |
 
-| 无损轨迹编辑器 | 地图图层与叠加 | 地图设置与节点测速 | 统一工具箱 |
-| :---: | :---: | :---: | :---: |
-| ![无损轨迹编辑器的分段拆分与工具轨](docs/screenshot-editor.png) | ![四类底图切换与透明户外专题叠加层](docs/screenshot-layers.png) | ![本地瓦片缓存与多节点连通性测速](docs/screenshot-map-settings.png) | ![工具箱主菜单、轨迹天气与检查更新](docs/screenshot-toolbox.png) |
+| 航点照片卡片与语义速览 | 极简视野与卫星航拍 |
+| :---: | :---: |
+| ![航点竖幅照片卡片与补给语义筛选列表](docs/screenshot-waypoints.png) | ![折叠剖面后的极简全视野与瑞士航拍底图](docs/screenshot-minimal.png) |
+
+| 无损轨迹编辑器 | 地图图层与透明叠加 |
+| :---: | :---: |
+| ![无损轨迹编辑器的分段拆分与工具轨](docs/screenshot-editor.png) | ![四类底图切换与透明户外专题叠加层](docs/screenshot-layers.png) |
+
+| 地图设置与节点测速 | 统一工具箱 |
+| :---: | :---: |
+| ![本地瓦片缓存与多节点连通性测速](docs/screenshot-map-settings.png) | ![工具箱主菜单、轨迹天气与检查更新](docs/screenshot-toolbox.png) |
 
 ## 快速开始
 
