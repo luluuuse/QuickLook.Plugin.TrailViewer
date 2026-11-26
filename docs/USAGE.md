@@ -22,7 +22,7 @@
   - **地形**：CyclOSM、OpenHikingMap、OpenTopoMap、Esri 世界地形图
   - **卫星**：Esri 世界影像、天地图
 - **户外专题叠加层**：图层面板底部可自由开关 3 套透明叠加层（**徒步路网**、**骑行路网**、**滑雪雪道**），可叠加于任意底图并共用本地瓦片缓存。
-- **无底图网格模式**：点击图层标题栏中的网格图标开启，仅在本地网格上显示轨迹与测距，不请求在线瓦片；再次点击或切换底图分类即恢复原底图。
+- **无底图网格模式**：点击图层标题栏中的网格图标或按 <kbd>X</kbd> 一键开关，仅在本地网格上显示轨迹与测距，不请求在线瓦片；再次点击、再按 <kbd>X</kbd> 或切换底图分类即恢复原底图。
 - **面板互斥**：工具箱、图层面板与航点列表互斥，打开其一会自动关闭另外两个。
 
 #### 地图设置
@@ -74,7 +74,7 @@
 - **航点速览列表**：点击顶部 **列表** 打开航点速览，支持 **带图片** 及危险/水源/营地/补给/下撤等本地筛选、合并近点与人工修正。
 - **照片卡片与全览灯箱**：
   - 带照片的航点弹出竖幅 4:3 照片卡片，点击照片进入全览灯箱，右下角箭头直接跳至下一处带照片的航点。
-  - 全览灯箱右上角显示相对原图像素的真实缩放比例，支持滚轮最高 `800%` 缩放、拖拽平移、点击百分比复原、**在浏览器中打开原图**，并在看图时自动后台预载下一张。
+  - 全览灯箱采用深色模糊背板隔离底图，多张照片时底部居中提供可点击缩略图导览条；右上角显示相对原图像素的真实缩放比例，支持滚轮最高 `800%` 缩放、拖拽平移、点击百分比复原、**在浏览器中打开原图**，并在看图时自动后台预载下一张。
 - **普通航点卡片**：长描述在卡片内滚动；打开时自动过滤部分 App 写入描述中的重复经纬度/海拔/时间遥测模板（保留用户手写备注），并回填缺失时间到顶栏。
 
 ### 5. 无损轨迹编辑与多格式导出
@@ -103,8 +103,8 @@
 
 #### 点位坐标
 
-- 打开即进入连续地图拾取（左键拖动与滚轮缩放不变），面板固定提供 **起点 / 终点 / 顶点 / 地图中心** 一键复制。
-- 所有结果按 6 位小数 `纬度, 经度`（WGS-84，不转换 GCJ-02）复制；拾取靠近航点自动吸附，并在面板备注点位海拔（不写入剪贴板）。结果下方提供 **该点天气** 快捷入口。
+- 打开即进入连续地图拾取（左键拖动与滚轮缩放不变），面板固定提供 **起点 / 顶点 / 终点 / 轨迹中心** 一键复制。
+- 所有结果按 6 位小数 `纬度, 经度`（WGS-84，不转换 GCJ-02）复制；拾取靠近航点自动吸附，并在面板备注点位海拔（不写入剪贴板）。结果下方提供直达当前所选气象/山景平台的快捷按钮。
 
 #### 叠加图导出
 
@@ -116,17 +116,19 @@
 - 统计当前文件中的内置图片、Data URI 与 HTTPS 外链，提供 **导出全部图片** 与 **导出内置图片**（不访问外网）两个入口，输出到源轨迹同级 `<文件名>-photos` 目录。
 - 外链最多 3 路并发下载，仅接受公开 HTTPS 图片并校验图片文件头；目录内隐藏清单支持断点续传（源文件修改后自动失效）。单图上限 `30 MB`，整批上限 `1000 张 / 1 GB`，重名自动追加 `-2`、`-3`。
 
-#### 轨迹天气
+#### 气象与山景
 
-- 在系统默认浏览器中打开 [Windy](https://www.windy.com/)（默认云层）并直接展开所选 **起点 / 终点 / 顶点** 的逐小时预报面板（温度、降雨、风速与阵风）。无坐标或无有效高差（< 1 米）时自动禁用对应选项。
+- 支持在 **天气** 与 **山景** 两类视图间切换（各分类自动本地记住上次所选平台，点位坐标页底部快捷按钮同步生效），在系统默认浏览器中打开所选 **起点 / 顶点 / 终点**；无坐标或无有效高差（< 1 米）时自动禁用对应选项：
+  - **天气**：**[Windy](https://www.windy.com/)**（14 级云层与逐小时点位预报）、**[Ventusky](https://www.ventusky.com/)**（直达点位实时与 14 天预报卡片）、**[Zoom Earth](https://zoom.earth/)**（9 级近实时卫星云图与逐小时卡片）。
+  - **山景**：**[PeakFinder](https://www.peakfinder.com/)**（360° 真实山脊线认山与日出日落轨迹，有海拔时自动带入高度）、**[ShadeMap](https://shademap.app/)**（13 级真实地形山谷阴影与日照时长）。
 
 ### 7. 语言、快捷键、更新与隐私
 
 - **界面主题**：点击工具箱底栏的三枚微缩色卡可在 **瑞士纸镜**（默认）、**冷岩墨** 与 **基础深色** 之间手动切换并持久保存，不会随底图切换自动变更。
 - **界面语言**：点击工具箱标题栏的地球按钮（`中` / `EN`）就地切换中英文，不重载预览并自动记住选择（未手动选择时跟随系统语言）。
-- **快捷键速查**：点击工具箱标题栏右侧 **?** 查看两列快捷键表（`W / S / A D / Q E / C / M / T` 等），文本框获焦时自动暂停全局快捷键。
+- **快捷键速查**：点击工具箱标题栏右侧 **?** 查看两列快捷键表（`W / S / A D / Q E / C / M / T / P / L / X`），文本框获焦时自动暂停全局快捷键。
 - **内置检查更新**：工具箱底部显示当前版本与 **检查更新** 入口，后台每 24 小时最多静默竞速检测一次 **GitHub Releases + GitCode 国内镜像**（自动回退）。发现正式新版时，顶部显示柔和青蓝微光提示点、底部显示翠绿胶囊（`↑ vX.Y.Z`）；支持查看双语日志、忽略此版本，以及一键下载安装包（核对 **SHA256 哈希** 与插件清单完整性）并调起 QuickLook 原生安装。
-- **隐私边界**：轨迹文件只在本地读取，从不上传服务器。在线底图仅向所选瓦片服务请求地图，轨迹天气仅把选定点坐标随链接发送给 Windy，检查更新仅从 GitHub / GitCode 拉取版本信息与安装包。
+- **隐私边界**：轨迹文件只在本地读取，从不上传服务器。在线底图仅向所选瓦片服务请求地图，气象与山景入口仅把选定点坐标（及 PeakFinder 可选海拔）随外链发送给当前所选平台（Windy / Ventusky / Zoom Earth / PeakFinder / ShadeMap），检查更新仅从 GitHub / GitCode 拉取版本信息与安装包。
 
 ---
 
@@ -148,7 +150,7 @@
   - **Terrain:** CyclOSM, OpenHikingMap, OpenTopoMap, Esri World Topo
   - **Satellite:** Esri World Imagery, Tianditu
 - **Transparent outdoor overlays:** toggle 3 overlays at the bottom of the layer panel (**Waymarked Hiking**, **Waymarked Cycling**, **OpenSnowMap Pistes**) over any basemap, backed by the local tile cache.
-- **No-map Grid mode:** click the grid icon in the layer header to render routes and measurements on a local coordinate grid without fetching online tiles; click again or switch categories to restore the previous basemap.
+- **No-map Grid mode:** click the grid icon in the layer header or press <kbd>X</kbd> to toggle local coordinate-grid mode without fetching online tiles; click again, press <kbd>X</kbd>, or switch categories to restore the previous basemap.
 - **Mutual exclusion:** the Toolbox, Layer panel and Waypoint list are mutually exclusive—opening one closes the others.
 
 #### Map settings
@@ -197,7 +199,7 @@ Click the gear icon in the layer panel header to open **Map settings**:
 - **Waypoint overview:** click **List** to open the overview with **With photos** and local semantic filters (danger/water/camp/supply/exit), nearby-point merging and manual corrections.
 - **Photo cards & lightbox:**
   - Photo waypoints open a portrait 4:3 photo card; click the photo for the full-size lightbox or use the bottom-right arrow to jump directly to the next photo waypoint.
-  - The lightbox shows true source-pixel percentage, supports wheel zoom up to `800%`, drag-to-pan, click-percentage reset, **Open in browser**, and background next-photo preloading.
+  - The lightbox uses a deepened blurred backdrop and shows a clickable bottom thumbnail strip for multi-photo waypoints, with true source-pixel percentage, wheel zoom up to `800%`, drag-to-pan, click-percentage reset, **Open in browser**, and background next-photo preloading.
 - **Plain waypoint cards:** long descriptions scroll inside the card; exporter-injected coordinate, elevation or timestamp boilerplate is stripped automatically while preserving user notes and recovering missing timestamps.
 
 ### 5. Non-destructive track editor & multi-format export
@@ -226,8 +228,8 @@ Listed in Toolbox menu order:
 
 #### Point coordinates
 
-- Enters continuous map picking immediately (pan and zoom stay active), with one-click copy buttons for **Start**, **End**, **Peak** and **Map centre**.
-- Copies six-decimal `latitude, longitude` (WGS-84, never silently converted to GCJ-02), snaps to nearby waypoints, and displays elevation notes (display-only, excluded from clipboard) plus a **Weather here** shortcut.
+- Enters continuous map picking immediately (pan and zoom stay active), with one-click copy buttons for **Start**, **Peak**, **End** and **Track centre**.
+- Copies six-decimal `latitude, longitude` (WGS-84, never silently converted to GCJ-02), snaps to nearby waypoints, and displays elevation notes (display-only, excluded from clipboard) plus a shortcut to open the picked point in the active Weather & sun service.
 
 #### Export overlay
 
@@ -239,14 +241,16 @@ Listed in Toolbox menu order:
 - Counts embedded files, Data URIs and HTTPS links, offering **Export all photos** and **Export embedded photos** (no network requests) into `<file name>-photos` beside the source track.
 - Downloads up to 3 HTTPS images concurrently with public-host and image-signature checks; a hidden manifest enables resumable export (invalidated if the source track changes). Limited to `30 MB` per image and `1000 images / 1 GB` per batch; duplicate names receive `-2`, `-3`.
 
-#### Route weather
+#### Weather & sun
 
-- Opens [Windy](https://www.windy.com/) in your default browser on the cloud layer with the hourly forecast panel expanded for **Start**, **End** or **Peak**. Disabled when coordinates or reliable elevation relief (`>= 1 m`) are unavailable.
+- Switch between **Weather** and **Sun** categories (each category remembers its last chosen service locally and shares it with the shortcut in Point coordinates) to open **Start**, **Peak**, or **End** in your default browser; disabled when coordinates or reliable elevation relief (`>= 1 m`) are unavailable:
+  - **Weather:** **[Windy](https://www.windy.com/)** (cloud layer at zoom 14 with hourly point forecast), **[Ventusky](https://www.ventusky.com/)** (point route with current & 14-day forecast card), and **[Zoom Earth](https://zoom.earth/)** (near-real-time satellite at zoom 9 with hourly card).
+  - **Sun:** **[PeakFinder](https://www.peakfinder.com/)** (360° mountain horizon & sun/moon path, including elevation when available) and **[ShadeMap](https://shademap.app/)** (real terrain shadow and sunlight map at zoom 13).
 
 ### 7. Language, shortcuts, updates & privacy
 
 - **Interface themes:** click the three miniature theme cards in the Toolbox footer to switch between **Swiss Paper** (default), **Slate Dark**, and **Classic Dark**; stored persistently and never auto-switched by basemaps.
 - **Interface language:** click the globe button (`中` / `EN`) in the Toolbox header to switch in place without reloading; saved automatically (defaults to system language).
-- **Keyboard reference:** click **?** in the Toolbox header to open the two-column shortcut table (`W / S / A D / Q E / C / M / T`, etc.); global shortcuts pause automatically while typing in text inputs.
+- **Keyboard reference:** click **?** in the Toolbox header to open the two-column shortcut table (`W / S / A D / Q E / C / M / T / P / L / X`); global shortcuts pause automatically while typing in text inputs.
 - **Built-in update checker:** the Toolbox footer displays the installed version and **Check updates**, quietly racing **GitHub Releases + GitCode mirror** at most once every 24 hours with automatic failover. New stable releases show a subtle cyan glow dot on the Toolbox toggle and an emerald footer pill (`↑ vX.Y.Z`), with bilingual release notes, version muting, **SHA256 checksum & manifest verification**, and native QuickLook installer handoff.
-- **Privacy:** track files are read locally and never uploaded. Online basemaps contact only their tile providers, route weather sends only the chosen point coordinate to Windy, and update checks contact GitHub / GitCode solely for release metadata and verified packages.
+- **Privacy:** track files are read locally and never uploaded. Online basemaps contact only their tile providers, Weather & sun sends only the chosen point coordinate (and optional elevation for PeakFinder) to the selected site (Windy, Ventusky, Zoom Earth, PeakFinder, or ShadeMap), and update checks contact GitHub / GitCode solely for release metadata and verified packages.

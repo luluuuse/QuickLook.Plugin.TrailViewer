@@ -11,11 +11,45 @@ Added / Changed / Deprecated / Removed / Fixed / Security 分类；没有内容�
 
 ### 中文
 
-暂无。
+#### 新增
+
+- **无底图模式 `X` 快捷键**：按 `X` 一键开关无底图测绘网格模式并自动记忆/恢复上次图源，同步接入 QuickLook 宿主按键转发与工具箱快捷键速查表。
+- **编辑模式底部操作提示胶囊**：手绘补线、框选擦除、顶点精修、点击拆分与环线改起点下，底部居中渲染半透明操作提示胶囊（抽屉折叠后依然可见，窄窗自动精简，并与轻提示自动垂直避让）。
+- **照片灯箱多图缩略图导览条**：同一航点含多张照片时，全览灯箱底部居中展示可点击缩略图导览条（支持直跳、高亮当前项与多图横向滚动），同时加深背板并叠加柔和模糊隔离底图。
+- **轻提示语义色条与上浮微动效**：轻提示从屏幕正中移至底部轻挂（自动避开海拔剖面与编辑提示胶囊），新增上浮入场动效与左侧语义状态色条（成功/警告/错误/信息）。
+
+#### 变更
+
+- **设计系统与视觉层次全量精修**：三套主题统一收口直角体系、6 级整数语义字号（可读文字全面 ≥ 10px）、中英文与等宽数字字体栈、4px 基准间距网格、5px 极细主题滚动条、全控件键盘焦点环、原生表单主题化及 3 级海拔阴影。
+- **对比度与色彩语义升级**：补齐瑞士纸镜、冷岩墨与基础深色三套主题核心令牌的 WCAG AA 对比度；修复浅色纸镜下航点标签、受限/错误提示与心率读数发白问题；纸镜编辑器激活态切为测绘钴蓝以解耦红色危险态，移除硬编码亮绿按钮，并升级 12 色沉稳多段轨迹测绘色板。
+- **统一响应式断点与双向微动效**：全站对齐 `420px / 720px / 1080px` 三档断点；为浮层与照片灯箱补齐双向开合微动效、按钮按压回弹与 160ms 主题平滑漫变；编辑浮层纳入拖图毛玻璃降级，KMZ 打包与更新下载进度条改走 GPU 合成层缩放。
+
+#### 修复
+
+- **顶部工具栏锐利边缘与跨按钮防重叠**：将顶部工具栏外轮廓改为 1px 实体边框并收口到按钮本体，消除小数倍 DPI 缩放下的边缘发虚与图层按钮右侧毛刺；收紧航点拼接按钮裁剪范围，修复悬停列表时图层按钮右侧出现阴影误采样加深的问题。
+- **冷岩墨主题顶部按钮激活态叠色修复**：为工具箱与图层切换按钮的激活态补齐深色底板叠层，使其与右侧航点/列表激活态色彩完全一致。
+- **连续轻提示淡出竞态修复**：连续触发新轻提示时同步清理上一次的隐藏计时器，避免新提示被提前关闭。
 
 ### English
 
-None yet.
+#### Added
+
+- **`X` Shortcut for No-Map Mode**: Press `X` to toggle the local no-map survey grid and restore the previous basemap, wired through both the viewer and QuickLook host key forwarding and added to the Toolbox shortcut reference.
+- **Interactive Editor Key-Hint Capsule**: Displays a translucent bottom-center gesture/key hint capsule during hand-draw, box-erase, vertex-edit, click-split, and loop-start modes (stays visible when the drawer is collapsed, compacts on narrow windows, and stacks cleanly below toasts).
+- **Photo Lightbox Backdrop & Thumbnail Strip**: Deepened the full-screen lightbox backdrop with subtle blur for crisp separation over light maps, and added a clickable bottom thumbnail strip with active highlighting and horizontal scrolling for multi-photo waypoints.
+- **Bottom-Docked Semantic Toasts**: Moved toasts from screen center to a bottom-center anchor above the elevation profile and editor hint capsule, adding a slide-up entrance and left semantic status accent bar (info/success/warn/error).
+
+#### Changed
+
+- **Design System & Visual Hierarchy Polish**: Unified corner radii across themes, converged typography to a 6-step integer scale (readable text ≥ 10px) with explicit sans/mono font stacks, adopted a 4px spacing grid, unified 5px themed scrollbars, expanded `:focus-visible` coverage, themed native form controls, and replaced hardcoded shadows with 3 elevation tokens.
+- **Contrast & Color Semantics**: Raised core theme tokens to WCAG AA contrast across Swiss Paper, Slate Dark, and Classic Dark; fixed washed-out waypoint tags, status warnings, and HR readouts on light parchment; switched Swiss editor active accents to cartographic cobalt to decouple from danger red, unified editor primary buttons, and upgraded the 12-color multi-segment track palette.
+- **Unified Breakpoints, Motion & GPU Performance**: Aligned responsive breakpoints to `420px / 720px / 1080px`; added bidirectional enter/exit transitions for overlays and the photo lightbox, tactile button press feedback, and scoped 160ms theme crossfades; extended map-drag backdrop degradation to editor overlays and switched KMZ/update progress bars to GPU-composited `scaleX`.
+
+#### Fixed
+
+- **Crisp Toolbar Borders & Backdrop Isolation**: Replaced spread-shadow toolbar outlines with crisp 1px borders directly on toggle buttons to eliminate fractional-DPI edge blur and right-edge burrs, and tightened joined waypoint clip bounds so hovering the list button never causes backdrop shadow bleed onto the layer toggle.
+- **Slate Dark Active Toggle Compositing**: Stacked the translucent active tint over the dark toolbar surface on the layer and toolbox toggles so their active appearance matches the waypoint and list toggles.
+- **Consecutive Toast Timer Race**: Cleared any pending fade-out hide timer when a new toast fires so rapid consecutive toasts are never hidden prematurely.
 
 ## 1.31.2 — 2026-11-26
 

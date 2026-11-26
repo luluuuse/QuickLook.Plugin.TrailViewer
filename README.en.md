@@ -50,7 +50,7 @@ in Explorer to see the route, waypoints, photos and elevation profile without op
 
 | Category | Action | Shortcut / Entry |
 |---|---|---|
-| **View & basemaps** | Switch basemap / Fit complete route | <kbd>Q</kbd> <kbd>E</kbd> / <kbd>C</kbd> |
+| **View & basemaps** | Switch basemap / No-map mode / Fit complete route | <kbd>Q</kbd> <kbd>E</kbd> / <kbd>X</kbd> / <kbd>C</kbd> |
 | | Cycle track coloring | <kbd>L</kbd> |
 | | Collapse or expand profile / Hide UI chrome | <kbd>P</kbd> / <kbd>S</kbd> |
 | **Waypoints & measure** | Move between waypoints / Show or hide waypoints | <kbd>←</kbd> <kbd>→</kbd> (or <kbd>A</kbd> <kbd>D</kbd>) / <kbd>W</kbd> |
@@ -72,7 +72,7 @@ in Explorer to see the route, waypoints, photos and elevation profile without op
 - **Track coloring & route networks:** Per-segment coloring with adaptive direction arrows and distance labels, plus **Single / Elevation / Speed / Heart rate** coloring; merged multi-route networks are detected automatically and skip global speed, splits and combined-profile calculations for fast loading.
 - **Route intelligence & per-km splits:** Moving time, recording gaps, GPS jump detection, and Naismith / Langmuir / steep-uphill time estimates; sortable per-kilometre splits with outlier-resistant proportion bars, synchronized profile spotlighting, and a unified compact left-column stack at `≤ 720 px` width or `≤ 520 px` height.
 - **Elevation profile & ClimbPro:** Gradient-colored terrain, quartile distance ticks, horizontal range brush stats, automatic ClimbPro major climb chips, optional heart-rate overlay with whole-route average line, and <kbd>P</kbd> collapse.
-- **Waypoints and photo albums:** Route-ordered navigation, portrait 4:3 photo cards, full-screen lightbox (true source-pixel percentages, wheel zoom up to 800%, drag-to-pan, next-photo preloading, and open-in-browser), scrollable plain cards, and local danger/water/camp/exit insight labels.
+- **Waypoints and photo albums:** Route-ordered navigation, portrait 4:3 photo cards, full-screen lightbox (deepened blurred backdrop, bottom thumbnail strip for multi-photo waypoints, true source-pixel percentages, wheel zoom up to 800%, drag-to-pan, next-photo preloading, and open-in-browser), scrollable plain cards, and local danger/water/camp/exit insight labels.
 
 ### Editing and export
 
