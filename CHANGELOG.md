@@ -21,22 +21,6 @@ Added / Changed / Deprecated / Removed / Fixed / Security 分类；没有内容�
 
 ### 中文
 
-#### 修复
-
-- **窄窗关闭工具箱防误拉回旧焦点**：在工具箱布局刷新回调中关闭自动焦点回滚，修复 360 px 窄窗下关闭工具箱时地图意外拉回旧聚焦点的问题。
-- **端到端浏览器测试套件全量对齐**：同步更新工具箱、点位坐标、灯箱与主题相关的浏览器自动化测试断言，确保 GitHub Actions 构建与发布流水线全绿通过。
-
-### English
-
-#### Fixed
-
-- **Prevent Narrow-Window Toolbox Close Map Recall**: Passed `revealFocus: false` in the toolbox layout-change callback so closing the toolbox in 360 px narrow viewports never recalls an older focused point.
-- **Browser E2E Suite Alignment**: Updated Playwright assertions across toolbox, coordinates, lightbox, and theme suites to match the v1.32 UI polish and pass GitHub Actions cleanly.
-
-## 1.32.0 — 2026-11-27
-
-### 中文
-
 #### 新增
 
 - **「气象与山景」双分类五平台外链卡**：重构工具箱天气卡，右上角支持在 **天气**（Windy / Ventusky / Zoom Earth）与 **山景**（PeakFinder / ShadeMap）之间一键切换并独立记忆偏好，零网络请求、零 API Key；各平台按徒步最擅长场景直达对应视图（Windy 14 级云层逐小时预报、Ventusky 点位实时与 14 天卡片、Zoom Earth 9 级实时卫星定点卡片、PeakFinder 360° 认山与日出日落并自动带入点位海拔、ShadeMap 13 级真实地形阴影）。
@@ -57,9 +41,11 @@ Added / Changed / Deprecated / Removed / Fixed / Security 分类；没有内容�
 #### 修复
 
 - **WebView2 快速开关卡顿与 `0x80080005` 启动报错修复**：关闭预览后将已清空画布的 WebView2 空白空壳短暂保活 15 秒（空闲或退出 QuickLook 时自动释放），消除连续“关闭再马上打开”时的 4–6 秒浏览器进程退出等待；同时监听浏览器进程退出事件自动失效旧环境，并在启动冲突时自动退避重试。
+- **窄窗关闭工具箱防误拉回旧焦点**：在工具箱布局刷新回调中关闭自动焦点回滚，修复 360 px 窄窗下关闭工具箱时地图意外拉回旧聚焦点的问题。
 - **顶部工具栏锐利边缘与跨按钮防重叠**：将顶部工具栏外轮廓改为 1px 实体边框并收口到按钮本体，消除小数倍 DPI 缩放下的边缘发虚与图层按钮右侧毛刺；收紧航点拼接按钮裁剪范围，修复悬停列表时图层按钮右侧出现阴影误采样加深的问题。
 - **冷岩墨主题顶部按钮激活态叠色修复**：为工具箱与图层切换按钮的激活态补齐深色底板叠层，使其与右侧航点/列表激活态色彩完全一致。
 - **连续轻提示淡出竞态修复**：连续触发新轻提示时同步清理上一次的隐藏计时器，避免新提示被提前关闭。
+- **端到端浏览器测试套件全量对齐**：同步更新工具箱、点位坐标、灯箱与主题相关的浏览器自动化测试断言，确保 GitHub Actions 构建与发布流水线全绿通过。
 
 ### English
 
@@ -83,9 +69,11 @@ Added / Changed / Deprecated / Removed / Fixed / Security 分类；没有内容�
 #### Fixed
 
 - **WebView2 Rapid Close/Reopen Stalls & `0x80080005` Recovery**: Added a 15-second blank-shell keep-alive after closing a preview (released automatically when idle or when QuickLook exits) to eliminate 4–6 s browser shutdown waits on rapid close/reopen, paired with `BrowserProcessExited` environment invalidation and automatic backoff retry on startup conflicts.
+- **Prevent Narrow-Window Toolbox Close Map Recall**: Passed `revealFocus: false` in the toolbox layout-change callback so closing the toolbox in 360 px narrow viewports never recalls an older focused point.
 - **Crisp Toolbar Borders & Backdrop Isolation**: Replaced spread-shadow toolbar outlines with crisp 1px borders directly on toggle buttons to eliminate fractional-DPI edge blur and right-edge burrs, and tightened joined waypoint clip bounds so hovering the list button never causes backdrop shadow bleed onto the layer toggle.
 - **Slate Dark Active Toggle Compositing**: Stacked the translucent active tint over the dark toolbar surface on the layer and toolbox toggles so their active appearance matches the waypoint and list toggles.
 - **Consecutive Toast Timer Race**: Cleared any pending fade-out hide timer when a new toast fires so rapid consecutive toasts are never hidden prematurely.
+- **Browser E2E Suite Alignment**: Updated Playwright assertions across toolbox, coordinates, lightbox, and theme suites to match the v1.32 UI polish and pass GitHub Actions cleanly.
 
 ## 1.31.2 — 2026-11-26
 
