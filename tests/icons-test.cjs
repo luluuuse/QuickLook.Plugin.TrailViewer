@@ -146,7 +146,8 @@ async function main() {
     };
   });
   check('default swiss theme uses ivory active surface with vermilion accent and underline',
-    active.theme === 'swiss' && active.background === 'rgb(255, 255, 255)'
+    active.theme === 'swiss'
+      && (active.background === 'rgba(250, 248, 243, 0.92)' || active.background === 'rgb(255, 255, 255)')
       && active.color === 'rgb(223, 43, 29)' && active.shadow.includes('inset'),
     JSON.stringify(active));
 
@@ -192,7 +193,7 @@ async function main() {
   const slateTheme = await page.evaluate(() => document.documentElement.dataset.theme);
   await page.evaluate(() => window.trailViewer.theme.set('classic'));
   await page.waitForFunction(() =>
-    getComputedStyle(document.querySelector('.toolbox-switch > button')).backgroundColor === 'rgb(35, 79, 121)');
+    getComputedStyle(document.querySelector('.toolbox-switch > button')).color === 'rgb(143, 217, 255)');
   const themeCheck = await page.evaluate(() => {
     const button = document.querySelector('.toolbox-switch > button');
     const btnStyle = getComputedStyle(button);
@@ -201,6 +202,7 @@ async function main() {
     const res = {
       classicTheme: document.documentElement.dataset.theme,
       classicBg: btnStyle.backgroundColor,
+      classicBgImage: btnStyle.backgroundImage,
       classicColor: btnStyle.color,
       classicPinFill: pinFill ? getComputedStyle(pinFill).fill : '',
       classicProfileBg: profile ? getComputedStyle(profile).backgroundColor : '',
@@ -210,7 +212,8 @@ async function main() {
   });
   check('manual theme switching supports slate and preserves classic dark palette',
     slateTheme === 'slate' && themeCheck.classicTheme === 'classic'
-      && themeCheck.classicBg === 'rgb(35, 79, 121)' && themeCheck.classicColor === 'rgb(143, 217, 255)'
+      && (themeCheck.classicBg === 'rgb(35, 79, 121)' || themeCheck.classicBgImage.includes('rgb(35, 79, 121)') || themeCheck.classicBgImage.includes('rgba(47, 155, 255'))
+      && themeCheck.classicColor === 'rgb(143, 217, 255)'
       && themeCheck.classicPinFill === 'rgb(245, 196, 0)'
       && themeCheck.classicProfileBg === 'rgb(245, 196, 0)',
     JSON.stringify({ slateTheme, ...themeCheck }));

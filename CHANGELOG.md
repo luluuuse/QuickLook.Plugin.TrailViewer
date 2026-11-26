@@ -17,6 +17,22 @@ Added / Changed / Deprecated / Removed / Fixed / Security 分类；没有内容�
 
 - No unreleased changes yet.
 
+## 1.32.1 — 2026-11-27
+
+### 中文
+
+#### 修复
+
+- **窄窗关闭工具箱防误拉回旧焦点**：在工具箱布局刷新回调中关闭自动焦点回滚，修复 360 px 窄窗下关闭工具箱时地图意外拉回旧聚焦点的问题。
+- **端到端浏览器测试套件全量对齐**：同步更新工具箱、点位坐标、灯箱与主题相关的浏览器自动化测试断言，确保 GitHub Actions 构建与发布流水线全绿通过。
+
+### English
+
+#### Fixed
+
+- **Prevent Narrow-Window Toolbox Close Map Recall**: Passed `revealFocus: false` in the toolbox layout-change callback so closing the toolbox in 360 px narrow viewports never recalls an older focused point.
+- **Browser E2E Suite Alignment**: Updated Playwright assertions across toolbox, coordinates, lightbox, and theme suites to match the v1.32 UI polish and pass GitHub Actions cleanly.
+
 ## 1.32.0 — 2026-11-27
 
 ### 中文

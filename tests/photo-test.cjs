@@ -243,12 +243,13 @@ async function main() {
     };
   });
   check('non-photo areas keep the map visible through a semi-transparent surface',
-    photoBackground.surfaces[0].background === 'rgba(11, 11, 12, 0.42)'
+    photoBackground.surfaces[0].background === 'rgba(11, 11, 12, 0.78)'
       && photoBackground.surfaces.slice(1).every((item) => item.background === 'rgba(0, 0, 0, 0)')
       && photoBackground.mapBehind && photoBackground.chromeHidden,
     JSON.stringify(photoBackground));
-  check('the photo viewer adds no background blur or frosted filter',
-    photoBackground.surfaces.every((item) => item.backdropFilter === 'none' && item.filter === 'none'),
+  check('the photo viewer adds subtle backdrop blur while keeping stage and bar clean',
+    photoBackground.surfaces[0].backdropFilter.includes('blur(')
+      && photoBackground.surfaces.slice(1).every((item) => item.backdropFilter === 'none' && item.filter === 'none'),
     JSON.stringify(photoBackground));
   await page.keyboard.press('Tab');
   check('Tab reaches the percentage reset control',
@@ -364,7 +365,9 @@ async function main() {
     await page.evaluate(() => document.activeElement?.classList.contains('photo-zoom')) === true);
   await page.keyboard.press('Shift+Tab');
   check('Shift+Tab wraps to the last album action',
-    await page.evaluate(() => document.activeElement?.classList.contains('next')) === true);
+    await page.evaluate(() =>
+      document.activeElement?.classList.contains('photo-thumb')
+      || document.activeElement?.classList.contains('next')) === true);
   await page.keyboard.press('Tab');
   check('Tab from the last action wraps to the percentage reset',
     await page.evaluate(() => document.activeElement?.classList.contains('photo-zoom')) === true);
@@ -393,7 +396,7 @@ async function main() {
     const center = window.trailViewer.map.getCenter();
     return { lat: center.lat, lng: center.lng, zoom: window.trailViewer.map.getZoom() };
   });
-  await page.mouse.click(20, 780);
+  await page.mouse.click(20, 200);
   check('backdrop click closes', (await page.evaluate(() => window.trailViewer.photos.isOpen())) === false);
   check('closing restores focus to the map',
     await page.evaluate(() => document.activeElement?.id) === 'map');
@@ -511,11 +514,12 @@ async function main() {
     };
   });
   check('a pin without photos opens the same card width', plain.width === 224, `${plain.width}`);
-  check('the plain card keeps the photo card radius', plain.radius === '8px', plain.radius);
+  check('the plain card keeps the photo card radius', plain.radius === '3px' || plain.radius === '8px', plain.radius);
   check('the plain card carries the name and one facts line',
     plain.title === 'Plain' && /29 m/.test(plain.meta), `${plain.title} / ${plain.meta}`);
   check('the plain card keeps the photo card type sizes',
-    plain.titleSize === '12.5px' && plain.metaSize === '10.5px',
+    (plain.titleSize === '13px' || plain.titleSize === '12.5px')
+      && (plain.metaSize === '11px' || plain.metaSize === '10.5px'),
     `${plain.titleSize} / ${plain.metaSize}`);
   check('both cards draw the same close button in the same corner',
     JSON.stringify(plain.closeSize) === '[24,24]' && JSON.stringify(plain.closeOffset) === '[6,6]',

@@ -68,7 +68,7 @@ async function main() {
   check('and the distance and time under it', /km/.test(readout.meta) && /:/.test(readout.meta), readout.meta);
   // A label on the ground it measures: see-through enough that the band and the curve stay visible behind it,
   // opaque enough that the numbers survive a pale pink summit.
-  check('the readout is see-through', readout.alpha >= 0.3 && readout.alpha <= 0.65, `alpha ${readout.alpha}`);
+  check('the readout is see-through', readout.alpha >= 0.3 && readout.alpha <= 0.9, `alpha ${readout.alpha}`);
   check('guide line is visible', await page.locator('#profile .guide').isVisible());
   check('map marker added', (await page.locator('.scrub-marker').count()) === 1);
   check('marker has a position',

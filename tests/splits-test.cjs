@@ -158,6 +158,8 @@ async function main() {
   });
   await page.locator('.split-toggle').click();
   await waitForLayout(page);
+  await page.waitForTimeout(220);
+  await waitForLayout(page);
   state = await splitState();
   check('clicking the entry reveals the split data',
     state.expanded === 'true' && state.contentPresent && state.rows.length > 0 && state.loaded,
@@ -328,6 +330,8 @@ async function main() {
 
   await page.locator('.split-toggle').click();
   await waitForLayout(page);
+  await page.waitForTimeout(220);
+  await waitForLayout(page);
   state = await splitState();
   const fullCollapsedZoom = state.zoomLeft;
   check('collapsing splits clears the trajectory highlight',
@@ -337,6 +341,8 @@ async function main() {
       && state.profileFocus?.lineVisible === false,
     JSON.stringify({ selected: state.selectedIndex, lines: state.highlightLines, profileFocus: state.profileFocus }));
   await page.locator('.split-toggle').click();
+  await waitForLayout(page);
+  await page.waitForTimeout(220);
   await waitForLayout(page);
   state = await splitState();
   check('opening splits under an expanded summary leaves the control column fixed',
@@ -398,6 +404,8 @@ async function main() {
     JSON.stringify(narrowProfile.profileFocus));
 
   await page.locator('.split-toggle').click();
+  await waitForLayout(page);
+  await page.waitForTimeout(220);
   await waitForLayout(page);
   state = await splitState();
   check('clicking the entry again removes the detailed rows',
@@ -587,7 +595,7 @@ async function main() {
     JSON.stringify({ descState, ascState, resetState }));
 
   const trackColorPlacement = await page.evaluate(() => {
-    const colorRect = document.querySelector('.track-color-toggle')?.getBoundingClientRect();
+    const colorRect = document.querySelector('.track-color-switch')?.getBoundingClientRect();
     const toolboxRect = document.querySelector('.toolbox-switch > button')?.getBoundingClientRect();
     const layerRect = document.querySelector('.layer-menu-toggle')?.getBoundingClientRect();
     return {

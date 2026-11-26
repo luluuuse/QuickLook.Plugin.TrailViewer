@@ -896,7 +896,7 @@ async function main() {
       waypointController.closeOverview(false);
       layerSwitch?.close();
     },
-    onLayoutChange: () => mapViewController?.refreshControls({ refitHome: false }),
+    onLayoutChange: () => mapViewController?.refreshControls({ refitHome: false, revealFocus: false }),
   });
   // First of the corner controls, so it stands leftmost: "where the map looks" before "what the map shows".
   const locateCtrl = createLocateControl({ L, map, el, t, onLocate: () => mapViewController.fit() });

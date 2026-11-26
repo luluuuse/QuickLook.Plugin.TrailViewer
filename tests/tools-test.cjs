@@ -138,10 +138,11 @@ async function main() {
   }));
   check('the help icon opens one keyboard reference page',
     shortcutPage.mainHidden === true && shortcutPage.pageHidden === false
-      && shortcutPage.keys.join('|') === 'W|S|A / D|Q / E|C|M|T|P|L',
+      && shortcutPage.keys.join('|') === 'W|S|A / D|Q / E|C|M|T|P|L|X',
     JSON.stringify(shortcutPage));
-  check('the keyboard reference names T, P and L with concise labels',
-    shortcutPage.labels.length === 9 && shortcutPage.labels.slice(-3).join('|') === 'Toolbox|Profile|Track color',
+  check('the keyboard reference names T, P, L and X with concise labels',
+    shortcutPage.labels.length === 10
+      && shortcutPage.labels.slice(-4).join('|') === 'Toolbox|Profile|Track color|No-map mode',
     shortcutPage.labels.join('|'));
   await page.locator('.toolbox-shortcut-page .toolbox-back').click();
   check('the shortcut page returns through the shared back action',
@@ -239,15 +240,16 @@ async function main() {
   }));
   const coordinateGrid = await page.locator('.toolbox-coordinate-grid').boundingBox();
   check('the four remaining coordinate modules stay on one row',
-    coordinateLabels.join('|') === 'Start|End|Peak|Centre'
+    coordinateLabels.join('|') === 'Start|Peak|End|Centre'
       && coordinateRow.length === 4
       && coordinateRow.every((item) => item.top === coordinateRow[0].top)
       && coordinateRow.every((item) => item.left >= coordinateGrid.x
         && item.right <= coordinateGrid.x + coordinateGrid.width),
     coordinateLabels.join('|'));
-  check('the centre module uses its short label and hover explanation',
-    await page.locator('[data-coordinate="center"]').getAttribute('title')
-      === 'Copy the current map centre coordinate');
+  check('the centre module uses its short label and track centre coordinate',
+    /^Centre:\s+\d+\.\d{6},\s+\d+\.\d{6}$/.test(
+      await page.locator('[data-coordinate="center"]').getAttribute('title') || '',
+    ));
 
   const albumAt = await page.evaluate(() => {
     const point = window.trailViewer.gpx.waypoints[1];
@@ -436,9 +438,11 @@ async function main() {
   await page.click('.toolbox-action[data-tool="coordinates"]');
   check('the short centre label and copied-point weather action follow Chinese',
     await page.locator('[data-coordinate="center"] span').textContent() === '中心'
-      && await page.locator('[data-coordinate="center"]').getAttribute('title') === '复制当前地图中心的坐标'
+      && /^中心：\d+\.\d{6},\s+\d+\.\d{6}$|^中心:\s+\d+\.\d{6},\s+\d+\.\d{6}$/.test(
+        await page.locator('[data-coordinate="center"]').getAttribute('title') || '',
+      )
       && await page.locator('.toolbox-coordinate-type').textContent() === '坐标类型：WGS-84'
-      && await page.locator('.toolbox-coordinate-weather span').textContent() === '该点天气');
+      && await page.locator('.toolbox-coordinate-weather span').textContent() === '用 Windy 查看');
   await page.click('.toolbox-coordinate-button[data-coordinate="start"]');
   await page.waitForFunction(() => window.__clipboardText === '30.580000, 114.300000');
   check('the elevation note follows the interface language',
@@ -450,7 +454,7 @@ async function main() {
     await page.locator('.toolbox-shortcut-page .toolbox-subtitle').textContent() === '快捷键速查'
       && await page.locator('.toolbox-shortcut-page .toolbox-subhint').textContent() === '地图获得焦点时可用。'
       && (await page.locator('.toolbox-shortcut-page .toolbox-shortcut-row span').allTextContents())
-        .join('|') === '航点|隐藏界面|点位/照片|切换图源|全轨迹|测距|工具箱|剖面图|轨迹着彩');
+        .join('|') === '航点|隐藏界面|点位/照片|切换图源|全轨迹|测距|工具箱|剖面图|轨迹着彩|无底图模式');
   await page.click('.toolbox-shortcut-page .toolbox-back');
 
   await page.setViewportSize({ width: 360, height: 740 });

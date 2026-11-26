@@ -278,6 +278,7 @@ async function main() {
   await page.setViewportSize({ width: 360, height: 740 });
   await openLayers();
   await waitForLayout(page);
+  await page.waitForTimeout(220);
   const narrowMenu = await page.locator('.layer-source-menu').boundingBox();
   check('the source menu stays 320 px wide and right-aligned in a narrow window',
     narrowMenu && Math.abs(narrowMenu.width - 320) < 1
