@@ -28,6 +28,13 @@ export function createToolbox({
   onWeather,
   weatherAvailable,
   weatherModes = [],
+  weatherCategories = [],
+  weatherProvidersByCategory = {},
+  weatherCategory = () => 'weather',
+  setWeatherCategory = /** @type {(next: string) => void} */ (() => {}),
+  weatherProviderForCategory = /** @type {(category: string) => string} */ (() => 'windy'),
+  weatherProvider = () => 'windy',
+  setWeatherProvider = /** @type {(category: string, next: string) => void} */ (() => {}),
   weatherHasElevation = () => true,
   editAvailable = () => true,
   onEdit,
@@ -56,6 +63,16 @@ export function createToolbox({
   const readTheme = theme;
   /** @type {(next: string) => boolean} */
   const writeTheme = setTheme;
+  /** @type {() => string} */
+  const readWeatherCategory = weatherCategory;
+  /** @type {(next: string) => void} */
+  const writeWeatherCategory = setWeatherCategory;
+  /** @type {(category: string) => string} */
+  const readProviderForCategory = weatherProviderForCategory;
+  /** @type {() => string} */
+  const readWeatherProvider = weatherProvider;
+  /** @type {(category: string, next: string) => void} */
+  const writeWeatherProvider = setWeatherProvider;
   let open = false;
   let button = null;
   let panel = null;
@@ -105,6 +122,7 @@ export function createToolbox({
     snapMarker: measurement.snapMarker,
     panel: () => panel,
     onBack: () => showView('main'),
+    weatherProvider: readWeatherProvider,
     onWeather: (point) => {
       closePanel();
       onCoordinateWeather?.(point);
@@ -154,6 +172,20 @@ export function createToolbox({
     weatherAvailable,
     weatherHasElevation,
     weatherModes,
+    weatherCategories,
+    weatherProvidersByCategory,
+    initialWeatherCategory: readWeatherCategory(),
+    initialWeatherProviders: Object.fromEntries(
+      weatherCategories.map((cat) => [cat, readProviderForCategory(cat)]),
+    ),
+    onWeatherCategoryChange: (category) => {
+      writeWeatherCategory(category);
+      coordinates.render();
+    },
+    onWeatherProviderChange: (category, provider) => {
+      writeWeatherProvider(category, provider);
+      coordinates.render();
+    },
     theme: readTheme,
     setTheme: writeTheme,
     themeModes,
@@ -173,7 +205,7 @@ export function createToolbox({
       showView('attachments');
     },
     onEdit: () => onEdit?.(),
-    onWeather: (mode) => onWeather?.(mode),
+    onWeather: (mode, provider) => onWeather?.(mode, provider),
     onUpdate: () => {
       if (measurement.active()) measurement.stop();
       showView('update');
@@ -443,6 +475,10 @@ export function createToolbox({
     weatherMode: main.weatherMode,
     isWeatherModeEnabled: main.isWeatherModeEnabled,
     setWeatherMode: main.setWeatherMode,
+    weatherCategory: main.weatherCategory,
+    setWeatherCategory: main.setWeatherCategory,
+    weatherProvider: main.weatherProvider,
+    setWeatherProvider: main.setWeatherProvider,
     applyUpdateStatus: updateTool.applyStatus,
     applyUpdateProgress: updateTool.applyProgress,
     applyUpdateDownloadResult: updateTool.applyDownloadResult,

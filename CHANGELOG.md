@@ -11,8 +11,21 @@ Added / Changed / Deprecated / Removed / Fixed / Security 分类；没有内容�
 
 ### 中文
 
+- 暂无未发布变更。
+
+### English
+
+- No unreleased changes yet.
+
+## 1.32.0 — 2026-11-27
+
+### 中文
+
 #### 新增
 
+- **「气象与山景」双分类五平台外链卡**：重构工具箱天气卡，右上角支持在 **天气**（Windy / Ventusky / Zoom Earth）与 **山景**（PeakFinder / ShadeMap）之间一键切换并独立记忆偏好，零网络请求、零 API Key；各平台按徒步最擅长场景直达对应视图（Windy 14 级云层逐小时预报、Ventusky 点位实时与 14 天卡片、Zoom Earth 9 级实时卫星定点卡片、PeakFinder 360° 认山与日出日落并自动带入点位海拔、ShadeMap 13 级真实地形阴影）。
+- **站点图标、悬停简介与氛围微动效**：为 5 个气象/山景站点补齐专属线条图标、双语悬停简介、右侧 `↗` 外链引导及三套主题独立调校的静息氛围背景与悬停微动效（跟随系统减少动态设置）。
+- **工具箱与图层面板制图底纹**：为上方 4 格快捷工具（测距刻度 / 坐标网格 / 透明棋盘 / 相册角标）、「编辑轨迹」及图层面板四大分类与三大户外叠加层统一加入克制制图底纹（地形面板采用自然不规则矢量等高线）。
 - **无底图模式 `X` 快捷键**：按 `X` 一键开关无底图测绘网格模式并自动记忆/恢复上次图源，同步接入 QuickLook 宿主按键转发与工具箱快捷键速查表。
 - **编辑模式底部操作提示胶囊**：手绘补线、框选擦除、顶点精修、点击拆分与环线改起点下，底部居中渲染半透明操作提示胶囊（抽屉折叠后依然可见，窄窗自动精简，并与轻提示自动垂直避让）。
 - **照片灯箱多图缩略图导览条**：同一航点含多张照片时，全览灯箱底部居中展示可点击缩略图导览条（支持直跳、高亮当前项与多图横向滚动），同时加深背板并叠加柔和模糊隔离底图。
@@ -20,12 +33,14 @@ Added / Changed / Deprecated / Removed / Fixed / Security 分类；没有内容�
 
 #### 变更
 
+- **工具箱排序与点位坐标联动优化**：将「编辑轨迹」移至四格快捷工具下方、「气象与山景」正上方；气象卡与点位坐标页的点位按钮统一调整为 **起点 / 顶点 / 终点** 顺序；点位坐标页「中心」改为聚焦并复制**轨迹几何中心**，底部快捷按钮动态显示当前所选气象/山景平台名。
 - **设计系统与视觉层次全量精修**：三套主题统一收口直角体系、6 级整数语义字号（可读文字全面 ≥ 10px）、中英文与等宽数字字体栈、4px 基准间距网格、5px 极细主题滚动条、全控件键盘焦点环、原生表单主题化及 3 级海拔阴影。
 - **对比度与色彩语义升级**：补齐瑞士纸镜、冷岩墨与基础深色三套主题核心令牌的 WCAG AA 对比度；修复浅色纸镜下航点标签、受限/错误提示与心率读数发白问题；纸镜编辑器激活态切为测绘钴蓝以解耦红色危险态，移除硬编码亮绿按钮，并升级 12 色沉稳多段轨迹测绘色板。
 - **统一响应式断点与双向微动效**：全站对齐 `420px / 720px / 1080px` 三档断点；为浮层与照片灯箱补齐双向开合微动效、按钮按压回弹与 160ms 主题平滑漫变；编辑浮层纳入拖图毛玻璃降级，KMZ 打包与更新下载进度条改走 GPU 合成层缩放。
 
 #### 修复
 
+- **WebView2 快速开关卡顿与 `0x80080005` 启动报错修复**：关闭预览后将已清空画布的 WebView2 空白空壳短暂保活 15 秒（空闲或退出 QuickLook 时自动释放），消除连续“关闭再马上打开”时的 4–6 秒浏览器进程退出等待；同时监听浏览器进程退出事件自动失效旧环境，并在启动冲突时自动退避重试。
 - **顶部工具栏锐利边缘与跨按钮防重叠**：将顶部工具栏外轮廓改为 1px 实体边框并收口到按钮本体，消除小数倍 DPI 缩放下的边缘发虚与图层按钮右侧毛刺；收紧航点拼接按钮裁剪范围，修复悬停列表时图层按钮右侧出现阴影误采样加深的问题。
 - **冷岩墨主题顶部按钮激活态叠色修复**：为工具箱与图层切换按钮的激活态补齐深色底板叠层，使其与右侧航点/列表激活态色彩完全一致。
 - **连续轻提示淡出竞态修复**：连续触发新轻提示时同步清理上一次的隐藏计时器，避免新提示被提前关闭。
@@ -34,6 +49,9 @@ Added / Changed / Deprecated / Removed / Fixed / Security 分类；没有内容�
 
 #### Added
 
+- **"Weather & Sun" Dual-Category 5-Platform Card**: Refactored the Toolbox weather card with a **Weather** (Windy / Ventusky / Zoom Earth) and **Sun** (PeakFinder / ShadeMap) toggle with per-category local persistence, zero network requests, and zero API keys; each platform opens its best hiking view (Windy zoom-14 clouds + hourly forecast, Ventusky point route with live & 14-day card, Zoom Earth zoom-9 live satellite with pinned hourly card, PeakFinder 360° horizon & sun path with automatic point elevation, and ShadeMap zoom-13 real DEM terrain shadows).
+- **Provider Icons, Hover Tooltips & Ambient Micro-Motion**: Added dedicated line icons, bilingual hover descriptions, `↗` external-link cue, and theme-calibrated ambient tints with subtle hover-only micro-animations (respecting `prefers-reduced-motion`).
+- **Cartographic Textures for Toolbox & Layer Panels**: Added restrained, hover-revealed cartographic textures to the 4 quick-tool cards, Edit Track card, and Layer panel categories/overlays (including an organic irregular topographic contour vector backdrop for Terrain).
 - **`X` Shortcut for No-Map Mode**: Press `X` to toggle the local no-map survey grid and restore the previous basemap, wired through both the viewer and QuickLook host key forwarding and added to the Toolbox shortcut reference.
 - **Interactive Editor Key-Hint Capsule**: Displays a translucent bottom-center gesture/key hint capsule during hand-draw, box-erase, vertex-edit, click-split, and loop-start modes (stays visible when the drawer is collapsed, compacts on narrow windows, and stacks cleanly below toasts).
 - **Photo Lightbox Backdrop & Thumbnail Strip**: Deepened the full-screen lightbox backdrop with subtle blur for crisp separation over light maps, and added a clickable bottom thumbnail strip with active highlighting and horizontal scrolling for multi-photo waypoints.
@@ -41,12 +59,14 @@ Added / Changed / Deprecated / Removed / Fixed / Security 分类；没有内容�
 
 #### Changed
 
+- **Toolbox Order & Point Coordinates Sync**: Moved Edit Track below the 4 quick tools right above Weather & Sun; unified point button ordering to **Start / Peak / End** across Weather & Sun and Point Coordinates; changed Coordinate **Centre** to focus and copy the **track bounding-box centre**, and updated the coordinate shortcut button to dynamically display the active Weather & Sun service.
 - **Design System & Visual Hierarchy Polish**: Unified corner radii across themes, converged typography to a 6-step integer scale (readable text ≥ 10px) with explicit sans/mono font stacks, adopted a 4px spacing grid, unified 5px themed scrollbars, expanded `:focus-visible` coverage, themed native form controls, and replaced hardcoded shadows with 3 elevation tokens.
 - **Contrast & Color Semantics**: Raised core theme tokens to WCAG AA contrast across Swiss Paper, Slate Dark, and Classic Dark; fixed washed-out waypoint tags, status warnings, and HR readouts on light parchment; switched Swiss editor active accents to cartographic cobalt to decouple from danger red, unified editor primary buttons, and upgraded the 12-color multi-segment track palette.
 - **Unified Breakpoints, Motion & GPU Performance**: Aligned responsive breakpoints to `420px / 720px / 1080px`; added bidirectional enter/exit transitions for overlays and the photo lightbox, tactile button press feedback, and scoped 160ms theme crossfades; extended map-drag backdrop degradation to editor overlays and switched KMZ/update progress bars to GPU-composited `scaleX`.
 
 #### Fixed
 
+- **WebView2 Rapid Close/Reopen Stalls & `0x80080005` Recovery**: Added a 15-second blank-shell keep-alive after closing a preview (released automatically when idle or when QuickLook exits) to eliminate 4–6 s browser shutdown waits on rapid close/reopen, paired with `BrowserProcessExited` environment invalidation and automatic backoff retry on startup conflicts.
 - **Crisp Toolbar Borders & Backdrop Isolation**: Replaced spread-shadow toolbar outlines with crisp 1px borders directly on toggle buttons to eliminate fractional-DPI edge blur and right-edge burrs, and tightened joined waypoint clip bounds so hovering the list button never causes backdrop shadow bleed onto the layer toggle.
 - **Slate Dark Active Toggle Compositing**: Stacked the translucent active tint over the dark toolbar surface on the layer and toolbox toggles so their active appearance matches the waypoint and list toggles.
 - **Consecutive Toast Timer Race**: Cleared any pending fade-out hide timer when a new toast fires so rapid consecutive toasts are never hidden prematurely.

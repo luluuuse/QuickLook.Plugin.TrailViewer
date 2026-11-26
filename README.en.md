@@ -58,7 +58,7 @@ in Explorer to see the route, waypoints, photos and elevation profile without op
 | | Undo / Redo (measure & editor) | <kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> |
 | **Toolbox & editor** | Open or close toolbox | <kbd>T</kbd> |
 | | Non-destructive track editor / Save or export | Toolbox → Edit track / <kbd>Ctrl</kbd>+<kbd>S</kbd> |
-| | Export overlay image / Route weather | Toolbox → Export overlay / Route weather |
+| | Export overlay image / Weather & sun | Toolbox → Export overlay / Weather & sun |
 
 ## Highlights
 
@@ -83,8 +83,8 @@ in Explorer to see the route, waypoints, photos and elevation profile without op
 ### Utilities and experience
 
 - **Three manual themes & cartographic details:** Switch in place between **Swiss Paper** (default), **Slate Dark**, and **Classic Dark** via miniature theme cards in the Toolbox footer (persisted across sessions), with Swiss Paper and Slate Dark adding a four-segment scale bar, live `1 : N` scale ratio, white-cased vermilion routes, and a dual-scale no-map survey grid.
-- **Manual measurement & coordinates:** Multi-section right-click distance measurement with waypoint/point/track snapping and live totals; one-click copy of shareable route summaries and WGS-84 coordinates (with elevation notes) for start, end, peak, map center, or any picked point.
-- **Route weather:** Opens Windy in your browser on the cloud layer with hourly forecasts expanded for the selected start, end or peak, without embedding third-party maps.
+- **Manual measurement & coordinates:** Multi-section right-click distance measurement with waypoint/point/track snapping and live totals; one-click copy of shareable route summaries and WGS-84 coordinates (with elevation notes and a shortcut to the active Weather & sun service) for start, peak, end, track centre, or any picked point.
+- **Weather & sun:** Switch between **Weather** (Windy / Ventusky / Zoom Earth) and **Sun** (PeakFinder / ShadeMap) with per-category local persistence, zero network requests, and zero API keys, opening forecasts, live satellite imagery, 360° peak horizons (with point elevation), or real terrain shadows in your browser.
 - **Dual-source updater & bilingual UI:** Quiet 24-hour background checks racing **GitHub Releases + GitCode mirror** with automatic failover (subtle cyan glow dot on the Toolbox toggle and emerald pill in the footer), bilingual release notes, version muting, **SHA256 package verification**, and native QuickLook installer handoff; switch in place between English and Chinese with persistent preferences.
 
 Detailed behaviour, advanced controls and export examples are in [docs/USAGE.md](docs/USAGE.md).
@@ -110,7 +110,7 @@ Detailed behaviour, advanced controls and export examples are in [docs/USAGE.md]
 
 The plugin sends no track data to a server. Opening a file reads that file locally. Online basemaps contact
 their tile providers when selected, and custom sources contact the addresses you configure. **No-map mode**
-renders the route on a local grid. Route weather sends the selected point to Windy. Update checks contact
+renders the route on a local grid. Weather & sun sends only the selected point coordinate (and optional elevation for PeakFinder) to the chosen site (Windy, Ventusky, Zoom Earth, PeakFinder, or ShadeMap). Update checks contact
 GitHub / GitCode to fetch release metadata and verify `.qlplugin` SHA256 checksums without uploading any track
 data. Preferences are stored in the user's local application data and are not tied to the versioned WebView cache.
 

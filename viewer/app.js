@@ -41,11 +41,20 @@ import { createUiFeedback } from './ui-feedback.js';
 import { createMeasurement } from './measure.js';
 import { createToolbox } from './toolbox.js';
 import {
+  TERRAIN_PROVIDERS,
+  WEATHER_CATEGORIES,
+  WEATHER_PROVIDERS,
   WEATHER_TARGETS,
   availableTargets,
+  normalizeAnyWeatherProvider,
   openExternal,
-  weatherTarget,
-  windyUrl,
+  saveProviderForCategory,
+  saveWeatherCategory,
+  savedActiveWeatherProvider,
+  savedProviderForCategory,
+  savedWeatherCategory,
+  weatherTargetPoint,
+  weatherUrl,
   zoomFor,
 } from './weather.js';
 import { installLeafletIcons } from './icons.js';
@@ -832,13 +841,14 @@ async function main() {
       map.setView(latlng, targetZoom, { animate: true });
     },
     onCoordinateWeather: (point) => {
-      const url = windyUrl(point, zoomFor('start'));
+      const provider = savedActiveWeatherProvider();
+      const url = weatherUrl(point, provider, zoomFor('start', provider));
       if (!url) {
         showToast(t('weather.unavailable'), 4000);
         return;
       }
       openExternal(url);
-      showToast(t('weather.opened'), 3500);
+      showToast(t('weather.opened', { provider: t(`weather.provider.${provider}`) }), 3500);
     },
     attachmentItems: photoAttachments,
     onExportAttachments: (includeExternal, onProgress) =>
@@ -847,6 +857,16 @@ async function main() {
     mountExportView: overlayExport.mount,
     weatherAvailable: () => availableTargets(liveState.gpx).length > 0,
     weatherModes: [...WEATHER_TARGETS],
+    weatherCategories: [...WEATHER_CATEGORIES],
+    weatherProvidersByCategory: {
+      weather: [...WEATHER_PROVIDERS],
+      terrain: [...TERRAIN_PROVIDERS],
+    },
+    weatherCategory: savedWeatherCategory,
+    setWeatherCategory: saveWeatherCategory,
+    weatherProviderForCategory: savedProviderForCategory,
+    weatherProvider: savedActiveWeatherProvider,
+    setWeatherProvider: saveProviderForCategory,
     weatherHasElevation: () => availableTargets(liveState.gpx).includes('highest'),
     lang: getLang,
     setLang,
@@ -861,15 +881,16 @@ async function main() {
     onDownloadUpdate: (url, name) => hostBridge.downloadUpdate(url, name),
     onIgnoreUpdate: (version) => hostBridge.ignoreUpdate(version),
     onOpenUpdateRelease: (url) => hostBridge.openUpdateRelease(url),
-    onWeather: (mode) => {
-      const target = weatherTarget(liveState.gpx, mode);
-      const url = windyUrl(target, zoomFor(mode));
+    onWeather: (mode, provider) => {
+      const activeProvider = normalizeAnyWeatherProvider(provider || savedActiveWeatherProvider());
+      const target = weatherTargetPoint(liveState.gpx, mode);
+      const url = weatherUrl(target, activeProvider, zoomFor(mode, activeProvider));
       if (!url) {
         showToast(t(mode === 'highest' ? 'weather.noElevation' : 'weather.unavailable'), 4000);
         return;
       }
       openExternal(url);
-      showToast(t('weather.opened'), 3500);
+      showToast(t('weather.opened', { provider: t(`weather.provider.${activeProvider}`) }), 3500);
     },
     onOpen: () => {
       waypointController.closeOverview(false);

@@ -33,8 +33,12 @@ internal sealed partial class TrailViewerPanel : UserControl, IDisposable
 
     private static readonly string FileHost = $"file.{PluginIdentity.VirtualHostSuffix}";
     private static readonly TimeSpan LoadTimeout = TimeSpan.FromSeconds(20);
+    private static readonly TimeSpan KeepAliveGrace = TimeSpan.FromSeconds(15);
     private static readonly object EnvironmentGate = new();
     private static System.Threading.Tasks.Task<CoreWebView2Environment>? _environmentTask;
+    private static WebView2? _keepAliveWebView;
+    private static DispatcherTimer? _keepAliveTimer;
+    private static bool _shutdownHooked;
     internal const long MaxInputBytes = 64L * 1024 * 1024;
     internal const long MaxKmzInputBytes = 1088L * 1024 * 1024;
 
@@ -62,6 +66,7 @@ internal sealed partial class TrailViewerPanel : UserControl, IDisposable
     private volatile IReadOnlyList<CustomHostMatcher> _customHostMatchers = Array.Empty<CustomHostMatcher>();
     private readonly HashSet<string> _registeredTileFilters = new(StringComparer.OrdinalIgnoreCase);
     private bool _finished;
+    private bool _initializingWebView;
     private volatile bool _disposed;
 
     public TrailViewerPanel()
@@ -195,19 +200,7 @@ internal sealed partial class TrailViewerPanel : UserControl, IDisposable
             }
             _attachments = new AttachmentExport(_sourcePath, _fileRoot);
 
-            _webView = new WebView2
-            {
-                CreationProperties = new CoreWebView2CreationProperties
-                {
-                    // Also keeps the chosen map layer (localStorage) between previews.
-                    UserDataFolder = UserDataFolder,
-                },
-                DefaultBackgroundColor = System.Drawing.Color.FromArgb(255, 24, 24, 24),
-            };
-            _webView.CoreWebView2InitializationCompleted += OnInitialized;
-            _webView.NavigationCompleted += OnNavigationCompleted;
-            // The window is already up and holding the keyboard by the time the control is in the tree.
-            _webView.Loaded += (_, _) => { _onScreen = IsVisible; FocusViewer(); };
+            AttachWebView();
             // QuickLook shows its preview without activating it (ShowActivated="False") and reads Space, Esc and
             // the arrows through a global keyboard hook of its own, so a WPF handler only ever sees a key after
             // someone clicks into the preview. The viewer keys are caught below the application instead.
@@ -221,7 +214,6 @@ internal sealed partial class TrailViewerPanel : UserControl, IDisposable
             IsVisibleChanged += (_, _) => UpdateOnScreen();
             Loaded += (_, _) => UpdateOnScreen();
             Unloaded += (_, _) => _onScreen = false;
-            Content = _webView;
             _timeout.Start();
             Trace("WebView2 runtime " + CoreWebView2Environment.GetAvailableBrowserVersionString());
             _ = EnsureWebViewAsync();
@@ -235,6 +227,32 @@ internal sealed partial class TrailViewerPanel : UserControl, IDisposable
             DropUnpackedFolder();
             Fail(Strings.PreviewFailed(ex.Message));
         }
+    }
+
+    private void AttachWebView()
+    {
+        if (_webView != null)
+        {
+            _webView.CoreWebView2InitializationCompleted -= OnInitialized;
+            _webView.NavigationCompleted -= OnNavigationCompleted;
+            _webView.Dispose();
+            _webView = null;
+        }
+
+        _webView = new WebView2
+        {
+            CreationProperties = new CoreWebView2CreationProperties
+            {
+                // Also keeps the chosen map layer (localStorage) between previews.
+                UserDataFolder = UserDataFolder,
+            },
+            DefaultBackgroundColor = System.Drawing.Color.FromArgb(255, 24, 24, 24),
+        };
+        _webView.CoreWebView2InitializationCompleted += OnInitialized;
+        _webView.NavigationCompleted += OnNavigationCompleted;
+        // The window is already up and holding the keyboard by the time the control is in the tree.
+        _webView.Loaded += (_, _) => { _onScreen = IsVisible; FocusViewer(); };
+        Content = _webView;
     }
 
     internal static void PrepareEnvironment()
@@ -254,30 +272,84 @@ internal sealed partial class TrailViewerPanel : UserControl, IDisposable
         {
             if (_environmentTask != null && (_environmentTask.IsFaulted || _environmentTask.IsCanceled))
                 _environmentTask = null;
-            return _environmentTask ??= CoreWebView2Environment.CreateAsync(null, UserDataFolder);
+            if (_environmentTask == null)
+            {
+                System.Threading.Tasks.Task<CoreWebView2Environment>? created = null;
+                created = CreateTrackedEnvironmentAsync(() => ResetSharedEnvironment(created));
+                _environmentTask = created;
+            }
+            return _environmentTask;
+        }
+    }
+
+    private static async System.Threading.Tasks.Task<CoreWebView2Environment> CreateTrackedEnvironmentAsync(
+        Action onBrowserProcessExited)
+    {
+        var env = await CoreWebView2Environment.CreateAsync(null, UserDataFolder);
+        env.BrowserProcessExited += (_, _) => onBrowserProcessExited();
+        return env;
+    }
+
+    private static void ResetSharedEnvironment(System.Threading.Tasks.Task<CoreWebView2Environment>? expected = null)
+    {
+        lock (EnvironmentGate)
+        {
+            if (expected == null || ReferenceEquals(_environmentTask, expected))
+                _environmentTask = null;
         }
     }
 
     private async System.Threading.Tasks.Task EnsureWebViewAsync()
     {
+        // When a user closes and quickly reopens a preview while the previous msedgewebview2.exe is still
+        // tearing down its UserDataFolder lock, EnsureCoreWebView2Async can fail with CO_E_SERVER_EXEC_FAILURE
+        // (0x80080005). Resetting the stale environment, waiting briefly for the exiting process to release the
+        // profile lock, and retrying on a fresh WebView2 control recovers cleanly.
+        int[] retryDelaysMs = { 350, 700 };
+        _initializingWebView = true;
         try
         {
-            var environment = await SharedEnvironmentAsync();
-            if (_webView == null || _finished) return;
-            await _webView.EnsureCoreWebView2Async(environment);
+            for (var attempt = 0; attempt <= retryDelaysMs.Length; attempt++)
+            {
+                if (_webView == null || _finished || _disposed) return;
+                System.Threading.Tasks.Task<CoreWebView2Environment>? envTask = null;
+                try
+                {
+                    envTask = SharedEnvironmentAsync();
+                    var environment = await envTask;
+                    if (_webView == null || _finished || _disposed) return;
+                    await _webView.EnsureCoreWebView2Async(environment);
+                    return;
+                }
+                catch (OperationCanceledException) when (_finished || _disposed)
+                {
+                    return;
+                }
+                catch (Exception ex) when (!_finished && !_disposed)
+                {
+                    ResetSharedEnvironment(envTask);
+                    if (attempt >= retryDelaysMs.Length)
+                    {
+                        Fail("Could not start WebView2: " + ex.Message);
+                        return;
+                    }
+                    Trace($"WebView2 startup attempt {attempt + 1} failed ({ex.Message}); retrying in {retryDelaysMs[attempt]} ms");
+                    try
+                    {
+                        await System.Threading.Tasks.Task.Delay(retryDelaysMs[attempt], _lifecycle.Token);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        return;
+                    }
+                    if (_finished || _disposed) return;
+                    AttachWebView();
+                }
+            }
         }
-        catch (Exception ex) when (!_finished)
+        finally
         {
-            Trace("prewarmed WebView2 environment failed; using the default profile: " + ex.Message);
-            try
-            {
-                if (_webView != null && !_finished)
-                    await _webView.EnsureCoreWebView2Async();
-            }
-            catch (Exception fallback) when (!_finished)
-            {
-                Fail("Could not start WebView2: " + fallback.Message);
-            }
+            _initializingWebView = false;
         }
     }
 
@@ -436,13 +508,89 @@ internal sealed partial class TrailViewerPanel : UserControl, IDisposable
         _attachments = null;
         if (_webView != null)
         {
-            _webView.CoreWebView2InitializationCompleted -= OnInitialized;
-            _webView.NavigationCompleted -= OnNavigationCompleted;
-            _webView.Dispose();
+            var webView = _webView;
             _webView = null;
+            Content = null;
+            webView.CoreWebView2InitializationCompleted -= OnInitialized;
+            webView.NavigationCompleted -= OnNavigationCompleted;
+            DetachCoreEvents(webView);
+            DeferDisposeWebView(webView);
         }
 
         DropUnpackedFolder();
+    }
+
+    private void DetachCoreEvents(WebView2 webView)
+    {
+        try
+        {
+            var core = webView.CoreWebView2;
+            if (core == null) return;
+            core.NewWindowRequested -= OnNewWindowRequested;
+            core.NavigationStarting -= OnNavigationStarting;
+            core.WebMessageReceived -= OnWebMessage;
+            core.WebResourceRequested -= OnWebResourceRequested;
+            core.WebResourceResponseReceived -= OnWebResourceResponseReceived;
+        }
+        catch (Exception)
+        {
+            // Ignore errors if WebView2 is already tearing down.
+        }
+    }
+
+    /// <summary>
+    /// Closing the last WebView2 triggers a ~5 s msedgewebview2.exe shutdown during which reopening a preview
+    /// stalls for 4-6 s or fails with CO_E_SERVER_EXEC_FAILURE. Holding a blank shell for 15 s keeps the
+    /// browser process warm across rapid close/reopen cycles, then releases all memory once idle.
+    /// </summary>
+    private static void DeferDisposeWebView(WebView2 webView)
+    {
+        try
+        {
+            var core = webView.CoreWebView2;
+            if (core == null)
+            {
+                webView.Dispose();
+                return;
+            }
+            core.Navigate("about:blank");
+            var previous = _keepAliveWebView;
+            _keepAliveWebView = webView;
+            previous?.Dispose();
+
+            if (!_shutdownHooked && Application.Current != null)
+            {
+                _shutdownHooked = true;
+                Application.Current.Exit += (_, _) => ReleaseKeepAliveWebView();
+            }
+            if (_keepAliveTimer == null)
+            {
+                _keepAliveTimer = new DispatcherTimer { Interval = KeepAliveGrace };
+                _keepAliveTimer.Tick += (_, _) => ReleaseKeepAliveWebView();
+            }
+            _keepAliveTimer.Stop();
+            _keepAliveTimer.Start();
+        }
+        catch (Exception)
+        {
+            try { webView.Dispose(); } catch (Exception) { }
+        }
+    }
+
+    private static void ReleaseKeepAliveWebView()
+    {
+        _keepAliveTimer?.Stop();
+        var webView = _keepAliveWebView;
+        _keepAliveWebView = null;
+        if (webView == null) return;
+        try
+        {
+            webView.Dispose();
+        }
+        catch (Exception)
+        {
+            // Best-effort cleanup.
+        }
     }
 
     private void DropUnpackedFolder()

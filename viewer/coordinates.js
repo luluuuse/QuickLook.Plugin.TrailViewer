@@ -7,42 +7,50 @@ function valid(point) {
     : null;
 }
 
-function routeEnds(gpx) {
+function routeSummary(gpx) {
   let first = null;
   let last = null;
+  let minLat = Infinity;
+  let maxLat = -Infinity;
+  let minLon = Infinity;
+  let maxLon = -Infinity;
+  const include = (point) => {
+    const coordinate = valid(point);
+    if (!coordinate) return;
+    const lat = Number(coordinate.lat);
+    const lon = Number(coordinate.lon);
+    if (!first) first = coordinate;
+    last = coordinate;
+    if (lat < minLat) minLat = lat;
+    if (lat > maxLat) maxLat = lat;
+    if (lon < minLon) minLon = lon;
+    if (lon > maxLon) maxLon = lon;
+  };
   for (const track of gpx?.tracks || []) {
     for (const segment of track.segments || []) {
-      for (const point of segment || []) {
-        const coordinate = valid(point);
-        if (!coordinate) continue;
-        if (!first) first = coordinate;
-        last = coordinate;
-      }
+      for (const point of segment || []) include(point);
     }
   }
   for (const route of gpx?.routes || []) {
-    for (const point of route.points || []) {
-      const coordinate = valid(point);
-      if (!coordinate) continue;
-      if (!first) first = coordinate;
-      last = coordinate;
-    }
+    for (const point of route.points || []) include(point);
   }
   if (!first) {
-    const waypoints = (gpx?.waypoints || []).map(valid).filter(Boolean);
-    first = waypoints[0] || null;
-    last = waypoints[waypoints.length - 1] || null;
+    for (const point of gpx?.waypoints || []) include(point);
   }
-  return { first, last };
+  const center = first
+    ? { lat: (minLat + maxLat) / 2, lon: (minLon + maxLon) / 2 }
+    : null;
+  return { first, last, center };
 }
 
 /** The four fixed coordinate sources. An arbitrary map point is supplied by the picker itself. */
 export function coordinateTargets(gpx) {
-  const ends = routeEnds(gpx);
+  const summary = routeSummary(gpx);
   return {
-    start: ends.first,
-    end: ends.last,
+    start: summary.first,
+    end: summary.last,
     highest: valid(highestPoint(gpx)),
+    center: summary.center,
   };
 }
 

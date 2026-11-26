@@ -1,17 +1,110 @@
-// Weather hand-off for the current track. The viewer does not embed a third-party map: it builds a Windy
-// deep link for a chosen point of the route and lets the host open it in the default browser. That keeps the
-// page free of extra network origins and of any API key.
+// Weather & mountain-view hand-off for the current track. The viewer does not embed a third-party map: it
+// builds a deep link for a chosen point of the route and lets the host open it in the default browser. That
+// keeps the page free of extra network origins and of any API key.
 //
-// Windy accepts one URL shape, /lat/lon?lat,lon,zoom. The query string alone only pans the map; repeating the
-// point in the path is what makes the site expand its point-forecast panel. The zoom decides whether the
-// place is recognisable, so every target here is opened at street level.
+// Each provider opens on the view where it adds the most hiking value:
+// - Windy: street-level clouds layer with the point-forecast panel (/lat/lon?clouds,lat,lon,14).
+// - Ventusky: canonical 3-decimal point route (/lat;lon) so the 14-day point forecast card opens.
+// - Zoom Earth: regional near-real-time satellite imagery with place card (/maps/satellite/#view=lat,lon,9z/place=lat,lon).
+// - PeakFinder: 360° mountain horizon & sun/moon path (?lat=lat&lng=lon[&ele=m]).
+// - ShadeMap: global DEM terrain shadow & sunlight map (/@lat,lon,13z).
+
+import { readStored, writeStored } from './storage.js';
 
 const WINDY_BASE = 'https://www.windy.com/';
+const VENTUSKY_BASE = 'https://www.ventusky.com/';
+const ZOOMEARTH_BASE = 'https://zoom.earth/maps/';
+const PEAKFINDER_BASE = 'https://www.peakfinder.com/';
+const SHADEMAP_BASE = 'https://shademap.app/';
 
-// Street level. A whole-route overview would need a wider level, but all three targets are single places.
+// Street level for Windy point forecasts; terrain shadow zoom for ShadeMap; regional cloud view for Zoom Earth.
 export const POINT_ZOOM = 14;
+export const TERRAIN_ZOOM = 13;
+export const REGIONAL_ZOOM = 9;
 
-export const WEATHER_TARGETS = Object.freeze(['start', 'end', 'highest']);
+export const WEATHER_TARGETS = Object.freeze(['start', 'highest', 'end']);
+export const WEATHER_CATEGORIES = Object.freeze(['weather', 'terrain']);
+export const DEFAULT_WEATHER_CATEGORY = 'weather';
+export const WEATHER_CATEGORY_KEY = 'weatherCategory';
+
+export const WEATHER_PROVIDERS = Object.freeze(['windy', 'ventusky', 'zoomearth']);
+export const TERRAIN_PROVIDERS = Object.freeze(['peakfinder', 'shademap']);
+export const ALL_WEATHER_PROVIDERS = Object.freeze([...WEATHER_PROVIDERS, ...TERRAIN_PROVIDERS]);
+export const DEFAULT_WEATHER_PROVIDER = 'windy';
+export const DEFAULT_TERRAIN_PROVIDER = 'peakfinder';
+export const WEATHER_PROVIDER_KEY = 'weatherProvider';
+export const TERRAIN_PROVIDER_KEY = 'terrainProvider';
+export const ZOOMEARTH_LAYER = 'satellite';
+
+export function normalizeWeatherCategory(value) {
+  return WEATHER_CATEGORIES.includes(value) ? value : DEFAULT_WEATHER_CATEGORY;
+}
+
+export function savedWeatherCategory() {
+  return normalizeWeatherCategory(readStored(WEATHER_CATEGORY_KEY));
+}
+
+export function saveWeatherCategory(category) {
+  const next = normalizeWeatherCategory(category);
+  writeStored(WEATHER_CATEGORY_KEY, next);
+  return next;
+}
+
+export function providersForCategory(category) {
+  return normalizeWeatherCategory(category) === 'terrain' ? TERRAIN_PROVIDERS : WEATHER_PROVIDERS;
+}
+
+export function categoryForProvider(provider) {
+  return TERRAIN_PROVIDERS.includes(provider) ? 'terrain' : 'weather';
+}
+
+export function normalizeWeatherProvider(value) {
+  return WEATHER_PROVIDERS.includes(value) ? value : DEFAULT_WEATHER_PROVIDER;
+}
+
+export function normalizeTerrainProvider(value) {
+  return TERRAIN_PROVIDERS.includes(value) ? value : DEFAULT_TERRAIN_PROVIDER;
+}
+
+export function normalizeAnyWeatherProvider(value) {
+  return ALL_WEATHER_PROVIDERS.includes(value) ? value : DEFAULT_WEATHER_PROVIDER;
+}
+
+export function savedWeatherProvider() {
+  return normalizeWeatherProvider(readStored(WEATHER_PROVIDER_KEY));
+}
+
+export function saveWeatherProvider(provider) {
+  const next = normalizeWeatherProvider(provider);
+  writeStored(WEATHER_PROVIDER_KEY, next);
+  return next;
+}
+
+export function savedTerrainProvider() {
+  return normalizeTerrainProvider(readStored(TERRAIN_PROVIDER_KEY));
+}
+
+export function saveTerrainProvider(provider) {
+  const next = normalizeTerrainProvider(provider);
+  writeStored(TERRAIN_PROVIDER_KEY, next);
+  return next;
+}
+
+export function savedProviderForCategory(category = savedWeatherCategory()) {
+  return normalizeWeatherCategory(category) === 'terrain'
+    ? savedTerrainProvider()
+    : savedWeatherProvider();
+}
+
+export function saveProviderForCategory(category, provider) {
+  return normalizeWeatherCategory(category) === 'terrain'
+    ? saveTerrainProvider(provider)
+    : saveWeatherProvider(provider);
+}
+
+export function savedActiveWeatherProvider() {
+  return savedProviderForCategory(savedWeatherCategory());
+}
 
 function trackPoints(gpx) {
   const list = [];
@@ -44,6 +137,18 @@ export function weatherTarget(gpx, mode = 'start') {
   if (mode === 'end') return valid(last);
   if (mode === 'highest') return valid(highestPoint(gpx));
   return valid(first);
+}
+
+/** Same target point as weatherTarget(), preserving finite elevation when present (e.g. for PeakFinder). */
+export function weatherTargetPoint(gpx, mode = 'start') {
+  const all = trackPoints(gpx);
+  const first = all[0] || gpx?.waypoints?.[0] || null;
+  const last = all[all.length - 1] || gpx?.waypoints?.[gpx.waypoints.length - 1] || null;
+  const raw = mode === 'end' ? last : mode === 'highest' ? highestPoint(gpx) : first;
+  const coords = valid(raw);
+  if (!coords) return null;
+  const ele = Number(raw?.ele);
+  return Number.isFinite(ele) ? { ...coords, ele } : coords;
 }
 
 /**
@@ -87,10 +192,13 @@ export function availableTargets(gpx) {
   });
 }
 
-/** Every target opens at the same level: they are all one place. */
-export function zoomFor(mode = 'start') {
+/** Zoom level matched to the provider's best hiking view. */
+export function zoomFor(mode = 'start', provider = DEFAULT_WEATHER_PROVIDER) {
   void mode;
-  return POINT_ZOOM;
+  const active = normalizeAnyWeatherProvider(provider);
+  if (active === 'windy') return POINT_ZOOM;
+  if (active === 'shademap') return TERRAIN_ZOOM;
+  return REGIONAL_ZOOM;
 }
 
 // Cloud cover is the layer that answers "will I be in the fog or under the sun", which is what a hiker opens
@@ -108,6 +216,35 @@ export function windyUrl(target, zoom = POINT_ZOOM, overlay = WINDY_OVERLAY) {
   const lon = target.lon.toFixed(4);
   const layer = overlay ? `${overlay},` : '';
   return `${WINDY_BASE}${lat}/${lon}?${layer}${lat},${lon},${zoom}`;
+}
+
+/**
+ * Unified weather & mountain-view hand-off URL across supported providers. Unknown providers fall back to Windy.
+ */
+export function weatherUrl(target, provider = DEFAULT_WEATHER_PROVIDER, zoom) {
+  if (!target) return null;
+  const active = normalizeAnyWeatherProvider(provider);
+  const level = zoom ?? zoomFor('start', active);
+  if (active === 'windy') return windyUrl(target, level);
+  const lat = target.lat.toFixed(4);
+  const lon = target.lon.toFixed(4);
+  if (active === 'ventusky') {
+    const vLat = String(Number(target.lat.toFixed(3)));
+    const vLon = String(Number(target.lon.toFixed(3)));
+    return `${VENTUSKY_BASE}${vLat};${vLon}`;
+  }
+  if (active === 'zoomearth') {
+    return `${ZOOMEARTH_BASE}${ZOOMEARTH_LAYER}/#view=${lat},${lon},${level}z/place=${lat},${lon}`;
+  }
+  if (active === 'peakfinder') {
+    const ele = Number(target.ele);
+    const eleQuery = Number.isFinite(ele) ? `&ele=${Math.round(ele)}` : '';
+    return `${PEAKFINDER_BASE}?lat=${lat}&lng=${lon}${eleQuery}`;
+  }
+  if (active === 'shademap') {
+    return `${SHADEMAP_BASE}@${lat},${lon},${level}z`;
+  }
+  return windyUrl(target, level);
 }
 
 /** Opens a URL in the default browser. The host cancels in-page navigation and hands https links to the OS. */

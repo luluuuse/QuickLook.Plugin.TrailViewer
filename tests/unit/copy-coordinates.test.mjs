@@ -41,16 +41,17 @@ const summary = {
   network: false,
 };
 
-test('coordinate copy supports start, end and peak', () => {
+test('coordinate copy supports start, end, peak and track center', () => {
   assert.deepEqual(coordinateTargets(gpx), {
     start: gpx.tracks[0].segments[0][0],
     end: gpx.tracks[0].segments[0][2],
     highest: gpx.tracks[0].segments[0][1],
+    center: { lat: 30.5, lon: 114.5 },
   });
   assert.equal(coordinateText({ lat: 30.52, lon: 114.52 }), '30.520000, 114.520000');
 });
 
-test('a route-only file still has start, end and a waypoint fallback', () => {
+test('a route-only file still has start, end, center and a waypoint fallback', () => {
   const route = { name: 'Plan', tracks: [], routes: [{ points: [
     { lat: 1, lon: 2 },
     { lat: 3, lon: 4 },
@@ -59,6 +60,7 @@ test('a route-only file still has start, end and a waypoint fallback', () => {
     start: { lat: 1, lon: 2 },
     end: { lat: 3, lon: 4 },
     highest: null,
+    center: { lat: 2, lon: 3 },
   });
 });
 

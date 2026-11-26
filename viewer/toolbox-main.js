@@ -3,24 +3,90 @@ import { iconMarkup, weatherMarkMarkup } from './icons.js';
 /** Main toolbox menu: quick actions, theme switcher, keyboard hints and route weather card. */
 export function createToolboxMain({
   el, t, exportAvailable, editAvailable = () => true, weatherAvailable, weatherHasElevation,
-  weatherModes, theme = () => 'swiss', setTheme = /** @type {(next: string) => boolean} */ (() => false), themeModes = [],
+  weatherModes, weatherCategories = [], weatherProvidersByCategory = {},
+  initialWeatherCategory = 'weather', initialWeatherProviders = {},
+  onWeatherCategoryChange, onWeatherProviderChange,
+  theme = () => 'swiss', setTheme = /** @type {(next: string) => boolean} */ (() => false), themeModes = [],
   currentVersion = '', onMeasure, onCoordinates, onExport, onAttachments,
   onWeather, onEdit, onUpdate, onClose,
 }) {
   let weatherMode = weatherModes[0] || 'start';
+  let weatherCategory = weatherCategories.includes(initialWeatherCategory)
+    ? initialWeatherCategory
+    : (weatherCategories[0] || 'weather');
+  const selectedProviders = {};
+  for (const cat of weatherCategories) {
+    const list = weatherProvidersByCategory[cat] || [];
+    const init = initialWeatherProviders[cat];
+    selectedProviders[cat] = list.includes(init) ? init : (list[0] || 'windy');
+  }
   let measureButton;
   let coordinateButton;
   let exportButton;
   let attachmentButton;
   let editButton;
   let weatherButton;
+  let weatherCard;
+  let weatherTabs;
   let weatherPicker;
+  let weatherProviderPicker;
   let quickGrid;
   let themePick;
   let versionBar;
   let versionLabel;
   let updateButton;
   let latestState = null;
+
+  function activeWeatherProvider() {
+    const list = weatherProvidersByCategory[weatherCategory] || [];
+    const current = selectedProviders[weatherCategory];
+    return list.includes(current) ? current : (list[0] || 'windy');
+  }
+
+  function weatherHintText() {
+    const provider = activeWeatherProvider();
+    const key = `weather.hint.${provider}`;
+    const specific = t(key);
+    return specific !== key
+      ? specific
+      : t('toolbox.weatherHint', { provider: t(`weather.provider.${provider}`) });
+  }
+
+  function syncWeatherButton() {
+    const provider = activeWeatherProvider();
+    const hint = weatherHintText();
+    weatherButton.querySelector('.toolbox-action-icon').innerHTML = iconMarkup(`provider-${provider}`);
+    weatherButton.querySelector('small').textContent = hint;
+    weatherButton.title = weatherAvailable() ? hint : t('weather.unavailable');
+    weatherButton.setAttribute('aria-label', weatherButton.title);
+    if (weatherCard) weatherCard.dataset.activeProvider = provider;
+  }
+
+  function rebuildProviderPicker() {
+    const providers = weatherProvidersByCategory[weatherCategory] || [];
+    const active = activeWeatherProvider();
+    weatherProviderPicker.replaceChildren();
+    for (const provider of providers) {
+      const option = el('button', 'toolbox-weather-mode toolbox-weather-provider');
+      option.type = 'button';
+      option.dataset.weatherProvider = provider;
+      option.innerHTML = `${iconMarkup(`provider-${provider}`, { size: 13 })}`
+        + `<span class="toolbox-weather-mode-label">${t(`weather.provider.${provider}`)}</span>`;
+      const desc = t(`weather.desc.${provider}`);
+      option.title = desc;
+      option.setAttribute('aria-label', desc);
+      option.setAttribute('aria-pressed', String(provider === active));
+      option.addEventListener('click', () => {
+        if (provider === activeWeatherProvider()) return;
+        selectedProviders[weatherCategory] = provider;
+        onWeatherProviderChange?.(weatherCategory, provider);
+        syncWeatherButton();
+        if (latestState) render(latestState);
+      });
+      weatherProviderPicker.append(option);
+    }
+    weatherProviderPicker.hidden = !weatherAvailable() || providers.length === 0;
+  }
 
   function build() {
     const view = el('div', 'toolbox-main');
@@ -77,15 +143,39 @@ export function createToolboxMain({
     weatherButton.type = 'button';
     weatherButton.dataset.tool = 'weather';
     weatherButton.innerHTML = `<span class="toolbox-action-icon">${iconMarkup('weather')}</span>`
-      + '<span><strong></strong><small></small></span>';
+      + '<span><strong></strong><small></small></span>'
+      + '<span class="toolbox-weather-ext" aria-hidden="true">\u2197</span>';
     weatherButton.querySelector('strong').textContent = t('toolbox.weather');
-    weatherButton.querySelector('small').textContent = t('toolbox.weatherHint');
-    weatherButton.title = weatherAvailable() ? t('toolbox.weatherHint') : t('weather.unavailable');
-    weatherButton.setAttribute('aria-label', weatherButton.title);
+    syncWeatherButton();
     weatherButton.addEventListener('click', () => {
       onClose();
-      onWeather?.(weatherMode);
+      onWeather?.(weatherMode, activeWeatherProvider());
     });
+
+    weatherTabs = el('div', 'toolbox-weather-tabs');
+    weatherTabs.setAttribute('role', 'group');
+    weatherTabs.setAttribute('aria-label', t('toolbox.weatherCategory'));
+    for (const category of weatherCategories) {
+      const tab = el('button', 'toolbox-weather-tab');
+      tab.type = 'button';
+      tab.dataset.weatherCategory = category;
+      tab.textContent = t(`weather.category.${category}`);
+      tab.setAttribute('aria-pressed', String(category === weatherCategory));
+      tab.addEventListener('click', () => {
+        if (category === weatherCategory) return;
+        weatherCategory = category;
+        onWeatherCategoryChange?.(category);
+        rebuildProviderPicker();
+        syncWeatherButton();
+        if (latestState) render(latestState);
+      });
+      weatherTabs.append(tab);
+    }
+    weatherTabs.hidden = weatherCategories.length <= 1;
+
+    const weatherHead = el('div', 'toolbox-weather-head');
+    weatherHead.append(weatherButton, weatherTabs);
+
     weatherPicker = el('div', 'toolbox-weather-picker');
     weatherPicker.setAttribute('role', 'group');
     weatherPicker.setAttribute('aria-label', t('toolbox.weatherTarget'));
@@ -103,12 +193,16 @@ export function createToolboxMain({
       weatherPicker.append(option);
     }
     weatherPicker.hidden = weatherModes.length === 0;
+    weatherProviderPicker = el('div', 'toolbox-weather-picker toolbox-weather-providers');
+    weatherProviderPicker.setAttribute('role', 'group');
+    weatherProviderPicker.setAttribute('aria-label', t('toolbox.weatherProvider'));
+    rebuildProviderPicker();
     weatherButton.disabled = !weatherAvailable();
-    weatherButton.title = weatherAvailable() ? t('toolbox.weatherHint') : t('weather.unavailable');
-    weatherButton.setAttribute('aria-label', weatherButton.title);
+    syncWeatherButton();
 
-    const weatherRow = el('div', 'toolbox-weather-card');
-    weatherRow.append(weatherButton, weatherPicker);
+    weatherCard = el('div', 'toolbox-weather-card');
+    weatherCard.dataset.activeProvider = activeWeatherProvider();
+    weatherCard.append(weatherHead, weatherPicker, weatherProviderPicker);
     quickGrid.append(measureButton, coordinateButton, exportButton, attachmentButton);
 
     themePick = el('div', 'toolbox-theme-pick');
@@ -149,7 +243,7 @@ export function createToolboxMain({
     updateButton.addEventListener('click', () => onUpdate?.());
     versionBar.append(versionBrand, themePick, updateButton);
 
-    view.append(editButton, quickGrid, weatherRow, versionBar);
+    view.append(quickGrid, editButton, weatherCard, versionBar);
     return view;
   }
 
@@ -180,11 +274,24 @@ export function createToolboxMain({
     exportButton.title = exportAvailable() ? t('toolbox.exportHint') : t('export.empty');
     exportButton.setAttribute('aria-label', exportButton.title);
     editButton.disabled = !editAvailable();
+    const available = weatherAvailable();
+    for (const tab of weatherTabs.querySelectorAll('[data-weather-category]')) {
+      tab.setAttribute('aria-pressed', String(tab.dataset.weatherCategory === weatherCategory));
+    }
+    weatherTabs.hidden = !available || weatherCategories.length <= 1;
     for (const option of weatherPicker.querySelectorAll('[data-weather-mode]')) {
       option.setAttribute('aria-pressed', String(option.dataset.weatherMode === weatherMode));
       option.disabled = Boolean(option.dataset.weatherMode === 'highest' && !weatherHasElevation());
     }
-    weatherPicker.hidden = !weatherAvailable() || weatherModes.length === 0;
+    weatherPicker.hidden = !available || weatherModes.length === 0;
+    const activeProvider = activeWeatherProvider();
+    for (const option of weatherProviderPicker.querySelectorAll('[data-weather-provider]')) {
+      option.setAttribute('aria-pressed', String(option.dataset.weatherProvider === activeProvider));
+    }
+    const activeProviders = weatherProvidersByCategory[weatherCategory] || [];
+    weatherProviderPicker.hidden = !available || activeProviders.length === 0;
+    weatherButton.disabled = !available;
+    syncWeatherButton();
     renderThemeState();
     const ver = updateState?.currentVersion || currentVersion;
     versionLabel.textContent = ver ? `v${ver}` : '';
@@ -206,13 +313,24 @@ export function createToolboxMain({
     editButton.title = t('toolbox.editHint');
     editButton.setAttribute('aria-label', editButton.title);
     weatherButton.querySelector('strong').textContent = t('toolbox.weather');
-    weatherButton.querySelector('small').textContent = t('toolbox.weatherHint');
-    weatherButton.title = weatherAvailable() ? t('toolbox.weatherHint') : t('weather.unavailable');
-    weatherButton.setAttribute('aria-label', weatherButton.title);
+    syncWeatherButton();
+    weatherTabs.setAttribute('aria-label', t('toolbox.weatherCategory'));
+    for (const tab of weatherTabs.querySelectorAll('[data-weather-category]')) {
+      tab.textContent = t(`weather.category.${tab.dataset.weatherCategory}`);
+    }
     weatherPicker.setAttribute('aria-label', t('toolbox.weatherTarget'));
     for (const option of weatherPicker.querySelectorAll('[data-weather-mode]')) {
       option.querySelector('.toolbox-weather-mode-label').textContent =
         t(`weather.mode.${option.dataset.weatherMode}`);
+    }
+    weatherProviderPicker.setAttribute('aria-label', t('toolbox.weatherProvider'));
+    for (const option of weatherProviderPicker.querySelectorAll('[data-weather-provider]')) {
+      const provider = option.dataset.weatherProvider;
+      option.querySelector('.toolbox-weather-mode-label').textContent =
+        t(`weather.provider.${provider}`);
+      const desc = t(`weather.desc.${provider}`);
+      option.title = desc;
+      option.setAttribute('aria-label', desc);
     }
     if (themePick) {
       themePick.setAttribute('aria-label', t('theme.label'));
@@ -235,6 +353,29 @@ export function createToolboxMain({
     setWeatherMode(mode) {
       if (!weatherModes.includes(mode)) return false;
       weatherMode = mode;
+      if (latestState) render(latestState);
+      return true;
+    },
+    weatherCategory: () => weatherCategory,
+    weatherProvider: () => activeWeatherProvider(),
+    setWeatherCategory(category) {
+      if (!weatherCategories.includes(category)) return false;
+      weatherCategory = category;
+      onWeatherCategoryChange?.(category);
+      rebuildProviderPicker();
+      syncWeatherButton();
+      if (latestState) render(latestState);
+      return true;
+    },
+    setWeatherProvider(provider) {
+      const targetCategory = weatherCategories.find((cat) => (weatherProvidersByCategory[cat] || []).includes(provider));
+      if (!targetCategory) return false;
+      weatherCategory = targetCategory;
+      selectedProviders[targetCategory] = provider;
+      onWeatherCategoryChange?.(targetCategory);
+      onWeatherProviderChange?.(targetCategory, provider);
+      rebuildProviderPicker();
+      syncWeatherButton();
       if (latestState) render(latestState);
       return true;
     },

@@ -84,6 +84,18 @@ const UI_ICONS = Object.freeze({
     + 'c-.9.5-1.4 1.1-1.4 2.1"/><path d="M12 17v.01"/>',
   weather: '<path d="M7.5 18a4.5 4.5 0 0 1-.3-8.99 6 6 0 0 1 11.3 1.6A3.9 3.9 0 0 1 17.6 18Z"/>'
     + '<path d="M9.5 21h5"/><path d="M11 15.5l-1.5 2.5"/><path d="M15 15.5 13.5 18"/>',
+  'provider-windy': '<path d="M3 8h11a2.5 2.5 0 1 0-2.5-2.5"/>'
+    + '<path d="M3 12h15a2.5 2.5 0 1 1-2.5 2.5"/><path d="M3 16h7a2 2 0 1 1-2 2"/>',
+  'provider-ventusky': '<path d="M6.5 14.5a3.5 3.5 0 0 1-.2-7A5 5 0 0 1 16 8.8a3.2 3.2 0 0 1-.5 5.7Z"/>'
+    + '<path d="M8.5 18l-1 2.5M12.5 18l-1 2.5M16.5 18l-1 2.5"/>',
+  'provider-zoomearth': '<path d="m13 7 4 4-3 3-4-4Z"/>'
+    + '<path d="m15 5 3-2 3 3-2 3M9 11l-3-2-3 3 2 3"/>'
+    + '<path d="M5 19a6 6 0 0 1 6-6M5 19a2.5 2.5 0 0 1 2.5-2.5"/>',
+  'provider-peakfinder': '<path d="m2.5 19 6-9.5 4.2 5.5 3.3-4.5 5.5 8.5Z"/>'
+    + '<circle cx="17.5" cy="6.5" r="2.2"/>',
+  'provider-shademap': '<circle cx="8" cy="7.5" r="2.8"/>'
+    + '<path d="M8 2.5v1M3 7.5h1M12 7.5h1M4.5 4l.7.7"/>'
+    + '<path d="M3 19h18M7 19l5.5-8L19 19"/><path d="M12.5 11v8M15 14.5l-2.5 2.5"/>',
   'editor-crop': '<path d="M6 3v12a3 3 0 0 0 3 3h12"/>'
     + '<path d="M3 6h12a3 3 0 0 1 3 3v12"/>',
   'editor-split': '<circle cx="6" cy="7" r="2.5"/><circle cx="6" cy="17" r="2.5"/>'

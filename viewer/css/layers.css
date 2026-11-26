@@ -81,6 +81,7 @@
   right: 10px;
   left: auto;
   z-index: var(--z-floating-panel);
+  isolation: isolate;
   display: flex;
   width: min(320px, calc(100vw - 20px));
   /* One scroll container only: the panel keeps its own size and the settings page scrolls inside it. */
@@ -96,6 +97,104 @@
   -webkit-backdrop-filter: var(--tool-panel-filter);
   backdrop-filter: var(--tool-panel-filter);
   box-shadow: var(--hud-shadow-swiss-top);
+}
+
+.layer-source-menu > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Subtle category-specific cartographic line backdrop across the layer panel, faded away from text. */
+.layer-source-menu::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.72;
+  transition: opacity 220ms ease;
+  -webkit-mask-image: radial-gradient(95% 88% at 92% 88%, #000 0%, rgba(0, 0, 0, 0.55) 48%, transparent 86%);
+  mask-image: radial-gradient(95% 88% at 92% 88%, #000 0%, rgba(0, 0, 0, 0.55) 48%, transparent 86%);
+}
+
+.layer-source-menu[data-active-category="road"]::before {
+  background-image:
+    linear-gradient(rgba(56, 189, 248, 0.13) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(56, 189, 248, 0.13) 1px, transparent 1px),
+    repeating-linear-gradient(-32deg, transparent 0 38px, rgba(56, 189, 248, 0.14) 38px 39.5px, transparent 39.5px 76px);
+  background-size: 24px 24px, 24px 24px, 100% 100%;
+}
+
+.layer-source-menu[data-active-category="terrain"]::before {
+  opacity: 0.42;
+  background-image: url('../assets/topo-contours.svg');
+  background-size: cover;
+  background-position: right bottom;
+  background-repeat: no-repeat;
+}
+
+.layer-source-menu[data-active-category="satellite"]::before {
+  background-image:
+    repeating-radial-gradient(
+      circle at 90% 90%,
+      transparent 0 26px,
+      rgba(129, 140, 248, 0.16) 26px 27px,
+      transparent 27px 54px
+    ),
+    linear-gradient(135deg, transparent 48%, rgba(56, 189, 248, 0.14) 49.5%, transparent 51%),
+    linear-gradient(45deg, transparent 48%, rgba(129, 140, 248, 0.12) 49.5%, transparent 51%);
+}
+
+.layer-source-menu[data-active-category="custom"]::before {
+  background-image:
+    repeating-linear-gradient(45deg, transparent 0 18px, rgba(245, 158, 11, 0.13) 18px 19px, transparent 19px 36px),
+    repeating-linear-gradient(-45deg, transparent 0 18px, rgba(245, 158, 11, 0.09) 18px 19px, transparent 19px 36px);
+}
+
+.layer-source-menu[data-active-category="none"]::before {
+  background-image:
+    linear-gradient(rgba(148, 163, 184, 0.14) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148, 163, 184, 0.14) 1px, transparent 1px);
+  background-size: 18px 18px;
+}
+
+:root[data-theme="swiss"] .layer-source-menu[data-active-category="road"]::before {
+  background-image:
+    linear-gradient(rgba(2, 132, 199, 0.12) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(2, 132, 199, 0.12) 1px, transparent 1px),
+    repeating-linear-gradient(-32deg, transparent 0 38px, rgba(2, 132, 199, 0.12) 38px 39.5px, transparent 39.5px 76px);
+}
+
+:root[data-theme="swiss"] .layer-source-menu[data-active-category="terrain"]::before {
+  opacity: 0.36;
+  background-image: url('../assets/topo-contours.svg');
+  background-size: cover;
+  background-position: right bottom;
+  background-repeat: no-repeat;
+}
+
+:root[data-theme="swiss"] .layer-source-menu[data-active-category="satellite"]::before {
+  background-image:
+    repeating-radial-gradient(
+      circle at 90% 90%,
+      transparent 0 26px,
+      rgba(67, 56, 202, 0.12) 26px 27px,
+      transparent 27px 54px
+    ),
+    linear-gradient(135deg, transparent 48%, rgba(2, 132, 199, 0.11) 49.5%, transparent 51%),
+    linear-gradient(45deg, transparent 48%, rgba(67, 56, 202, 0.09) 49.5%, transparent 51%);
+}
+
+:root[data-theme="swiss"] .layer-source-menu[data-active-category="custom"]::before {
+  background-image:
+    repeating-linear-gradient(45deg, transparent 0 18px, rgba(180, 83, 9, 0.11) 18px 19px, transparent 19px 36px),
+    repeating-linear-gradient(-45deg, transparent 0 18px, rgba(180, 83, 9, 0.08) 18px 19px, transparent 19px 36px);
+}
+
+:root[data-theme="swiss"] .layer-source-menu[data-active-category="none"]::before {
+  background-image:
+    linear-gradient(rgba(71, 85, 105, 0.12) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(71, 85, 105, 0.12) 1px, transparent 1px);
 }
 
 .layer-source-menu[hidden] {
@@ -252,6 +351,9 @@
 }
 
 .layer-switch .layer-source-menu .layer-category-button {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
   display: flex;
   height: 46px;
   padding: 4px;
@@ -260,6 +362,109 @@
   gap: 3px;
   flex-direction: column;
   text-align: center;
+  transition: background-color 180ms ease, color 180ms ease;
+}
+
+.layer-switch .layer-source-menu .layer-category-button > * {
+  position: relative;
+  z-index: 1;
+}
+
+.layer-switch .layer-source-menu .layer-category-button::before,
+.layer-switch .layer-source-menu .layer-category-button::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0;
+  transition: opacity 200ms ease;
+}
+
+.layer-switch .layer-source-menu .layer-category-button:hover::before,
+.layer-switch .layer-source-menu .layer-category-button.active::before {
+  opacity: 1;
+}
+
+.layer-switch .layer-source-menu .layer-category-button:hover::after,
+.layer-switch .layer-source-menu .layer-category-button.active::after {
+  opacity: 0.72;
+}
+
+.layer-switch .layer-source-menu .layer-category-button:hover:not(.active) {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+:root[data-theme="swiss"] .layer-switch .layer-source-menu .layer-category-button:hover:not(.active) {
+  background: rgba(24, 34, 46, 0.04);
+}
+
+.layer-category-button[data-layer="road"]::before {
+  background: radial-gradient(110% 100% at 85% 90%, rgba(56, 189, 248, 0.16), transparent 72%);
+}
+
+.layer-category-button[data-layer="road"]::after {
+  background-image:
+    linear-gradient(rgba(56, 189, 248, 0.16) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(56, 189, 248, 0.16) 1px, transparent 1px);
+  background-size: 10px 10px;
+  -webkit-mask-image: linear-gradient(150deg, transparent 25%, #000 100%);
+  mask-image: linear-gradient(150deg, transparent 25%, #000 100%);
+}
+
+.layer-category-button[data-layer="terrain"]::before {
+  background: radial-gradient(110% 100% at 85% 90%, rgba(217, 160, 91, 0.18), transparent 72%);
+}
+
+.layer-category-button[data-layer="terrain"]::after {
+  background-image: repeating-linear-gradient(
+    -26deg,
+    transparent 0 7px,
+    rgba(217, 160, 91, 0.2) 7px 8px,
+    transparent 8px 15px
+  );
+  -webkit-mask-image: linear-gradient(150deg, transparent 22%, #000 100%);
+  mask-image: linear-gradient(150deg, transparent 22%, #000 100%);
+}
+
+.layer-category-button[data-layer="satellite"]::before {
+  background: radial-gradient(110% 100% at 85% 90%, rgba(56, 189, 248, 0.16), rgba(99, 102, 241, 0.12) 55%, transparent 80%);
+}
+
+.layer-category-button[data-layer="satellite"]::after {
+  background-image: radial-gradient(circle at 78% 26%, rgba(165, 243, 252, 0.36) 0 1px, transparent 1.6px),
+    radial-gradient(circle at 24% 72%, rgba(129, 140, 248, 0.32) 0 1px, transparent 1.6px);
+}
+
+.layer-category-button[data-layer="custom"]::before {
+  background: radial-gradient(110% 100% at 85% 90%, rgba(245, 158, 11, 0.18), transparent 72%);
+}
+
+.layer-category-button[data-layer="custom"]::after {
+  background-image: repeating-linear-gradient(
+    45deg,
+    transparent 0 8px,
+    rgba(245, 158, 11, 0.16) 8px 9px,
+    transparent 9px 16px
+  );
+  -webkit-mask-image: linear-gradient(150deg, transparent 25%, #000 100%);
+  mask-image: linear-gradient(150deg, transparent 25%, #000 100%);
+}
+
+:root[data-theme="swiss"] .layer-category-button[data-layer="road"]::before {
+  background: radial-gradient(110% 100% at 85% 90%, rgba(2, 132, 199, 0.12), transparent 72%);
+}
+
+:root[data-theme="swiss"] .layer-category-button[data-layer="terrain"]::before {
+  background: radial-gradient(110% 100% at 85% 90%, rgba(180, 83, 9, 0.12), transparent 72%);
+}
+
+:root[data-theme="swiss"] .layer-category-button[data-layer="satellite"]::before {
+  background: radial-gradient(110% 100% at 85% 90%, rgba(3, 105, 161, 0.12), rgba(79, 70, 229, 0.08) 55%, transparent 80%);
+}
+
+:root[data-theme="swiss"] .layer-category-button[data-layer="custom"]::before {
+  background: radial-gradient(110% 100% at 85% 90%, rgba(217, 119, 6, 0.13), transparent 72%);
 }
 
 .layer-category-button svg {
@@ -306,9 +511,143 @@
 }
 
 .layer-provider-option {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
   display: flex;
   align-items: center;
   gap: 6px;
+  transition: background-color 160ms ease, color 160ms ease;
+}
+
+.layer-provider-option > * {
+  position: relative;
+  z-index: 1;
+}
+
+.layer-provider-option::before,
+.layer-provider-option::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0;
+  transition: opacity 180ms ease;
+}
+
+.layer-switch .layer-source-menu .layer-provider-option:hover:not(.selected) {
+  background: rgba(255, 255, 255, 0.045);
+}
+
+:root[data-theme="swiss"] .layer-switch .layer-source-menu .layer-provider-option:hover:not(.selected) {
+  background: rgba(24, 34, 46, 0.04);
+}
+
+.layer-provider-option:hover:not(.selected)::before {
+  opacity: 1;
+}
+
+.layer-provider-option:hover:not(.selected)::after {
+  opacity: 0.78;
+}
+
+.layer-provider-option.selected::after {
+  opacity: 0.36;
+}
+
+.layer-provider-option[data-category="road"]::before {
+  background: linear-gradient(90deg, transparent 22%, rgba(56, 189, 248, 0.14) 100%);
+}
+
+.layer-provider-option[data-category="road"]::after {
+  background-image:
+    linear-gradient(rgba(56, 189, 248, 0.18) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(56, 189, 248, 0.18) 1px, transparent 1px);
+  background-size: 11px 11px;
+  -webkit-mask-image: linear-gradient(90deg, transparent 42%, #000 100%);
+  mask-image: linear-gradient(90deg, transparent 42%, #000 100%);
+}
+
+.layer-provider-option[data-category="terrain"]::before {
+  background: linear-gradient(90deg, transparent 22%, rgba(217, 160, 91, 0.16) 100%);
+}
+
+.layer-provider-option[data-category="terrain"]::after {
+  background-image: repeating-linear-gradient(
+    -24deg,
+    transparent 0 8px,
+    rgba(217, 160, 91, 0.22) 8px 9px,
+    transparent 9px 17px
+  );
+  -webkit-mask-image: linear-gradient(90deg, transparent 40%, #000 100%);
+  mask-image: linear-gradient(90deg, transparent 40%, #000 100%);
+}
+
+.layer-provider-option[data-category="satellite"]::before {
+  background: linear-gradient(90deg, transparent 20%, rgba(56, 189, 248, 0.13) 65%, rgba(129, 140, 248, 0.16) 100%);
+}
+
+.layer-provider-option[data-category="satellite"]::after {
+  background-image:
+    radial-gradient(circle at 86% 35%, rgba(186, 230, 253, 0.45) 0 1px, transparent 1.6px),
+    radial-gradient(circle at 74% 68%, rgba(165, 180, 252, 0.38) 0 1px, transparent 1.6px),
+    radial-gradient(circle at 92% 72%, rgba(125, 211, 252, 0.36) 0 1px, transparent 1.5px);
+}
+
+.layer-provider-option[data-category="custom"]::before {
+  background: linear-gradient(90deg, transparent 22%, rgba(245, 158, 11, 0.16) 100%);
+}
+
+.layer-provider-option[data-category="custom"]::after {
+  background-image: repeating-linear-gradient(
+    45deg,
+    transparent 0 8px,
+    rgba(245, 158, 11, 0.18) 8px 9px,
+    transparent 9px 17px
+  );
+  -webkit-mask-image: linear-gradient(90deg, transparent 42%, #000 100%);
+  mask-image: linear-gradient(90deg, transparent 42%, #000 100%);
+}
+
+.layer-provider-option.selected[data-category="road"]::after {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.22) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.22) 1px, transparent 1px);
+}
+
+.layer-provider-option.selected[data-category="terrain"]::after {
+  background-image: repeating-linear-gradient(
+    -24deg,
+    transparent 0 8px,
+    rgba(255, 255, 255, 0.24) 8px 9px,
+    transparent 9px 17px
+  );
+}
+
+.layer-provider-option.selected[data-category="custom"]::after {
+  background-image: repeating-linear-gradient(
+    45deg,
+    transparent 0 8px,
+    rgba(255, 255, 255, 0.22) 8px 9px,
+    transparent 9px 17px
+  );
+}
+
+:root[data-theme="swiss"] .layer-provider-option[data-category="road"]::before {
+  background: linear-gradient(90deg, transparent 22%, rgba(2, 132, 199, 0.11) 100%);
+}
+
+:root[data-theme="swiss"] .layer-provider-option[data-category="terrain"]::before {
+  background: linear-gradient(90deg, transparent 22%, rgba(180, 83, 9, 0.11) 100%);
+}
+
+:root[data-theme="swiss"] .layer-provider-option[data-category="satellite"]::before {
+  background: linear-gradient(90deg, transparent 20%, rgba(3, 105, 161, 0.10) 65%, rgba(79, 70, 229, 0.10) 100%);
+}
+
+:root[data-theme="swiss"] .layer-provider-option[data-category="custom"]::before {
+  background: linear-gradient(90deg, transparent 22%, rgba(217, 119, 6, 0.12) 100%);
 }
 
 .layer-provider-option[hidden] {
@@ -705,6 +1044,57 @@
   background: var(--icon-active-background);
   color: var(--icon-active);
   font-weight: 600;
+}
+
+.layer-switch .layer-source-menu .layer-overlay-chip[data-overlay="hiking"]:hover {
+  border-color: rgba(52, 211, 153, 0.48);
+  background: linear-gradient(135deg, rgba(52, 211, 153, 0.12), var(--surface-hover));
+}
+
+.layer-switch .layer-source-menu .layer-overlay-chip[data-overlay="hiking"].active {
+  border-color: rgba(52, 211, 153, 0.65);
+  background: linear-gradient(135deg, rgba(52, 211, 153, 0.20), rgba(16, 185, 129, 0.08));
+  color: #34d399;
+}
+
+.layer-switch .layer-source-menu .layer-overlay-chip[data-overlay="cycling"]:hover {
+  border-color: rgba(251, 146, 60, 0.48);
+  background: linear-gradient(135deg, rgba(251, 146, 60, 0.12), var(--surface-hover));
+}
+
+.layer-switch .layer-source-menu .layer-overlay-chip[data-overlay="cycling"].active {
+  border-color: rgba(251, 146, 60, 0.65);
+  background: linear-gradient(135deg, rgba(251, 146, 60, 0.20), rgba(234, 88, 12, 0.08));
+  color: #fb923c;
+}
+
+.layer-switch .layer-source-menu .layer-overlay-chip[data-overlay="pistes"]:hover {
+  border-color: rgba(56, 189, 248, 0.48);
+  background: linear-gradient(135deg, rgba(56, 189, 248, 0.12), var(--surface-hover));
+}
+
+.layer-switch .layer-source-menu .layer-overlay-chip[data-overlay="pistes"].active {
+  border-color: rgba(56, 189, 248, 0.65);
+  background: linear-gradient(135deg, rgba(56, 189, 248, 0.20), rgba(2, 132, 199, 0.08));
+  color: #38bdf8;
+}
+
+:root[data-theme="swiss"] .layer-switch .layer-source-menu .layer-overlay-chip[data-overlay="hiking"].active {
+  border-color: rgba(4, 120, 87, 0.48);
+  background: linear-gradient(135deg, rgba(5, 150, 105, 0.14), rgba(5, 150, 105, 0.05));
+  color: #047857;
+}
+
+:root[data-theme="swiss"] .layer-switch .layer-source-menu .layer-overlay-chip[data-overlay="cycling"].active {
+  border-color: rgba(194, 65, 12, 0.48);
+  background: linear-gradient(135deg, rgba(234, 88, 12, 0.14), rgba(234, 88, 12, 0.05));
+  color: #c2410c;
+}
+
+:root[data-theme="swiss"] .layer-switch .layer-source-menu .layer-overlay-chip[data-overlay="pistes"].active {
+  border-color: rgba(3, 105, 161, 0.48);
+  background: linear-gradient(135deg, rgba(2, 132, 199, 0.14), rgba(2, 132, 199, 0.05));
+  color: #0369a1;
 }
 
 .layer-cache-options.is-disabled {

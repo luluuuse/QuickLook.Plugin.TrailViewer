@@ -14,12 +14,14 @@ internal sealed partial class TrailViewerPanel
     private async void OnInitialized(object sender, CoreWebView2InitializationCompletedEventArgs e)
     {
         Trace($"WebView2 initialized: success={e.IsSuccess} {e.InitializationException?.Message}");
-        if (_webView == null)
-            return; // preview already closed
+        if (_webView == null || !ReferenceEquals(sender, _webView))
+            return; // preview already closed or superseded by a retry
 
         if (!e.IsSuccess)
         {
-            Fail("Could not start WebView2: " + e.InitializationException?.Message);
+            // EnsureWebViewAsync owns retry and final error reporting while startup is in progress.
+            if (!_initializingWebView)
+                Fail("Could not start WebView2: " + e.InitializationException?.Message);
             return;
         }
 
@@ -35,18 +37,13 @@ internal sealed partial class TrailViewerPanel
             core.Settings.UserAgent += " TrailViewer/"
                 + (typeof(TrailViewerPanel).Assembly.GetName().Version?.ToString(3) ?? "unknown");
             core.NewWindowRequested += OnNewWindowRequested;
-            core.NavigationStarting += (_, args) =>
-            {
-                // The page never navigates away: https links (map attribution) open in the default browser,
-                // anything else (e.g. a file dropped on the view) is blocked.
-                if (Uri.TryCreate(args.Uri, UriKind.Absolute, out var uri) && uri.Host == AppHost)
-                    return;
-                args.Cancel = true;
-                OpenInBrowser(args.Uri);
-            };
+            core.NavigationStarting += OnNavigationStarting;
             core.WebMessageReceived += OnWebMessage;
             core.WebResourceRequested += OnWebResourceRequested;
             core.WebResourceResponseReceived += OnWebResourceResponseReceived;
+            // The new WebView2 is now holding the browser process warm, so any keep-alive shell from the
+            // previous preview can be released immediately.
+            ReleaseKeepAliveWebView();
 
             // Allow = served as if with "Access-Control-Allow-Origin: *", so the page (another origin) can fetch
             // the file. The page treats everything in the file as text and has a Content-Security-Policy.
@@ -134,6 +131,16 @@ internal sealed partial class TrailViewerPanel
         {
             return string.Empty;
         }
+    }
+
+    private static void OnNavigationStarting(object sender, CoreWebView2NavigationStartingEventArgs args)
+    {
+        // The page never navigates away: https links (map attribution) open in the default browser,
+        // anything else (e.g. a file dropped on the view) is blocked.
+        if (Uri.TryCreate(args.Uri, UriKind.Absolute, out var uri) && uri.Host == AppHost)
+            return;
+        args.Cancel = true;
+        OpenInBrowser(args.Uri);
     }
 
     private static void OnNewWindowRequested(object sender, CoreWebView2NewWindowRequestedEventArgs args)

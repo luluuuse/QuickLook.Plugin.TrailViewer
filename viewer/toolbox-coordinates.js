@@ -5,7 +5,7 @@ import { createSnapIndicator, createSnapReticleMarker } from './snap-indicator.j
 /** Coordinate subview: point targets, free-map picking, snapping and clipboard feedback. */
 export function createCoordinateTool({
   L, map, el, t, copyText, showToast, coordinatePoints, focusCoordinate, snapMarker,
-  panel, onBack, onWeather, renderToolbox,
+  panel, onBack, weatherProvider = () => 'windy', onWeather, renderToolbox,
 }) {
   const lifecycle = new AbortController();
   const { signal } = lifecycle;
@@ -37,8 +37,8 @@ export function createCoordinateTool({
   const grid = el('div', 'toolbox-coordinate-grid');
   const choices = [
     { mode: 'start', labelKey: 'coordinates.start', createIcon: () => weatherMarkElement('start', { size: 16 }) },
-    { mode: 'end', labelKey: 'coordinates.end', createIcon: () => weatherMarkElement('end', { size: 16 }) },
     { mode: 'highest', labelKey: 'coordinates.highest', createIcon: () => weatherMarkElement('highest', { size: 16 }) },
+    { mode: 'end', labelKey: 'coordinates.end', createIcon: () => weatherMarkElement('end', { size: 16 }) },
     { mode: 'center', labelKey: 'coordinates.center', createIcon: () => iconElement('locate') },
   ];
   for (const { mode, labelKey, createIcon } of choices) {
@@ -47,12 +47,7 @@ export function createCoordinateTool({
     option.dataset.coordinate = mode;
     option.append(createIcon(), el('span', null, t(labelKey)));
     option.addEventListener('click', () => {
-      if (mode === 'center') {
-        const centre = map.getCenter();
-        copy({ lat: centre.lat, lon: centre.lng }, mode);
-      } else {
-        copy(coordinatePoints()[mode], mode, { focus: true });
-      }
+      copy(coordinatePoints()[mode], mode, { focus: true });
     }, { signal });
     grid.append(option);
   }
@@ -65,9 +60,15 @@ export function createCoordinateTool({
   const weather = el('button', 'toolbox-coordinate-weather');
   weather.type = 'button';
   weather.hidden = true;
-  weather.append(iconElement('weather'), el('span', null, t('coordinates.weather')));
-  weather.title = t('coordinates.weatherHint');
-  weather.setAttribute('aria-label', weather.title);
+  const weatherLabel = el('span');
+  weather.append(iconElement('weather'), weatherLabel);
+  function syncWeatherHint() {
+    const provider = t(`weather.provider.${weatherProvider()}`);
+    weatherLabel.textContent = t('coordinates.weather', { provider });
+    weather.title = t('coordinates.weatherHint', { provider });
+    weather.setAttribute('aria-label', weather.title);
+  }
+  syncWeatherHint();
   weather.addEventListener('click', () => {
     if (!copiedPoint) return;
     onWeather(copiedPoint);
@@ -215,17 +216,14 @@ export function createCoordinateTool({
     const targets = coordinatePoints();
     for (const option of view.querySelectorAll('[data-coordinate]')) {
       const mode = option.dataset.coordinate;
-      if (mode === 'center') {
-        option.title = t('coordinates.centerHint');
-      } else {
-        option.disabled = !targets[mode];
-        option.title = targets[mode]
-          ? `${t(`coordinates.${mode}`)}: ${formatCoord(targets[mode])}`
-          : t('coordinates.unavailable');
-      }
+      option.disabled = !targets[mode];
+      option.title = targets[mode]
+        ? `${t(`coordinates.${mode}`)}: ${formatCoord(targets[mode])}`
+        : t('coordinates.unavailable');
       option.setAttribute('aria-label', option.title);
     }
     instruction.textContent = t(active ? 'coordinates.pick' : 'coordinates.instruction');
+    syncWeatherHint();
   }
 
   function relabel() {
@@ -238,9 +236,7 @@ export function createCoordinateTool({
     }
     result.querySelector('span').textContent = t('coordinates.result');
     elevation.textContent = elevationText(copiedPoint);
-    weather.querySelector('span').textContent = t('coordinates.weather');
-    weather.title = t('coordinates.weatherHint');
-    weather.setAttribute('aria-label', weather.title);
+    syncWeatherHint();
     hint.querySelector('span').textContent = t('coordinates.pick');
     snapIndicator.relabel();
     render();

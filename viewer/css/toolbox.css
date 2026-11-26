@@ -212,10 +212,78 @@
 }
 
 .toolbox-hero-action {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
   grid-template-columns: auto minmax(0, 1fr) auto;
   padding: 9px 11px;
   border-color: var(--accent-muted);
   background: linear-gradient(135deg, var(--accent-tint), var(--surface-card));
+  transition: border-color 180ms ease, background 180ms ease;
+}
+
+.toolbox-hero-action > * {
+  position: relative;
+  z-index: 1;
+}
+
+.toolbox-hero-action::before,
+.toolbox-hero-action::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  transition: opacity 220ms ease;
+}
+
+.toolbox-hero-action::before {
+  opacity: 0.42;
+  background-image: repeating-linear-gradient(
+    -24deg,
+    transparent 0 12px,
+    rgba(255, 255, 255, 0.05) 12px 13px,
+    transparent 13px 24px
+  );
+}
+
+:root[data-theme="swiss"] .toolbox-hero-action::before {
+  background-image: repeating-linear-gradient(
+    -24deg,
+    transparent 0 12px,
+    rgba(223, 43, 29, 0.06) 12px 13px,
+    transparent 13px 24px
+  );
+}
+
+.toolbox-hero-action::after {
+  opacity: 0;
+  background: linear-gradient(
+    112deg,
+    transparent 26%,
+    rgba(255, 255, 255, 0.11) 50%,
+    transparent 74%
+  );
+  background-size: 220% 100%;
+}
+
+:root[data-theme="swiss"] .toolbox-hero-action::after {
+  background: linear-gradient(
+    112deg,
+    transparent 26%,
+    rgba(223, 43, 29, 0.09) 50%,
+    transparent 74%
+  );
+  background-size: 220% 100%;
+}
+
+.toolbox-hero-action:hover:not(:disabled)::before {
+  opacity: 0.78;
+}
+
+.toolbox-hero-action:hover:not(:disabled)::after {
+  opacity: 1;
+  animation: toolbox-hero-sheen 2.1s ease-in-out infinite;
 }
 
 .toolbox-hero-action .toolbox-action-icon {
@@ -230,10 +298,18 @@
   color: var(--muted);
   font-size: 16px;
   line-height: 1;
+  transition: transform 160ms ease, color 160ms ease;
+}
+
+.toolbox-hero-action:hover:not(:disabled) .toolbox-hero-chevron {
+  color: var(--accent);
+  transform: translateX(2px);
 }
 
 .toolbox-quick-action {
   position: relative;
+  overflow: hidden;
+  isolation: isolate;
   min-width: 0;
   min-height: 44px;
   display: flex;
@@ -241,6 +317,43 @@
   gap: 8px;
   padding: 8px 10px;
   text-align: left;
+  transition: border-color 180ms ease, background-color 180ms ease;
+}
+
+.toolbox-quick-action > * {
+  position: relative;
+  z-index: 1;
+}
+
+.toolbox-quick-action::before,
+.toolbox-quick-action::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  transition: opacity 220ms ease;
+}
+
+.toolbox-quick-action::before {
+  opacity: 0.36;
+}
+
+.toolbox-quick-action::after {
+  opacity: 0;
+}
+
+.toolbox-quick-action:hover:not(:disabled)::before {
+  opacity: 1;
+}
+
+.toolbox-quick-action:hover:not(:disabled)::after {
+  opacity: 0.85;
+}
+
+.toolbox-quick-action:disabled::before,
+.toolbox-quick-action:disabled::after {
+  opacity: 0;
 }
 
 .toolbox-quick-action .toolbox-action-icon {
@@ -248,6 +361,163 @@
   height: 26px;
   flex: none;
   border-radius: var(--control-radius);
+  transition: color 180ms ease, background-color 180ms ease;
+}
+
+.toolbox-quick-action:disabled .toolbox-action-icon {
+  color: var(--icon-disabled);
+  background: var(--surface-muted);
+}
+
+/* Measure: emerald ruler ticks */
+.toolbox-quick-action[data-tool="measure"] .toolbox-action-icon {
+  color: #34d399;
+  background: rgba(52, 211, 153, 0.14);
+}
+
+.toolbox-quick-action[data-tool="measure"]::before {
+  background: radial-gradient(120% 110% at 92% 85%, rgba(52, 211, 153, 0.18), transparent 72%);
+}
+
+.toolbox-quick-action[data-tool="measure"]::after {
+  background:
+    repeating-linear-gradient(90deg, rgba(52, 211, 153, 0.28) 0 1px, transparent 1px 8px) left bottom / 100% 5px no-repeat,
+    repeating-linear-gradient(90deg, rgba(52, 211, 153, 0.42) 0 1px, transparent 1px 24px) left bottom / 100% 8px no-repeat;
+}
+
+:root[data-theme="swiss"] .toolbox-quick-action[data-tool="measure"] .toolbox-action-icon {
+  color: #047857;
+  background: rgba(5, 150, 105, 0.11);
+}
+
+:root[data-theme="swiss"] .toolbox-quick-action[data-tool="measure"]::before {
+  background: radial-gradient(120% 110% at 92% 85%, rgba(5, 150, 105, 0.13), transparent 72%);
+}
+
+:root[data-theme="swiss"] .toolbox-quick-action[data-tool="measure"]::after {
+  background:
+    repeating-linear-gradient(90deg, rgba(4, 120, 87, 0.24) 0 1px, transparent 1px 8px) left bottom / 100% 5px no-repeat,
+    repeating-linear-gradient(90deg, rgba(4, 120, 87, 0.38) 0 1px, transparent 1px 24px) left bottom / 100% 8px no-repeat;
+}
+
+/* Coordinates: sky-blue reticle & coordinate grid */
+.toolbox-quick-action[data-tool="coordinates"] .toolbox-action-icon {
+  color: #38bdf8;
+  background: rgba(56, 189, 248, 0.14);
+}
+
+.toolbox-quick-action[data-tool="coordinates"]::before {
+  background: radial-gradient(120% 110% at 92% 50%, rgba(56, 189, 248, 0.18), transparent 72%);
+}
+
+.toolbox-quick-action[data-tool="coordinates"]::after {
+  background-image:
+    linear-gradient(rgba(56, 189, 248, 0.16) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(56, 189, 248, 0.16) 1px, transparent 1px);
+  background-size: 12px 12px;
+  -webkit-mask-image: linear-gradient(90deg, transparent 32%, #000 100%);
+  mask-image: linear-gradient(90deg, transparent 32%, #000 100%);
+}
+
+:root[data-theme="swiss"] .toolbox-quick-action[data-tool="coordinates"] .toolbox-action-icon {
+  color: #0369a1;
+  background: rgba(2, 132, 199, 0.11);
+}
+
+:root[data-theme="swiss"] .toolbox-quick-action[data-tool="coordinates"]::before {
+  background: radial-gradient(120% 110% at 92% 50%, rgba(2, 132, 199, 0.13), transparent 72%);
+}
+
+:root[data-theme="swiss"] .toolbox-quick-action[data-tool="coordinates"]::after {
+  background-image:
+    linear-gradient(rgba(3, 105, 161, 0.16) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(3, 105, 161, 0.16) 1px, transparent 1px);
+}
+
+/* Overlay export: warm amber transparency checkerboard */
+.toolbox-quick-action[data-tool="export"]:not(:disabled) .toolbox-action-icon {
+  color: #f59e0b;
+  background: rgba(245, 158, 11, 0.14);
+}
+
+.toolbox-quick-action[data-tool="export"]::before {
+  background: radial-gradient(120% 110% at 92% 50%, rgba(245, 158, 11, 0.18), transparent 72%);
+}
+
+.toolbox-quick-action[data-tool="export"]::after {
+  background-image: conic-gradient(
+    rgba(245, 158, 11, 0.16) 90deg,
+    transparent 90deg 180deg,
+    rgba(245, 158, 11, 0.16) 180deg 270deg,
+    transparent 270deg
+  );
+  background-size: 10px 10px;
+  -webkit-mask-image: linear-gradient(90deg, transparent 38%, #000 100%);
+  mask-image: linear-gradient(90deg, transparent 38%, #000 100%);
+}
+
+:root[data-theme="swiss"] .toolbox-quick-action[data-tool="export"]:not(:disabled) .toolbox-action-icon {
+  color: #b45309;
+  background: rgba(217, 119, 6, 0.11);
+}
+
+:root[data-theme="swiss"] .toolbox-quick-action[data-tool="export"]::before {
+  background: radial-gradient(120% 110% at 92% 50%, rgba(217, 119, 6, 0.13), transparent 72%);
+}
+
+:root[data-theme="swiss"] .toolbox-quick-action[data-tool="export"]::after {
+  background-image: conic-gradient(
+    rgba(180, 83, 9, 0.14) 90deg,
+    transparent 90deg 180deg,
+    rgba(180, 83, 9, 0.14) 180deg 270deg,
+    transparent 270deg
+  );
+}
+
+/* Attachments: soft violet viewfinder crop corners */
+.toolbox-quick-action[data-tool="attachments"]:not(:disabled) .toolbox-action-icon {
+  color: #a78bfa;
+  background: rgba(167, 139, 250, 0.14);
+}
+
+.toolbox-quick-action[data-tool="attachments"]::before {
+  background: radial-gradient(120% 110% at 92% 50%, rgba(167, 139, 250, 0.18), transparent 72%);
+}
+
+.toolbox-quick-action[data-tool="attachments"]::after {
+  background:
+    linear-gradient(rgba(167, 139, 250, 0.36), rgba(167, 139, 250, 0.36)) calc(100% - 7px) 6px / 7px 1.5px no-repeat,
+    linear-gradient(rgba(167, 139, 250, 0.36), rgba(167, 139, 250, 0.36)) calc(100% - 7px) 6px / 1.5px 7px no-repeat,
+    linear-gradient(rgba(167, 139, 250, 0.36), rgba(167, 139, 250, 0.36)) calc(100% - 7px) calc(100% - 6px) / 7px 1.5px no-repeat,
+    linear-gradient(rgba(167, 139, 250, 0.36), rgba(167, 139, 250, 0.36)) calc(100% - 7px) calc(100% - 6px) / 1.5px 7px no-repeat;
+}
+
+:root[data-theme="swiss"] .toolbox-quick-action[data-tool="attachments"]:not(:disabled) .toolbox-action-icon {
+  color: #6d28d9;
+  background: rgba(109, 40, 217, 0.11);
+}
+
+:root[data-theme="swiss"] .toolbox-quick-action[data-tool="attachments"]::before {
+  background: radial-gradient(120% 110% at 92% 50%, rgba(109, 40, 217, 0.13), transparent 72%);
+}
+
+:root[data-theme="swiss"] .toolbox-quick-action[data-tool="attachments"]::after {
+  background:
+    linear-gradient(rgba(109, 40, 217, 0.32), rgba(109, 40, 217, 0.32)) calc(100% - 7px) 6px / 7px 1.5px no-repeat,
+    linear-gradient(rgba(109, 40, 217, 0.32), rgba(109, 40, 217, 0.32)) calc(100% - 7px) 6px / 1.5px 7px no-repeat,
+    linear-gradient(rgba(109, 40, 217, 0.32), rgba(109, 40, 217, 0.32)) calc(100% - 7px) calc(100% - 6px) / 7px 1.5px no-repeat,
+    linear-gradient(rgba(109, 40, 217, 0.32), rgba(109, 40, 217, 0.32)) calc(100% - 7px) calc(100% - 6px) / 1.5px 7px no-repeat;
+}
+
+@keyframes toolbox-hero-sheen {
+  0%, 100% { background-position: 100% 0; }
+  50% { background-position: 0% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toolbox-hero-action:hover:not(:disabled)::after {
+    animation: none;
+  }
 }
 
 .toolbox-quick-action strong {
@@ -328,7 +598,344 @@
 
 .toolbox-weather-card .toolbox-action:hover:not(:disabled) {
   border-color: transparent;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+:root[data-theme="swiss"] .toolbox-weather-card .toolbox-action:hover:not(:disabled) {
+  background: rgba(24, 34, 46, 0.03);
+}
+
+.toolbox-weather-head {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.toolbox-weather-head::before,
+.toolbox-weather-head::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  transition: opacity 240ms ease, background 240ms ease;
+}
+
+.toolbox-weather-head::after {
+  opacity: 0.48;
+}
+
+.toolbox-weather-head:hover::after {
+  opacity: 0.96;
+}
+
+.toolbox-weather-head .toolbox-action {
+  position: relative;
+  z-index: 1;
+}
+
+.toolbox-weather-head .toolbox-action-icon {
+  transition: color 220ms ease, background-color 220ms ease;
+}
+
+.toolbox-weather-head .toolbox-action strong {
+  padding-right: 92px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.toolbox-weather-head .toolbox-action small {
+  padding-right: 16px;
+}
+
+.toolbox-weather-ext {
+  position: absolute;
+  right: 9px;
+  bottom: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1;
+  opacity: 0.72;
+  transition: transform 160ms ease, color 160ms ease, opacity 160ms ease;
+}
+
+.toolbox-weather-head:hover .toolbox-weather-ext {
+  color: var(--icon-active);
+  opacity: 1;
+  transform: translate(1.5px, -1.5px);
+}
+
+.toolbox-weather-card .toolbox-action:disabled .toolbox-weather-ext {
+  opacity: 0.3;
+  transform: none;
+}
+
+/* Provider-specific atmospheric tints & hover micro-animations (dark themes default, Swiss parchment below). */
+.toolbox-weather-card[data-active-provider="windy"] .toolbox-weather-head::before {
+  background: radial-gradient(125% 110% at 88% 12%, rgba(56, 189, 248, 0.22), rgba(56, 189, 248, 0.04) 58%, transparent 82%);
+}
+
+.toolbox-weather-card[data-active-provider="windy"] .toolbox-weather-head::after {
+  background-image: repeating-linear-gradient(
+    -14deg,
+    transparent 0 10px,
+    rgba(125, 211, 252, 0.22) 10px 11.5px,
+    transparent 11.5px 22px
+  );
+  background-size: 64px 64px;
+}
+
+.toolbox-weather-card[data-active-provider="windy"] .toolbox-weather-head:hover::after {
+  animation: weather-wind-drift 1.8s linear infinite;
+}
+
+.toolbox-weather-card[data-active-provider="windy"] .toolbox-action-icon {
+  color: #38bdf8;
+  background: rgba(56, 189, 248, 0.14);
+}
+
+.toolbox-weather-card[data-active-provider="ventusky"] .toolbox-weather-head::before {
+  background: radial-gradient(125% 110% at 86% 12%, rgba(99, 132, 241, 0.24), rgba(99, 132, 241, 0.05) 58%, transparent 82%);
+}
+
+.toolbox-weather-card[data-active-provider="ventusky"] .toolbox-weather-head::after {
+  background-image: repeating-linear-gradient(
+    112deg,
+    transparent 0 9px,
+    rgba(165, 180, 252, 0.16) 9px 10px,
+    transparent 10px 18px
+  );
+  background-size: 28px 36px;
+}
+
+.toolbox-weather-card[data-active-provider="ventusky"] .toolbox-weather-head:hover::after {
+  animation: weather-rain-fall 1.15s linear infinite;
+}
+
+.toolbox-weather-card[data-active-provider="ventusky"] .toolbox-action-icon {
+  color: #818cf8;
+  background: rgba(129, 140, 248, 0.15);
+}
+
+.toolbox-weather-card[data-active-provider="zoomearth"] .toolbox-weather-head::before {
+  background:
+    radial-gradient(95% 110% at 88% 15%, rgba(139, 92, 246, 0.22), transparent 64%),
+    radial-gradient(85% 95% at 18% 90%, rgba(56, 189, 248, 0.14), transparent 68%);
+}
+
+.toolbox-weather-card[data-active-provider="zoomearth"] .toolbox-weather-head::after {
+  background-image:
+    radial-gradient(circle at 76% 32%, rgba(216, 180, 254, 0.38) 0 1.2px, transparent 1.6px),
+    radial-gradient(circle at 62% 68%, rgba(125, 211, 252, 0.32) 0 1px, transparent 1.5px),
+    radial-gradient(circle at 88% 72%, rgba(196, 181, 253, 0.28) 0 1px, transparent 1.5px),
+    linear-gradient(108deg, transparent 32%, rgba(167, 139, 250, 0.16) 50%, transparent 68%);
+  background-size: 100% 100%, 100% 100%, 100% 100%, 220% 100%;
+}
+
+.toolbox-weather-card[data-active-provider="zoomearth"] .toolbox-weather-head:hover::after {
+  animation: weather-orbit-sweep 2.8s ease-in-out infinite;
+}
+
+.toolbox-weather-card[data-active-provider="zoomearth"] .toolbox-action-icon {
+  color: #a78bfa;
+  background: rgba(167, 139, 250, 0.15);
+}
+
+.toolbox-weather-card[data-active-provider="peakfinder"] .toolbox-weather-head::before {
+  background: radial-gradient(115% 120% at 84% 12%, rgba(245, 158, 11, 0.25), rgba(251, 146, 60, 0.06) 56%, transparent 82%);
+}
+
+.toolbox-weather-card[data-active-provider="peakfinder"] .toolbox-weather-head::after {
+  background: linear-gradient(180deg, rgba(251, 191, 36, 0.16), rgba(245, 158, 11, 0.05));
+  clip-path: polygon(0% 100%, 0% 84%, 16% 62%, 31% 78%, 48% 48%, 63% 72%, 79% 54%, 93% 74%, 100% 66%, 100% 100%);
+}
+
+.toolbox-weather-card[data-active-provider="peakfinder"] .toolbox-weather-head:hover::before {
+  animation: weather-sun-breathe 2.4s ease-in-out infinite;
+}
+
+.toolbox-weather-card[data-active-provider="peakfinder"] .toolbox-action-icon {
+  color: #f59e0b;
+  background: rgba(245, 158, 11, 0.15);
+}
+
+.toolbox-weather-card[data-active-provider="shademap"] .toolbox-weather-head::before {
+  background: linear-gradient(
+    128deg,
+    rgba(251, 191, 36, 0.22) 0%,
+    rgba(251, 191, 36, 0.06) 45%,
+    rgba(15, 23, 42, 0.26) 54%,
+    rgba(51, 65, 85, 0.18) 100%
+  );
+}
+
+.toolbox-weather-card[data-active-provider="shademap"] .toolbox-weather-head::after {
+  background: linear-gradient(
+    128deg,
+    transparent 28%,
+    rgba(253, 224, 71, 0.14) 48%,
+    rgba(15, 23, 42, 0.22) 53%,
+    transparent 74%
+  );
+  background-size: 180% 100%;
+}
+
+.toolbox-weather-card[data-active-provider="shademap"] .toolbox-weather-head:hover::after {
+  animation: weather-shade-shift 2.4s ease-in-out infinite alternate;
+}
+
+.toolbox-weather-card[data-active-provider="shademap"] .toolbox-action-icon {
+  color: #fbbf24;
+  background: rgba(251, 191, 36, 0.15);
+}
+
+/* Swiss parchment light-theme ink & wash calibration. */
+:root[data-theme="swiss"] .toolbox-weather-card[data-active-provider="windy"] .toolbox-weather-head::before {
+  background: radial-gradient(125% 110% at 88% 12%, rgba(2, 132, 199, 0.15), rgba(2, 132, 199, 0.03) 58%, transparent 82%);
+}
+
+:root[data-theme="swiss"] .toolbox-weather-card[data-active-provider="windy"] .toolbox-weather-head::after {
+  background-image: repeating-linear-gradient(
+    -14deg,
+    transparent 0 11px,
+    rgba(2, 132, 199, 0.13) 11px 12px,
+    transparent 12px 22px
+  );
+}
+
+:root[data-theme="swiss"] .toolbox-weather-card[data-active-provider="windy"] .toolbox-action-icon {
+  color: #0369a1;
+  background: rgba(2, 132, 199, 0.12);
+}
+
+:root[data-theme="swiss"] .toolbox-weather-card[data-active-provider="ventusky"] .toolbox-weather-head::before {
+  background: radial-gradient(125% 110% at 86% 12%, rgba(79, 70, 229, 0.14), rgba(79, 70, 229, 0.03) 58%, transparent 82%);
+}
+
+:root[data-theme="swiss"] .toolbox-weather-card[data-active-provider="ventusky"] .toolbox-weather-head::after {
+  background-image: repeating-linear-gradient(
+    112deg,
+    transparent 0 9px,
+    rgba(79, 70, 229, 0.14) 9px 10px,
+    transparent 10px 18px
+  );
+}
+
+:root[data-theme="swiss"] .toolbox-weather-card[data-active-provider="ventusky"] .toolbox-action-icon {
+  color: #4338ca;
+  background: rgba(79, 70, 229, 0.11);
+}
+
+:root[data-theme="swiss"] .toolbox-weather-card[data-active-provider="zoomearth"] .toolbox-weather-head::before {
+  background:
+    radial-gradient(95% 110% at 88% 15%, rgba(109, 40, 217, 0.14), transparent 64%),
+    radial-gradient(85% 95% at 18% 90%, rgba(2, 132, 199, 0.10), transparent 68%);
+}
+
+:root[data-theme="swiss"] .toolbox-weather-card[data-active-provider="zoomearth"] .toolbox-action-icon {
+  color: #6d28d9;
+  background: rgba(109, 40, 217, 0.11);
+}
+
+:root[data-theme="swiss"] .toolbox-weather-card[data-active-provider="peakfinder"] .toolbox-weather-head::before {
+  background: radial-gradient(115% 120% at 84% 12%, rgba(217, 119, 6, 0.17), rgba(234, 88, 12, 0.04) 56%, transparent 82%);
+}
+
+:root[data-theme="swiss"] .toolbox-weather-card[data-active-provider="peakfinder"] .toolbox-weather-head::after {
+  background: linear-gradient(180deg, rgba(217, 119, 6, 0.16), rgba(217, 119, 6, 0.04));
+}
+
+:root[data-theme="swiss"] .toolbox-weather-card[data-active-provider="peakfinder"] .toolbox-action-icon {
+  color: #b45309;
+  background: rgba(217, 119, 6, 0.12);
+}
+
+:root[data-theme="swiss"] .toolbox-weather-card[data-active-provider="shademap"] .toolbox-weather-head::before {
+  background: linear-gradient(
+    128deg,
+    rgba(217, 119, 6, 0.16) 0%,
+    rgba(217, 119, 6, 0.05) 45%,
+    rgba(30, 41, 59, 0.13) 54%,
+    rgba(51, 65, 85, 0.09) 100%
+  );
+}
+
+:root[data-theme="swiss"] .toolbox-weather-card[data-active-provider="shademap"] .toolbox-action-icon {
+  color: #b45309;
+  background: rgba(217, 119, 6, 0.12);
+}
+
+@keyframes weather-wind-drift {
+  from { background-position: 0 0; }
+  to { background-position: 64px -16px; }
+}
+
+@keyframes weather-rain-fall {
+  from { background-position: 0 0; }
+  to { background-position: -14px 36px; }
+}
+
+@keyframes weather-orbit-sweep {
+  0%, 100% { background-position: 0 0, 0 0, 0 0, 100% 0; }
+  50% { background-position: 0 0, 0 0, 0 0, 0% 0; }
+}
+
+@keyframes weather-sun-breathe {
+  0%, 100% { opacity: 0.9; }
+  50% { opacity: 1; filter: brightness(1.16); }
+}
+
+@keyframes weather-shade-shift {
+  from { background-position: 15% 0; }
+  to { background-position: 85% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toolbox-weather-head:hover::before,
+  .toolbox-weather-head:hover::after {
+    animation: none;
+  }
+}
+
+.toolbox-weather-tabs {
+  position: absolute;
+  top: 7px;
+  right: 8px;
+  z-index: 2;
+  display: inline-flex;
+  overflow: hidden;
+  border: 1px solid var(--border-control);
+  border-radius: var(--radius-pill);
+  background: var(--surface-muted);
+}
+
+.toolbox-weather-tabs[hidden] {
+  display: none;
+}
+
+.toolbox-weather-tab {
+  min-height: 20px;
+  padding: 0 7px;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 10.5px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.toolbox-weather-tab:hover {
   background: var(--surface-hover);
+  color: var(--text-bright);
+}
+
+.toolbox-weather-tab[aria-pressed="true"] {
+  background: var(--icon-active-background);
+  color: var(--icon-active);
+  font-weight: 600;
 }
 
 .toolbox-weather-picker {
@@ -392,6 +999,11 @@
 
 .toolbox-weather-mode:disabled svg {
   opacity: 0.45;
+}
+
+.toolbox-weather-provider {
+  gap: 3px;
+  padding: 5px 3px;
 }
 
 /* Manual theme switcher: Style C miniature Swiss cards tucked into the 2B-tinted footer bar. */

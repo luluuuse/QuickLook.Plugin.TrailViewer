@@ -52,6 +52,7 @@ export function renderLayerMenu({
   updateChoiceButtons, renderCustomList, t,
 }) {
   if (!currentCategory) return;
+  providerList?.closest('.layer-source-menu')?.setAttribute('data-active-category', currentCategory);
   updateChoiceButtons();
   for (const [key, button] of Object.entries(providerButtons)) {
     const visible = providers[key].category === currentCategory;
