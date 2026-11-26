@@ -17,6 +17,7 @@ export function savedTheme(params = null) {
 }
 
 let activeTheme = DEFAULT_THEME;
+let themeSwitchTimer = 0;
 const listeners = new Set();
 
 export function getTheme() {
@@ -42,6 +43,14 @@ export function initTheme(params = null) {
 export function setTheme(next, { remember = true } = {}) {
   const resolved = normalizeTheme(next);
   if (!resolved || resolved === activeTheme) return false;
+  if (typeof document !== 'undefined' && document.documentElement) {
+    document.documentElement.classList.add('is-theme-switching');
+    clearTimeout(themeSwitchTimer);
+    themeSwitchTimer = setTimeout(() => {
+      document.documentElement.classList.remove('is-theme-switching');
+      themeSwitchTimer = 0;
+    }, 180);
+  }
   applyTheme(resolved);
   if (remember) writeStored(THEME_KEY, resolved);
   for (const listener of listeners) listener(resolved);

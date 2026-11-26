@@ -16,7 +16,7 @@
   height: var(--toolbar-height);
   padding: 0;
   place-items: center;
-  border: 0;
+  border: 1px solid var(--toolbar-border);
   cursor: pointer;
 }
 
@@ -24,9 +24,9 @@
 .toolbox-switch > button.active:hover,
 .toolbox-switch > button[aria-expanded="true"],
 .toolbox-switch > button[aria-expanded="true"]:hover {
-  background: var(--icon-active-background);
+  background: linear-gradient(var(--icon-active-background), var(--icon-active-background)), var(--toolbar-surface);
   color: var(--icon-active);
-  box-shadow: inset 0 -2px var(--icon-active-line);
+  box-shadow: var(--toolbar-shadow), inset 0 -2px var(--icon-active-line);
 }
 
 .toolbox-panel {
@@ -78,7 +78,7 @@
 .toolbox-lang {
   display: inline-flex;
   flex: none;
-  gap: 5px;
+  gap: var(--space-1);
   align-items: center;
   height: 24px;
   padding: 0 9px;
@@ -87,7 +87,7 @@
   background: var(--surface-control);
   color: var(--muted);
   cursor: pointer;
-  font: 600 12px/1 "Segoe UI", system-ui, sans-serif;
+  font: 600 var(--text-base)/1 var(--font-sans);
 }
 
 .toolbox-lang-text {
@@ -142,7 +142,7 @@
 .toolbox-quick-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 7px;
+  gap: var(--space-2);
 }
 
 /* Two columns of key/label cells: six shortcuts fit in three rows, so the reference stays inside a short
@@ -159,7 +159,7 @@
   min-width: 0;
   min-height: 24px;
   align-items: center;
-  gap: 7px;
+  gap: var(--space-2);
 }
 
 .toolbox-shortcut-row .toolbox-shortcut-keys {
@@ -170,7 +170,7 @@
   flex: none;
   min-width: 38px;
   color: var(--text);
-  font: 600 11px/1.35 "Segoe UI", system-ui, sans-serif;
+  font: 600 var(--text-sm)/1.35 var(--font-sans);
   text-align: center;
   white-space: nowrap;
 }
@@ -189,7 +189,7 @@
   display: grid;
   grid-template-columns: 30px minmax(0, 1fr);
   align-items: center;
-  gap: 7px;
+  gap: var(--space-2);
   width: 100%;
   padding: 8px 9px;
   border: 1px solid var(--border-hairline);
@@ -221,7 +221,7 @@
 .toolbox-hero-action .toolbox-action-icon {
   width: 30px;
   height: 30px;
-  border-radius: 7px;
+  border-radius: var(--control-radius);
   background: var(--accent-tint);
   color: var(--accent);
 }
@@ -247,7 +247,7 @@
   width: 26px;
   height: 26px;
   flex: none;
-  border-radius: 6px;
+  border-radius: var(--control-radius);
 }
 
 .toolbox-quick-action strong {
@@ -281,7 +281,7 @@
   width: 26px;
   height: 26px;
   place-items: center;
-  border-radius: 6px;
+  border-radius: var(--control-radius);
   background: var(--toolbox-tool-icon-bg);
   color: var(--toolbox-tool-icon);
   font-size: 15px;
@@ -300,13 +300,13 @@
 }
 
 .toolbox-action strong {
-  font-size: 12.5px;
+  font-size: var(--text-md);
 }
 
 .toolbox-action small {
   margin-top: 2px;
   color: var(--muted);
-  font-size: 10.5px;
+  font-size: var(--text-sm);
   line-height: 1.3;
 }
 
@@ -316,7 +316,7 @@
   display: grid;
   overflow: hidden;
   border: 1px solid var(--border-subtle);
-  border-radius: 5px;
+  border-radius: var(--control-radius);
   background: var(--surface-card);
 }
 
@@ -355,7 +355,7 @@
   color: var(--muted);
   cursor: pointer;
   font: inherit;
-  font-size: 10.5px;
+  font-size: var(--text-sm);
   white-space: nowrap;
 }
 
@@ -398,7 +398,7 @@
 .toolbox-theme-pick {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
+  gap: var(--space-2);
   flex: none;
 }
 
@@ -501,7 +501,7 @@
   align-items: center;
   align-self: flex-start;
   min-height: 28px;
-  gap: 5px;
+  gap: var(--space-1);
   padding: 2px 7px;
   border: 0;
   border-radius: var(--radius-sm);
@@ -525,7 +525,7 @@
 .toolbox-subhint {
   margin: 0;
   color: var(--muted);
-  font-size: 10.5px;
+  font-size: var(--text-sm);
   line-height: 1.45;
 }
 
@@ -542,7 +542,7 @@
 
 .toolbox-export-settings .label {
   color: var(--muted);
-  font-size: 11.5px;
+  font-size: var(--text-base);
 }
 
 .toolbox-export-settings .pick {
@@ -720,13 +720,15 @@
 
 .toolbox-coordinate-result code {
   color: var(--text);
-  font-size: 11px;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
   overflow-wrap: anywhere;
 }
 
 .toolbox-coordinate-elevation {
   color: var(--icon-active);
-  font-size: 10.5px;
+  font-size: var(--text-sm);
   font-weight: 600;
 }
 
@@ -744,7 +746,7 @@
   color: var(--btn-primary-text);
   cursor: pointer;
   font: inherit;
-  font-size: 10.5px;
+  font-size: var(--text-sm);
 }
 
 .toolbox-coordinate-weather:hover {
@@ -771,7 +773,7 @@
 .toolbox-attachment-actions {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 5px;
+  gap: var(--space-1);
 }
 
 .toolbox-attachment-export {
@@ -818,7 +820,7 @@
 
 .toolbox-measure-kicker {
   color: var(--highlight-fg);
-  font-size: 10.5px;
+  font-size: var(--text-sm);
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
@@ -837,14 +839,14 @@
 .toolbox-measure-help {
   margin: 7px 0 9px;
   color: var(--muted);
-  font-size: 10.5px;
+  font-size: var(--text-sm);
   line-height: 1.45;
 }
 
 .toolbox-list-heading {
   margin-bottom: 4px;
   color: var(--muted);
-  font-size: 10.5px;
+  font-size: var(--text-sm);
 }
 
 .toolbox-section-list {
@@ -878,7 +880,7 @@
   min-height: 29px;
   align-items: center;
   justify-content: center;
-  gap: 5px;
+  gap: var(--space-1);
   padding: 4px 6px;
   border: 1px solid var(--border-control);
   border-radius: var(--radius-sm);
@@ -946,7 +948,7 @@
 .toolbox-version-brand {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
+  gap: var(--space-2);
   min-width: 0;
 }
 
@@ -968,7 +970,7 @@
 
 .toolbox-brand-name {
   color: var(--text-bright);
-  font-size: 11.5px;
+  font-size: var(--text-base);
   font-weight: 700;
   line-height: 1.15;
   letter-spacing: 0.01em;
@@ -976,7 +978,8 @@
 }
 
 .toolbox-version-text {
-  font-size: 10px;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
   line-height: 1.15;
   font-variant-numeric: tabular-nums;
   color: var(--ink-muted);
@@ -1063,8 +1066,9 @@
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 5px;
-  font-size: 11.5px;
+  gap: var(--space-1);
+  font-family: var(--font-mono);
+  font-size: var(--text-base);
   font-weight: 500;
   font-variant-numeric: tabular-nums;
 }
@@ -1115,9 +1119,11 @@
 
 .toolbox-update-progress-fill {
   height: 100%;
-  width: 0%;
+  width: 100%;
   background: var(--accent);
-  transition: width 120ms ease;
+  transform-origin: left center;
+  transform: scaleX(0);
+  transition: transform 120ms ease-out;
 }
 
 .toolbox-update-progress-text {
@@ -1133,7 +1139,7 @@
   border: 1px solid var(--border-hairline);
   border-radius: var(--radius-sm);
   background: var(--surface-inset);
-  font-size: 11.5px;
+  font-size: var(--text-base);
   line-height: 1.5;
   color: var(--text);
 }
@@ -1214,7 +1220,7 @@
   color: var(--text);
 }
 
-@media (max-width: 700px) {
+@media (max-width: 720px) {
   .toolbox-panel {
     top: var(--floating-panel-top);
     right: 10px;

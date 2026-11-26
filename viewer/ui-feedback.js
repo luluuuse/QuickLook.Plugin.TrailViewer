@@ -1,18 +1,21 @@
 export function createUiFeedback({ t, toolbox, afterShow }) {
   let hidden = false;
   let toastTimer = 0;
+  let toastHideTimer = 0;
 
-  function showToast(text, hold = 1500) {
+  function showToast(text, hold = 1500, tone = 'info') {
     const node = document.getElementById('toast');
     if (!node) return;
+    clearTimeout(toastTimer);
+    clearTimeout(toastHideTimer);
     node.textContent = text;
+    node.dataset.tone = tone || 'info';
     node.hidden = false;
     node.classList.remove('on');
     requestAnimationFrame(() => node.classList.add('on'));
-    clearTimeout(toastTimer);
     toastTimer = setTimeout(() => {
       node.classList.remove('on');
-      setTimeout(() => { node.hidden = true; }, 300);
+      toastHideTimer = setTimeout(() => { node.hidden = true; }, 220);
     }, hold);
   }
 

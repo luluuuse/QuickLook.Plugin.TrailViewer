@@ -36,11 +36,16 @@
   --on-accent: #ffffff;
   --accent: #df2b1d;
   --accent-hover: #c52216;
+  --accent-text: #b82014;
   --accent-muted: rgba(223, 43, 29, 0.42);
   --accent-tint: rgba(223, 43, 29, 0.10);
   --secondary-accent: #297bb8;
+  --secondary-accent-text: #1c5f93;
   --secondary-accent-tint: rgba(41, 123, 184, 0.12);
   --secondary-accent-border: rgba(41, 123, 184, 0.42);
+  --shadow-sm: 0 1px 4px rgba(18, 28, 40, 0.14);
+  --shadow-md: 0 3px 10px rgba(18, 28, 40, 0.14);
+  --shadow-lg: 0 8px 22px rgba(18, 28, 40, 0.16);
   --tool-panel-background: rgba(250, 248, 243, 0.93);
   --tool-panel-filter: blur(14px) saturate(1.08);
   --surface-raised: #ffffff;
@@ -60,9 +65,21 @@
   --panel-radius: 3px;
   --control-radius: 3px;
   --radius-sm: 2px;
-  --radius-md: 8px;
+  --radius-md: 3px;
   --radius-lg: 4px;
   --radius-pill: 999px;
+  --font-sans: "Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei UI", system-ui, sans-serif;
+  --font-mono: "Cascadia Mono", "Consolas", ui-monospace, monospace;
+  --text-xs: 10px;
+  --text-sm: 11px;
+  --text-base: 12px;
+  --text-md: 13px;
+  --text-lg: 15px;
+  --text-xl: 20px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
   --motion-panel: 120ms cubic-bezier(0.2, 0, 0, 1);
   --icon-size: 16px;
   --icon-size-compact: 12px;
@@ -91,7 +108,8 @@
   --toolbar-hover-tint: rgba(24, 34, 46, 0.06);
   --toolbar-surface-hover: #ffffff;
   --toolbar-blur: blur(12px);
-  --toolbar-shadow: 0 0 0 1px rgba(24, 34, 46, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.78), 0 3px 10px rgba(18, 28, 40, 0.10);
+  --toolbar-border: rgba(24, 34, 46, 0.24);
+  --toolbar-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.78), 0 2px 8px rgba(18, 28, 40, 0.12);
   --floating-panel-top: 54px;
   --floating-panel-header-height: 40px;
   --z-map-ui: 900;
@@ -106,13 +124,18 @@
   --z-tool-panel: 1400;
   --z-photo-modal: 3000;
   --editor-surface: rgba(250, 248, 243, 0.94);
-  --editor-active-bg: rgba(223, 43, 29, 0.10);
-  --editor-active-border: rgba(223, 43, 29, 0.42);
-  --editor-active-fg: #df2b1d;
+  --editor-active-bg: rgba(28, 95, 147, 0.12);
+  --editor-active-border: rgba(28, 95, 147, 0.42);
+  --editor-active-fg: #1c5f93;
   --editor-keep: #df2b1d;
   --editor-cut: #64748b;
   --editor-danger: #d92d20;
   --editor-danger-text: #b42318;
+  --wpt-tag-photo: #0f766e;
+  --wpt-tag-note: #b45309;
+  --wpt-tag-custom: #1d6ca8;
+  --status-warn-text: #a16207;
+  --profile-hr-text: #ff9aa4;
   --editor-save-bg: #18212b;
   --editor-save-hover: #263445;
   --editor-crop-dim: rgba(24, 34, 46, 0.24);
@@ -132,9 +155,9 @@
   --profile-guide: rgba(223, 43, 29, 0.82);
   --profile-dot-bg: #df2b1d;
   --profile-dot-ring: #18212b;
-  --profile-readout-bg: rgba(24, 33, 43, 0.62);
+  --profile-readout-bg: rgba(24, 33, 43, 0.84);
   --profile-readout-text: #ffffff;
-  --profile-readout-meta: #c4d0dd;
+  --profile-readout-meta: #dce6f0;
   --profile-extremum-bg: rgba(250, 248, 243, 0.92);
   --profile-extremum-high: #b8321a;
   --profile-extremum-low: #1d6ca8;
@@ -147,9 +170,9 @@
   --toast-bg: rgba(24, 33, 43, 0.92);
   --coord-label-bg: rgba(24, 33, 43, 0.68);
   --toast-text: #ffffff;
-  --btn-primary-bg: #df2b1d;
-  --btn-primary-hover: #c52216;
-  --btn-primary-border: #c52216;
+  --btn-primary-bg: #c52216;
+  --btn-primary-hover: #a81c11;
+  --btn-primary-border: #a81c11;
   --btn-primary-text: #ffffff;
   --highlight-fg: #1d6ca8;
   --highlight-tint: rgba(41, 123, 184, 0.12);
@@ -184,8 +207,9 @@
   --success-tint: rgba(21, 128, 61, 0.10);
   --success-border: rgba(21, 128, 61, 0.42);
   --scrollbar-thumb: rgba(24, 34, 46, 0.28);
+  --scrollbar-thumb-hover: rgba(24, 34, 46, 0.46);
   --ink-muted: var(--muted);
-  font: 13px/1.4 "Segoe UI", system-ui, sans-serif;
+  font: var(--text-md)/1.45 var(--font-sans);
 }
 
 :root[data-theme="slate"] {
@@ -199,6 +223,7 @@
   --control-radius: 3px;
   --toolbar-radius: 3px;
   --radius-sm: 2px;
+  --radius-md: 3px;
   --radius-lg: 4px;
   --swiss-corner-ticks:
     linear-gradient(90deg, rgba(218, 230, 244, 0.20), rgba(218, 230, 244, 0.20)) 5px 6px / 5px 1px no-repeat,
@@ -221,13 +246,18 @@
   --text-bright: #ffffff;
   --muted: #93a3b5;
   --on-accent: #ffffff;
-  --accent: #f04234;
-  --accent-hover: #ff5547;
+  --accent: #d43124;
+  --accent-hover: #e54336;
+  --accent-text: #ff6659;
   --accent-muted: rgba(240, 66, 52, 0.48);
   --accent-tint: rgba(240, 66, 52, 0.16);
   --secondary-accent: #58aeed;
+  --secondary-accent-text: #74bef5;
   --secondary-accent-tint: rgba(88, 174, 237, 0.16);
   --secondary-accent-border: rgba(88, 174, 237, 0.48);
+  --shadow-sm: 0 1px 4px rgba(0, 0, 0, 0.36);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.42);
+  --shadow-lg: 0 10px 26px rgba(0, 0, 0, 0.52);
   --tool-panel-background: rgba(25, 32, 41, 0.88);
   --tool-panel-filter: blur(14px) saturate(1.05);
   --surface-raised: #222c38;
@@ -263,7 +293,8 @@
   --toolbar-surface: rgba(25, 32, 41, 0.88);
   --toolbar-hover-tint: rgba(255, 255, 255, 0.09);
   --toolbar-surface-hover: rgba(45, 58, 74, 0.90);
-  --toolbar-shadow: 0 0 0 1px rgba(218, 230, 244, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 4px 14px rgba(0, 0, 0, 0.42);
+  --toolbar-border: rgba(218, 230, 244, 0.18);
+  --toolbar-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 3px 12px rgba(0, 0, 0, 0.42);
   --editor-surface: rgba(25, 32, 41, 0.92);
   --editor-active-bg: rgba(240, 66, 52, 0.22);
   --editor-active-border: rgba(240, 66, 52, 0.52);
@@ -272,6 +303,11 @@
   --editor-cut: #64748b;
   --editor-danger: #ef4444;
   --editor-danger-text: #fca5a5;
+  --wpt-tag-photo: #6ee7b7;
+  --wpt-tag-note: #fbbf24;
+  --wpt-tag-custom: #7dd3fc;
+  --status-warn-text: #f3d078;
+  --profile-hr-text: #ff9aa4;
   --editor-save-bg: #297bb8;
   --editor-save-hover: #3590d4;
   --editor-crop-dim: rgba(15, 23, 42, 0.56);
@@ -290,9 +326,9 @@
   --profile-guide: rgba(240, 66, 52, 0.85);
   --profile-dot-bg: #f04234;
   --profile-dot-ring: #ffffff;
-  --profile-readout-bg: rgba(16, 22, 29, 0.62);
+  --profile-readout-bg: rgba(16, 22, 29, 0.82);
   --profile-readout-text: #f1f5f9;
-  --profile-readout-meta: #aebcc9;
+  --profile-readout-meta: #cdd9e5;
   --profile-extremum-bg: rgba(20, 26, 34, 0.78);
   --profile-extremum-high: #ffd166;
   --profile-extremum-low: #8fd4ff;
@@ -342,6 +378,7 @@
   --success-tint: rgba(34, 197, 94, 0.16);
   --success-border: rgba(74, 222, 128, 0.48);
   --scrollbar-thumb: #4b5d73;
+  --scrollbar-thumb-hover: #647b96;
   --ink-muted: var(--muted);
 }
 
@@ -356,6 +393,7 @@
   --control-radius: 8px;
   --toolbar-radius: 8px;
   --radius-sm: 4px;
+  --radius-md: 8px;
   --radius-lg: 10px;
   --swiss-corner-ticks: none;
   --graticule-line: rgba(255, 255, 255, 0.12);
@@ -366,13 +404,18 @@
   --text-bright: #ffffff;
   --muted: #aeb8c4;
   --on-accent: #ffffff;
-  --accent: #2f9bff;
-  --accent-hover: #4aa8ff;
+  --accent: #1a78d6;
+  --accent-hover: #2c8ae6;
+  --accent-text: #5cb3ff;
   --accent-muted: #356d9d;
   --accent-tint: rgba(47, 155, 255, 0.18);
   --secondary-accent: #2f9bff;
+  --secondary-accent-text: #5cb3ff;
   --secondary-accent-tint: rgba(47, 155, 255, 0.18);
   --secondary-accent-border: rgba(47, 155, 255, 0.55);
+  --shadow-sm: 0 1px 4px rgba(0, 0, 0, 0.36);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.42);
+  --shadow-lg: 0 10px 26px rgba(0, 0, 0, 0.52);
   --tool-panel-background: rgba(24, 24, 24, 0.78);
   --tool-panel-filter: blur(14px) saturate(0.9);
   --surface-raised: #2a2a2a;
@@ -408,7 +451,8 @@
   --toolbar-surface: rgba(24, 24, 24, 0.78);
   --toolbar-hover-tint: rgba(255, 255, 255, 0.09);
   --toolbar-surface-hover: rgba(50, 50, 50, 0.80);
-  --toolbar-shadow: 0 0 0 1px rgba(0, 0, 0, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 3px 10px rgba(0, 0, 0, 0.38);
+  --toolbar-border: rgba(0, 0, 0, 0.48);
+  --toolbar-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 2px 8px rgba(0, 0, 0, 0.32);
   --editor-surface: rgba(24, 24, 24, 0.88);
   --editor-active-bg: #234f79;
   --editor-active-border: rgba(143, 217, 255, 0.45);
@@ -417,6 +461,11 @@
   --editor-cut: #64748b;
   --editor-danger: #ef4444;
   --editor-danger-text: #fca5a5;
+  --wpt-tag-photo: #6ee7b7;
+  --wpt-tag-note: #fbbf24;
+  --wpt-tag-custom: #7dd3fc;
+  --status-warn-text: #e6c56a;
+  --profile-hr-text: #ffb3bb;
   --editor-save-bg: #0369a1;
   --editor-save-hover: #0284c7;
   --editor-crop-dim: rgba(15, 23, 42, 0.56);
@@ -435,9 +484,9 @@
   --profile-guide: rgba(255, 255, 255, 0.65);
   --profile-dot-bg: #ffffff;
   --profile-dot-ring: rgba(24, 24, 24, 0.55);
-  --profile-readout-bg: rgba(16, 16, 16, 0.65);
+  --profile-readout-bg: rgba(16, 16, 16, 0.82);
   --profile-readout-text: #e6e6e6;
-  --profile-readout-meta: #cfcfcf;
+  --profile-readout-meta: #d6dce2;
   --profile-extremum-bg: rgba(16, 16, 16, 0.58);
   --profile-extremum-high: #ffd166;
   --profile-extremum-low: #8fd4ff;
@@ -487,6 +536,7 @@
   --success-tint: rgba(34, 197, 94, 0.14);
   --success-border: rgba(74, 222, 128, 0.45);
   --scrollbar-thumb: #555555;
+  --scrollbar-thumb-hover: #777777;
   --ink-muted: var(--muted);
 }
 
@@ -496,6 +546,43 @@ html, body {
   overflow: hidden;
   background: var(--bg);
   color: var(--text);
+  font-family: var(--font-sans);
+  accent-color: var(--accent);
+}
+
+.editor-drawer,
+.editor-topbar,
+.editor-save-popover {
+  accent-color: var(--editor-active-fg);
+}
+
+select option {
+  background: var(--panel-solid);
+  color: var(--text);
+}
+
+/* Unified ultra-thin themed scrollbars across all scrollable panels and drawers */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: var(--radius-pill);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
 }
 
 #map {
@@ -506,9 +593,44 @@ html, body {
 
 button:focus-visible,
 a:focus-visible,
-[role="button"]:focus-visible {
+[role="button"]:focus-visible,
+[role="option"]:focus-visible,
+[role="menuitem"]:focus-visible,
+[role="tab"]:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex]:not([tabindex="-1"]):focus-visible {
   outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
+}
+
+.toolbox-item:focus-visible,
+.toolbox-theme-chip:focus-visible,
+.layer-source-item:focus-visible,
+.editor-list-row:focus-visible,
+.editor-save-option:focus-visible,
+.editor-tool-btn:focus-visible,
+.waypoint-overview-item:focus-visible,
+.splits-table tbody tr:focus-visible {
+  outline-offset: -2px;
+}
+
+html[lang^="zh"] .toolbox-section-title,
+html[lang^="zh"] .layer-menu-heading,
+html[lang^="zh"] .layer-custom-heading,
+html[lang^="zh"] .editor-drawer-title,
+html[lang^="zh"] .editor-section-label,
+html[lang^="zh"] .info-label {
+  letter-spacing: 0;
+}
+
+html[lang^="zh"] .toolbox-update-notes,
+html[lang^="zh"] .editor-help-text,
+html[lang^="zh"] .editor-drawer-hint,
+html[lang^="zh"] .place-desc,
+html[lang^="zh"] .waypoint-desc {
+  line-height: 1.55;
 }
 
 /* Application icons share one open outlined geometry. Data symbols deliberately opt into their own fill
@@ -561,12 +683,12 @@ a:focus-visible,
 
 .control-key {
   min-width: 18px;
-  padding: 1px 4px;
+  padding: 1px var(--space-1);
   border: 1px solid var(--kbd-border);
   border-radius: var(--radius-sm);
   background: var(--kbd-bg);
   color: var(--kbd-text);
-  font: 600 9px/1.35 "Segoe UI", system-ui, sans-serif;
+  font: 600 var(--text-xs)/1.35 var(--font-sans);
   text-align: center;
   white-space: nowrap;
 }
@@ -582,20 +704,95 @@ a:focus-visible,
 
 #info:not([hidden]),
 #splits:not([hidden]),
-#profile:not([hidden]),
-.toolbox-panel:not([hidden]),
-.layer-source-menu:not([hidden]),
-.waypoint-overview:not([hidden]) {
+#profile:not([hidden]) {
   animation: panel-fade var(--motion-panel);
 }
 
 #info:not([hidden]) > *,
 #splits:not([hidden]) > *,
-#profile:not([hidden]) > *,
-.toolbox-panel:not([hidden]) > *,
-.layer-source-menu:not([hidden]) > *,
-.waypoint-overview:not([hidden]) > * {
+#profile:not([hidden]) > * {
   animation: panel-content-enter var(--motion-panel);
+}
+
+/* M1: Bidirectional enter/exit micro-transitions for floating overlays */
+.toolbox-panel,
+.layer-source-menu,
+.waypoint-overview,
+.editor-drawer,
+.editor-save-popover {
+  transition:
+    opacity 120ms cubic-bezier(0.2, 0, 0, 1),
+    translate 120ms cubic-bezier(0.2, 0, 0, 1),
+    scale 120ms cubic-bezier(0.2, 0, 0, 1),
+    display 120ms allow-discrete;
+}
+
+.toolbox-panel[hidden],
+.layer-source-menu[hidden],
+.waypoint-overview[hidden],
+.editor-drawer[hidden],
+.editor-save-popover[hidden] {
+  opacity: 0;
+  translate: 0 -4px;
+  scale: 0.98;
+  pointer-events: none;
+}
+
+@starting-style {
+  .toolbox-panel:not([hidden]),
+  .layer-source-menu:not([hidden]),
+  .waypoint-overview:not([hidden]),
+  .editor-drawer:not([hidden]),
+  .editor-save-popover:not([hidden]) {
+    opacity: 0;
+    translate: 0 -4px;
+    scale: 0.98;
+  }
+}
+
+/* M3: Tactile press feedback via individual transform properties (never clobbers positioning transforms) */
+.toolbox-switch > button:active:not(:disabled),
+.layer-menu-toggle:active:not(:disabled),
+.track-color-toggle:active:not(:disabled),
+.pins-switch button:active:not(:disabled),
+.waypoint-overview-switch button:active:not(:disabled),
+.locate-switch button:active:not(:disabled),
+.toolbox-action:active:not(:disabled),
+.toolbox-quick-action:active:not(:disabled),
+.toolbox-back:active:not(:disabled),
+.toolbox-lang:active:not(:disabled),
+.toolbox-version-btn:active:not(:disabled),
+.layer-item:active:not(:disabled),
+.layer-source-item:active:not(:disabled),
+.editor-btn:active:not(:disabled),
+.editor-rail-btn:active:not(:disabled),
+.editor-mode-btn:active:not(:disabled),
+.editor-segmented-tab:active:not(:disabled) {
+  translate: 0 1px;
+  scale: 0.98;
+}
+
+/* M3: Scoped 160ms theme crossfade (active only during theme switch, zero steady-state overhead) */
+html.is-theme-switching body,
+html.is-theme-switching #info,
+html.is-theme-switching #splits,
+html.is-theme-switching #profile,
+html.is-theme-switching .toolbox-panel,
+html.is-theme-switching .layer-switch,
+html.is-theme-switching .layer-source-menu,
+html.is-theme-switching .waypoint-overview,
+html.is-theme-switching .editor-topbar,
+html.is-theme-switching .editor-rail,
+html.is-theme-switching .editor-drawer,
+html.is-theme-switching .editor-save-popover,
+html.is-theme-switching .editor-mode-hint,
+html.is-theme-switching .toolbox-panel button,
+html.is-theme-switching .layer-switch button,
+html.is-theme-switching .editor-topbar button,
+html.is-theme-switching .editor-drawer button,
+html.is-theme-switching .editor-drawer input,
+html.is-theme-switching .editor-drawer select {
+  transition: background-color 160ms ease, color 160ms ease, border-color 160ms ease !important;
 }
 
 @keyframes panel-fade {
@@ -618,7 +815,14 @@ a:focus-visible,
 
 body.is-map-dragging .toolbox-panel,
 body.is-map-dragging .layer-source-menu,
-body.is-map-dragging .waypoint-overview {
+body.is-map-dragging .waypoint-overview,
+body.is-map-dragging .editor-topbar,
+body.is-map-dragging .editor-rail,
+body.is-map-dragging .editor-drawer,
+body.is-map-dragging .editor-save-popover,
+body.is-map-dragging .editor-context-menu,
+body.is-map-dragging .editor-exit-guard,
+body.is-map-dragging .editor-mode-hint {
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
   transition: none;

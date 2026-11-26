@@ -23,6 +23,8 @@ export function createPhotoViewer({ el, formatters, formatCoord, t }) {
   let counter = null;
   let zoomOutput = null;
   let closeButton = null;
+  let strip = null;
+  const thumbButtons = [];
   const stepButtons = [];
   let list = [];
   let index = 0;
@@ -138,7 +140,11 @@ export function createPhotoViewer({ el, formatters, formatCoord, t }) {
       setZoom(step, event);
     }, { passive: false });
     stage.addEventListener('click', () => hide());
-    root.append(bar, stage);
+    strip = el('div', 'photo-strip');
+    strip.hidden = true;
+    strip.setAttribute('role', 'tablist');
+    strip.addEventListener('click', (event) => event.stopPropagation());
+    root.append(bar, stage, strip);
     document.body.append(root);
     if (typeof ResizeObserver === 'function') {
       resizeObserver = new ResizeObserver(scheduleLayout);
@@ -315,6 +321,59 @@ export function createPhotoViewer({ el, formatters, formatCoord, t }) {
     status.replaceChildren(...nodes);
   }
 
+  function renderStrip() {
+    if (!strip) return;
+    thumbButtons.length = 0;
+    if (list.length < 2) {
+      strip.hidden = true;
+      strip.replaceChildren();
+      return;
+    }
+    const frag = document.createDocumentFragment();
+    list.forEach((url, idx) => {
+      const btn = el('button', 'photo-thumb');
+      btn.type = 'button';
+      btn.dataset.index = String(idx);
+      const label = t('photo.jumpTo', { index: idx + 1, total: list.length });
+      btn.title = label;
+      btn.setAttribute('aria-label', label);
+      const thumbImg = el('img');
+      thumbImg.alt = '';
+      thumbImg.loading = 'lazy';
+      thumbImg.decoding = 'async';
+      thumbImg.referrerPolicy = 'no-referrer';
+      thumbImg.src = url;
+      thumbImg.addEventListener('error', () => {
+        btn.classList.add('is-broken');
+        btn.textContent = String(idx + 1);
+      });
+      btn.append(thumbImg);
+      btn.addEventListener('click', (event) => {
+        event.stopPropagation();
+        if (idx === index) return;
+        index = idx;
+        load();
+      });
+      thumbButtons.push(btn);
+      frag.append(btn);
+    });
+    strip.replaceChildren(frag);
+    strip.hidden = false;
+    syncStripActive();
+  }
+
+  function syncStripActive() {
+    for (let i = 0; i < thumbButtons.length; i += 1) {
+      const active = i === index;
+      const btn = thumbButtons[i];
+      btn.classList.toggle('is-active', active);
+      btn.setAttribute('aria-current', active ? 'true' : 'false');
+      if (active && typeof btn.scrollIntoView === 'function') {
+        btn.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+      }
+    }
+  }
+
   function load() {
     const url = list[index];
     const mine = ++token;
@@ -322,6 +381,7 @@ export function createPhotoViewer({ el, formatters, formatCoord, t }) {
     counter.textContent = many ? `${index + 1} / ${list.length}` : '';
     counter.hidden = !many;
     for (const button of stepButtons) button.hidden = !many;
+    syncStripActive();
     img.hidden = true;
     resetZoom();
     status.hidden = false;
@@ -374,6 +434,7 @@ export function createPhotoViewer({ el, formatters, formatCoord, t }) {
     root.hidden = false;
     document.body.classList.add('showing-photo');
     if (opening) trap.activate(closeButton);
+    renderStrip();
     load();
   }
 
@@ -399,6 +460,11 @@ export function createPhotoViewer({ el, formatters, formatCoord, t }) {
       const label = t(Number(button.dataset.delta) < 0 ? 'photo.previous' : 'photo.next');
       button.title = label;
       button.setAttribute('aria-label', label);
+    }
+    for (let i = 0; i < thumbButtons.length; i += 1) {
+      const label = t('photo.jumpTo', { index: i + 1, total: list.length });
+      thumbButtons[i].title = label;
+      thumbButtons[i].setAttribute('aria-label', label);
     }
     if (shownPoint) paintMeta(shownPoint);
     if (zoomOutput && !zoomOutput.hidden) paintZoom();

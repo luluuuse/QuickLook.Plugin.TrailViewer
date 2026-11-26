@@ -363,6 +363,7 @@ export function createToolbox({
         ['T', 'toolbox.shortcutToolbox'],
         ['P', 'toolbox.shortcutProfile'],
         ['L', 'toolbox.shortcutColor'],
+        ['X', 'toolbox.shortcutNoMap'],
       ]) {
         const row = el('div', 'toolbox-shortcut-row');
         row.setAttribute('role', 'listitem');

@@ -299,7 +299,7 @@ export function createEditorDrawers(ctx) {
           const { track, reorderedByTime, timestampsCleared, maxGapMeters } = mergeTrackSegments(store.getCurrent());
           store.apply('merge', track);
           if (maxGapMeters > 500) {
-            notifyToast(t('editor.split.mergeGap', { dist: formatDistance(maxGapMeters) }));
+            notifyToast(t('editor.split.mergeGap', { dist: formatDistance(maxGapMeters) }), 2600, 'warn');
           } else if (timestampsCleared) {
             notifyToast(t('editor.split.mergeCleared'));
           } else if (reorderedByTime) {
@@ -519,7 +519,7 @@ export function createEditorDrawers(ctx) {
       }
       return true;
     } catch {
-      notifyToast(t('editor.topology.appendFail'), 3200);
+      notifyToast(t('editor.topology.appendFail'), 3200, 'error');
       return false;
     }
   }
@@ -529,7 +529,7 @@ export function createEditorDrawers(ctx) {
     const res = await onImportExternalTrack(opts);
     if (!res || res.cancelled) return false;
     if (!res.ok) {
-      notifyToast(t('editor.topology.appendFail'), 3200);
+      notifyToast(t('editor.topology.appendFail'), 3200, 'error');
       return false;
     }
     return importExternalPayload(res.name, res.text);
@@ -541,7 +541,7 @@ export function createEditorDrawers(ctx) {
       const text = await file.text();
       return importExternalPayload(file.name, text);
     } catch {
-      notifyToast(t('editor.topology.appendFail'), 3200);
+      notifyToast(t('editor.topology.appendFail'), 3200, 'error');
       return false;
     }
   }

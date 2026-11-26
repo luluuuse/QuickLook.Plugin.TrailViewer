@@ -37,6 +37,17 @@ function makeController(overrides = {}) {
         selectedCategory = layer;
         calls.push(`layer:${layer}`);
       },
+      toggleNoMap: () => {
+        if (selectedLayer === 'none') {
+          selectedLayer = 'road.osm';
+          selectedCategory = 'road';
+          calls.push('no-map:off');
+        } else {
+          selectedLayer = 'none';
+          selectedCategory = 'none';
+          calls.push('no-map:on');
+        }
+      },
     }),
     fit: () => calls.push('fit'),
     toggleChrome: () => calls.push('chrome'),
@@ -92,15 +103,17 @@ test('viewer shortcuts route to their owning controllers', () => {
   ]);
 });
 
-test('X and Shift+X are no longer viewer shortcuts', () => {
+test('X toggles no-map mode while Shift+X remains ignored', () => {
   const { controller, calls } = makeController();
-  for (const event of [keyEvent('x'), keyEvent('X', { shiftKey: true })]) {
-    controller.onKeyDown(event);
-    assert.equal(event.prevented, 0);
-  }
+  const shifted = keyEvent('X', { shiftKey: true });
+  controller.onKeyDown(shifted);
+  assert.equal(shifted.prevented, 0);
+
+  const plain = keyEvent('x');
+  controller.onKeyDown(plain);
+  assert.equal(plain.prevented, 1);
   controller.pressKey('x');
-  controller.pressKey('X');
-  assert.deepEqual(calls, []);
+  assert.deepEqual(calls, ['no-map:on', 'no-map:off']);
 });
 
 test('modified, repeated and editable-target keys belong to the host', () => {

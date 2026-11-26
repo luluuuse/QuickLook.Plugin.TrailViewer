@@ -268,8 +268,9 @@ export function createUpdateTool({
 
     progressWrap.hidden = !downloading;
     if (downloading) {
-      const pct = totalBytes > 0 ? Math.min(100, Math.round((downloadedBytes / totalBytes) * 100)) : 0;
-      progressFill.style.width = `${pct}%`;
+      const ratio = totalBytes > 0 ? Math.max(0, Math.min(1, downloadedBytes / totalBytes)) : 0;
+      const pct = Math.round(ratio * 100);
+      progressFill.style.transform = `scaleX(${ratio})`;
       const sizeText = totalBytes > 0
         ? `${formatBytes(downloadedBytes)} / ${formatBytes(totalBytes)}`
         : formatBytes(downloadedBytes);

@@ -1,20 +1,20 @@
 import { distanceMeters } from './geo.js';
 import { isValidHeartRate } from './track-analysis.js';
 
-/** High-contrast 12-color palette for multi-segment tracks (avoids common topo greens and grays). */
+/** High-contrast 12-color cartographic palette for multi-segment tracks (avoids washed-out neons and topo forest greens). */
 export const SPLIT_COLORS = Object.freeze([
-  '#f97316', // orange
-  '#38bdf8', // sky
-  '#eab308', // amber
-  '#e879f9', // fuchsia
-  '#22d3ee', // cyan
-  '#fb7185', // rose
-  '#a78bfa', // violet
-  '#2dd4bf', // teal
-  '#facc15', // gold
-  '#60a5fa', // blue
-  '#f43f5e', // crimson
-  '#c084fc', // orchid
+  '#df2b1d', // vermilion
+  '#1d6ca8', // cobalt
+  '#c25e00', // burnt orange
+  '#7c3aed', // violet
+  '#0e7490', // deep cyan
+  '#be185d', // magenta
+  '#a16207', // ochre
+  '#4338ca', // indigo
+  '#0f766e', // deep teal
+  '#b91c1c', // crimson
+  '#9333ea', // purple
+  '#0369a1', // steel blue
 ]);
 
 function trackColorSignature(track) {

@@ -233,6 +233,7 @@ internal sealed partial class TrailViewerPanel
             case Key.S: name = "s"; break;
             case Key.M: name = "m"; break;
             case Key.T: name = "t"; break;
+            case Key.X: name = "x"; break;
             case Key.Z when measureHistory:
                 name = (modifiers & ModifierKeys.Shift) != 0 ? "Z" : "z";
                 break;

@@ -605,6 +605,13 @@ export function createLayerSwitcher({
     toggle: () => (menuOpen ? closeMenu() : openMenu({ focus: false })),
     isOpen: () => menuOpen,
     resumeMap: () => select(noMapReturn || 'road.osm', true),
+    toggleNoMap: () => toggleNoMapLayer({
+      enabled: current !== 'none',
+      current,
+      noMapReturn,
+      select,
+      setNoMapReturn: (value) => { noMapReturn = value; },
+    }),
     setDirectKey,
     keyRejected() {
       pendingKeyProvider = null;

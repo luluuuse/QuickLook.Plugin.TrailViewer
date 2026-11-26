@@ -116,6 +116,7 @@ export function createEditorShell({
   let drawerBody = null;
   let wptNoteOpen = false;
   let contextMenu = null;
+  let modeHint = null;
   let cropOverlay = null;
   let cropDimLeft = null;
   let cropDimRight = null;
@@ -522,12 +523,70 @@ export function createEditorShell({
     requestAnimationFrame(() => window.dispatchEvent(new Event('resize')));
   }
 
+  function updateModeHint() {
+    if (!modeHint) return;
+    if (!store.isActive()) {
+      modeHint.hidden = true;
+      document.documentElement.style.setProperty('--editor-hint-offset', '0px');
+      return;
+    }
+    /** @type {Array<[string, string, boolean?, boolean?]> | null} */
+    let items = null;
+    if (activeTool === 'draw' && (activeSubMode === 'draw' || activeSubMode === '')) {
+      items = [
+        [t('editor.keyHint.leftClick'), t('editor.keyHint.drawAdd'), false],
+        [t('editor.keyHint.rightDrag'), t('editor.keyHint.pan'), true],
+        ['Backspace', t('editor.keyHint.undo'), false],
+      ];
+    } else if (activeTool === 'draw' && activeSubMode === 'box-erase') {
+      items = [
+        [t('editor.keyHint.leftDrag'), t('editor.keyHint.boxErase'), false],
+        [t('editor.keyHint.rightDrag'), t('editor.keyHint.pan'), true],
+      ];
+    } else if (activeTool === 'draw' && activeSubMode === 'vertex') {
+      items = [
+        [t('editor.keyHint.leftDrag'), t('editor.keyHint.dragVertex'), false],
+        ['+', t('editor.keyHint.insertVertex'), false],
+        [t('editor.keyHint.rightClick'), t('editor.keyHint.deleteVertex'), true],
+      ];
+    } else if (activeTool === 'crop' && activeSubMode === 'split') {
+      items = [
+        [t('editor.keyHint.leftClick'), t('editor.keyHint.split'), false],
+        [t('editor.keyHint.leftDrag'), t('editor.keyHint.pan'), true],
+      ];
+    } else if (activeTool === 'topology' && activeSubMode === 'loop-start') {
+      items = [
+        [t('editor.keyHint.leftClick'), t('editor.keyHint.loopStart'), false],
+        [t('editor.keyHint.leftDrag'), t('editor.keyHint.pan'), true],
+      ];
+    }
+    if (!items) {
+      modeHint.hidden = true;
+      document.documentElement.style.setProperty('--editor-hint-offset', '0px');
+      return;
+    }
+    const frag = document.createDocumentFragment();
+    items.forEach(([keyLabel, actionLabel, secondary], idx) => {
+      if (idx > 0) {
+        const sep = el('span', secondary ? 'editor-mode-hint-sep is-secondary' : 'editor-mode-hint-sep', '\u00b7');
+        frag.append(sep);
+      }
+      const item = el('span', secondary ? 'editor-mode-hint-item is-secondary' : 'editor-mode-hint-item');
+      item.append(el('kbd', 'control-key', keyLabel), el('span', null, actionLabel));
+      frag.append(item);
+    });
+    modeHint.replaceChildren(frag);
+    modeHint.hidden = false;
+    document.documentElement.style.setProperty('--editor-hint-offset', '40px');
+  }
+
   function updateRail() {
     for (const [id, btn] of railButtons.entries()) {
       const pressed = id === activeTool && drawerOpen;
       btn.setAttribute('aria-pressed', String(pressed));
     }
     if (drawer) drawer.hidden = !drawerOpen;
+    updateModeHint();
     handleLayoutChange();
   }
 
@@ -576,6 +635,7 @@ export function createEditorShell({
           hoveredSegIndex = -1;
           syncSegmentHighlight();
         }
+        updateModeHint();
       },
       getSegmentColors: (tracks) => segmentColorResolver.resolve(tracks),
       getSelectedSegIndex: () => selectedSegIndex,
@@ -857,13 +917,13 @@ export function createEditorShell({
     if (!saveProgress || !saveProgressText || !saveProgressFill) return;
     if (!info || !(info.total > 0)) {
       saveProgress.hidden = true;
-      saveProgressFill.style.width = '0%';
+      saveProgressFill.style.transform = 'scaleX(0)';
       return;
     }
     const { completed, total, failed } = info;
-    const pct = Math.max(0, Math.min(100, Math.round((completed / total) * 100)));
+    const ratio = Math.max(0, Math.min(1, completed / total));
     saveProgress.hidden = false;
-    saveProgressFill.style.width = `${pct}%`;
+    saveProgressFill.style.transform = `scaleX(${ratio})`;
     if (completed >= total) {
       saveProgressText.textContent = t('editor.save.kmzWriting');
     } else if (failed > 0) {
@@ -887,10 +947,10 @@ export function createEditorShell({
       if (fmt === 'gpx' && watchFriendly) {
         const warn = findGarminWaypointWarnings(current.waypoints);
         if (warn.tooLongCount > 0) {
-          notifyToast(t('editor.save.garminWarn', { count: warn.tooLongCount }), 3200);
+          notifyToast(t('editor.save.garminWarn', { count: warn.tooLongCount }), 3200, 'warn');
         }
       } else if (fmt === 'tcx' && !hasTrackTimestamps(current)) {
-        notifyToast(t('editor.save.tcxNoTime'), 3500);
+        notifyToast(t('editor.save.tcxNoTime'), 3500, 'warn');
       }
       const content = serializeTrack(current, fmt, { watchFriendly });
       saveSequence += 1;
@@ -936,14 +996,15 @@ export function createEditorShell({
               })
               : t('editor.save.okWithRemote', { path: savedPath, packed }),
             3200,
+            lastProgress.failed > 0 ? 'warn' : 'success',
           );
         } else {
-          notifyToast(t('editor.save.ok', { path: savedPath }));
+          notifyToast(t('editor.save.ok', { path: savedPath }), 2000, 'success');
         }
         return true;
       }
       if (result?.cancelled) return false;
-      notifyToast(t('editor.save.fail', { detail: result?.detail || 'error' }), 3500);
+      notifyToast(t('editor.save.fail', { detail: result?.detail || 'error' }), 3500, 'error');
       return false;
     } finally {
       if (mySession === sessionId) {
@@ -1161,7 +1222,11 @@ export function createEditorShell({
     contextMenu = el('div', 'editor-context-menu');
     contextMenu.hidden = true;
 
-    root.append(topbar, metaPopover, savePopover, saveProgress, exitGuard, rail, drawer, drawerTooltip, contextMenu);
+    modeHint = el('div', 'editor-mode-hint');
+    modeHint.hidden = true;
+    modeHint.setAttribute('aria-live', 'polite');
+
+    root.append(topbar, metaPopover, savePopover, saveProgress, exitGuard, rail, drawer, drawerTooltip, contextMenu, modeHint);
     document.body.append(root);
   }
 
@@ -1381,6 +1446,8 @@ export function createEditorShell({
       splitOverlay.hidden = true;
     }
     if (root) root.hidden = true;
+    if (modeHint) modeHint.hidden = true;
+    document.documentElement.style.setProperty('--editor-hint-offset', '0px');
     document.body.classList.remove('is-editing');
     const committed = sessionOverwroteOriginal ? lastOverwrittenTrack : null;
     lastOverwrittenTrack = null;

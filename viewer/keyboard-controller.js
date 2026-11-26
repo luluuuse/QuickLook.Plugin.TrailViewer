@@ -88,6 +88,14 @@ export function createKeyboardController({
       if (waypointController.hasControl()) waypointController.toggle();
       return;
     }
+    if (name === 'x') {
+      const switcher = getLayerSwitch();
+      if (!switcher) return;
+      if (switcher.toggleNoMap) switcher.toggleNoMap();
+      else if (switcher.current?.() === 'none') switcher.resumeMap?.();
+      else switcher.select?.('none', true);
+      return;
+    }
     const turn = LAYER_KEYS[name];
     if (turn) cycleLayer(turn);
   }
@@ -109,7 +117,7 @@ export function createKeyboardController({
     if (event.ctrlKey || event.altKey || event.metaKey) return;
     const plainShortcut = !event.shiftKey
       && (key === 'w' || key === 's' || key === 'c' || key === 'm' || key === 't'
-        || key === 'p' || key === 'l' || LAYER_KEYS[key]);
+        || key === 'p' || key === 'l' || key === 'x' || LAYER_KEYS[key]);
     if (!photoOpen && plainShortcut) {
       if (event.repeat) return;
       event.preventDefault();
