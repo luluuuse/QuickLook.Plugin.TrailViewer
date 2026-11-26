@@ -224,9 +224,9 @@ export function createUpdateTool({
     totalBytes = 0;
     render();
     if (ok) {
-      showToast?.(t('update.launched'), 3600);
+      showToast?.(t('update.launched'), 3600, 'success');
     } else {
-      showToast?.(t('update.downloadFail', { detail: detail || 'error' }), 3600);
+      showToast?.(t('update.downloadFail', { detail: detail || 'error' }), 3600, 'error');
     }
   }
 

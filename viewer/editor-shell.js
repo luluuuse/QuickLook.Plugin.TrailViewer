@@ -87,7 +87,7 @@ export function createEditorShell({
   };
   /** @type {() => void} */
   const handleLayoutChange = onLayoutChange;
-  /** @type {(msg: string, ms?: number) => void} */
+  /** @type {(msg: string, ms?: number, tone?: string) => void} */
   const notifyToast = showToast;
   let root = null;
   let topbar = null;
