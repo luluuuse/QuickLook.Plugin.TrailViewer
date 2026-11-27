@@ -585,6 +585,7 @@ export function createLayerSwitcher({
       }, { signal: lifecycle.signal });
       bar.append(menu);
       L.DomEvent.disableClickPropagation(bar);
+      L.DomEvent.disableScrollPropagation(bar);
       // Close on the initial map press. A text selection can begin inside the form and end over the map, which
       // produces a click on the map; that completion click must not dismiss the editor mid-drag.
       map.getContainer().addEventListener('pointerdown', (event) => {

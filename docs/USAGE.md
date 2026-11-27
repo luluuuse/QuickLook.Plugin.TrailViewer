@@ -53,7 +53,7 @@
 
 #### 海拔剖面与 ClimbPro
 
-- **坡度与游标**：曲线按坡度着色并标注最高/最低点，底部带 25% / 50% / 75% 里程刻度；悬停查看海拔、里程与时间，点击可固定游标。
+- **坡度与游标**：曲线按坡度着色并标注最高/最低点，底部带 25% / 50% / 75% 里程刻度；悬停查看海拔、里程与时间，放大查看轨迹时需停留约 200 ms 或横向扫动才联动平移视野（避免划向任务栏误触跳动），点击可立即定位并固定游标。
 - **区间刷选分析**：在剖面绘图区水平拖拽框选任意区间，实时统计里程、爬升/下降、平均坡度、用时、均速与平均心率，并同步高亮地图轨迹（点击关闭按钮或画布空白处清除）。
 - **ClimbPro 主坡段**：自动识别主要爬坡段并在标题栏展示横滑列表，点击任一坡段同步聚焦地图与剖面。
 - **心率叠加与一键折叠**：含逐点心率时可点击 **心率** 开关叠加独立纵轴曲线与全程平均心率虚线（缺失点断开不插值）；点击折叠按钮或按 <kbd>P</kbd> 可收起/展开剖面。
@@ -97,14 +97,14 @@
 
 #### 距离测量
 
-- 按 <kbd>M</kbd> 开始或结束测距；右键在地图上打点，左键拖动地图、滚轮缩放，也可点击 **在地图中心打点**。
+- 按 <kbd>M</kbd> 开始或结束测距；左键在地图上打点（直点起点、终点或航点时同样直接落点而不弹出标记卡片），右键拖动地图、滚轮缩放，也可点击 **在地图中心打点**。
 - 靠近航点、已有测距点或轨迹点（14 px 内）时自动吸附并显示对应准星，优先级为 `航点 > 测距点 > 轨迹点`。
 - 支持 **结束本段** 开启新分段、**撤销打点** / <kbd>Ctrl</kbd>+<kbd>Z</kbd> 与 <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> 重做、**清空**；点击顶部 **返回** 自动结束打点并保留当前测距线在地图上。测距仅保存在内存中，不修改源文件。
 
 #### 点位坐标
 
-- 打开即进入连续地图拾取（左键拖动与滚轮缩放不变），面板固定提供 **起点 / 顶点 / 终点 / 轨迹中心** 一键复制。
-- 所有结果按 6 位小数 `纬度, 经度`（WGS-84，不转换 GCJ-02）复制；拾取靠近航点自动吸附，并在面板备注点位海拔（不写入剪贴板）。结果下方提供直达当前所选气象/山景平台的快捷按钮。
+- 打开即进入连续地图拾取（左键拖动与滚轮缩放不变，底部常驻轻提示胶囊），面板固定提供 **起点 / 顶点 / 终点 / 轨迹中心** 一键复制。
+- 所有结果按 6 位小数 `纬度, 经度`（WGS-84，不转换 GCJ-02）复制；拾取靠近航点或轨迹点均会自动吸附（同距离航点优先），并在地图标签与面板备注源点海拔（不写入剪贴板）。结果下方提供直达当前所选气象/山景平台的快捷按钮。
 
 #### 叠加图导出
 
@@ -178,7 +178,7 @@ Click the gear icon in the layer panel header to open **Map settings**:
 
 #### Elevation profile & ClimbPro
 
-- **Gradient & scrub:** gradient-colored terrain with high/low labels and 25% / 50% / 75% distance ticks; hover for live readout or click to pin the cursor.
+- **Gradient & scrub:** gradient-colored terrain with high/low labels and 25% / 50% / 75% distance ticks; hover for live readout (with a ~200 ms dwell / horizontal-scrub gate before panning a zoomed-in map, preventing accidental jumps when moving toward the taskbar) or click to pin and pan immediately.
 - **Range brush analysis:** drag horizontally across the chart to inspect distance, ascent/descent, average grade, duration, average speed and average heart rate while highlighting the matching map segment (clear via the close button or clicking outside the chart).
 - **ClimbPro major climbs:** automatically detects major climbs in a scrollable header strip; click any climb chip to focus both map and profile.
 - **Heart-rate overlay & collapse:** toggle **Heart rate** when per-point data is available to plot a dual-axis curve with a whole-route average line (gaps stay broken, never interpolated); click the collapse toggle or press <kbd>P</kbd> to fold/expand the profile.
@@ -222,14 +222,14 @@ Listed in Toolbox menu order:
 
 #### Measure distance
 
-- Press <kbd>M</kbd> to start or finish measuring; right-click adds points while left-drag pans and the wheel zooms (or use **Add at map centre**).
+- Press <kbd>M</kbd> to start or finish measuring; left-click adds points (including directly on start/end or waypoint markers without opening popups) while right-drag pans and the wheel zooms (or use **Add at map centre**).
 - Snaps automatically within 14 px with priority `waypoint > measured point > track point`.
 - Supports **End section**, **Undo point** / <kbd>Ctrl</kbd>+<kbd>Z</kbd> & <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> redo, and **Clear**. Clicking **Back** stops active point collection while keeping measured lines on the map. Measurements remain in memory only.
 
 #### Point coordinates
 
-- Enters continuous map picking immediately (pan and zoom stay active), with one-click copy buttons for **Start**, **Peak**, **End** and **Track centre**.
-- Copies six-decimal `latitude, longitude` (WGS-84, never silently converted to GCJ-02), snaps to nearby waypoints, and displays elevation notes (display-only, excluded from clipboard) plus a shortcut to open the picked point in the active Weather & sun service.
+- Enters continuous map picking immediately (pan and zoom stay active, with a bottom key-hint capsule matching the editor style), with one-click copy buttons for **Start**, **Peak**, **End** and **Track centre**.
+- Copies six-decimal `latitude, longitude` (WGS-84, never silently converted to GCJ-02), snaps to nearby waypoints and track points (waypoints win ties), and displays elevation notes (display-only, excluded from clipboard) plus a shortcut to open the picked point in the active Weather & sun service.
 
 #### Export overlay
 

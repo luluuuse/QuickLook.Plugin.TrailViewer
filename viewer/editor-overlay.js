@@ -169,6 +169,7 @@ export function createEditorOverlay({
   onViewportChange = () => {},
   onContextMenu = () => {},
   onDrawChange = () => {},
+  onFocusBounds = null,
 }) {
   /** @type {(meters: number) => void} */
   const handleSplitAt = onSplitAt;
@@ -1559,8 +1560,10 @@ export function createEditorOverlay({
       const bounds = L.latLngBounds(pts);
       if (bounds.getNorthEast().equals(bounds.getSouthWest())) {
         map.setView(pts[0], Math.max(map.getZoom(), 16), { animate: true });
+      } else if (typeof onFocusBounds === 'function') {
+        onFocusBounds(bounds, { maxZoom: 16, animate: true });
       } else {
-        map.fitBounds(bounds, { padding: [90, 90], maxZoom: 17, animate: true });
+        map.fitBounds(bounds, { padding: [90, 90], maxZoom: 16, animate: true });
       }
     },
     showSplitPreviewAt(alongMeters) {

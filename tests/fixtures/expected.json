@@ -50,6 +50,8 @@
     },
     "kml-gxtrack.kml": {
       "tracks": 2,
+      "startMarkers": 1,
+      "endMarkers": 1,
       "segments": 3,
       "routes": 0,
       "waypoints": 0,

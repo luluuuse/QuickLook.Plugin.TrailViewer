@@ -156,16 +156,18 @@ async function main() {
     inside(frame.safe, frame.pin) && inside(frame.safe, frame.popup),
     JSON.stringify(frame));
 
-  // The portrait photo card is taller than a short window's safe band, so "inside the safe frame" cannot hold
-  // for it. The contract is: horizontally inside the safe frame, top aligned to it, and fully on screen.
+  // In a short window, a portrait photo card either fits inside the safe band or aligns to its top edge
+  // while staying horizontally inside the safe frame and fully on screen.
   await firstPage.setViewportSize({ width: 760, height: 560 });
   await waitForLayout(firstPage);
   await firstPage.waitForFunction(() => {
     const safe = window.trailViewer.mapLayout().safe;
     const popup = document.querySelector('.leaflet-popup')?.getBoundingClientRect();
     if (!popup) return false;
+    const taller = popup.height > safe.height;
     return popup.left >= safe.left - 1 && popup.right <= safe.right + 1
-      && popup.top >= safe.top - 1 && popup.top <= safe.top + 2
+      && popup.top >= safe.top - 1
+      && (taller ? popup.top <= safe.top + 2 : popup.bottom <= safe.bottom + 1)
       && popup.bottom <= window.innerHeight + 1;
   });
   await waitForMapIdle(firstPage);
@@ -173,16 +175,19 @@ async function main() {
   const tallCard = await firstPage.evaluate(() => {
     const safe = window.trailViewer.mapLayout().safe;
     const popup = document.querySelector('.leaflet-popup').getBoundingClientRect();
+    const tallerThanSafe = popup.height > safe.height;
     return {
-      tallerThanSafe: popup.height > safe.height,
+      tallerThanSafe,
       horizontallyInside: popup.left >= safe.left - 1 && popup.right <= safe.right + 1,
-      topAligned: Math.abs(popup.top - safe.top) < 2,
+      verticallyGood: tallerThanSafe
+        ? Math.abs(popup.top - safe.top) < 2
+        : (popup.top >= safe.top - 1 && popup.bottom <= safe.bottom + 1),
       onScreen: popup.top >= -1 && popup.bottom <= window.innerHeight + 1,
       pinInside: document.querySelector('.gpx-pin.selected') !== null,
     };
   });
   check('resizing keeps a tall card readable and on screen',
-    tallCard.horizontallyInside && tallCard.topAligned && tallCard.onScreen && tallCard.pinInside,
+    tallCard.horizontallyInside && tallCard.verticallyGood && tallCard.onScreen && tallCard.pinInside,
     JSON.stringify(tallCard));
 
   const profilePage = await browser.newPage({ viewport: { width: 640, height: 600 }, locale: 'en-US' });

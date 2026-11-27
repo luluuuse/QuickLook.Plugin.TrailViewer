@@ -119,7 +119,7 @@ export function createToolbox({
     showToast,
     coordinatePoints,
     focusCoordinate,
-    snapMarker: measurement.snapMarker,
+    snapMarker: measurement.snapCoordinate,
     panel: () => panel,
     onBack: () => showView('main'),
     weatherProvider: readWeatherProvider,
@@ -455,6 +455,7 @@ export function createToolbox({
       }, { signal: lifecycle.signal });
       bar.append(panel);
       L.DomEvent.disableClickPropagation(bar);
+      L.DomEvent.disableScrollPropagation(bar);
       map.on('click', closePanel);
       return bar;
     },

@@ -75,14 +75,19 @@ export function createMapView({ map, isChromeHidden }) {
   let layoutFrame = 0;
   let pendingRefitHome = true;
   let pendingRevealFocus = true;
+  let pendingAnimate = false;
   let revealFrame = 0;
   let revealAgain = false;
+  let revealAnimate = false;
   let layoutSignature = '';
   let lastFittedSignature = '';
   let homeView = null;
   let atHome = true;
   let lastFocus = null;
   let initialRoutePending = false;
+  let lastContainerWidth = container.clientWidth;
+  let lastContainerHeight = container.clientHeight;
+  let fittingRoute = false;
   const observed = new WeakSet();
   let observer = null;
 
@@ -283,13 +288,17 @@ export function createMapView({ map, isChromeHidden }) {
     setVariable('--editor-rail-top', cssPixels(editorRailTop));
   }
 
+  function prefersReducedMotion() {
+    return typeof window.matchMedia === 'function'
+      && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  }
+
   function measureSafeRect(snapshot) {
     const width = snapshot.width;
     const height = snapshot.height;
+    // Top-left floating panels (#info, #splits, zoom/locate) sit in the corner and should not
+    // push the entire top safe boundary down across the full width of the map.
     const topBoxes = [
-      snapshot.info,
-      snapshot.splits,
-      snapshot.zoom,
       snapshot.tools,
       snapshot.exportPanel,
       snapshot.toolbox,
@@ -345,8 +354,9 @@ export function createMapView({ map, isChromeHidden }) {
    * leaves a card taller than the safe band straddling the summary. focusSelection knows to align such a card
    * to the safe top, so the card reads from its heading down.
    */
-  function scheduleReveal() {
+  function scheduleReveal({ animate = false } = {}) {
     if (!lastFocus) return;
+    revealAnimate = revealFrame ? (revealAnimate || animate) : animate;
     if (revealFrame) {
       revealAgain = true;
       return;
@@ -354,10 +364,12 @@ export function createMapView({ map, isChromeHidden }) {
     revealFrame = requestAnimationFrame(() => {
       revealFrame = requestAnimationFrame(() => {
         revealFrame = 0;
-        focusSelection(lastFocus.latlng, lastFocus.options);
+        const useAnimate = revealAnimate;
+        revealAnimate = false;
+        focusSelection(lastFocus.latlng, { ...lastFocus.options, animate: useAnimate });
         if (revealAgain) {
           revealAgain = false;
-          scheduleReveal();
+          scheduleReveal({ animate: useAnimate });
         }
       });
     });
@@ -368,6 +380,7 @@ export function createMapView({ map, isChromeHidden }) {
     cancelAnimationFrame(revealFrame);
     revealFrame = 0;
     revealAgain = false;
+    revealAnimate = false;
   }
 
   function refineDependentVariables(snapshot) {
@@ -411,22 +424,25 @@ export function createMapView({ map, isChromeHidden }) {
     initialRoutePending = false;
     const shouldRefitHome = pendingRefitHome;
     const shouldRevealFocus = pendingRevealFocus;
+    const shouldAnimate = pendingAnimate;
     pendingRefitHome = true;
     pendingRevealFocus = true;
+    pendingAnimate = false;
     layoutFrame = 0;
     if (signature === layoutSignature) return;
     layoutSignature = signature;
     if (fitInitialRoute && atHome && bounds?.isValid()) fit();
-    else if (!atHome && lastFocus && shouldRevealFocus) scheduleReveal();
+    else if (!atHome && lastFocus && shouldRevealFocus) scheduleReveal({ animate: shouldAnimate });
     else if (shouldRefitHome && atHome && signature !== lastFittedSignature) {
-      fit();
+      fit({ animate: shouldAnimate });
     }
   }
 
-  function scheduleRefresh({ refitHome = true, revealFocus = true } = {}) {
+  function scheduleRefresh({ refitHome = true, revealFocus = true, animate = false } = {}) {
     if (!revealFocus) cancelScheduledReveal();
-    pendingRefitHome = layoutFrame ? pendingRefitHome && refitHome : refitHome;
+    pendingRefitHome = layoutFrame ? (pendingRefitHome || refitHome) : refitHome;
     pendingRevealFocus = layoutFrame ? pendingRevealFocus && revealFocus : revealFocus;
+    pendingAnimate = layoutFrame ? (pendingAnimate || animate) : animate;
     if (layoutFrame) return;
     layoutFrame = requestAnimationFrame(() => {
       observeLayoutNodes();
@@ -435,41 +451,97 @@ export function createMapView({ map, isChromeHidden }) {
     });
   }
 
-  function fitRoute({ animate = false, maxZoom = 16 } = {}) {
-    if (!bounds?.isValid()) return;
-    const width = container.clientWidth;
-    const height = container.clientHeight;
-    map.fitBounds(bounds, {
-      paddingTopLeft: [safeRect.left, safeRect.top],
-      paddingBottomRight: [width - safeRect.right, height - safeRect.bottom],
-      maxZoom,
-      animate,
-    });
-    const center = map.getCenter();
-    homeView = { lat: center.lat, lng: center.lng, zoom: map.getZoom() };
-    atHome = true;
-    lastFittedSignature = currentSignature();
+  function syncSafeRect() {
+    if (container.clientWidth <= 0 || container.clientHeight <= 0) return;
+    const refined = refineDependentVariables(readLayoutSnapshot());
+    safeRect = measureSafeRect(refined);
   }
 
-  function fit() {
-    fitRoute();
+  let pendingFitEnd = null;
+
+  function clearPendingFitEnd() {
+    if (!pendingFitEnd) return;
+    map.off('moveend', pendingFitEnd);
+    pendingFitEnd = null;
+  }
+
+  function fitRoute({ animate = false, maxZoom = 16, duration = 0.35 } = {}) {
+    if (!bounds?.isValid()) return;
+    syncSafeRect();
+    clearPendingFitEnd();
+    const width = container.clientWidth;
+    const height = container.clientHeight;
+    const useAnimate = Boolean(animate) && !prefersReducedMotion();
+    const recordHome = () => {
+      fittingRoute = false;
+      const center = map.getCenter();
+      homeView = { lat: center.lat, lng: center.lng, zoom: map.getZoom() };
+      atHome = true;
+      lastContainerWidth = container.clientWidth;
+      lastContainerHeight = container.clientHeight;
+      lastFittedSignature = currentSignature();
+      layoutSignature = lastFittedSignature;
+    };
+    fittingRoute = true;
+    let startedMove = false;
+    const onMoveStart = () => { startedMove = true; };
+    if (useAnimate) {
+      map.once('movestart', onMoveStart);
+      pendingFitEnd = () => {
+        pendingFitEnd = null;
+        recordHome();
+      };
+      map.once('moveend', pendingFitEnd);
+    }
+    try {
+      map.fitBounds(bounds, {
+        paddingTopLeft: [safeRect.left, safeRect.top],
+        paddingBottomRight: [width - safeRect.right, height - safeRect.bottom],
+        maxZoom,
+        animate: useAnimate,
+        duration: useAnimate ? duration : undefined,
+        easeLinearity: 0.25,
+      });
+    } finally {
+      if (useAnimate) {
+        map.off('movestart', onMoveStart);
+        if (!startedMove) {
+          clearPendingFitEnd();
+          recordHome();
+        }
+      } else {
+        recordHome();
+      }
+    }
+  }
+
+  function fit(options) {
+    fitRoute(options);
   }
 
   function focusBounds(nextBounds, options = {}) {
     if (!nextBounds?.isValid()) return;
+    syncSafeRect();
+    clearPendingFitEnd();
     const width = container.clientWidth;
     const height = container.clientHeight;
     const before = map.getZoom();
+    const useAnimate = (options.animate ?? true) && !prefersReducedMotion();
+    const duration = options.duration ?? 0.38;
     map.fitBounds(nextBounds, {
       paddingTopLeft: [safeRect.left, safeRect.top],
       paddingBottomRight: [width - safeRect.right, height - safeRect.bottom],
       maxZoom: options.maxZoom ?? 15,
-      animate: options.animate ?? true,
+      animate: useAnimate,
+      duration: useAnimate ? duration : undefined,
+      easeLinearity: 0.25,
     });
     const gain = options.minZoomGain ?? 0;
     if (gain > 0 && map.getZoom() < before + gain) {
       map.setView(nextBounds.getCenter(), Math.min(options.maxZoom ?? 15, before + gain), {
-        animate: options.animate ?? true,
+        animate: useAnimate,
+        duration: useAnimate ? duration : undefined,
+        easeLinearity: 0.25,
       });
     }
     atHome = false;
@@ -509,8 +581,13 @@ export function createMapView({ map, isChromeHidden }) {
     const at = map.latLngToContainerPoint(latlng);
     const focus = unionRects([pointRect(at.x, at.y, 38), options.popup ? popupRect(true) : null]);
     const offset = focusOffset(focus, safeRect);
+    const useAnimate = (options.animate ?? true) && !prefersReducedMotion();
     if (offset.needed) {
-      map.panBy([-offset.x, -offset.y], { animate: options.animate ?? true });
+      map.panBy([-offset.x, -offset.y], {
+        animate: useAnimate,
+        duration: useAnimate ? (options.duration ?? 0.35) : undefined,
+        easeLinearity: 0.25,
+      });
     }
     atHome = false;
     homeView = null;
@@ -545,6 +622,15 @@ export function createMapView({ map, isChromeHidden }) {
   });
   map.on('moveend', () => {
     document.body.classList.remove('is-map-dragging');
+    if (fittingRoute) return;
+    const sizeChanged = container.clientWidth !== lastContainerWidth
+      || container.clientHeight !== lastContainerHeight;
+    if (sizeChanged) {
+      lastContainerWidth = container.clientWidth;
+      lastContainerHeight = container.clientHeight;
+      if (atHome) scheduleRefresh({ refitHome: true });
+      return;
+    }
     if (homeView && sameView({
       lat: map.getCenter().lat,
       lng: map.getCenter().lng,
@@ -556,7 +642,9 @@ export function createMapView({ map, isChromeHidden }) {
     }
   });
   map.on('resize', () => {
-    scheduleRefresh();
+    lastContainerWidth = container.clientWidth;
+    lastContainerHeight = container.clientHeight;
+    scheduleRefresh({ refitHome: true });
     if (!atHome) scheduleReveal();
   });
 
@@ -573,9 +661,13 @@ export function createMapView({ map, isChromeHidden }) {
     revealPoint,
     observeControls() {
       observer = new ResizeObserver((entries) => {
+        const containerResized = entries.some((entry) => entry.target === container);
         const toolboxOnly = entries.length > 0
           && entries.every((entry) => entry.target.id === 'toolbox-panel');
-        scheduleRefresh({ refitHome: false, revealFocus: !toolboxOnly });
+        if (containerResized) {
+          map.invalidateSize({ animate: false, pan: false });
+        }
+        scheduleRefresh({ refitHome: containerResized, revealFocus: !toolboxOnly });
       });
       observeLayoutNodes();
       placeControls(readLayoutSnapshot());
@@ -585,8 +677,8 @@ export function createMapView({ map, isChromeHidden }) {
       addEventListener('resize', () => scheduleRefresh({ refitHome: true }));
       scheduleRefresh({ refitHome: true });
     },
-    refreshControls({ refitHome = true, revealFocus = true } = {}) {
-      scheduleRefresh({ refitHome, revealFocus });
+    refreshControls({ refitHome = true, revealFocus = true, animate = false } = {}) {
+      scheduleRefresh({ refitHome, revealFocus, animate });
     },
     safeRect: () => ({ ...safeRect }),
     layoutState: () => layoutState,

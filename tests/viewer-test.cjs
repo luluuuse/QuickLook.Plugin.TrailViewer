@@ -84,8 +84,8 @@ async function main() {
     check(fixture, 'track lines', got.lines, want.segments);
     check(fixture, 'dashed routes', got.dashed, want.routes);
     check(fixture, 'waypoint records', got.waypoints, want.waypoints);
-    check(fixture, 'start markers', got.startMarkers, want.tracks);
-    check(fixture, 'end markers', got.endMarkers, want.tracks);
+    check(fixture, 'start markers', got.startMarkers, want.startMarkers ?? want.tracks);
+    check(fixture, 'end markers', got.endMarkers, want.endMarkers ?? want.tracks);
     check(fixture, 'elevation profile', got.profile, want.elevation);
     if (want.segments > 0 && !got.info.includes('Distance')) failures.push(`${fixture}: info box has no distance`);
 

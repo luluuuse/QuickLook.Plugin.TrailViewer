@@ -135,6 +135,43 @@ async function main() {
   check('leaving clears the cursor', await page.evaluate(() => !window.trailViewer.scrub.point()));
   check('leaving removes the map marker', (await page.locator('.scrub-marker').count()) === 0);
 
+  // When zoomed in, quickly sweeping vertically across the profile toward the taskbar must not jump the map.
+  const zoomBeforeSweep = await page.evaluate(() => {
+    const api = window.trailViewer;
+    const first = api.gpx.tracks[0].segments[0][0];
+    api.map.setView([first.lat, first.lon], 17, { animate: false });
+    const c = api.map.getCenter();
+    return { lat: c.lat, lng: c.lng };
+  });
+  await page.mouse.move(plot.x + plot.width * 0.85, plot.y - 20);
+  await page.mouse.move(plot.x + plot.width * 0.85, plot.y + plot.height * 0.35);
+  await page.mouse.move(plot.x + plot.width * 0.85, plot.y + plot.height * 0.85);
+  await page.mouse.move(plot.x + plot.width * 0.85, plot.y + plot.height + 30);
+  await page.waitForTimeout(260);
+  const centerAfterQuickSweep = await page.evaluate(() => {
+    const c = window.trailViewer.map.getCenter();
+    return { lat: c.lat, lng: c.lng };
+  });
+  check('quick vertical sweep across profile does not pan zoomed-in map',
+    Math.abs(centerAfterQuickSweep.lat - zoomBeforeSweep.lat) < 1e-6
+      && Math.abs(centerAfterQuickSweep.lng - zoomBeforeSweep.lng) < 1e-6,
+    JSON.stringify({ before: zoomBeforeSweep, after: centerAfterQuickSweep }));
+
+  // Dwelling on the profile past the anti-accidental-pan threshold resumes map following.
+  await page.mouse.move(plot.x + plot.width * 0.85, plot.y + plot.height / 2);
+  await page.waitForTimeout(260);
+  const centerAfterDwell = await page.evaluate(() => {
+    const c = window.trailViewer.map.getCenter();
+    return { lat: c.lat, lng: c.lng };
+  });
+  check('dwelling on the profile pans the zoomed-in map to reveal the point',
+    Math.abs(centerAfterDwell.lat - zoomBeforeSweep.lat) > 1e-4
+      || Math.abs(centerAfterDwell.lng - zoomBeforeSweep.lng) > 1e-4,
+    JSON.stringify({ before: zoomBeforeSweep, after: centerAfterDwell }));
+  await page.mouse.move(plot.x + plot.width / 2, plot.y - 120);
+  await waitForScrub({ exists: false });
+  await page.evaluate(() => window.trailViewer.locate());
+
   // The extreme edges clamp to the track instead of running past it.
   await page.mouse.move(plot.x + 1, plot.y + 20);
   await waitForScrub({ min: 0, max: 0 });

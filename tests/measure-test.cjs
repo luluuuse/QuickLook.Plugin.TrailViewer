@@ -123,6 +123,41 @@ async function main() {
   });
   check('hidden waypoint pins still provide snapping targets', hiddenSnap === 'marker', hiddenSnap);
 
+  // Clicking directly on a visible waypoint pin while measuring commits a snapped marker point without opening its popup.
+  await page.evaluate(() => {
+    window.trailViewer.pins.show();
+    window.trailViewer.measure.start();
+  });
+  await waitForLayout(page);
+  const visiblePin = await page.evaluate(() => {
+    const api = window.trailViewer;
+    const pin = document.querySelector('.gpx-pin');
+    if (!pin) return null;
+    const rect = pin.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height - 2;
+    const target = api.measure.snapAt(api.map.containerPointToLatLng([cx, cy]));
+    return { x: cx, y: cy, target };
+  });
+  check('a visible waypoint pin is available for direct click measurement', Boolean(visiblePin));
+  await page.mouse.move(visiblePin.x, visiblePin.y);
+  await page.mouse.click(visiblePin.x, visiblePin.y);
+  await page.waitForFunction(() => window.trailViewer.measure.summary().pointCount === 1);
+  const clickedPinResult = await page.evaluate(() => ({
+    point: window.trailViewer.measure.sections()[0][0],
+    popupCount: document.querySelectorAll('.leaflet-popup').length,
+  }));
+  check('clicking directly on a waypoint pin commits the snapped waypoint without opening a popup',
+    clickedPinResult.point.kind === 'marker'
+      && clickedPinResult.point.lat === visiblePin.target.lat
+      && clickedPinResult.point.lon === visiblePin.target.lon
+      && clickedPinResult.popupCount === 0,
+    JSON.stringify(clickedPinResult));
+  await page.evaluate(() => {
+    window.trailViewer.measure.clear();
+    window.trailViewer.measure.stop();
+  });
+
   // A pure track has no waypoint that could win the nearest-target comparison.
   await openViewer(page, base, 'gpx10.gpx');
   await waitForLayout(page);
@@ -254,6 +289,28 @@ async function main() {
     JSON.stringify(trackSnapStyle));
 
   await page.mouse.click(visibleTrackPoint.x + 5, visibleTrackPoint.y);
+  await page.waitForFunction(() => window.trailViewer.measure.summary().pointCount === 1);
+  // Clicking directly on the start marker (circleMarker with bound popup) must also commit a point instead of opening a popup.
+  const startMarkerTarget = await page.evaluate(() => {
+    const api = window.trailViewer;
+    const start = api.gpx.tracks[0].segments[0][0];
+    const screen = api.map.latLngToContainerPoint([start.lat, start.lon]);
+    return { ...start, x: screen.x, y: screen.y };
+  });
+  await page.mouse.move(startMarkerTarget.x, startMarkerTarget.y);
+  await page.mouse.click(startMarkerTarget.x, startMarkerTarget.y);
+  await page.waitForFunction(() => window.trailViewer.measure.summary().pointCount === 2);
+  const startClickResult = await page.evaluate(() => ({
+    point: window.trailViewer.measure.sections()[0][1],
+    popupCount: document.querySelectorAll('.leaflet-popup').length,
+  }));
+  check('clicking directly on the start marker commits the snapped start point without opening a popup',
+    startClickResult.point.kind === 'track'
+      && startClickResult.point.lat === startMarkerTarget.lat
+      && startClickResult.point.lon === startMarkerTarget.lon
+      && startClickResult.popupCount === 0,
+    JSON.stringify(startClickResult));
+  await page.evaluate(() => window.trailViewer.measure.undo());
   await page.waitForFunction(() => window.trailViewer.measure.summary().pointCount === 1);
   await page.mouse.click(680, 440);
   await page.waitForFunction(() => window.trailViewer.measure.summary().pointCount === 2);

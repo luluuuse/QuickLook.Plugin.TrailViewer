@@ -103,15 +103,59 @@ function attachScrub({
     interactive: false,
     className: 'scrub-marker',
   });
+  const HOVER_REVEAL_DELAY_MS = 200;
+  const HOVER_HORIZONTAL_ARM_PX = 28;
+  const HOVER_HORIZONTAL_RATIO = 2.2;
   let pinned = false;
   let onMap = false;
   let current = null;
   let frame = 0;
   let queued = null;
+  let hoverRevealArmed = false;
+  let hoverRevealTimer = 0;
+  let lastHoverPos = null;
+  let hoverTravelX = 0;
+  let hoverTravelY = 0;
   let chartRect = chart.getBoundingClientRect();
   let readoutKey = '';
   let readoutWidth = 0;
   let readoutHeight = 0;
+
+  function resetHoverGate() {
+    if (hoverRevealTimer) {
+      clearTimeout(hoverRevealTimer);
+      hoverRevealTimer = 0;
+    }
+    hoverRevealArmed = false;
+    lastHoverPos = null;
+    hoverTravelX = 0;
+    hoverTravelY = 0;
+  }
+
+  function updateHoverGate(clientX, clientY) {
+    if (hoverRevealArmed) return;
+    if (!lastHoverPos) {
+      lastHoverPos = { x: clientX, y: clientY };
+      hoverRevealTimer = setTimeout(() => {
+        hoverRevealTimer = 0;
+        if (drag || pinned || !current) return;
+        hoverRevealArmed = true;
+        revealPoint?.([current.lat, current.lon], { remember: false });
+      }, HOVER_REVEAL_DELAY_MS);
+      return;
+    }
+    hoverTravelX += Math.abs(clientX - lastHoverPos.x);
+    hoverTravelY += Math.abs(clientY - lastHoverPos.y);
+    lastHoverPos = { x: clientX, y: clientY };
+    if (hoverTravelX >= HOVER_HORIZONTAL_ARM_PX
+      && hoverTravelX >= hoverTravelY * HOVER_HORIZONTAL_RATIO) {
+      if (hoverRevealTimer) {
+        clearTimeout(hoverRevealTimer);
+        hoverRevealTimer = 0;
+      }
+      hoverRevealArmed = true;
+    }
+  }
 
   function measureChart() {
     chartRect = chart.getBoundingClientRect();
@@ -140,7 +184,7 @@ function attachScrub({
     return Math.min(total, Math.max(0, ratio * total));
   }
 
-  function place(distance) {
+  function place(distance, { reveal = true } = {}) {
     const point = pointNear(points, Math.max(0, Math.min(total, distance)));
     current = point;
     const x = (point.along / total) * chartRect.width;
@@ -199,10 +243,16 @@ function attachScrub({
       marker.addTo(map);
       onMap = true;
     }
-    revealPoint?.(latlng, { remember: pinned });
+    if (reveal) revealPoint?.(latlng, { remember: pinned });
   }
 
   function clear() {
+    resetHoverGate();
+    if (frame) {
+      cancelAnimationFrame(frame);
+      frame = 0;
+    }
+    queued = null;
     guide.hidden = true;
     dot.hidden = true;
     if (heart) heart.dot.hidden = true;
@@ -215,12 +265,13 @@ function attachScrub({
     current = null;
   }
 
-  function schedule(clientX) {
+  function schedule(clientX, clientY) {
+    updateHoverGate(clientX, clientY);
     queued = clientX;
     if (frame) return;
     frame = requestAnimationFrame(() => {
       frame = 0;
-      if (queued !== null) place(distanceAt(queued));
+      if (queued !== null) place(distanceAt(queued), { reveal: hoverRevealArmed });
       queued = null;
     });
   }
@@ -333,9 +384,10 @@ function attachScrub({
   document.addEventListener('keydown', onDocumentKeyDown);
 
   svg.addEventListener('pointermove', (event) => {
-    if (!drag && !pinned) schedule(event.clientX);
+    if (!drag && !pinned) schedule(event.clientX, event.clientY);
   });
   svg.addEventListener('pointerleave', () => {
+    resetHoverGate();
     if (!drag && !pinned) clear();
   });
   svg.addEventListener('pointerdown', (event) => {

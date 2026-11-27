@@ -20,7 +20,6 @@ export function createCoordinateTool({
   let highlight = null;
   let highlightTimer = 0;
   let copyTimer = 0;
-  let pickHintTimer = 0;
   let moveFrame = 0;
 
   const view = el('section', 'toolbox-subview toolbox-coordinate');
@@ -78,7 +77,25 @@ export function createCoordinateTool({
 
   const hint = el('div', 'coordinate-pick-hint');
   hint.hidden = true;
-  hint.append(iconElement('coordinates'), el('span', null, t('coordinates.pick')));
+  hint.setAttribute('aria-live', 'polite');
+  function renderHint() {
+    const items = [
+      [t('editor.keyHint.leftClick'), t('coordinates.hint.pick'), false],
+      [t('editor.keyHint.leftDrag'), t('editor.keyHint.pan'), true],
+      [t('coordinates.hint.scroll'), t('coordinates.hint.zoom'), true],
+    ];
+    const frag = document.createDocumentFragment();
+    items.forEach(([keyLabel, actionLabel, secondary], idx) => {
+      if (idx > 0) {
+        frag.append(el('span', secondary ? 'coordinate-pick-hint-sep is-secondary' : 'coordinate-pick-hint-sep', '\u00b7'));
+      }
+      const item = el('span', secondary ? 'coordinate-pick-hint-item is-secondary' : 'coordinate-pick-hint-item');
+      item.append(el('kbd', 'control-key', keyLabel), el('span', null, actionLabel));
+      frag.append(item);
+    });
+    hint.replaceChildren(frag);
+  }
+  renderHint();
   map.getContainer().append(hint);
 
   function elevationText(point) {
@@ -108,7 +125,6 @@ export function createCoordinateTool({
     if (!active) return;
     active = false;
     hideSnap();
-    clearTimeout(pickHintTimer);
     clearTimeout(highlightTimer);
     panel()?.classList.remove('is-picking');
     map.getContainer().classList.remove('is-coordinate-picking');
@@ -123,22 +139,15 @@ export function createCoordinateTool({
     map.closePopup();
     panel()?.classList.add('is-picking');
     map.getContainer().classList.add('is-coordinate-picking');
-    clearTimeout(pickHintTimer);
     hint.hidden = false;
     renderToolbox();
   }
 
-  function showHint() {
-    clearTimeout(pickHintTimer);
-    hint.hidden = false;
-    pickHintTimer = setTimeout(() => {
-      hint.hidden = true;
-    }, 1800);
-  }
-
-  function showPoint(point, targetKey, coordinate, snapped, ephemeral) {
+  function showPoint(point, targetKey, coordinate, snapKind, ephemeral) {
     clearTimeout(highlightTimer);
     if (highlight) map.removeLayer(highlight);
+    const snapped = Boolean(snapKind);
+    const snapTextKey = snapKind === 'track' ? 'coordinates.snapTrack' : 'coordinates.snapMarker';
     const halo = L.circleMarker([point.lat, point.lon], {
       radius: 20,
       color: '#2f9bff',
@@ -163,7 +172,7 @@ export function createCoordinateTool({
     label.append(
       el('strong', null, t(`coordinates.${targetKey}`)),
       el('small', 'coordinate-focus-details',
-        snapped ? `${t('coordinates.snapMarker')} \u00b7 ${coordinate}` : coordinate),
+        snapped ? `${t(snapTextKey)} \u00b7 ${coordinate}` : coordinate),
       el('small', 'coordinate-focus-elevation', elevationText(point)),
     );
     const tag = L.marker([point.lat, point.lon], {
@@ -177,9 +186,9 @@ export function createCoordinateTool({
       }),
     });
     const layers = [halo, dot, tag];
-    if (snapped) {
+    if (snapKind) {
       const reticle = createSnapReticleMarker(L, point, {
-        kind: 'marker',
+        kind: snapKind,
         animate: false,
         zIndexOffset: 2300,
       });
@@ -194,12 +203,12 @@ export function createCoordinateTool({
     }
   }
 
-  function copy(point, targetKey, { focus = false, snapped = false, ephemeral = false } = {}) {
+  function copy(point, targetKey, { focus = false, snapKind = null, ephemeral = false } = {}) {
     if (!point) return;
     const coordinate = formatCoord(point);
     copiedPoint = { lat: Number(point.lat), lon: Number(point.lon), ele: point.ele };
     paint(targetKey, coordinate, elevationText(point));
-    showPoint(point, targetKey, coordinate, snapped, ephemeral);
+    showPoint(point, targetKey, coordinate, snapKind, ephemeral);
     if (focus) focusCoordinate(point);
     clearTimeout(copyTimer);
     copyTimer = setTimeout(async () => {
@@ -237,7 +246,7 @@ export function createCoordinateTool({
     result.querySelector('span').textContent = t('coordinates.result');
     elevation.textContent = elevationText(copiedPoint);
     syncWeatherHint();
-    hint.querySelector('span').textContent = t('coordinates.pick');
+    renderHint();
     snapIndicator.relabel();
     render();
   }
@@ -266,9 +275,11 @@ export function createCoordinateTool({
     event.preventDefault();
     event.stopPropagation();
     hideSnap();
-    showHint();
     const target = snapMarker(map.mouseEventToLatLng(event));
-    if (target) copy(target, 'picked', { snapped: target.kind === 'marker', ephemeral: true });
+    if (target) {
+      const snapKind = target.kind === 'marker' || target.kind === 'track' ? target.kind : null;
+      copy(target, 'picked', { snapKind, ephemeral: true });
+    }
   }, { capture: true, signal });
 
   function destroy() {
@@ -280,7 +291,6 @@ export function createCoordinateTool({
     snapIndicator.destroy();
     clearTimeout(highlightTimer);
     clearTimeout(copyTimer);
-    clearTimeout(pickHintTimer);
     if (highlight) map.removeLayer(highlight);
     hint.remove();
   }

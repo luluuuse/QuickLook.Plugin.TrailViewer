@@ -11,11 +11,31 @@ Added / Changed / Deprecated / Removed / Fixed / Security 分类；没有内容�
 
 ### 中文
 
-- 暂无未发布变更。
+#### 变更
+
+- **多段连续轨迹起终点智能合并**：对顺序排列的多段轨迹（如中途暂停续录导出的多段 `<gx:Track>`），相邻两段首尾间距在 500 米以内时自动隐藏交界处的红绿起终点（保留既有断档提示），仅展示整条路线的总起点与总终点；相距较远的独立支线仍保留各自起终点。
+- **全场景聚焦轨迹与安全区对齐统一**：排除左上角摘要/分段/缩放面板对整行顶部安全区的压占，释放更多画布高度让轨迹更舒展；为「回到整条轨迹（C）」、分段/爬坡/编辑聚焦与航点切换统一加入平缓移动过渡（跟随系统减少动态设置）；修复首次打开文件或窗口缩放时全览聚焦被异步重排取消的问题，同步统一编辑模式多段轨迹聚焦、退出编辑自动重聚焦及全览态折叠/展开剖面图（`P`）重算。
+- **海拔剖面图悬停防误触门控**：放大查看轨迹时，快速纵向划过剖面图移向桌面任务栏不再触发视野跳动；仅在剖面图内停留约 200 ms 或横向扫动后启动地图跟随平移，单击剖面图仍立即定位。
+- **点位坐标支持吸附轨迹点与轻提示统一**：复制点位坐标拾取模式同时支持吸附航点与轨迹点（同距离下航点优先），悬停显示对应菱形/十字准星与标签并带出源点海拔；底部操作提示同步统一为与轨迹编辑一致的紧凑键帽胶囊样式。
+
+#### 修复
+
+- **测距模式吸附起终点与航点无法打点修复**：测距开启时改为在地图捕获阶段优先处理左键打点、自动关闭已开弹窗并在交互元素上保持十字光标，修复吸附起点、终点或航点时左键被标记弹窗拦截导致无法打点的问题。
+- **工具箱与图源面板滚轮穿透修复**：拦截图源切换菜单与工具箱浮层内的滚轮事件冒泡，修复「检查更新」更新日志区域无法用鼠标滚轮滑动并误触发底图缩放的问题，同时为更新日志区隔离滚动边界避免连带滚动外层面板。
 
 ### English
 
-- No unreleased changes yet.
+#### Changed
+
+- **Smart Start/End Deduplication for Stitched Multi-Track Routes**: When consecutive tracks (such as pause/resume `<gx:Track>` segments) connect within 500 m, intermediate junction start/end dots are suppressed so only the route's overall start and end markers remain visible, while distant independent tracks keep their own endpoints.
+- **Unified Route Focusing, Expanded Safe Area & Smooth Motion**: Excluded top-left corner panels (summary card, splits toggle, zoom/locate) from pushing down the full-width top safe boundary so routes fit larger and higher on screen; added gentle ease-out pan/zoom transitions (~350 ms, respecting `prefers-reduced-motion`) to **Fit the whole track (`C`)**, segment/climb/editor focusing, and waypoint selection; fixed initial open and window resize losing home refit, and aligned editor multi-track focusing, post-edit refit, and profile collapse/expand (`P`) refit.
+- **Elevation Profile Hover Anti-Accidental-Pan Gate**: Sweeping vertically across the elevation profile toward the taskbar while zoomed in no longer jumps the map view; map following activates after ~200 ms of dwell or intentional horizontal scrubbing, while clicking the profile still pans immediately.
+- **Coordinate Picking Track Snapping & Unified Hint Capsule**: Map coordinate picking now snaps to both waypoints and track points (waypoints win ties), showing the matching diamond/cross reticle and source elevation; its bottom hint now matches the compact key-cap capsule style used by track editing.
+
+#### Fixed
+
+- **Distance Measurement Click on Start/End & Waypoint Markers**: Handled primary measurement clicks in the map container capture phase (closing any open popup on start and keeping the crosshair cursor over interactive layers), fixing clicks snapped to start/end or waypoint markers being swallowed by marker popups instead of placing points.
+- **Toolbox & Layer Panel Wheel Scroll Propagation**: Disabled Leaflet scroll propagation on the Toolbox and Layer Switcher control panels so mouse-wheel scrolling works inside the Check Updates release notes (and scrollable menus) without zooming the underlying map, and added `overscroll-behavior: contain` to keep release-notes scrolling isolated from the outer panel.
 
 ## 1.32.1 — 2026-11-27
 

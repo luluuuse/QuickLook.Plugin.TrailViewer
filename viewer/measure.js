@@ -257,6 +257,17 @@ export function createMeasurement({
     };
   }
 
+  function snapCoordinateAt(latlng) {
+    const marker = nearest(getWaypointIndex(), latlng, 'marker');
+    const track = nearest(getTrackIndex(), latlng, 'track');
+    return chooseSnap([marker, track].filter(Boolean)) || {
+      lat: Number(latlng.lat),
+      lon: Number(latlng.lng ?? latlng.lon),
+      kind: 'free',
+      distancePixels: Infinity,
+    };
+  }
+
   function hideHover() {
     if (moveFrame) {
       cancelAnimationFrame(moveFrame);
@@ -304,12 +315,15 @@ export function createMeasurement({
 
   let panState = null;
 
-  function onMapClick(event) {
-    if (!active) return;
-    if (event.originalEvent?.target?.closest?.('.leaflet-control, .leaflet-control-container')) {
+  function onContainerClick(event) {
+    if (!active || event.button !== 0) return;
+    if (event.target instanceof Element
+      && event.target.closest('.leaflet-control, .leaflet-control-container')) {
       return;
     }
-    addAt(event.latlng);
+    event.preventDefault();
+    event.stopPropagation();
+    addAt(map.mouseEventToLatLng(event));
   }
 
   function onContextMenu(event) {
@@ -325,6 +339,7 @@ export function createMeasurement({
 
   const domLifecycle = new AbortController();
   const container = map.getContainer();
+  container.addEventListener('click', onContainerClick, { capture: true, signal: domLifecycle.signal });
   container.addEventListener('pointerdown', (event) => {
     if (!active || (event.button !== 2 && event.button !== 1)) return;
     if (event.target instanceof Element && event.target.closest('.leaflet-control, .leaflet-control-container')) {
@@ -365,7 +380,6 @@ export function createMeasurement({
     });
   }
 
-  map.on('click', onMapClick);
   map.on('contextmenu', onContextMenu);
   map.on('mousemove', onMouseMove);
   map.on('mouseout', hideHover);
@@ -374,6 +388,7 @@ export function createMeasurement({
   function start() {
     getTrackIndex();
     active = true;
+    map.closePopup();
     if (map.dragging) map.dragging.disable();
     document.body.classList.add('measuring');
     notify();
@@ -443,7 +458,6 @@ export function createMeasurement({
     }
     pendingHoverLatLng = null;
     domLifecycle.abort();
-    map.off('click', onMapClick);
     map.off('contextmenu', onContextMenu);
     map.off('mousemove', onMouseMove);
     map.off('mouseout', hideHover);
@@ -484,5 +498,6 @@ export function createMeasurement({
     indexed: () => Boolean(trackIndex),
     snapAt,
     snapMarker: snapMarkerAt,
+    snapCoordinate: snapCoordinateAt,
   };
 }

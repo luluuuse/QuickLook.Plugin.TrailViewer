@@ -1747,6 +1747,7 @@
 .toolbox-update-notes {
   max-height: 170px;
   overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 8px 10px;
   border: 1px solid var(--border-hairline);
   border-radius: var(--radius-sm);

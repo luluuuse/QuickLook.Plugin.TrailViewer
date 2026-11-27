@@ -128,7 +128,8 @@
 
 /* Measurement graphics sit above the recorded route but never take pointers, so panning and right-click
    collection continue to work over the line itself. */
-body.measuring #map.leaflet-container {
+body.measuring #map.leaflet-container,
+body.measuring #map.leaflet-container .leaflet-interactive {
   cursor: crosshair;
 }
 

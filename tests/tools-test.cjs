@@ -264,7 +264,8 @@ async function main() {
       && await page.locator('.toolbox-coordinate-button[data-coordinate="any"]').count() === 0);
   check('the coordinate panel declares WGS-84 without an Esc-cancel instruction',
     await page.locator('.toolbox-coordinate-type').textContent() === 'Coordinate type: WGS-84'
-      && !/Esc/i.test(await page.locator('.coordinate-pick-hint').textContent()));
+      && !/Esc/i.test(await page.locator('.coordinate-pick-hint').textContent())
+      && await page.locator('.coordinate-pick-hint kbd.control-key').count() >= 1);
   await page.mouse.move(albumAt.x + 10, albumAt.y);
   await page.waitForFunction(() => {
     const svg = document.querySelector('.snap-indicator-marker svg');
@@ -352,8 +353,8 @@ async function main() {
       && rapidPickCopy.clipboard === rapidPickCopy.displayed,
     JSON.stringify(rapidPickCopy));
   await page.waitForTimeout(1900);
-  check('transient pick feedback disappears while picking remains active',
-    await page.locator('.coordinate-pick-hint').isHidden()
+  check('transient pick halo disappears while mode hint and picking remain active',
+    await page.locator('.coordinate-pick-hint').isVisible()
       && await page.locator('.coordinate-focus-halo').count() === 0
       && await page.locator('#map').evaluate((node) => node.classList.contains('is-coordinate-picking')));
 
@@ -474,6 +475,7 @@ async function main() {
       && narrow.info.left >= 0 && narrow.info.right <= 360 && narrow.overflow === false,
     JSON.stringify(narrow));
 
+  await page.setViewportSize({ width: 1200, height: 800 });
   await openViewer(page, base, 'track-time-ele.gpx');
   await page.click('.toolbox-switch > button');
   const emptyAttachment = page.locator('.toolbox-action[data-tool="attachments"]');
@@ -481,6 +483,67 @@ async function main() {
     await emptyAttachment.isDisabled()
       && await emptyAttachment.getAttribute('title') === '这个文件没有可导出的附件图片。',
     await emptyAttachment.getAttribute('title'));
+
+  // Coordinate picking on a track without waypoints snaps to track points and copies exact coordinates + elevation.
+  await page.click('.toolbox-action[data-tool="coordinates"]');
+  const trackTarget = await page.evaluate(() => {
+    const api = window.trailViewer;
+    for (const seg of api.gpx.tracks.flatMap((trk) => trk.segments)) {
+      for (const pt of seg) {
+        const screen = api.map.latLngToContainerPoint([pt.lat, pt.lon]);
+        if (screen.x > 100 && screen.x < innerWidth - 320 && screen.y > 100 && screen.y < innerHeight - 180) {
+          return { ...pt, x: screen.x, y: screen.y };
+        }
+      }
+    }
+    return null;
+  });
+  check('a track point is available for coordinate track snapping', Boolean(trackTarget));
+  await page.mouse.move(trackTarget.x, trackTarget.y);
+  await page.waitForFunction(() => {
+    const svg = document.querySelector('.snap-indicator-track svg');
+    const label = document.querySelector('.snap-label.coordinate-snap-label span');
+    return svg?.dataset.symbol === 'snap-track' && label?.textContent === '吸附：轨迹点';
+  });
+  await page.mouse.click(trackTarget.x, trackTarget.y);
+  const expectedTrackCoord = `${trackTarget.lat.toFixed(6)}, ${trackTarget.lon.toFixed(6)}`;
+  await page.waitForFunction((expected) => window.__clipboardText === expected, expectedTrackCoord);
+  check('clicking near a track point snaps to its exact coordinate and reports track snap',
+    await page.evaluate(() => window.__clipboardText) === expectedTrackCoord
+      && /已吸附到轨迹点/.test(await page.locator('.coordinate-focus-details').textContent())
+      && /海拔：\d+/.test(await page.locator('.toolbox-coordinate-elevation').textContent()),
+    await page.evaluate(() => window.__clipboardText));
+  await page.click('.toolbox-coordinate .toolbox-back');
+
+  await page.evaluate(() => {
+    window.trailViewer.updateStatus({
+      status: 'available',
+      currentVersion: '1.32.0',
+      latestVersion: '1.32.1',
+      hasUpdate: true,
+      notesZh: `## 新增\n${Array.from({ length: 12 }, (_, i) => `- 更新条目 ${i + 1}：用于验证更新日志列表支持鼠标滚轮滚动`).join('\n')}`,
+    });
+  });
+  await page.click('[data-tool="update"]');
+  const notesBox = await page.locator('.toolbox-update-notes').boundingBox();
+  const zoomBeforeWheel = await page.evaluate(() => window.trailViewer.map.getZoom());
+  await page.mouse.move(notesBox.x + notesBox.width / 2, notesBox.y + notesBox.height / 2);
+  await page.mouse.wheel(0, 240);
+  await page.waitForTimeout(120);
+  const notesScroll = await page.evaluate(() => {
+    const node = document.querySelector('.toolbox-update-notes');
+    return {
+      scrollTop: node ? node.scrollTop : 0,
+      scrollHeight: node ? node.scrollHeight : 0,
+      clientHeight: node ? node.clientHeight : 0,
+      zoom: window.trailViewer.map.getZoom(),
+    };
+  });
+  check('mouse wheel scrolls the update release notes without zooming the map',
+    notesScroll.scrollHeight > notesScroll.clientHeight
+      && notesScroll.scrollTop > 0
+      && notesScroll.zoom === zoomBeforeWheel,
+    JSON.stringify({ zoomBeforeWheel, ...notesScroll }));
 
   check('no page errors', errors.length === 0, errors.join(' | '));
   await artifacts.capture(page, failures, errors);

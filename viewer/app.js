@@ -246,7 +246,7 @@ const waypointController = createWaypointController({
     [stop.point.lat, stop.point.lon],
     { popup },
   ),
-  onLayoutChange: () => mapViewController?.refreshControls(),
+  onLayoutChange: () => mapViewController?.refreshControls({ refitHome: true, animate: true }),
   onOverviewOpen: () => {
     toolboxController?.close();
     layerSwitch?.close();
@@ -272,7 +272,7 @@ const profileController = createProfileController({
     if (!editorStore?.isActive()) waypointController.focus(index);
   },
   revealPoint: (latlng, options) => mapViewController?.revealPoint(latlng, options),
-  onLayoutChange: () => mapViewController?.refreshControls({ refitHome: false }),
+  onLayoutChange: () => mapViewController?.refreshControls({ refitHome: true, animate: true }),
   onRangeSelect: (range) => focusProfileRange(range),
   onCropRange: (fromMeters, toMeters) => openTrackEditor({ initialTool: 'crop', cropRange: [fromMeters, toMeters] }),
   isEditingSuspended: () => Boolean(editorStore?.isActive()),
@@ -409,6 +409,7 @@ async function ensureEditorLoaded() {
           onViewportChange: () => editorShell?.refreshVertexStatus?.(),
           onDrawChange: () => editorShell?.refreshDrawStatus?.(),
           onContextMenu: (info) => editorShell?.showContextMenu(info),
+          onFocusBounds: (bounds, options) => mapViewController?.focusBounds(bounds, options),
         });
         editorShell = shellMod.createEditorShell({
           el,
@@ -443,6 +444,7 @@ async function ensureEditorLoaded() {
           onShowPins: () => waypointController?.show?.(),
           isPinsVisible: () => Boolean(waypointController?.visible?.()),
           onExit: ({ overwroteOriginal = false, committed = null } = {}) => {
+            let routeUpdated = false;
             if (overwroteOriginal && committed) {
               ctx.gpx = committed;
               currentEditedGpx = committed;
@@ -510,6 +512,7 @@ async function ensureEditorLoaded() {
               }
               savedColorModeBeforeEdit = null;
               mapViewController?.setRoute(newTracks.bounds);
+              routeUpdated = Boolean(newTracks.bounds?.isValid());
             } else {
               currentEditedGpx = ctx.gpx;
               if (savedColorModeBeforeEdit) {
@@ -537,7 +540,10 @@ async function ensureEditorLoaded() {
               if (profileBox) profileBox.hidden = true;
               document.body.classList.remove('with-profile');
             }
-            mapViewController?.refreshControls({ refitHome: false, revealFocus: false });
+            if (routeUpdated) {
+              mapViewController?.fit({ animate: true });
+            }
+            mapViewController?.refreshControls({ refitHome: routeUpdated, revealFocus: false });
           },
           onLayoutChange: () => mapViewController?.refreshControls({ refitHome: false, revealFocus: false }),
           showToast,
@@ -600,7 +606,7 @@ const keyboardController = createKeyboardController({
     redo: () => editorStore?.redo(),
     save: () => editorShell?.triggerSave(),
   }),
-  fit: () => mapViewController?.fit(),
+  fit: () => mapViewController?.fit({ animate: true }),
   toggleChrome,
 });
 const pressKey = keyboardController.pressKey;
@@ -899,7 +905,7 @@ async function main() {
     onLayoutChange: () => mapViewController?.refreshControls({ refitHome: false, revealFocus: false }),
   });
   // First of the corner controls, so it stands leftmost: "where the map looks" before "what the map shows".
-  const locateCtrl = createLocateControl({ L, map, el, t, onLocate: () => mapViewController.fit() });
+  const locateCtrl = createLocateControl({ L, map, el, t, onLocate: () => mapViewController.fit({ animate: true }) });
   const warnTiandituTemporarily = () => {
     if (tiandituTransientShown) return;
     tiandituTransientShown = true;

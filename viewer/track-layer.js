@@ -1,3 +1,4 @@
+import { distanceMeters } from './geo.js';
 import {
   adaptiveDistanceIntervals,
   directionSamples,
@@ -20,6 +21,32 @@ const COLORS = ['#df2b1d', '#297bb8', '#d98a1c', '#9c3ce6', '#249e58', '#d9367a'
 const ROUTE_COLOR = '#ffffff';
 const NETWORK_LOD_PIXELS = 0.75;
 const NETWORK_VIEW_PADDING = 0.25;
+export const ENDPOINT_STITCH_METERS = 500;
+
+/**
+ * Resolves which track groups should render start/end markers.
+ * Consecutive track groups whose previous end and next start are within maxStitchMeters are treated
+ * as one continuous pause/resume route: intermediate junction markers are suppressed so only the
+ * chain's overall start and end remain visible.
+ */
+export function resolveTrackEndpoints(trackGroups, maxStitchMeters = ENDPOINT_STITCH_METERS) {
+  const endpoints = trackGroups.map((group) => {
+    const first = group.segments[0]?.points[0] || null;
+    const lastLine = group.segments[group.segments.length - 1];
+    const last = lastLine?.points[lastLine.points.length - 1] || null;
+    return { first, last, showStart: Boolean(first), showEnd: Boolean(last) };
+  });
+  for (let index = 1; index < endpoints.length; index += 1) {
+    const previous = endpoints[index - 1];
+    const current = endpoints[index];
+    if (!previous.last || !current.first) continue;
+    if (distanceMeters(previous.last, current.first) <= maxStitchMeters) {
+      previous.showEnd = false;
+      current.showStart = false;
+    }
+  }
+  return endpoints;
+}
 
 function lineBounds(L, points) {
   let south = Infinity;
@@ -522,7 +549,8 @@ export function createTrackLayer({ L, el, localized, t, pointPopup, onFocusBound
         bounds.extend(shape.getBounds());
       }
 
-      model.trackGroups.forEach((group) => {
+      const resolvedEndpoints = showEnds ? resolveTrackEndpoints(model.trackGroups) : [];
+      model.trackGroups.forEach((group, groupIndex) => {
         const track = group.track;
         group.segments.forEach((segmentLine, segmentIndex) => {
           const points = segmentLine.points;
@@ -575,10 +603,10 @@ export function createTrackLayer({ L, el, localized, t, pointPopup, onFocusBound
           }
         });
 
-        const first = group.segments[0]?.points[0];
-        const lastLine = group.segments[group.segments.length - 1];
-        const last = lastLine?.points[lastLine.points.length - 1];
-        if (last && showEnds) {
+        const endpoint = resolvedEndpoints[groupIndex];
+        const first = endpoint?.first;
+        const last = endpoint?.last;
+        if (last && endpoint?.showEnd) {
           const marker = L.circleMarker([last.lat, last.lon], {
             radius: 7.5,
             color: '#18212b',
@@ -589,7 +617,7 @@ export function createTrackLayer({ L, el, localized, t, pointPopup, onFocusBound
           }).bindPopup(() => pointPopup(last, t('label.end'))).addTo(baseLayer);
           navigationMarks.push({ kind: 'end', marker, point: last });
         }
-        if (first && showEnds) {
+        if (first && endpoint?.showStart) {
           const marker = L.circleMarker([first.lat, first.lon], {
             radius: 5.5,
             color: '#18212b',
