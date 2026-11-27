@@ -51,10 +51,12 @@ import {
 
 export { LAYERS, loadCustomProviders, normalizeLayer } from './layer-registry.js';
 
+export const DEFAULT_LAYER = 'satellite.esri';
+
 export function savedLayer(params) {
   const fromHost = normalizeLayer(params.get('layer'));
   if (fromHost) return fromHost;
-  return normalizeLayer(readStored(LAYER_KEY)) || 'road.osm';
+  return normalizeLayer(readStored(LAYER_KEY)) || DEFAULT_LAYER;
 }
 
 const TILE_CACHE_LIMITS = [256, 512, 2048, 0];
@@ -119,7 +121,7 @@ export function createLayerSwitcher({
       );
     }
   }
-  const initialKey = normalizeLayer(initial) || 'road.osm';
+  const initialKey = normalizeLayer(initial) || DEFAULT_LAYER;
   let pendingKeyProvider = null;
   let current = null;
   let currentCategory = PROVIDERS[initialKey].category;

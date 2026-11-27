@@ -293,8 +293,8 @@ async function main() {
   });
   check('hovering near a marker in coordinate mode shows the standardized diamond snap indicator',
     coordinateHoverSnap.symbol === 'snap-marker'
-      && coordinateHoverSnap.background === 'rgba(24, 33, 43, 0.9)'
-      && coordinateHoverSnap.border === 'rgba(223, 43, 29, 0.55)'
+      && coordinateHoverSnap.background === 'rgba(7, 20, 26, 0.74)'
+      && coordinateHoverSnap.border === 'rgba(255, 242, 168, 0.55)'
       && coordinateHoverSnap.dx <= 1
       && coordinateHoverSnap.dy <= 1.5,
     JSON.stringify(coordinateHoverSnap));
@@ -319,7 +319,7 @@ async function main() {
     };
   });
   check('the coordinate label is more transparent and fits its text',
-    coordinateLabel.background === 'rgba(24, 33, 43, 0.68)' && coordinateLabel.fits,
+    coordinateLabel.background === 'rgba(24, 24, 24, 0.68)' && coordinateLabel.fits,
     JSON.stringify(coordinateLabel));
   check('the snapped point keeps continuous map picking active',
     await page.locator('#toolbox-panel').isVisible()

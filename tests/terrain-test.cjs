@@ -75,10 +75,10 @@ async function main() {
     expanded: node.getAttribute('aria-expanded'),
   }));
   check('the four map types share one visible layer entry',
-    layerEntry.label === 'Road' && layerEntry.icon === 'layer-road'
+    layerEntry.label === 'Satellite' && layerEntry.icon === 'layer-satellite'
       && layerEntry.expanded === 'false', JSON.stringify(layerEntry));
-  check('the road source is the default',
-    await page.evaluate(() => window.trailViewer.layer()) === 'road.osm');
+  check('the Esri satellite source is the default',
+    await page.evaluate(() => window.trailViewer.layer()) === 'satellite.esri');
   check('the source menu starts closed',
     await page.locator('.layer-source-menu').evaluate((node) => node.hidden));
   check('no terrain tile before it is asked for', requestsFor('/cyclosm/').length === 0);
@@ -89,9 +89,9 @@ async function main() {
     return { background: style.backgroundColor, filter: style.backdropFilter };
   });
   check('the map layer panel uses the shared translucent tool surface',
-    layerSurface.background === 'rgba(250, 248, 243, 0.93)'
+    layerSurface.background === 'rgba(24, 24, 24, 0.78)'
       && layerSurface.filter.includes('blur(14px)')
-      && layerSurface.filter.includes('saturate(1.08)'),
+      && layerSurface.filter.includes('saturate(0.9)'),
     JSON.stringify(layerSurface));
   const categoryLabels = await page.$$eval('.layer-category-button', (nodes) => nodes.map((node) => node.textContent));
   check('the layer panel exposes four map types', categoryLabels.length === 4, categoryLabels.join('/'));
@@ -100,9 +100,10 @@ async function main() {
   check('the layer entry exposes its expanded state',
     await page.getAttribute('.layer-menu-toggle', 'aria-expanded') === 'true');
   check('the active map type is checked in the layer panel',
-    await page.getAttribute('.layer-category-button[data-layer="road"]', 'aria-checked') === 'true');
+    await page.getAttribute('.layer-category-button[data-layer="satellite"]', 'aria-checked') === 'true');
   check('the expanded layer menu shows the Q / E category shortcut',
     await page.textContent('.layer-section-heading-row .control-key') === 'Q / E');
+  await page.click('.layer-category-button[data-layer="road"]');
   await waitForLayout(page);
   check('the road menu offers OSM, Tianditu and Esri Gray Canvas',
     (await page.$$eval('.layer-source-menu button[data-provider]:not([hidden])',
@@ -243,9 +244,9 @@ async function main() {
     };
   });
   check('the active no-map icon uses the shared accent active state',
-    noMapActiveStyle.background === 'rgb(255, 255, 255)'
-      && noMapActiveStyle.color === 'rgb(223, 43, 29)'
-      && noMapActiveStyle.shadow.includes('rgb(223, 43, 29)'),
+    noMapActiveStyle.background === 'rgb(35, 79, 121)'
+      && noMapActiveStyle.color === 'rgb(143, 217, 255)'
+      && noMapActiveStyle.shadow.includes('rgb(47, 155, 255)'),
     JSON.stringify(noMapActiveStyle));
   check('no-map mode does not repeat itself as a provider row',
     await page.locator('.layer-main-view .layer-menu-section').nth(1)

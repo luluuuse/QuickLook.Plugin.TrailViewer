@@ -373,6 +373,8 @@ export function createHostBridge() {
         trackSaveResult(parts[1], Number(parts[2]), parts[3], parts[4]);
       } else if (parts[0] === 'trackSaveProgress') {
         trackSaveProgress(parts[1], Number(parts[2]), Number(parts[3]), Number(parts[4]));
+      } else if (parts[0] === 'hostReveal') {
+        api.revealViewer?.();
       } else if (parts[0] === 'nodeProbeResult') {
         nodeProbeResult(parts[1], parts[2] === '1', Number(parts[3]), parts[4]);
       } else if (parts[0] === 'trackImportList') {

@@ -46,7 +46,7 @@ export function createToolbox({
   onOpenUpdateRelease,
   lang = () => 'zh',
   setLang = () => false,
-  theme = () => 'swiss',
+  theme = () => 'classic',
   setTheme = /** @type {(next: string) => boolean} */ (() => false),
   themeModes = [],
   onOpen,

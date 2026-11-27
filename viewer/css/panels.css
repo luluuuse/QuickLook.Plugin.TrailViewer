@@ -1,5 +1,15 @@
 /* Summary, profile, overlays and dark Leaflet controls. */
 
+/* Inside QuickLook host, keep canvas and HUD hidden behind the theme background until the host
+   finishes post-ready window/DPI layout and sends hostReveal (with a 180 ms JS safety fallback). */
+body.ql-host:not(.revealed):not(.failed) #map,
+body.ql-host:not(.revealed):not(.failed) #info,
+body.ql-host:not(.revealed):not(.failed) #splits,
+body.ql-host:not(.revealed):not(.failed) #profile {
+  opacity: 0;
+  pointer-events: none;
+}
+
 /* Picking a point is a different mode from panning the map: the whole surface stops saying "drag me" and says
    "click here". Both selectors are needed -- Leaflet puts .leaflet-grab on the container and .leaflet-interactive
    on every layer inside it, and either one alone leaves part of the map showing the grab hand. */

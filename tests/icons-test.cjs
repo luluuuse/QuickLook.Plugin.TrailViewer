@@ -57,7 +57,7 @@ async function main() {
     zoomIn: window.__readIcon('.leaflet-control-zoom-in svg'),
     zoomOut: window.__readIcon('.leaflet-control-zoom-out svg'),
     locate: window.__readIcon('.locate-switch svg'),
-    layers: window.__readIcon('.layer-menu-toggle svg[data-icon="layer-road"]'),
+    layers: window.__readIcon('.layer-menu-toggle svg[data-icon="layer-satellite"]'),
     layerChevron: window.__readIcon('.layer-menu-chevron'),
     toolbox: window.__readIcon('.toolbox-switch > button svg'),
     pins: window.__readIcon('.pins-switch svg'),
@@ -67,7 +67,7 @@ async function main() {
     expectedDefault(top.zoomIn, 'plus') && expectedDefault(top.zoomOut, 'minus'),
     JSON.stringify(top));
   check('locate, current source, toolbox, pins and list use the shared default size',
-    expectedDefault(top.locate, 'locate') && expectedDefault(top.layers, 'layer-road')
+    expectedDefault(top.locate, 'locate') && expectedDefault(top.layers, 'layer-satellite')
       && expectedDefault(top.toolbox, 'toolbox') && expectedDefault(top.pins, 'pin')
       && expectedDefault(top.list, 'list'), JSON.stringify(top));
   check('the layer dropdown uses the compact shared chevron',
@@ -99,7 +99,7 @@ async function main() {
     '.layer-provider-option:not([hidden]) .layer-provider-label',
   )].map((node) => node.textContent));
   check('the layer menu shows only providers from the active map type',
-    visibleProviders.join('|') === 'OpenStreetMap HOT|Tianditu road|Esri Light Gray|Esri Dark Gray',
+    visibleProviders.join('|') === 'Esri World Imagery|Tianditu satellite',
     visibleProviders.join('|'));
   const categoryIcons = await page.$$eval('.layer-category-button', (nodes) => nodes.map((node) => ({
     name: node.querySelector('svg')?.dataset.icon,
@@ -145,10 +145,10 @@ async function main() {
       shadow: style.boxShadow,
     };
   });
-  check('default swiss theme uses ivory active surface with vermilion accent and underline',
-    active.theme === 'swiss'
-      && (active.background === 'rgba(250, 248, 243, 0.92)' || active.background === 'rgb(255, 255, 255)')
-      && active.color === 'rgb(223, 43, 29)' && active.shadow.includes('inset'),
+  check('default classic theme uses charcoal active surface with electric-blue accent and underline',
+    active.theme === 'classic'
+      && active.background === 'rgba(24, 24, 24, 0.78)'
+      && active.color === 'rgb(143, 217, 255)' && active.shadow.includes('inset'),
     JSON.stringify(active));
 
   const brandIcon = await page.evaluate(() => {
@@ -180,12 +180,12 @@ async function main() {
       profileShadow: profile ? getComputedStyle(profile).boxShadow : '',
     };
   });
-  check('waypoint and photo symbols use semantic fills with dark outlines in swiss theme',
-    symbols.pin === 'waypoint' && symbols.pinFill === 'rgb(255, 255, 255)'
+  check('waypoint and photo symbols use semantic fills with dark outlines in classic theme',
+    symbols.pin === 'waypoint' && symbols.pinFill === 'rgb(245, 196, 0)'
       && symbols.pinStroke === '1.5px' && symbols.camera === 'camera', JSON.stringify(symbols));
   check('start, end and profile data symbols follow the data-symbol stroke policy',
     symbols.startStroke === '1.5' && symbols.endStroke === '1.5'
-      && symbols.profileBackground === 'rgb(255, 255, 255)' && /1\.4px/.test(symbols.profileShadow),
+      && symbols.profileBackground === 'rgb(245, 196, 0)' && /1\.4px/.test(symbols.profileShadow),
     JSON.stringify(symbols));
 
   // Verify manual switching to slate and classic themes (classic preserves legacy blue/yellow palette).
@@ -228,7 +228,7 @@ async function main() {
     expectedDefault(overview.close, 'close') && expectedCompact(overview.filter, 'chevron-down')
       && expectedCompact(overview.edit, 'edit'), JSON.stringify(overview));
   await page.click('.waypoint-overview-header .close');
-
+  await page.evaluate(() => window.trailViewer.measure.stop());
   await page.locator('.gpx-pin[title="Album"]').click();
   await page.waitForSelector('.photo-popup .photo-frame');
   // The card draws its own close control inside the photo frame and hides Leaflet's, so the icon assertions

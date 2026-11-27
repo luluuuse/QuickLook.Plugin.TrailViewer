@@ -13,6 +13,7 @@ Added / Changed / Deprecated / Removed / Fixed / Security 分类；没有内容�
 
 #### 变更
 
+- **默认主题与默认底图调整**：新安装默认主题调整为「经典深灰」，默认底图调整为卫星图源 **Esri World Imagery**（已手动切换过主题或底图的用户偏好保持不变）。
 - **全链路性能优化（冷启动、长轨迹、编辑内存与宿主缓存）**：编辑器撤销栈消除冗余双倍深拷贝并对航点/元数据编辑启用轨迹结构共享（超 2 万点轨迹历史收紧至 20 步）；照片全览灯箱、叠加图导出及无图文件的附件导出模块改为按需懒加载；航点沿轨重排改用空间索引加速；8,000 点以上长轨迹自动切换 Canvas 渲染并缓存路网源点计数与飞点检测结果；C# 瓦片缓存复用目录枚举元数据与线程局部 SHA256；导出序列化坐标/海拔格式化去正则化提速。
 - **多段连续轨迹起终点智能合并**：对顺序排列的多段轨迹（如中途暂停续录导出的多段 `<gx:Track>`），相邻两段首尾间距在 500 米以内时自动隐藏交界处的红绿起终点（保留既有断档提示），仅展示整条路线的总起点与总终点；相距较远的独立支线仍保留各自起终点。
 - **全场景聚焦轨迹与安全区对齐统一**：排除左上角摘要/分段/缩放面板对整行顶部安全区的压占，释放更多画布高度让轨迹更舒展；为「回到整条轨迹（C）」、分段/爬坡/编辑聚焦与航点切换统一加入平缓移动过渡（跟随系统减少动态设置）；修复首次打开文件或窗口缩放时全览聚焦被异步重排取消的问题，同步统一编辑模式多段轨迹聚焦、退出编辑自动重聚焦及全览态折叠/展开剖面图（`P`）重算。
@@ -28,6 +29,7 @@ Added / Changed / Deprecated / Removed / Fixed / Security 分类；没有内容�
 
 #### Changed
 
+- **Default Theme & Basemap**: Changed the fresh-install default theme to **Classic Dark** (`classic`) and the default basemap to **Esri World Imagery** (`satellite.esri`), while preserving existing user-saved preferences.
 - **End-to-End Performance Optimizations (Startup, Long Tracks, Editor Memory & Tile Cache)**: Removed redundant double deep-cloning in the editor undo stack with structural sharing for waypoint/metadata edits (capping history to 20 steps above 20k points); lazy-loaded the photo lightbox, overlay exporter, and photo-less attachment exporter on demand; accelerated along-track waypoint sorting with spatial indexing; enabled Canvas rendering for tracks with `>= 8,000` points and cached network source-point counts and anomaly detection results; reduced Win32 metadata syscalls and per-tile `SHA256` allocations in `TileCache.cs`; and replaced regex-heavy coordinate/elevation formatting in track serializers.
 - **Smart Start/End Deduplication for Stitched Multi-Track Routes**: When consecutive tracks (such as pause/resume `<gx:Track>` segments) connect within 500 m, intermediate junction start/end dots are suppressed so only the route's overall start and end markers remain visible, while distant independent tracks keep their own endpoints.
 - **Unified Route Focusing, Expanded Safe Area & Smooth Motion**: Excluded top-left corner panels (summary card, splits toggle, zoom/locate) from pushing down the full-width top safe boundary so routes fit larger and higher on screen; added gentle ease-out pan/zoom transitions (~350 ms, respecting `prefers-reduced-motion`) to **Fit the whole track (`C`)**, segment/climb/editor focusing, and waypoint selection; fixed initial open and window resize losing home refit, and aligned editor multi-track focusing, post-edit refit, and profile collapse/expand (`P`) refit.

@@ -85,6 +85,7 @@ const {
   installViewerMessages,
   installTextInputReporting,
 } = hostBridge;
+if (hasQuickLookHost) document.body.classList.add('ql-host');
 const runtimeConfig = window.__TRAILVIEWER_RUNTIME_CONFIG__ || {};
 const initialTileCache = savedTileCache(params, runtimeConfig.tileCache);
 let runtimeTiandituKey = runtimeConfig.direct === true
@@ -133,6 +134,9 @@ function ensurePhotoViewer() {
     photoViewerPromise = import('./photo-viewer.js').then(({ createPhotoViewer }) => {
       photoViewerInstance = createPhotoViewer({ el, formatters, formatCoord, t });
       return photoViewerInstance;
+    }).catch((err) => {
+      photoViewerPromise = null;
+      throw err;
     });
   }
   return photoViewerPromise;
@@ -722,6 +726,9 @@ async function main() {
           lazyExporterPromise = import('./attachments.js').then(({ createAttachmentExporter }) => {
             lazyExporter = createAttachmentExporter({ post, hasHost: hasQuickLookHost });
             return lazyExporter;
+          }).catch((err) => {
+            lazyExporterPromise = null;
+            throw err;
           });
         }
         return lazyExporterPromise;
@@ -849,6 +856,9 @@ async function main() {
           overlayPanelHandle = overlayInstance.mount(overlayMountNode);
         }
         return overlayInstance;
+      }).catch((err) => {
+        overlayPromise = null;
+        throw err;
       });
     }
     return overlayPromise;
@@ -1137,6 +1147,7 @@ async function main() {
   onThemeChange(() => {
     syncPreferences();
     toolboxController?.refreshTheme?.();
+    activeTrackLayer?.refreshTheme?.();
   });
   const api = createTestApi({
     gpx, summary, map, scrub, photoViewer, hikeEstimate, tracks, timing, loadSplitsData,
@@ -1152,8 +1163,28 @@ async function main() {
     attachmentExporter, decodeMessage, measurement,
     theme: { get: getTheme, set: setTheme, modes: [...THEMES] },
   });
+  let viewerRevealed = !hasQuickLookHost;
+  let revealFallbackTimer = 0;
+  function revealViewer() {
+    if (viewerRevealed) return;
+    viewerRevealed = true;
+    if (revealFallbackTimer) {
+      clearTimeout(revealFallbackTimer);
+      revealFallbackTimer = 0;
+    }
+    activeProfile?.refit?.();
+    mapViewController?.settleAndFit?.();
+    activeTrackLayer?.refreshDistanceMarks?.();
+    waypointController?.refreshMapMarks?.();
+    document.body.classList.add('revealed');
+  }
+  api.revealViewer = revealViewer;
   window.trailViewer = api;
   window.addEventListener('pagehide', () => {
+    if (revealFallbackTimer) {
+      clearTimeout(revealFallbackTimer);
+      revealFallbackTimer = 0;
+    }
     swissScaleRatio?.destroy?.();
     toolboxController?.destroy();
     layerSwitch?.destroy();
@@ -1167,6 +1198,9 @@ async function main() {
     timing.firstPaintMs = performance.now() - started;
   }));
   post(`ready\t${summary.points} points, ${distanceLog(summary.distanceMeters)}`);
+  if (hasQuickLookHost && !viewerRevealed) {
+    revealFallbackTimer = setTimeout(revealViewer, 180);
+  }
   if (hostBridge.hasHost) {
     setTimeout(() => hostBridge.checkUpdate(false), 1200);
   }

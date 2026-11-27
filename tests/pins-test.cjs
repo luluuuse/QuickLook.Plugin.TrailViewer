@@ -97,10 +97,10 @@ async function main() {
   check('the tooltip offers to hide them', s.title === 'Hide markers and anomaly labels (W)', s.title);
   check('the marker control keeps the key in its tooltip without a duplicate badge', s.key === '', s.key);
   check('and screen readers get the same action name', s.accessibleName === s.title, s.accessibleName);
-  check('the marker control uses the shared pin icon', s.icon === 'pin' && s.iconColor === 'rgb(223, 43, 29)',
+  check('the marker control uses the shared pin icon', s.icon === 'pin' && s.iconColor === 'rgb(143, 217, 255)',
     `${s.icon}/${s.iconColor}`);
   check('its active state uses the shared accent surface and underline',
-    s.background === 'rgb(255, 255, 255)' && /inset/.test(s.shadow), `${s.background} ${s.shadow}`);
+    s.background === 'rgb(35, 79, 121)' && /inset/.test(s.shadow), `${s.background} ${s.shadow}`);
 
   // 2. Hiding takes the pins off the map and leaves everything else alone.
   await page.locator('.pins-switch button').click();
@@ -116,7 +116,7 @@ async function main() {
   check('the switch is off', s.visible === false && s.active === false);
   check('the switch exposes its off state', s.pressed === 'false', s.pressed);
   check('the tooltip now offers to show them', s.title === 'Show markers and anomaly labels (W)', s.title);
-  check('the pin icon is muted while markers are hidden', s.iconColor === 'rgb(90, 103, 118)', s.iconColor);
+  check('the pin icon is muted while markers are hidden', s.iconColor === 'rgb(174, 184, 196)', s.iconColor);
 
   // 3. A key press outranks the hidden state: the pins come back and the first one is selected.
   await press('ArrowRight');
@@ -125,7 +125,7 @@ async function main() {
   check('the profile dots come back with them', s.profileHidden === 0, `${s.profileHidden}`);
   check('and selects the first marker', s.index === 0 && s.selected === 1, `${s.index}/${s.selected}`);
   check('the switch follows the arrow', s.active === true);
-  check('the pin icon becomes active again', s.iconColor === 'rgb(223, 43, 29)', s.iconColor);
+  check('the pin icon becomes active again', s.iconColor === 'rgb(143, 217, 255)', s.iconColor);
 
   // 4. The choice survives a reload: hidden stays hidden.
   await page.locator('.pins-switch button').click();

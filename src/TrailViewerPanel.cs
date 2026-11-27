@@ -68,6 +68,7 @@ internal sealed partial class TrailViewerPanel : UserControl, IDisposable
     private bool _finished;
     private bool _initializingWebView;
     private volatile bool _disposed;
+    private DispatcherTimer? _revealTimer;
 
     public TrailViewerPanel()
     {
@@ -425,6 +426,43 @@ internal sealed partial class TrailViewerPanel : UserControl, IDisposable
             : $"ERROR {name} {_clock.ElapsedMilliseconds} ms: {error}");
 
         Finished?.Invoke(error);
+
+        if (error == null && _webView != null)
+        {
+            ScheduleHostReveal();
+        }
+    }
+
+    private void ScheduleHostReveal()
+    {
+        if (_disposed || _webView == null)
+            return;
+        var webView = _webView;
+        SizeChangedEventHandler? onSizeChanged = null;
+        var timer = new DispatcherTimer(DispatcherPriority.Loaded, Dispatcher)
+        {
+            Interval = TimeSpan.FromMilliseconds(50),
+        };
+        _revealTimer = timer;
+        onSizeChanged = (_, _) =>
+        {
+            if (_disposed || !ReferenceEquals(_revealTimer, timer))
+                return;
+            timer.Stop();
+            timer.Interval = TimeSpan.FromMilliseconds(35);
+            timer.Start();
+        };
+        webView.SizeChanged += onSizeChanged;
+        timer.Tick += (_, _) =>
+        {
+            timer.Stop();
+            webView.SizeChanged -= onSizeChanged;
+            if (ReferenceEquals(_revealTimer, timer))
+                _revealTimer = null;
+            if (!_disposed && ReferenceEquals(_webView, webView))
+                _ = PostToViewerMessageAsync("hostReveal");
+        };
+        timer.Start();
     }
 
     private void ShowMessage(string text)
@@ -494,6 +532,8 @@ internal sealed partial class TrailViewerPanel : UserControl, IDisposable
     {
         _disposed = true;
         _finished = true; // no callbacks after the preview is closed
+        _revealTimer?.Stop();
+        _revealTimer = null;
         _lifecycle.Cancel();
         _onScreen = false;
         _textInput = false;

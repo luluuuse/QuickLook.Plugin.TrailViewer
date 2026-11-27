@@ -533,8 +533,20 @@ export function createTrackLayer({ L, el, localized, t, pointPopup, onFocusBound
         scheduleDistanceMarks();
         scheduleAnnotationMarks();
       };
+      const onMapZoomEnd = () => {
+        if (pendingDistanceRender) {
+          cancelAnimationFrame(pendingDistanceRender);
+          pendingDistanceRender = 0;
+        }
+        if (pendingAnnotationRender) {
+          cancelAnimationFrame(pendingAnnotationRender);
+          pendingAnnotationRender = 0;
+        }
+        renderDistanceMarks();
+        renderAnnotationMarks();
+      };
       map.on('move', onMapMove);
-      map.on('zoomend', onMapViewportChange);
+      map.on('zoomend', onMapZoomEnd);
       map.on('moveend', onMapViewportChange);
       map.on('resize', onMapViewportChange);
 
@@ -558,6 +570,26 @@ export function createTrackLayer({ L, el, localized, t, pointPopup, onFocusBound
       const longTrackRenderer = !network && totalSingleTrackPoints >= LONG_TRACK_CANVAS_POINTS
         ? L.canvas({ padding: 0.5 })
         : null;
+      const canvasCasingLines = [];
+      function readCanvasCasingStyle() {
+        const root = typeof document !== 'undefined' ? document.documentElement : null;
+        const theme = root?.dataset?.theme || '';
+        const raw = root && typeof getComputedStyle === 'function'
+          ? getComputedStyle(root).getPropertyValue('--track-casing').trim()
+          : '';
+        if (theme === 'classic' || raw === 'transparent') {
+          return { color: '#ffffff', opacity: 0 };
+        }
+        return raw
+          ? { color: raw, opacity: 1 }
+          : { color: '#ffffff', opacity: 0.82 };
+      }
+      function refreshTheme() {
+        if (canvasCasingLines.length === 0) return;
+        const style = readCanvasCasingStyle();
+        for (const casing of canvasCasingLines) casing.setStyle(style);
+      }
+      const initialCanvasCasingStyle = longTrackRenderer ? readCanvasCasingStyle() : null;
       const resolvedEndpoints = showEnds ? resolveTrackEndpoints(model.trackGroups) : [];
       model.trackGroups.forEach((group, groupIndex) => {
         const track = group.track;
@@ -586,14 +618,15 @@ export function createTrackLayer({ L, el, localized, t, pointPopup, onFocusBound
           } else {
             const latLngs = points.map((point) => [point.lat, point.lon]);
             const rendererOption = longTrackRenderer ? { renderer: longTrackRenderer } : {};
-            L.polyline(latLngs, {
-              color: '#ffffff',
+            const casing = L.polyline(latLngs, {
+              color: initialCanvasCasingStyle ? initialCanvasCasingStyle.color : '#ffffff',
               weight: 6.5,
-              opacity: 0.82,
+              opacity: initialCanvasCasingStyle ? initialCanvasCasingStyle.opacity : 0.82,
               interactive: false,
               className: 'gpx-track-casing',
               ...rendererOption,
             }).addTo(singleLineLayer);
+            if (longTrackRenderer) canvasCasingLines.push(casing);
             const tooltipNode = title ? localized(el('span'), () => title(segmentIndex + 1)) : null;
             const polyline = L.polyline(latLngs, {
               color,
@@ -735,6 +768,7 @@ export function createTrackLayer({ L, el, localized, t, pointPopup, onFocusBound
         colorCapabilities: () => ({ ...capabilities }),
         colorRange: (mode) => trackColorRange(gpx.tracks, mode),
         setColorMode,
+        refreshTheme,
         refreshDistanceMarks() {
           if (network) return;
           renderDistanceMarks();
@@ -844,7 +878,7 @@ export function createTrackLayer({ L, el, localized, t, pointPopup, onFocusBound
             pendingAnnotationRender = 0;
           }
           map.off('move', onMapMove);
-          map.off('zoomend', onMapViewportChange);
+          map.off('zoomend', onMapZoomEnd);
           map.off('moveend', onMapViewportChange);
           map.off('resize', onMapViewportChange);
           baseLayer.remove();

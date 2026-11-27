@@ -82,8 +82,8 @@ async function main() {
   });
   check('cancel and save use clearly different primary/secondary styles',
     formActions.cancel.background !== formActions.save.background
-      && (formActions.save.background === 'rgb(197, 34, 22)' || formActions.save.background === 'rgb(223, 43, 29)')
-      && (formActions.save.border === 'rgb(168, 28, 17)' || formActions.save.border === 'rgb(197, 34, 22)')
+      && formActions.save.background === 'rgb(35, 79, 121)'
+      && formActions.save.border === 'rgb(53, 109, 157)'
       && formActions.save.weight === '600'
       && formActions.save.width > formActions.cancel.width,
     JSON.stringify(formActions));
@@ -303,8 +303,8 @@ async function main() {
   await hostedPage.evaluate(() => localStorage.clear());
   await hostedPage.goto(`${base}/viewer/index.html?src=../tests/fixtures/${fixture}&layer=custom.missing`);
   await hostedPage.waitForFunction(() => document.body.classList.contains('loaded'));
-  check('a deleted host-persisted custom layer falls back to road.osm',
-    await hostedPage.evaluate(() => window.trailViewer.layer() === 'road.osm'));
+  check('a deleted host-persisted custom layer falls back to satellite.esri',
+    await hostedPage.evaluate(() => window.trailViewer.layer() === 'satellite.esri'));
   await hostedPage.close();
 
   const migrationPage = await browser.newPage({ viewport: { width: 1200, height: 800 }, locale: 'zh-CN' });

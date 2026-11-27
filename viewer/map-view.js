@@ -447,8 +447,23 @@ export function createMapView({ map, isChromeHidden }) {
     layoutFrame = requestAnimationFrame(() => {
       observeLayoutNodes();
       placeControls(readLayoutSnapshot());
-      layoutFrame = requestAnimationFrame(() => finishLayout(readLayoutSnapshot()));
+      finishLayout(readLayoutSnapshot());
     });
+  }
+
+  function settleAndFit() {
+    if (layoutFrame) {
+      cancelAnimationFrame(layoutFrame);
+      layoutFrame = 0;
+    }
+    initialRoutePending = false;
+    pendingRefitHome = true;
+    pendingRevealFocus = true;
+    pendingAnimate = false;
+    observeLayoutNodes();
+    placeControls(readLayoutSnapshot());
+    map.invalidateSize({ animate: false, pan: false });
+    fitRoute({ animate: false });
   }
 
   function syncSafeRect() {
@@ -656,6 +671,7 @@ export function createMapView({ map, isChromeHidden }) {
     },
     fit,
     fitRoute,
+    settleAndFit,
     focusBounds,
     focusSelection,
     revealPoint,
