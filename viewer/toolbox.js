@@ -87,6 +87,10 @@ export function createToolbox({
   let exportBack = null;
   let exportSettingsContainer = null;
   let exportSettingsPanel = null;
+  let themesView = null;
+  let themesBack = null;
+  let themesTitle = null;
+  let themesList = null;
   let view = 'main';
   // Where the shortcut page goes back to. It is opened from any page, so the back action returns to that
   // page rather than always to the menu.
@@ -191,9 +195,7 @@ export function createToolbox({
       coordinates.render();
     },
     theme: readTheme,
-    setTheme: writeTheme,
     themeModes,
-    currentVersion,
     onMeasure: () => startMeasure(),
     onCoordinates: () => {
       if (measurement.active()) measurement.stop();
@@ -210,6 +212,10 @@ export function createToolbox({
     },
     onEdit: () => onEdit?.(),
     onWeather: (mode, provider) => onWeather?.(mode, provider),
+    onThemes: () => {
+      if (measurement.active()) measurement.stop();
+      showView('themes');
+    },
     onUpdate: () => {
       if (measurement.active()) measurement.stop();
       showView('update');
@@ -258,6 +264,13 @@ export function createToolbox({
     exportView.hidden = view !== 'export';
     shortcutsView.hidden = view !== 'shortcuts';
     updateTool.view.hidden = view !== 'update';
+    if (themesView) {
+      themesView.hidden = view !== 'themes';
+      const currentTheme = readTheme();
+      for (const card of themesList?.querySelectorAll('[data-theme-option]') || []) {
+        card.setAttribute('aria-pressed', String(card.dataset.themeOption === currentTheme));
+      }
+    }
     helpButton.classList.toggle('active', view === 'shortcuts');
     helpButton.setAttribute('aria-pressed', String(view === 'shortcuts'));
     renderLanguage();
@@ -311,7 +324,7 @@ export function createToolbox({
   function closePanel({ restoreFocus = false } = {}) {
     if (!open) return;
     coordinates.stop();
-    if (['coordinate', 'attachments', 'export', 'shortcuts'].includes(view)) view = 'main';
+    if (['coordinate', 'attachments', 'export', 'shortcuts', 'themes'].includes(view)) view = 'main';
     open = false;
     panel.hidden = true;
     button.setAttribute('aria-expanded', 'false');
@@ -426,12 +439,63 @@ export function createToolbox({
       exportSettingsContainer = el('div', 'toolbox-export-settings');
       exportView.append(exportSettingsContainer);
 
+      const THEME_TRACK = {
+        classic: { stroke: '#3b9eff', casing: '#141618', startFill: '#1c1f22', endRing: '#ffffff' },
+        ios: { stroke: '#007aff', casing: '#ffffff', startFill: '#f4f9ff', endRing: '#ffffff' },
+        nordic: { stroke: '#1b65c4', casing: '#ffffff', startFill: '#ffffff', endRing: '#ffffff' },
+        forest: { stroke: '#34d399', casing: '#0e1813', startFill: '#13221b', endRing: '#ecfdf5' },
+        slate: { stroke: '#f04b3d', casing: '#121923', startFill: '#18212d', endRing: '#ffffff' },
+        desert: { stroke: '#f59e38', casing: '#17120e', startFill: '#241b15', endRing: '#fff7ed' },
+        swiss: { stroke: '#df2b1d', casing: '#f5f1e6', startFill: '#f5f1e6', endRing: '#ffffff' },
+      };
+      themesView = el('section', 'toolbox-subview toolbox-themes');
+      themesView.hidden = true;
+      themesBack = el('button', 'toolbox-back');
+      themesBack.type = 'button';
+      themesBack.append(iconElement('arrow-left'), el('span', null, t('toolbox.back')));
+      themesBack.addEventListener('click', () => showView('main'));
+      themesTitle = el('h2', 'toolbox-subtitle', t('theme.panelTitle'));
+      themesList = el('div', 'toolbox-theme-list');
+      themesList.setAttribute('role', 'group');
+      themesList.setAttribute('aria-label', t('theme.label'));
+      for (const mode of themeModes) {
+        const card = el('button', 'toolbox-theme-card');
+        card.type = 'button';
+        card.dataset.themeOption = mode;
+        const label = t(`theme.${mode}`);
+        card.title = t(`theme.${mode}Hint`);
+        card.setAttribute('aria-label', label);
+        card.setAttribute('aria-pressed', String(readTheme() === mode));
+
+        const preview = el('span', 'toolbox-theme-preview');
+        preview.dataset.themePreview = mode;
+        preview.setAttribute('aria-hidden', 'true');
+        const trackColors = THEME_TRACK[mode] || THEME_TRACK.classic;
+        preview.innerHTML =
+          '<span class="ttp-bar"></span>'
+          + '<svg class="ttp-route" viewBox="0 0 60 40" aria-hidden="true">'
+          + `<path d="M10 29 C 19 28, 22 14, 31 18 S 43 24, 50 14" fill="none" stroke="${trackColors.casing}" stroke-width="4" stroke-linecap="round" opacity="0.9"/>`
+          + `<path d="M10 29 C 19 28, 22 14, 31 18 S 43 24, 50 14" fill="none" stroke="${trackColors.stroke}" stroke-width="2.1" stroke-linecap="round"/>`
+          + `<circle cx="10" cy="29" r="2.2" fill="${trackColors.startFill}" stroke="${trackColors.stroke}" stroke-width="1.3"/>`
+          + `<circle cx="50" cy="14" r="2.3" fill="${trackColors.stroke}" stroke="${trackColors.endRing}" stroke-width="0.9"/></svg>`;
+
+        const name = el('span', 'toolbox-theme-card-name', label);
+        card.append(preview, name);
+        card.addEventListener('click', () => {
+          writeTheme(mode);
+          render();
+        });
+        themesList.append(card);
+      }
+      themesView.append(themesBack, themesTitle, themesList);
+
       panel.append(
         header,
         main.view,
         coordinates.view,
         attachments.view,
         exportView,
+        themesView,
         shortcutsView,
         measureTool.view,
         updateTool.view,
@@ -524,6 +588,18 @@ export function createToolbox({
       shortcutsBack.querySelector('span').textContent = t('toolbox.back');
       shortcutsView.querySelector('.toolbox-subtitle').textContent = t('toolbox.help');
       shortcutsView.querySelector('.toolbox-subhint').textContent = t('toolbox.helpHint');
+      if (themesView) {
+        themesBack.querySelector('span').textContent = t('toolbox.back');
+        themesTitle.textContent = t('theme.panelTitle');
+        themesList.setAttribute('aria-label', t('theme.label'));
+        for (const card of themesList.querySelectorAll('[data-theme-option]')) {
+          const mode = card.dataset.themeOption;
+          const label = t(`theme.${mode}`);
+          card.title = t(`theme.${mode}Hint`);
+          card.setAttribute('aria-label', label);
+          card.querySelector('.toolbox-theme-card-name').textContent = label;
+        }
+      }
       for (const label of shortcutRows) label.textContent = t(label.dataset.labelKey);
       exportSettingsPanel?.relabel();
       measureTool.relabel();

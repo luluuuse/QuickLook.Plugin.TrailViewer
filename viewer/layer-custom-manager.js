@@ -30,6 +30,11 @@ export function createCustomSourceManager({
     return typeof value === 'function' ? Boolean(value()) : Boolean(value);
   }
 
+  function inSettingsView() {
+    const value = ui?.settingsViewOpen;
+    return typeof value === 'function' ? Boolean(value()) : Boolean(value);
+  }
+
   function refreshProviders() {
     for (const id of Object.keys(LAYERS.custom.providers)) unregisterProvider(id);
     for (const entry of entries) registerProvider(entry);
@@ -225,7 +230,7 @@ export function createCustomSourceManager({
     const editing = Boolean(ui.form && !ui.form.hidden);
     const customPage = inCustomView();
     ui.list.hidden = editing;
-    ui.addButton.hidden = !customPage || editing;
+    ui.addButton.hidden = (!customPage && !inSettingsView()) || editing;
     ui.empty.hidden = editing || entries.length > 0;
     ui.count.hidden = editing || !customPage;
     ui.count.textContent = `${entries.length}/${CUSTOM_LIMITS.maxEntries}`;

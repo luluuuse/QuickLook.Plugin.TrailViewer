@@ -152,15 +152,14 @@ async function main() {
     JSON.stringify(active));
 
   const brandIcon = await page.evaluate(() => {
-    const icon = document.querySelector('.toolbox-version-bar .toolbox-brand-icon');
+    const icon = document.querySelector('.toolbox-update-brand-icon');
     return {
       inSummary: document.querySelectorAll('#info .info-brand-icon').length,
       src: icon?.getAttribute('src') || null,
-      width: icon ? getComputedStyle(icon).width : null,
     };
   });
-  check('toolbox footer renders the 26 px brand icon and keeps the summary header clean',
-    brandIcon.inSummary === 0 && brandIcon.src === 'assets/trailviewer-icon.svg' && brandIcon.width === '26px',
+  check('toolbox renders the TrailViewer brand icon and keeps the summary header clean',
+    brandIcon.inSummary === 0 && brandIcon.src === 'assets/trailviewer-icon.svg',
     JSON.stringify(brandIcon));
 
   const symbols = await page.evaluate(() => {

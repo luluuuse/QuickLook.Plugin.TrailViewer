@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { performance } from 'node:perf_hooks';
 import test from 'node:test';
 import { createTrackEditorStore } from '../../viewer/track-editor-store.js';
 import { addWaypoint, reverseTrack, sortWaypointsAlongTrack, updateWaypoint } from '../../viewer/track-ops.js';

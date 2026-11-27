@@ -1,7 +1,7 @@
 import { readStored, writeStored } from './storage.js';
 
 export const THEME_KEY = 'theme';
-export const THEMES = Object.freeze(['swiss', 'slate', 'classic', 'ios']);
+export const THEMES = Object.freeze(['classic', 'ios', 'nordic', 'forest', 'slate', 'desert', 'swiss']);
 export const DEFAULT_THEME = 'classic';
 
 /** @param {string | null | undefined} value */

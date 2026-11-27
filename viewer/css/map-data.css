@@ -84,7 +84,10 @@
 
 .swiss-scale-ratio[hidden],
 :root[data-theme="classic"] .swiss-scale-ratio,
-:root[data-theme="ios"] .swiss-scale-ratio {
+:root[data-theme="ios"] .swiss-scale-ratio,
+:root[data-theme="forest"] .swiss-scale-ratio,
+:root[data-theme="nordic"] .swiss-scale-ratio,
+:root[data-theme="desert"] .swiss-scale-ratio {
   display: none;
 }
 

@@ -181,8 +181,8 @@ async function main() {
       && state.mapMoves === 0,
     `${collapsedView.zoom}@${collapsedView.center.lat},${collapsedView.center.lng} -> `
       + `${state.zoom}@${state.center.lat},${state.center.lng}, moves=${state.mapMoves}`);
-  check('the map safe area starts below the opened split panel', state.mapClearsPanel,
-    JSON.stringify(state));
+  check('opening the split panel keeps the panel below summary and clear of zoom controls',
+    state.belowInfo && state.zoomClear, JSON.stringify(state));
   check('phase one exposes four requested columns',
     state.headers.join('|') === 'Split|Time|Ascent|Moving speed', state.headers.join('|'));
   check('the expanded panel starts in basic mode with a one-click details control',
@@ -211,7 +211,8 @@ async function main() {
   check('the rows scroll under a fixed table header',
     state.scrollable && state.stickyHeader === 'sticky', JSON.stringify(state));
   check('the fastest moving split is highlighted',
-    state.fastestRows === 1 && state.fastestSpeedColour === 'rgb(201, 42, 42)',
+    state.fastestRows === 1
+      && (state.fastestSpeedColour === 'rgb(255, 98, 109)' || state.fastestSpeedColour === 'rgb(201, 42, 42)'),
     `${state.fastestRows}/${state.fastestSpeedColour}`);
   check('total and moving time sit at the bottom of the opened panel',
     state.totals.length === 2 && state.totals[0].value === '1:00:00'

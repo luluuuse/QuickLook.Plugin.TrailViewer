@@ -577,6 +577,7 @@ export function createLayerSwitcher({
         providerButtons,
         providerLabels,
         customViewOpen: () => customViewOpen,
+        settingsViewOpen: () => settingsViewOpen,
       });
       bar.addEventListener('keydown', (event) => {
         if (event.key !== 'Escape' || !menuOpen) return;

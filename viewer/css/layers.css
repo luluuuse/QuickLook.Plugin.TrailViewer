@@ -686,14 +686,67 @@
 
 .layer-settings-view {
   display: flex;
-  padding-top: 9px;
+  padding-top: 8px;
   flex-direction: column;
   gap: 8px;
-  /* The page holds two sections now; it shrinks into the panel and scrolls itself instead of running off-screen. */
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
+}
+
+.layer-settings-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3px;
+  padding: 3px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--control-radius);
+  background: var(--surface-inset);
+  flex: none;
+}
+
+.layer-switch .layer-source-menu .layer-settings-tab {
+  width: 100%;
+  padding: 5px 8px;
+  border: 1px solid transparent;
+  border-radius: calc(var(--control-radius) - 2px);
+  background: transparent;
+  color: var(--muted);
+  font-size: 11.5px;
+  font-weight: 500;
+  line-height: 1.25;
+  text-align: center;
+  cursor: pointer;
+  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+
+.layer-switch .layer-source-menu .layer-settings-tab:hover:not(.active) {
+  background: var(--surface-hover);
+  color: var(--text-bright);
+}
+
+.layer-switch .layer-source-menu .layer-settings-tab.active {
+  border-color: var(--accent);
+  background: var(--icon-active-background);
+  color: var(--icon-active);
+  font-weight: 600;
+}
+
+.layer-switch .layer-source-menu .layer-settings-tab.active:hover {
+  border-color: var(--accent-hover);
+  background: var(--accent-tint);
+  color: var(--icon-active);
+}
+
+.layer-settings-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.layer-settings-pane[hidden] {
+  display: none;
 }
 
 .layer-settings-section {
@@ -1080,6 +1133,7 @@
 }
 
 :root[data-theme="swiss"] .layer-switch .layer-source-menu .layer-overlay-chip[data-overlay="hiking"].active,
+:root[data-theme="nordic"] .layer-switch .layer-source-menu .layer-overlay-chip[data-overlay="hiking"].active,
 :root[data-theme="ios"][data-map-tone="light"] .layer-switch .layer-source-menu .layer-overlay-chip[data-overlay="hiking"].active {
   border-color: rgba(4, 120, 87, 0.48);
   background: linear-gradient(135deg, rgba(5, 150, 105, 0.14), rgba(5, 150, 105, 0.05));
@@ -1087,6 +1141,7 @@
 }
 
 :root[data-theme="swiss"] .layer-switch .layer-source-menu .layer-overlay-chip[data-overlay="cycling"].active,
+:root[data-theme="nordic"] .layer-switch .layer-source-menu .layer-overlay-chip[data-overlay="cycling"].active,
 :root[data-theme="ios"][data-map-tone="light"] .layer-switch .layer-source-menu .layer-overlay-chip[data-overlay="cycling"].active {
   border-color: rgba(194, 65, 12, 0.48);
   background: linear-gradient(135deg, rgba(234, 88, 12, 0.14), rgba(234, 88, 12, 0.05));
@@ -1094,6 +1149,7 @@
 }
 
 :root[data-theme="swiss"] .layer-switch .layer-source-menu .layer-overlay-chip[data-overlay="pistes"].active,
+:root[data-theme="nordic"] .layer-switch .layer-source-menu .layer-overlay-chip[data-overlay="pistes"].active,
 :root[data-theme="ios"][data-map-tone="light"] .layer-switch .layer-source-menu .layer-overlay-chip[data-overlay="pistes"].active {
   border-color: rgba(3, 105, 161, 0.48);
   background: linear-gradient(135deg, rgba(2, 132, 199, 0.14), rgba(2, 132, 199, 0.05));
@@ -1261,10 +1317,21 @@
   border: 1px solid var(--border-control);
   border-radius: var(--control-radius);
   background: var(--surface-row);
+  transition: background-color 120ms ease, border-color 120ms ease;
+}
+
+.layer-custom-row:hover:not(.active) {
+  border-color: var(--border-muted);
+  background: var(--surface-hover);
 }
 
 .layer-custom-row.active {
   border-color: var(--accent-muted);
+  background: var(--accent-tint);
+}
+
+.layer-custom-row.active:hover {
+  border-color: var(--accent);
   background: var(--accent-tint);
 }
 
@@ -1285,8 +1352,17 @@
   font: inherit;
 }
 
-.layer-custom-select:hover {
-  background: var(--toolbar-hover-tint);
+.layer-switch .layer-source-menu .layer-custom-select:hover {
+  background: transparent;
+}
+
+.layer-custom-row:hover .layer-custom-name,
+.layer-custom-row.active .layer-custom-name {
+  color: var(--text-bright);
+}
+
+.layer-custom-row.active .layer-custom-name {
+  font-weight: 600;
 }
 
 .layer-custom-select:focus-visible {
@@ -1400,16 +1476,17 @@
   font: inherit;
 }
 
-.layer-custom-action:hover {
-  background: var(--surface-hover);
+.layer-switch .layer-source-menu .layer-custom-action:hover {
+  background: var(--toolbar-hover-tint);
   color: var(--text-bright);
 }
 
-.layer-custom-action.danger:hover {
+.layer-switch .layer-source-menu .layer-custom-action.danger:hover {
   color: var(--danger-text);
 }
 
-.layer-custom-action.confirm {
+.layer-switch .layer-source-menu .layer-custom-action.confirm,
+.layer-switch .layer-source-menu .layer-custom-action.confirm:hover {
   background: var(--danger-tint);
   color: var(--danger-text);
 }
@@ -2302,36 +2379,58 @@
 
 :root[data-theme="slate"] .waypoint-insight-badge.insight-danger,
 :root[data-theme="classic"] .waypoint-insight-badge.insight-danger,
+:root[data-theme="forest"] .waypoint-insight-badge.insight-danger,
+:root[data-theme="desert"] .waypoint-insight-badge.insight-danger,
 :root[data-theme="ios"]:not([data-map-tone="light"]) .waypoint-insight-badge.insight-danger { color: #ff8c8c; }
 :root[data-theme="slate"] .waypoint-insight-badge.insight-water,
 :root[data-theme="classic"] .waypoint-insight-badge.insight-water,
+:root[data-theme="forest"] .waypoint-insight-badge.insight-water,
+:root[data-theme="desert"] .waypoint-insight-badge.insight-water,
 :root[data-theme="ios"]:not([data-map-tone="light"]) .waypoint-insight-badge.insight-water { color: #75b5ff; }
 :root[data-theme="slate"] .waypoint-insight-badge.insight-camp,
 :root[data-theme="classic"] .waypoint-insight-badge.insight-camp,
+:root[data-theme="forest"] .waypoint-insight-badge.insight-camp,
+:root[data-theme="desert"] .waypoint-insight-badge.insight-camp,
 :root[data-theme="ios"]:not([data-map-tone="light"]) .waypoint-insight-badge.insight-camp { color: #6fd49a; }
 :root[data-theme="slate"] .waypoint-insight-badge.insight-rescue,
 :root[data-theme="classic"] .waypoint-insight-badge.insight-rescue,
+:root[data-theme="forest"] .waypoint-insight-badge.insight-rescue,
+:root[data-theme="desert"] .waypoint-insight-badge.insight-rescue,
 :root[data-theme="ios"]:not([data-map-tone="light"]) .waypoint-insight-badge.insight-rescue { color: #f18bc4; }
 :root[data-theme="slate"] .waypoint-insight-badge.insight-exit,
 :root[data-theme="classic"] .waypoint-insight-badge.insight-exit,
+:root[data-theme="forest"] .waypoint-insight-badge.insight-exit,
+:root[data-theme="desert"] .waypoint-insight-badge.insight-exit,
 :root[data-theme="ios"]:not([data-map-tone="light"]) .waypoint-insight-badge.insight-exit { color: #f5a36b; }
 :root[data-theme="slate"] .waypoint-insight-badge.insight-supply,
 :root[data-theme="classic"] .waypoint-insight-badge.insight-supply,
+:root[data-theme="forest"] .waypoint-insight-badge.insight-supply,
+:root[data-theme="desert"] .waypoint-insight-badge.insight-supply,
 :root[data-theme="ios"]:not([data-map-tone="light"]) .waypoint-insight-badge.insight-supply { color: #b3d879; }
 :root[data-theme="slate"] .waypoint-insight-badge.insight-crossing,
 :root[data-theme="classic"] .waypoint-insight-badge.insight-crossing,
+:root[data-theme="forest"] .waypoint-insight-badge.insight-crossing,
+:root[data-theme="desert"] .waypoint-insight-badge.insight-crossing,
 :root[data-theme="ios"]:not([data-map-tone="light"]) .waypoint-insight-badge.insight-crossing { color: #73d0e3; }
 :root[data-theme="slate"] .waypoint-insight-badge.insight-junction,
 :root[data-theme="classic"] .waypoint-insight-badge.insight-junction,
+:root[data-theme="forest"] .waypoint-insight-badge.insight-junction,
+:root[data-theme="desert"] .waypoint-insight-badge.insight-junction,
 :root[data-theme="ios"]:not([data-map-tone="light"]) .waypoint-insight-badge.insight-junction { color: #e5bd5b; }
 :root[data-theme="slate"] .waypoint-insight-badge.insight-summit,
 :root[data-theme="classic"] .waypoint-insight-badge.insight-summit,
+:root[data-theme="forest"] .waypoint-insight-badge.insight-summit,
+:root[data-theme="desert"] .waypoint-insight-badge.insight-summit,
 :root[data-theme="ios"]:not([data-map-tone="light"]) .waypoint-insight-badge.insight-summit { color: #c49aef; }
 :root[data-theme="slate"] .waypoint-insight-badge.insight-access,
 :root[data-theme="classic"] .waypoint-insight-badge.insight-access,
+:root[data-theme="forest"] .waypoint-insight-badge.insight-access,
+:root[data-theme="desert"] .waypoint-insight-badge.insight-access,
 :root[data-theme="ios"]:not([data-map-tone="light"]) .waypoint-insight-badge.insight-access { color: #a9bddc; }
 :root[data-theme="slate"] .waypoint-insight-badge.insight-viewpoint,
 :root[data-theme="classic"] .waypoint-insight-badge.insight-viewpoint,
+:root[data-theme="forest"] .waypoint-insight-badge.insight-viewpoint,
+:root[data-theme="desert"] .waypoint-insight-badge.insight-viewpoint,
 :root[data-theme="ios"]:not([data-map-tone="light"]) .waypoint-insight-badge.insight-viewpoint { color: #81cabe; }
 
 .waypoint-overview-empty {
@@ -2378,6 +2477,7 @@
 :root[data-theme="ios"] .layer-switch .layer-source-menu .layer-cache-clear:hover:not(:disabled),
 :root[data-theme="ios"] .layer-switch .layer-source-menu .layer-cache-toggle:hover:not(:disabled),
 :root[data-theme="ios"] .layer-switch .layer-source-menu .layer-node-choice:hover:not(:disabled),
+:root[data-theme="ios"] .layer-switch .layer-source-menu .layer-settings-tab:hover:not(.active):not(:disabled),
 :root[data-theme="ios"] .insight-filter:hover:not(:disabled),
 :root[data-theme="ios"] .waypoint-correct-option:hover:not(:disabled) {
   border-color: var(--glass-hover-border);
@@ -2389,6 +2489,7 @@
 :root[data-theme="ios"] .layer-switch .layer-source-menu .layer-cache-choice.selected,
 :root[data-theme="ios"] .layer-switch .layer-source-menu .layer-cache-toggle.active,
 :root[data-theme="ios"] .layer-switch .layer-source-menu .layer-node-choice.active,
+:root[data-theme="ios"] .layer-switch .layer-source-menu .layer-settings-tab.active,
 :root[data-theme="ios"] .insight-filter.active,
 :root[data-theme="ios"] .waypoint-correct-option.selected {
   border-color: var(--glass-selected-border);
@@ -2402,6 +2503,7 @@
 :root[data-theme="ios"] .layer-switch .layer-source-menu .layer-cache-choice.selected:hover:not(:disabled),
 :root[data-theme="ios"] .layer-switch .layer-source-menu .layer-cache-toggle.active:hover:not(:disabled),
 :root[data-theme="ios"] .layer-switch .layer-source-menu .layer-node-choice.active:hover:not(:disabled),
+:root[data-theme="ios"] .layer-switch .layer-source-menu .layer-settings-tab.active:hover:not(:disabled),
 :root[data-theme="ios"] .insight-filter.active:hover:not(:disabled),
 :root[data-theme="ios"] .waypoint-correct-option.selected:hover:not(:disabled) {
   border-color: var(--glass-selected-border);

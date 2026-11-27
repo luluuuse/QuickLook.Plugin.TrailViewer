@@ -18,7 +18,12 @@ import {
 } from './track-color.js';
 
 const COLORS = ['#df2b1d', '#297bb8', '#d98a1c', '#9c3ce6', '#249e58', '#d9367a', '#0c9ea8', '#e67e22'];
-const IOS_COLORS = ['#007aff', '#34c759', '#ff9500', '#af52de', '#ff2d55', '#5ac8fa', '#ff3b30', '#5856d6'];
+const THEME_PALETTES = {
+  ios: ['#007aff', '#34c759', '#ff9500', '#af52de', '#ff2d55', '#5ac8fa', '#ff3b30', '#5856d6'],
+  forest: ['#2ecc71', '#f3c46b', '#5ac8fa', '#ff7a59', '#b388ff', '#26c6da', '#ff5252', '#ffd54f'],
+  nordic: ['#1b65c4', '#0f766e', '#d97706', '#7c3aed', '#e11d48', '#0284c7', '#16a34a', '#ea580c'],
+  desert: ['#f08c2e', '#f2cf78', '#5ec8e5', '#6fd49a', '#e86f52', '#c49aef', '#ff9aa4', '#81cabe'],
+};
 const ROUTE_COLOR = '#ffffff';
 const NETWORK_LOD_PIXELS = 0.75;
 const NETWORK_VIEW_PADDING = 0.25;
@@ -30,7 +35,7 @@ function activeThemeName() {
 }
 
 function trackColorForIndex(index, theme = activeThemeName()) {
-  const palette = theme === 'ios' ? IOS_COLORS : COLORS;
+  const palette = THEME_PALETTES[theme] || COLORS;
   return palette[index % palette.length];
 }
 

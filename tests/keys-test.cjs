@@ -83,7 +83,8 @@ async function main() {
     s.exportTitle);
   check('the summary does not carry them either', s.summaryKeys === 0, `${s.summaryKeys}`);
   check('the summary announces changes politely', s.infoLive === 'polite', s.infoLive);
-  check('the background starts on the road source', s.layer === 'road.osm' && s.layerCategory === 'road', s.layer);
+  check('the background starts on the satellite source',
+    s.layer === 'satellite.esri' && s.layerCategory === 'satellite', s.layer);
   check('the active background exposes its pressed state', s.activePressed === 'true', s.activePressed);
 
   // Buttons are now reachable with Tab. Space must still belong to QuickLook, while Enter activates the focused
@@ -114,10 +115,10 @@ async function main() {
 
   // 3. E walks the bar forwards and wraps; Q walks it backwards.
   const order = [
+    ['e', 'road.osm', 'road'],
     ['e', 'terrain.cyclosm', 'terrain'],
     ['e', 'satellite.esri', 'satellite'],
-    ['e', 'road.osm', 'road'],
-    ['q', 'satellite.esri', 'satellite'],
+    ['q', 'terrain.cyclosm', 'terrain'],
   ];
   for (const [key, want, category] of order) {
     await press(key);

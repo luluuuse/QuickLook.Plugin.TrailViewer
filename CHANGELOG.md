@@ -17,18 +17,20 @@ Added / Changed / Deprecated / Removed / Fixed / Security 分类；没有内容�
 
 - None yet.
 
-## 1.32.3 — 2026-11-27
+## 1.32.3 — 2026-11-28
 
 ### 中文
 
 #### 新增
 
-- **iOS 液态玻璃（Liquid Glass）自适应主题**：新增第 4 套手动主题「液态玻璃（`ios`）」，采用高通透光学折射玻璃膜、对角镜面高光环边与柔和圆角控件，可根据当前底图明暗自动在深透晶璃（卫星/无底图，纯白字+冰蓝高亮）与亮透晶璃（路网/地形图，深墨字+系统蓝高亮）间自适应切换，搭配带白边系统蓝轨迹；彻底隔离瑞士测绘装饰，遵循系统减少动态设置。
+- **七套完整手工主题与「外观主题」实时预览面板**：在原有三套主题基础上新增 **液态玻璃（`ios`，随底图明暗自适应）**、**极昼冰白（`nordic`）**、**林海松绿（`forest`）**与 **荒漠琥珀（`desert`）** 四套主题，并在工具箱底栏收口为「外观主题」子页入口，支持连续点击实时对比全套面板、轨迹与标题栏配色。
 - **QuickLook 宿主深度集成**：支持顶部标题栏随主题与底图明暗自动切换深/浅，标题栏实时追加路线里程与累计爬升（`▲` 标记，编辑未保存时显示 `* `），标题栏 `···` 菜单新增「复制轨迹摘要」「导出透明叠加图」「导出轨迹附件」快捷项，窗口尺寸改用当前所在屏幕自适应比例。
-- **全主题五态按钮与自动化视觉守门**：建立 `docs/THEME_STANDARD.md` 主题开发标准与 `npm run theme:check` 自动检查脚本；统一四套主题的按钮常态/悬停/选中/选中悬停/禁用五态反馈，补齐冷岩墨与经典深灰强调色按钮 WCAG AA（`>= 4.5:1`）对比度，并修复「每公里」顶栏悬停右侧缺口与「仅导出本地照片」悬停失效问题。
+- **全主题五态按钮与自动化视觉守门**：建立 `docs/THEME_STANDARD.md` 主题开发标准与 `npm run theme:check` 自动检查脚本；统一七套主题的按钮常态/悬停/选中/选中悬停/禁用五态反馈，补齐强调色按钮 WCAG AA（`>= 4.5:1`）对比度，并修复「每公里」顶栏悬停右侧缺口与「仅导出本地照片」悬停失效问题。
 
 #### 变更
 
+- **全新极简手绘风格插件图标**：重构插件图标为极简少线条的日系山野风格（保留左圆润右棱角轮廓、四象限地形配色与居中红点测绘三角），大幅提升 `16–32px` 小尺寸识别度。
+- **地图设置双标签页与顶栏「添加图层」快捷入口**：将地图设置拆分为「常规」与「图源节点」双标签页以减少垂直滚动，并在地图设置顶栏的「网格」与「关闭」之间新增「添加图层（`+`）」快捷按钮。
 - **默认主题与默认底图调整**：新安装默认主题调整为「经典深灰」，默认底图调整为卫星图源 **Esri World Imagery**（已手动切换过主题或底图的用户偏好保持不变）。
 - **全链路性能优化（冷启动、长轨迹、编辑内存与宿主缓存）**：编辑器撤销栈消除冗余双倍深拷贝并对航点/元数据编辑启用轨迹结构共享（超 2 万点轨迹历史收紧至 20 步）；照片全览灯箱、叠加图导出及无图文件的附件导出模块改为按需懒加载；航点沿轨重排改用空间索引加速；8,000 点以上长轨迹自动切换 Canvas 渲染并缓存路网源点计数与飞点检测结果；C# 瓦片缓存复用目录枚举元数据与线程局部 SHA256；导出序列化坐标/海拔格式化去正则化提速。
 - **多段连续轨迹起终点智能合并**：对顺序排列的多段轨迹（如中途暂停续录导出的多段 `<gx:Track>`），相邻两段首尾间距在 500 米以内时自动隐藏交界处的红绿起终点（保留既有断档提示），仅展示整条路线的总起点与总终点；相距较远的独立支线仍保留各自起终点。
@@ -38,6 +40,7 @@ Added / Changed / Deprecated / Removed / Fixed / Security 分类；没有内容�
 
 #### 修复
 
+- **定制图源列表悬停割裂修复**：修复图层菜单通用按钮悬停样式覆盖定制图源行的问题，改为整行统一响应悬停，已选中的图源在悬停时保持强调色底色与清晰边框，不再出现左灰右蓝的割裂块。
 - **测距模式吸附起终点与航点无法打点修复**：测距开启时改为在地图捕获阶段优先处理左键打点、自动关闭已开弹窗并在交互元素上保持十字光标，修复吸附起点、终点或航点时左键被标记弹窗拦截导致无法打点的问题。
 - **工具箱与图源面板滚轮穿透修复**：拦截图源切换菜单与工具箱浮层内的滚轮事件冒泡，修复「检查更新」更新日志区域无法用鼠标滚轮滑动并误触发底图缩放的问题，同时为更新日志区隔离滚动边界避免连带滚动外层面板。
 
@@ -45,12 +48,14 @@ Added / Changed / Deprecated / Removed / Fixed / Security 分类；没有内容�
 
 #### Added
 
-- **Adaptive iOS Liquid Glass Theme**: Added a fourth selectable theme, **Liquid Glass (`ios`)**, featuring translucent optical glass membranes, diagonal specular rim highlights, and softly rounded controls that automatically adapt between dark crystal glass (on satellite/no-map layers, with luminous white ink and ice-blue accents) and light crystal glass (on road/terrain layers, with deep ink and Apple-blue accents), paired with white-cased Apple-blue tracks and `prefers-reduced-motion` support.
+- **Seven Manual Themes & Live Appearance Preview Panel**: Expanded the theme library with **Liquid Glass (`ios`, adaptive to basemap tone)**, **Nordic Ice (`nordic`)**, **Alpine Forest (`forest`)**, and **Desert Amber (`desert`)**, and consolidated theme switching into a dedicated Toolbox **Appearance** panel for instant side-by-side preview of panels, tracks, and titlebar tones.
 - **Deeper QuickLook Host Integration**: Synced QuickLook's native titlebar Light/Dark theme with the active theme and basemap tone, enriched the titlebar with live distance/ascent (`▲`) metadata (plus `* ` dirty indicator during editing), added **Copy track summary**, **Export overlay PNG**, and **Export attachments** to QuickLook's `···` More menu, and adopted per-monitor adaptive window sizing.
-- **Unified 5-State Button Polish & Automated Theme Guardrail**: Added `docs/THEME_STANDARD.md` and `npm run theme:check` to enforce 5-way theme sync, token parity, and WCAG AA (`>= 4.5:1`) contrast across all four themes; upgraded Slate and Classic accent fill/hover contrast, unified selected-hover and measure button states, and fixed the expanded Splits header hover gap and local-photo export hover feedback.
+- **Unified 5-State Button Polish & Automated Theme Guardrail**: Added `docs/THEME_STANDARD.md` and `npm run theme:check` to enforce 5-way theme sync, token parity, and WCAG AA (`>= 4.5:1`) contrast across all seven themes; upgraded accent fill/hover contrast, unified selected-hover and measure button states, and fixed the expanded Splits header hover gap and local-photo export hover feedback.
 
 #### Changed
 
+- **Minimal Alpine Plugin Icon**: Redesigned the plugin icon with minimal strokes and clean flat alpine colors while preserving the asymmetric silhouette, four-quadrant palette, and central red-dot triangulation mark for crisp `16–32px` legibility.
+- **Tabbed Map Settings & Header Add-Layer Shortcut**: Split Map Settings into **General** and **Map nodes** tabs to reduce scrolling, and added a quick **Add layer (`+`)** button between the no-map grid toggle and close button in the Map Settings header.
 - **Default Theme & Basemap**: Changed the fresh-install default theme to **Classic Dark** (`classic`) and the default basemap to **Esri World Imagery** (`satellite.esri`), while preserving existing user-saved preferences.
 - **End-to-End Performance Optimizations (Startup, Long Tracks, Editor Memory & Tile Cache)**: Removed redundant double deep-cloning in the editor undo stack with structural sharing for waypoint/metadata edits (capping history to 20 steps above 20k points); lazy-loaded the photo lightbox, overlay exporter, and photo-less attachment exporter on demand; accelerated along-track waypoint sorting with spatial indexing; enabled Canvas rendering for tracks with `>= 8,000` points and cached network source-point counts and anomaly detection results; reduced Win32 metadata syscalls and per-tile `SHA256` allocations in `TileCache.cs`; and replaced regex-heavy coordinate/elevation formatting in track serializers.
 - **Smart Start/End Deduplication for Stitched Multi-Track Routes**: When consecutive tracks (such as pause/resume `<gx:Track>` segments) connect within 500 m, intermediate junction start/end dots are suppressed so only the route's overall start and end markers remain visible, while distant independent tracks keep their own endpoints.
@@ -60,6 +65,7 @@ Added / Changed / Deprecated / Removed / Fixed / Security 分类；没有内容�
 
 #### Fixed
 
+- **Custom Source Row Hover Split**: Fixed the generic layer-menu button hover rule overriding `.layer-custom-select:hover` with an opaque gray fill inside active rows; custom source rows now highlight cohesively across the full card while preserving the selected accent background on hover.
 - **Distance Measurement Click on Start/End & Waypoint Markers**: Handled primary measurement clicks in the map container capture phase (closing any open popup on start and keeping the crosshair cursor over interactive layers), fixing clicks snapped to start/end or waypoint markers being swallowed by marker popups instead of placing points.
 - **Toolbox & Layer Panel Wheel Scroll Propagation**: Disabled Leaflet scroll propagation on the Toolbox and Layer Switcher control panels so mouse-wheel scrolling works inside the Check Updates release notes (and scrollable menus) without zooming the underlying map, and added `overscroll-behavior: contain` to keep release-notes scrolling isolated from the outer panel.
 

@@ -315,7 +315,46 @@ export function createLayerSettingsView({
   nodesBody.append(singleRow);
   nodesSection.append(nodesHeader, nodesBody);
 
-  settingsView.append(keySection, cacheSection, nodesSection);
+  const settingsTabs = el('div', 'layer-settings-tabs');
+  settingsTabs.setAttribute('role', 'tablist');
+  const generalTab = el('button', 'layer-settings-tab active', t('layer.settingsTabGeneral'));
+  generalTab.type = 'button';
+  generalTab.setAttribute('role', 'tab');
+  generalTab.setAttribute('aria-selected', 'true');
+  generalTab.dataset.settingsTab = 'general';
+  generalTab.dataset.labelKey = 'layer.settingsTabGeneral';
+  const nodesTab = el('button', 'layer-settings-tab', t('layer.settingsTabNodes'));
+  nodesTab.type = 'button';
+  nodesTab.setAttribute('role', 'tab');
+  nodesTab.setAttribute('aria-selected', 'false');
+  nodesTab.dataset.settingsTab = 'nodes';
+  nodesTab.dataset.labelKey = 'layer.settingsTabNodes';
+  settingsTabs.append(generalTab, nodesTab);
+
+  const generalPane = el('div', 'layer-settings-pane');
+  generalPane.setAttribute('role', 'tabpanel');
+  generalPane.dataset.settingsPane = 'general';
+  generalPane.append(keySection, cacheSection);
+
+  const nodesPane = el('div', 'layer-settings-pane');
+  nodesPane.setAttribute('role', 'tabpanel');
+  nodesPane.dataset.settingsPane = 'nodes';
+  nodesPane.hidden = true;
+  nodesPane.append(nodesSection);
+
+  function selectSettingsTab(tab) {
+    const isGeneral = tab !== 'nodes';
+    generalTab.classList.toggle('active', isGeneral);
+    generalTab.setAttribute('aria-selected', String(isGeneral));
+    nodesTab.classList.toggle('active', !isGeneral);
+    nodesTab.setAttribute('aria-selected', String(!isGeneral));
+    generalPane.hidden = !isGeneral;
+    nodesPane.hidden = isGeneral;
+  }
+  generalTab.addEventListener('click', () => selectSettingsTab('general'));
+  nodesTab.addEventListener('click', () => selectSettingsTab('nodes'));
+
+  settingsView.append(settingsTabs, generalPane, nodesPane);
 
   const customView = el('section', 'layer-custom-view');
   customView.hidden = true;

@@ -71,7 +71,7 @@ internal static class ViewerPreferences
     private static readonly Dictionary<string, string[]> Allowed = new(StringComparer.Ordinal)
     {
         ["lang"] = new[] { "en", "zh" },
-        ["theme"] = new[] { "swiss", "slate", "classic", "ios" },
+        ["theme"] = new[] { "classic", "ios", "nordic", "forest", "slate", "desert", "swiss" },
         ["layer"] = new[]
         {
             // Legacy category values remain readable so an upgrade keeps the user's selected background.
@@ -150,7 +150,8 @@ internal static class ViewerPreferences
         {
             var values = Load(path ?? FilePath);
             var theme = values.TryGetValue("theme", out var savedTheme) ? savedTheme : "classic";
-            if (string.Equals(theme, "swiss", StringComparison.Ordinal))
+            if (string.Equals(theme, "swiss", StringComparison.Ordinal)
+                || string.Equals(theme, "nordic", StringComparison.Ordinal))
                 return Themes.Light;
             if (!string.Equals(theme, "ios", StringComparison.Ordinal))
                 return Themes.Dark;

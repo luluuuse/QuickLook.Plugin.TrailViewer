@@ -6,9 +6,9 @@ export function createToolboxMain({
   weatherModes, weatherCategories = [], weatherProvidersByCategory = {},
   initialWeatherCategory = 'weather', initialWeatherProviders = {},
   onWeatherCategoryChange, onWeatherProviderChange,
-  theme = () => 'swiss', setTheme = /** @type {(next: string) => boolean} */ (() => false), themeModes = [],
-  currentVersion = '', onMeasure, onCoordinates, onExport, onAttachments,
-  onWeather, onEdit, onUpdate, onClose,
+  theme = () => 'swiss', themeModes = [],
+  onMeasure, onCoordinates, onExport, onAttachments,
+  onWeather, onEdit, onUpdate, onThemes, onClose,
 }) {
   let weatherMode = weatherModes[0] || 'start';
   let weatherCategory = weatherCategories.includes(initialWeatherCategory)
@@ -33,7 +33,6 @@ export function createToolboxMain({
   let quickGrid;
   let themePick;
   let versionBar;
-  let versionLabel;
   let updateButton;
   let latestState = null;
 
@@ -208,40 +207,25 @@ export function createToolboxMain({
     themePick = el('div', 'toolbox-theme-pick');
     themePick.setAttribute('role', 'group');
     themePick.setAttribute('aria-label', t('theme.label'));
-    for (const mode of themeModes) {
-      const option = el('button', 'toolbox-theme-option');
-      option.type = 'button';
-      option.dataset.themeOption = mode;
-      const label = t(`theme.${mode}`);
-      option.title = label;
-      option.setAttribute('aria-label', label);
-      option.setAttribute('aria-pressed', String(theme() === mode));
-      option.addEventListener('click', () => {
-        setTheme(mode);
-        renderThemeState();
-      });
-      themePick.append(option);
-    }
+    const themeTrigger = el('button', 'toolbox-theme-trigger');
+    themeTrigger.type = 'button';
+    themeTrigger.dataset.tool = 'themes';
+    const triggerSwatch = el('span', 'toolbox-theme-option toolbox-theme-trigger-swatch');
+    const triggerLabel = el('span', 'toolbox-theme-trigger-label', '');
+    const triggerCaret = el('span', 'toolbox-theme-trigger-caret', '\u203a');
+    triggerCaret.setAttribute('aria-hidden', 'true');
+    themeTrigger.append(triggerSwatch, triggerLabel, triggerCaret);
+    themeTrigger.addEventListener('click', () => onThemes?.());
+    themePick.append(themeTrigger);
     themePick.hidden = themeModes.length === 0;
 
     versionBar = el('div', 'toolbox-version-bar');
-    const versionBrand = el('span', 'toolbox-version-brand');
-    const brandIcon = el('img', 'toolbox-brand-icon');
-    brandIcon.src = 'assets/trailviewer-icon.svg';
-    brandIcon.alt = '';
-    brandIcon.setAttribute('aria-hidden', 'true');
-    const brandCopy = el('span', 'toolbox-brand-copy');
-    const brandName = el('span', 'toolbox-brand-name', 'TrailViewer');
-    versionLabel = el('span', 'toolbox-version-text', currentVersion ? `v${currentVersion}` : '');
-    versionLabel.hidden = !currentVersion;
-    brandCopy.append(brandName, versionLabel);
-    versionBrand.append(brandIcon, brandCopy);
     updateButton = el('button', 'toolbox-version-btn');
     updateButton.type = 'button';
     updateButton.dataset.tool = 'update';
     updateButton.textContent = t('update.checkNow');
     updateButton.addEventListener('click', () => onUpdate?.());
-    versionBar.append(versionBrand, themePick, updateButton);
+    versionBar.append(themePick, updateButton);
 
     view.append(quickGrid, editButton, weatherCard, versionBar);
     return view;
@@ -250,7 +234,17 @@ export function createToolboxMain({
   function renderThemeState() {
     if (!themePick) return;
     const current = theme();
-    for (const option of themePick.querySelectorAll('[data-theme-option]')) {
+    const trigger = themePick.querySelector('.toolbox-theme-trigger');
+    const triggerSwatch = themePick.querySelector('.toolbox-theme-trigger-swatch');
+    const triggerLabel = themePick.querySelector('.toolbox-theme-trigger-label');
+    if (triggerSwatch) triggerSwatch.dataset.themeOption = current;
+    if (triggerLabel) triggerLabel.textContent = t(`theme.${current}`);
+    if (trigger) {
+      const label = `${t('theme.label')}: ${t(`theme.${current}`)}`;
+      trigger.title = label;
+      trigger.setAttribute('aria-label', label);
+    }
+    for (const option of themePick.querySelectorAll('button[data-theme-option]')) {
       option.setAttribute('aria-pressed', String(option.dataset.themeOption === current));
     }
   }
@@ -293,9 +287,6 @@ export function createToolboxMain({
     weatherButton.disabled = !available;
     syncWeatherButton();
     renderThemeState();
-    const ver = updateState?.currentVersion || currentVersion;
-    versionLabel.textContent = ver ? `v${ver}` : '';
-    versionLabel.hidden = !ver;
     const hasNew = Boolean(updateState?.hasUpdate && updateState?.latestVersion);
     updateButton.classList.toggle('has-update', hasNew);
     updateButton.textContent = hasNew
@@ -334,12 +325,6 @@ export function createToolboxMain({
     }
     if (themePick) {
       themePick.setAttribute('aria-label', t('theme.label'));
-      for (const option of themePick.querySelectorAll('[data-theme-option]')) {
-        const mode = option.dataset.themeOption;
-        const label = t(`theme.${mode}`);
-        option.title = label;
-        option.setAttribute('aria-label', label);
-      }
       renderThemeState();
     }
   }

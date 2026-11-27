@@ -1,198 +1,36 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
   <defs>
-    <!-- 3A Sculpted Alpine Specimen Silhouette:
-         NW smooth sunlit contours, NE angular glacier facets,
-         SE serrated Swiss rock crags, SW rolling alpine meadow with blue-stream valley notch -->
-    <clipPath id="alpineSpecimenClip">
-      <path d="M 139 8 L 158 24 L 182 22 L 204 38 L 226 46 L 232 72 L 244 96 L 238 118 L 250 137 L 234 152 L 244 172 L 226 188 L 232 208 L 208 218 L 194 236 L 170 232 L 152 246 L 130 238 L 113 249 C 96 242, 82 246, 68 242 C 62 232, 56 230, 50 234 C 34 226, 20 212, 16 194 C 11 180, 18 168, 13 154 C 10 144, 6 139, 8 136 C 16 122, 16 106, 24 90 C 32 72, 42 58, 56 44 C 72 30, 92 20, 114 14 C 124 11, 132 10, 139 8 Z"/>
+    <!-- G10: Minimal Alpine Emblem (D9 × Studio Ghibli palette) -->
+    <clipPath id="alpineClip">
+      <path d="M 134 16 L 194 36 L 236 86 L 242 132 L 222 194 L 174 232 L 120 240 A 112 112 0 0 1 134 16 Z"/>
     </clipPath>
-
-    <radialGradient id="nwRef" cx="128" cy="122" r="155" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#FFFFFF"/>
-      <stop offset="32%" stop-color="#FCF8EA"/>
-      <stop offset="72%" stop-color="#F3EBD6"/>
-      <stop offset="100%" stop-color="#E7DEC5"/>
-    </radialGradient>
-    <radialGradient id="neRef" cx="128" cy="122" r="160" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#FFFFFF"/>
-      <stop offset="35%" stop-color="#F0F8FE"/>
-      <stop offset="75%" stop-color="#D7ECFA"/>
-      <stop offset="100%" stop-color="#BEDDF4"/>
-    </radialGradient>
-    <radialGradient id="seRef" cx="128" cy="122" r="165" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#3A506E"/>
-      <stop offset="36%" stop-color="#567093"/>
-      <stop offset="74%" stop-color="#748FB2"/>
-      <stop offset="100%" stop-color="#5A7496"/>
-    </radialGradient>
-    <radialGradient id="swRef" cx="128" cy="122" r="165" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#F4F5DF"/>
-      <stop offset="28%" stop-color="#D7ECAE"/>
-      <stop offset="65%" stop-color="#AEDA7C"/>
-      <stop offset="100%" stop-color="#82BA57"/>
-    </radialGradient>
-    <radialGradient id="peakLift" cx="116" cy="110" r="95" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.24"/>
-      <stop offset="55%" stop-color="#FFFFFF" stop-opacity="0.06"/>
-      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"/>
-    </radialGradient>
-    <linearGradient id="seDepthGrad" x1="0.2" y1="0.2" x2="0.95" y2="0.95">
-      <stop offset="0%" stop-color="#1A2638" stop-opacity="0.16"/>
-      <stop offset="100%" stop-color="#1A2638" stop-opacity="0"/>
-    </linearGradient>
-
-    <clipPath id="clipNW">
-      <polygon points="6,6 142,6 135,22 138,44 129,72 132,96 128,122 98,126 72,122 44,132 22,129 6,138"/>
-    </clipPath>
-    <clipPath id="clipNE">
-      <polygon points="142,6 250,6 250,138 232,130 208,133 182,123 156,127 128,122 132,96 129,72 138,44 135,22"/>
-    </clipPath>
-    <clipPath id="clipSE">
-      <polygon points="128,122 156,127 182,123 208,133 232,130 250,138 250,250 112,250 120,232 116,208 126,178 123,152"/>
-    </clipPath>
-    <clipPath id="clipSW">
-      <polygon points="6,138 22,129 44,132 72,122 98,126 128,122 123,152 126,178 116,208 120,232 112,250 6,250"/>
-    </clipPath>
-
-    <g id="contoursIndex">
-      <path d="M 134 48 C 176 52, 204 82, 208 130 C 202 174, 168 202, 118 206 C 74 202, 46 174, 44 130 C 48 82, 84 52, 134 48 Z"/>
-      <path d="M 138 10 C 202 16, 242 64, 250 135 C 242 202, 194 242, 114 248 C 48 242, 8 202, 2 137 C 10 64, 62 16, 138 10 Z"/>
-    </g>
-    <g id="contoursInter">
-      <path d="M 131 84 C 153 86, 166 102, 168 125 C 164 147, 147 162, 123 164 C 101 162, 86 147, 84 125 C 86 102, 103 86, 131 84 Z"/>
-      <path d="M 132 66 C 165 69, 185 92, 188 127 C 183 161, 158 182, 121 185 C 87 182, 66 161, 64 127 C 67 92, 94 69, 132 66 Z"/>
-      <path d="M 136 29 C 189 34, 223 73, 229 132 C 222 188, 181 222, 116 227 C 61 222, 27 188, 23 133 C 29 73, 73 34, 136 29 Z"/>
-      <path d="M 141 -12 C 214 -4, 260 50, 270 137 C 260 214, 204 260, 112 268 C 38 260, -10 214, -18 140 C -8 50, 54 -4, 141 -12 Z"/>
-      <path d="M 144 -34 C 230 -24, 286 38, 298 140 C 288 232, 220 288, 108 296 C 20 288, -36 232, -46 144 C -34 38, 42 -24, 144 -34 Z"/>
-    </g>
   </defs>
 
-  <g clip-path="url(#alpineSpecimenClip)">
-    <!-- Four Organic Ridge-Bounded Terrain Quadrants -->
-    <g clip-path="url(#clipNW)"><rect x="0" y="0" width="256" height="256" fill="url(#nwRef)"/></g>
-    <g clip-path="url(#clipNE)"><rect x="0" y="0" width="256" height="256" fill="url(#neRef)"/></g>
-    <g clip-path="url(#clipSE)">
-      <rect x="0" y="0" width="256" height="256" fill="url(#seRef)"/>
-      <rect x="0" y="0" width="256" height="256" fill="url(#seDepthGrad)"/>
-    </g>
-    <g clip-path="url(#clipSW)"><rect x="0" y="0" width="256" height="256" fill="url(#swRef)"/></g>
+  <g clip-path="url(#alpineClip)">
+    <!-- Four flat terrain quadrants -->
+    <polygon points="0,0 135,0 128,128 0,128" fill="#FFF6DC"/>
+    <polygon points="135,0 256,0 256,132 128,128" fill="#82CDF2"/>
+    <polygon points="0,128 128,128 119,256 0,256" fill="#7AC663"/>
+    <polygon points="128,128 256,132 256,256 119,256" fill="#294869"/>
 
-    <!-- Seamless Continuous Dual-Weight Swiss Contours -->
-    <g clip-path="url(#clipNW)" fill="none" stroke="#B08154">
-      <g stroke-width="2.5" opacity="0.78"><use href="#contoursIndex"/></g>
-      <g stroke-width="1.35" opacity="0.58"><use href="#contoursInter"/></g>
-    </g>
-    <g clip-path="url(#clipNE)" fill="none" stroke="#3A91D4">
-      <g stroke-width="2.5" opacity="0.82"><use href="#contoursIndex"/></g>
-      <g stroke-width="1.35" opacity="0.62"><use href="#contoursInter"/></g>
-    </g>
-    <g clip-path="url(#clipSW)" fill="none" stroke="#6B8746">
-      <g stroke-width="2.2" opacity="0.62"><use href="#contoursIndex"/></g>
-      <g stroke-width="1.25" opacity="0.46"><use href="#contoursInter"/></g>
-    </g>
-    <g clip-path="url(#clipSE)" fill="none" stroke="#D0E3F6">
-      <g stroke-width="1.5" opacity="0.28"><use href="#contoursIndex"/></g>
-      <g stroke-width="1" opacity="0.18"><use href="#contoursInter"/></g>
+    <!-- Minimal horizontal sky clouds & sunlit meadow accent -->
+    <path d="M 170 72 L 212 72" stroke="#FFFDF5" stroke-width="6.5" stroke-linecap="round" opacity="0.92"/>
+    <path d="M 190 90 L 222 90" stroke="#FFFDF5" stroke-width="5" stroke-linecap="round" opacity="0.78"/>
+    <path d="M 42 184 L 78 184" stroke="#E8F6B8" stroke-width="5" stroke-linecap="round" opacity="0.65"/>
+
+    <!-- Minimal cross ridges -->
+    <g fill="none" stroke="#1E3250" stroke-width="5.8" stroke-linecap="round">
+      <path d="M 134 16 L 128 128 L 120 240"/>
+      <path d="M 16 128 L 128 128 L 242 132"/>
     </g>
 
-    <!-- NW Scree Stipple -->
-    <g clip-path="url(#clipNW)" fill="#525C68" opacity="0.48">
-      <circle cx="96" cy="96" r="1.4"/><circle cx="104" cy="90" r="1.1"/><circle cx="88" cy="104" r="1.3"/>
-      <circle cx="110" cy="78" r="1.2"/><circle cx="102" cy="108" r="1.2"/><circle cx="78" cy="112" r="1.4"/>
-      <circle cx="116" cy="64" r="1.1"/><circle cx="108" cy="54" r="1.3"/><circle cx="120" cy="40" r="1.2"/>
-      <circle cx="92" cy="84" r="1.1"/><circle cx="64" cy="116" r="1.2"/><circle cx="114" cy="102" r="1.3"/>
-    </g>
-
-    <!-- NE Glacial Tarn, Meltwater Outlet & Crevasses -->
-    <g clip-path="url(#clipNE)">
-      <path d="M 192 50 C 202 42, 218 44, 222 54 C 225 63, 212 69, 198 66 C 188 64, 185 56, 192 50 Z"
-            fill="#80C8F5" stroke="#2B7EC0" stroke-width="2.1"/>
-      <path d="M 218 46 C 228 36, 238 28, 248 22" fill="none" stroke="#3F96D8" stroke-width="2" stroke-linecap="round"/>
-      <g stroke="#2F85C7" stroke-width="1.4" stroke-linecap="round" opacity="0.62">
-        <path d="M 164 96 L 176 90"/><path d="M 170 104 L 184 97"/><path d="M 178 110 L 190 104"/>
-        <path d="M 156 54 L 168 48"/><path d="M 160 62 L 173 56"/>
-      </g>
-    </g>
-
-    <!-- SW Alpine Forest Stipple & Glacial Stream -->
-    <g clip-path="url(#clipSW)">
-      <path d="M 6 156 C 42 162, 74 188, 102 250 L 6 250 Z" fill="#7AB352" opacity="0.28"/>
-      <g fill="#45782C" opacity="0.58">
-        <circle cx="22" cy="158" r="2.1"/><circle cx="34" cy="164" r="1.8"/><circle cx="18" cy="172" r="2"/>
-        <circle cx="46" cy="172" r="2.1"/><circle cx="30" cy="178" r="1.7"/><circle cx="56" cy="182" r="2"/>
-        <circle cx="42" cy="188" r="1.8"/><circle cx="18" cy="212" r="2.1"/><circle cx="32" cy="218" r="1.9"/>
-        <circle cx="26" cy="230" r="2.2"/><circle cx="44" cy="232" r="1.8"/><circle cx="38" cy="242" r="2"/>
-        <circle cx="84" cy="204" r="2"/><circle cx="96" cy="212" r="1.8"/><circle cx="78" cy="218" r="2.1"/>
-        <circle cx="90" cy="226" r="1.9"/><circle cx="104" cy="228" r="2"/><circle cx="84" cy="238" r="2.1"/>
-        <circle cx="98" cy="242" r="1.8"/>
-      </g>
-      <path d="M 6 196 C 36 198, 54 218, 66 254" fill="none" stroke="#3B94D8" stroke-width="6.8" stroke-linecap="round"/>
-      <path d="M 6 196 C 36 198, 54 218, 66 254" fill="none" stroke="#BEE5FB" stroke-width="1.8" stroke-linecap="round" opacity="0.65"/>
-      <path d="M 88 158 C 72 174, 58 192, 48 210" fill="none" stroke="#3B94D8" stroke-width="2.4" stroke-linecap="round" opacity="0.85"/>
-    </g>
-
-    <!-- SE Radial Sculpted Swiss Felszeichnung Rock Engraving -->
-    <g clip-path="url(#clipSE)">
-      <polygon points="128,122 184,158 170,174 128,136" fill="#A2BCD8" opacity="0.46"/>
-      <polygon points="128,122 152,202 138,208 124,150" fill="#95B0CE" opacity="0.38"/>
-      <polygon points="164,132 232,160 220,170 162,140" fill="#9EB8D5" opacity="0.34"/>
-      <g fill="#19212B" stroke="#151C24" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M 134 128 L 166 154 L 184 184 L 218 212 L 246 246 L 222 250 L 194 214 L 166 186 L 146 158 Z" opacity="0.88"/>
-        <path d="M 146 126 L 196 136 L 224 156 L 250 170 L 250 192 L 214 166 L 182 148 L 148 138 Z" opacity="0.86"/>
-        <path d="M 125 144 L 142 184 L 162 218 L 178 250 L 152 250 L 138 214 L 122 178 Z" opacity="0.84"/>
-        <g fill="none" stroke="#18202A" stroke-linecap="round">
-          <path d="M 156 142 L 194 159" stroke-width="2.6"/>
-          <path d="M 168 152 L 208 172" stroke-width="1.8" opacity="0.85"/>
-          <path d="M 176 164 L 226 190" stroke-width="2.6"/>
-          <path d="M 186 176 L 236 204" stroke-width="1.8" opacity="0.85"/>
-          <path d="M 196 190 L 246 218" stroke-width="2.8"/>
-          <path d="M 208 206 L 248 230" stroke-width="1.8" opacity="0.82"/>
-          <path d="M 142 162 L 176 200" stroke-width="2.6"/>
-          <path d="M 150 182 L 188 220" stroke-width="1.8" opacity="0.85"/>
-          <path d="M 158 202 L 198 242" stroke-width="2.4"/>
-          <path d="M 132 192 L 156 234" stroke-width="2.6"/>
-          <path d="M 126 212 L 144 246" stroke-width="1.8" opacity="0.82"/>
-          <path d="M 192 128 L 244 148" stroke-width="2.4"/>
-          <path d="M 212 142 L 248 158" stroke-width="1.8" opacity="0.82"/>
-        </g>
-      </g>
-    </g>
-
-    <!-- Organic Serrated Four Main Alpine Arêtes -->
-    <g fill="none" stroke="#18202A" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M 128 122 L 132 96 L 129 72 L 138 44 L 135 22 L 142 6" stroke-width="4.2"/>
-      <path d="M 128 122 L 156 127 L 182 123 L 208 133 L 232 130 L 250 138" stroke-width="4.2"/>
-      <path d="M 128 122 L 123 152 L 126 178 L 116 208 L 120 232 L 112 250" stroke-width="4.2"/>
-      <path d="M 128 122 L 98 126 L 72 122 L 44 132 L 22 129 L 6 138" stroke-width="2.8" opacity="0.68"/>
-    </g>
-
-    <!-- Sculpted Rock Spurs along North & South Arêtes -->
-    <g fill="#1C2531" opacity="0.85">
-      <path d="M 131 94 L 156 88 L 148 100 L 130 105 Z"/>
-      <path d="M 133 66 L 160 58 L 151 70 L 130 76 Z"/>
-      <path d="M 137 36 L 160 28 L 153 39 L 136 46 Z"/>
-      <path d="M 135 16 L 152 10 L 148 19 L 135 24 Z" opacity="0.75"/>
-    </g>
-    <g stroke="#222E3D" stroke-width="2" stroke-linecap="round" opacity="0.58">
-      <path d="M 130 82 L 114 75"/><path d="M 134 54 L 118 48"/>
-      <path d="M 124 156 L 105 164"/><path d="M 124 184 L 103 194"/><path d="M 119 212 L 102 222"/>
-    </g>
-
-    <!-- Central Summit Elevation Glow -->
-    <rect x="0" y="0" width="256" height="256" fill="url(#peakLift)"/>
-
-    <!-- Organic Mountain Switchback Footpath (SW Meadow -> NW Contours -> NE Glacier -> Straight to Summit) -->
-    <path d="M 34 226 C 46 218, 40 206, 54 198 C 68 190, 58 176, 46 168 C 34 160, 46 146, 62 138 C 74 132, 54 118, 48 104 C 43 92, 64 88, 72 76 C 80 64, 76 50, 94 46 C 112 42, 118 58, 134 52 C 150 46, 166 50, 178 64 C 188 76, 172 86, 180 96 C 186 104, 174 108, 166 110 L 128 122"
-          fill="none" stroke="#222A34" stroke-width="2.1" stroke-dasharray="4.5 3.6"
-          stroke-linecap="round" stroke-linejoin="round" opacity="0.72"/>
-
-    <!-- T4 Swiss Survey Triangulation Peak Symbol (White Fill + Bold Ink Frame + Red Dot) -->
-    <polygon points="128,94 153,138 103,138" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="5.5" stroke-linejoin="round"/>
-    <polygon points="128,100 148,134 108,134" fill="#FFFFFF" stroke="#18202A" stroke-width="4.2" stroke-linejoin="round"/>
-    <circle cx="128" cy="123" r="5.6" fill="#DC2626"/>
+    <!-- Center Swiss survey triangulation peak symbol -->
+    <polygon points="128,76 172,152 84,152" fill="#FFFDF6" stroke="#FFFDF6" stroke-width="8" stroke-linejoin="round"/>
+    <polygon points="128,82 166,147 90,147" fill="#FFFDF6" stroke="#1E3250" stroke-width="5.8" stroke-linejoin="round"/>
+    <circle cx="128" cy="128" r="11.5" fill="#E34234"/>
   </g>
 
-  <!-- Subtle Alpine Relief Contour Edge -->
-  <path d="M 139 8 L 158 24 L 182 22 L 204 38 L 226 46 L 232 72 L 244 96 L 238 118 L 250 137 L 234 152 L 244 172 L 226 188 L 232 208 L 208 218 L 194 236 L 170 232 L 152 246 L 130 238 L 113 249 C 96 242, 82 246, 68 242 C 62 232, 56 230, 50 234 C 34 226, 20 212, 16 194 C 11 180, 18 168, 13 154 C 10 144, 6 139, 8 136 C 16 122, 16 106, 24 90 C 32 72, 42 58, 56 44 C 72 30, 92 20, 114 14 C 124 11, 132 10, 139 8 Z"
-        fill="none" stroke="#18202A" stroke-opacity="0.24" stroke-width="2" stroke-linejoin="round"/>
+  <!-- Crisp outer alpine silhouette -->
+  <path d="M 134 16 L 194 36 L 236 86 L 242 132 L 222 194 L 174 232 L 120 240 A 112 112 0 0 1 134 16 Z"
+        fill="none" stroke="#1E3250" stroke-width="5.8" stroke-linejoin="round"/>
 </svg>
