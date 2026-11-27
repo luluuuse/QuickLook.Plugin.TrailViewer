@@ -1,6 +1,11 @@
+<div align="center">
+  <img src="viewer/assets/trailviewer-icon.svg" alt="TrailViewer" width="104" height="104">
+
 # QuickLook.Plugin.TrailViewer
 
 简体中文 | [English](README.en.md)
+
+</div>
 
 在 Windows 上直接用 QuickLook 预览 GPX、KML、KMZ 和 FIT 轨迹。在资源管理器中选中轨迹文件并按
 <kbd>Space</kbd>，无需打开地图软件即可查看路线、航点、照片和海拔剖面。
@@ -42,10 +47,10 @@
 
 ## 快速开始
 
-1. 从 [GitHub Releases](https://github.com/luluuuse/QuickLook.Plugin.TrailViewer/releases/latest) 下载最新
-   `.qlplugin`。
-2. 打开安装包完成安装，并从托盘完全退出后重新启动 QuickLook。
-3. 在资源管理器中选中 `.gpx`、`.kml`、`.kmz` 或 `.fit` 文件，按 <kbd>Space</kbd>。
+1. 先安装宿主软件 **QuickLook**（如已安装可跳过）：可通过 [Microsoft Store](https://apps.microsoft.com/detail/9nv4bs3l1h4s)、[QuickLook GitHub Releases](https://github.com/QL-Win/QuickLook/releases) 下载安装，或在终端执行 `winget install QL-Win.QuickLook`。
+2. 从 [GitHub Releases](https://github.com/luluuuse/QuickLook.Plugin.TrailViewer/releases/latest) 下载最新 `.qlplugin`。
+3. 选中 `.qlplugin` 安装包按 <kbd>Space</kbd>（或双击打开）完成安装，并从系统托盘完全退出后重新启动 QuickLook。
+4. 在资源管理器中选中 `.gpx`、`.kml`、`.kmz` 或 `.fit` 文件，按 <kbd>Space</kbd> 即可预览。
 
 ### 常用操作
 

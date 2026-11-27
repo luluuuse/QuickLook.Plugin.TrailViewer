@@ -1,6 +1,11 @@
+<div align="center">
+  <img src="viewer/assets/trailviewer-icon.svg" alt="TrailViewer" width="104" height="104">
+
 # QuickLook.Plugin.TrailViewer
 
 [简体中文](README.md) | English
+
+</div>
 
 Preview GPX, KML, KMZ and FIT tracks directly in QuickLook on Windows. Press <kbd>Space</kbd> on a track file
 in Explorer to see the route, waypoints, photos and elevation profile without opening a map application.
@@ -42,9 +47,10 @@ in Explorer to see the route, waypoints, photos and elevation profile without op
 
 ## Quick start
 
-1. Download the latest `.qlplugin` from [GitHub Releases](https://github.com/luluuuse/QuickLook.Plugin.TrailViewer/releases/latest).
-2. Open the package, install it, and restart QuickLook from the tray.
-3. Select a `.gpx`, `.kml`, `.kmz` or `.fit` file in Explorer and press <kbd>Space</kbd>.
+1. Install **QuickLook** first (skip if already installed) via the [Microsoft Store](https://apps.microsoft.com/detail/9nv4bs3l1h4s), [QuickLook GitHub Releases](https://github.com/QL-Win/QuickLook/releases), or `winget install QL-Win.QuickLook`.
+2. Download the latest `.qlplugin` from [GitHub Releases](https://github.com/luluuuse/QuickLook.Plugin.TrailViewer/releases/latest).
+3. Press <kbd>Space</kbd> on (or open) the `.qlplugin` package to install it, then quit and restart QuickLook from the system tray.
+4. Select a `.gpx`, `.kml`, `.kmz` or `.fit` file in Explorer and press <kbd>Space</kbd>.
 
 ### Common controls
 
