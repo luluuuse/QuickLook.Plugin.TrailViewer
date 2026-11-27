@@ -42,6 +42,9 @@ async function main() {
   await waitForLayout(page);
 
   await page.locator('.layer-menu-toggle').click();
+  await page.locator('#layer-source-menu').evaluate(
+    (node) => Promise.all(node.getAnimations().map((anim) => anim.finished.catch(() => {}))),
+  );
   await waitForLayout(page);
   const wideMenu = await page.locator('#layer-source-menu').boundingBox();
   check('the layer panel is 320 px wide and aligned to the right edge',
