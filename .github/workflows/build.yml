@@ -136,3 +136,24 @@ jobs:
           name: browser-failure-${{ matrix.group }}
           path: test-results/
           if-no-files-found: ignore
+
+  sync-gitcode:
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Push main branch to GitCode mirror
+        env:
+          GITCODE_TOKEN: ${{ secrets.GITCODE_TOKEN }}
+        run: |
+          if [ -z "$GITCODE_TOKEN" ]; then
+            echo "GITCODE_TOKEN not set; skipping GitCode main sync."
+            exit 0
+          fi
+          encoded=$(python3 -c 'import os, urllib.parse; print(urllib.parse.quote(os.environ["GITCODE_TOKEN"], safe=""))')
+          git push "https://oauth2:${encoded}@gitcode.com/luluse/QuickLook.Plugin.TrailViewer.git" HEAD:refs/heads/main
