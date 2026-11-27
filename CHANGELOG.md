@@ -11,6 +11,22 @@ Added / Changed / Deprecated / Removed / Fixed / Security 分类；没有内容�
 
 ### 中文
 
+- 暂无。
+
+### English
+
+- None yet.
+
+## 1.32.3 — 2026-11-27
+
+### 中文
+
+#### 新增
+
+- **iOS 液态玻璃（Liquid Glass）自适应主题**：新增第 4 套手动主题「液态玻璃（`ios`）」，采用高通透光学折射玻璃膜、对角镜面高光环边与柔和圆角控件，可根据当前底图明暗自动在深透晶璃（卫星/无底图，纯白字+冰蓝高亮）与亮透晶璃（路网/地形图，深墨字+系统蓝高亮）间自适应切换，搭配带白边系统蓝轨迹；彻底隔离瑞士测绘装饰，遵循系统减少动态设置。
+- **QuickLook 宿主深度集成**：支持顶部标题栏随主题与底图明暗自动切换深/浅，标题栏实时追加路线里程与累计爬升（`▲` 标记，编辑未保存时显示 `* `），标题栏 `···` 菜单新增「复制轨迹摘要」「导出透明叠加图」「导出轨迹附件」快捷项，窗口尺寸改用当前所在屏幕自适应比例。
+- **全主题五态按钮与自动化视觉守门**：建立 `docs/THEME_STANDARD.md` 主题开发标准与 `npm run theme:check` 自动检查脚本；统一四套主题的按钮常态/悬停/选中/选中悬停/禁用五态反馈，补齐冷岩墨与经典深灰强调色按钮 WCAG AA（`>= 4.5:1`）对比度，并修复「每公里」顶栏悬停右侧缺口与「仅导出本地照片」悬停失效问题。
+
 #### 变更
 
 - **默认主题与默认底图调整**：新安装默认主题调整为「经典深灰」，默认底图调整为卫星图源 **Esri World Imagery**（已手动切换过主题或底图的用户偏好保持不变）。
@@ -26,6 +42,12 @@ Added / Changed / Deprecated / Removed / Fixed / Security 分类；没有内容�
 - **工具箱与图源面板滚轮穿透修复**：拦截图源切换菜单与工具箱浮层内的滚轮事件冒泡，修复「检查更新」更新日志区域无法用鼠标滚轮滑动并误触发底图缩放的问题，同时为更新日志区隔离滚动边界避免连带滚动外层面板。
 
 ### English
+
+#### Added
+
+- **Adaptive iOS Liquid Glass Theme**: Added a fourth selectable theme, **Liquid Glass (`ios`)**, featuring translucent optical glass membranes, diagonal specular rim highlights, and softly rounded controls that automatically adapt between dark crystal glass (on satellite/no-map layers, with luminous white ink and ice-blue accents) and light crystal glass (on road/terrain layers, with deep ink and Apple-blue accents), paired with white-cased Apple-blue tracks and `prefers-reduced-motion` support.
+- **Deeper QuickLook Host Integration**: Synced QuickLook's native titlebar Light/Dark theme with the active theme and basemap tone, enriched the titlebar with live distance/ascent (`▲`) metadata (plus `* ` dirty indicator during editing), added **Copy track summary**, **Export overlay PNG**, and **Export attachments** to QuickLook's `···` More menu, and adopted per-monitor adaptive window sizing.
+- **Unified 5-State Button Polish & Automated Theme Guardrail**: Added `docs/THEME_STANDARD.md` and `npm run theme:check` to enforce 5-way theme sync, token parity, and WCAG AA (`>= 4.5:1`) contrast across all four themes; upgraded Slate and Classic accent fill/hover contrast, unified selected-hover and measure button states, and fixed the expanded Splits header hover gap and local-photo export hover feedback.
 
 #### Changed
 

@@ -18,11 +18,21 @@ import {
 } from './track-color.js';
 
 const COLORS = ['#df2b1d', '#297bb8', '#d98a1c', '#9c3ce6', '#249e58', '#d9367a', '#0c9ea8', '#e67e22'];
+const IOS_COLORS = ['#007aff', '#34c759', '#ff9500', '#af52de', '#ff2d55', '#5ac8fa', '#ff3b30', '#5856d6'];
 const ROUTE_COLOR = '#ffffff';
 const NETWORK_LOD_PIXELS = 0.75;
 const NETWORK_VIEW_PADDING = 0.25;
 const LONG_TRACK_CANVAS_POINTS = 8000;
 export const ENDPOINT_STITCH_METERS = 500;
+
+function activeThemeName() {
+  return typeof document !== 'undefined' ? (document.documentElement?.dataset?.theme || '') : '';
+}
+
+function trackColorForIndex(index, theme = activeThemeName()) {
+  const palette = theme === 'ios' ? IOS_COLORS : COLORS;
+  return palette[index % palette.length];
+}
 
 /**
  * Resolves which track groups should render start/end markers.
@@ -322,6 +332,13 @@ export function createTrackLayer({ L, el, localized, t, pointPopup, onFocusBound
 
         map.on('move zoomend resize', schedule);
         refresh();
+        layer.refreshColors = (theme) => {
+          for (const [entry, line] of rendered.entries()) {
+            if (typeof entry.colorIndex !== 'number') continue;
+            entry.color = trackColorForIndex(entry.colorIndex, theme);
+            line.setStyle({ color: entry.color });
+          }
+        };
         layer.destroy = () => {
           if (pending) {
             cancelAnimationFrame(pending);
@@ -585,17 +602,33 @@ export function createTrackLayer({ L, el, localized, t, pointPopup, onFocusBound
           : { color: '#ffffff', opacity: 0.82 };
       }
       function refreshTheme() {
-        if (canvasCasingLines.length === 0) return;
-        const style = readCanvasCasingStyle();
-        for (const casing of canvasCasingLines) casing.setStyle(style);
+        const theme = activeThemeName();
+        if (canvasCasingLines.length > 0) {
+          const style = readCanvasCasingStyle();
+          for (const casing of canvasCasingLines) casing.setStyle(style);
+        }
+        for (const entry of singleTrackEntries) {
+          const nextColor = trackColorForIndex(entry.colorIndex, theme);
+          entry.polyline.setStyle({ color: nextColor });
+        }
+        if (networkEntries.length > 0) {
+          for (const entry of networkEntries) {
+            if (typeof entry.colorIndex === 'number') {
+              entry.color = trackColorForIndex(entry.colorIndex, theme);
+            }
+          }
+          networkLayer?.refreshColors?.(theme);
+        }
       }
+      const initialTheme = activeThemeName();
       const initialCanvasCasingStyle = longTrackRenderer ? readCanvasCasingStyle() : null;
       const resolvedEndpoints = showEnds ? resolveTrackEndpoints(model.trackGroups) : [];
       model.trackGroups.forEach((group, groupIndex) => {
         const track = group.track;
         group.segments.forEach((segmentLine, segmentIndex) => {
           const points = segmentLine.points;
-          const color = COLORS[colorIndex++ % COLORS.length];
+          const entryColorIndex = colorIndex++;
+          const color = trackColorForIndex(entryColorIndex, initialTheme);
           const title = track.name
             ? (number) => (track.segments.length > 1
               ? t('point.segment', { name: track.name, segment: number })
@@ -609,6 +642,7 @@ export function createTrackLayer({ L, el, localized, t, pointPopup, onFocusBound
               points,
               bounds: lineBoundsValue,
               color,
+              colorIndex: entryColorIndex,
               weight: 4,
               className: 'gpx-track gpx-network-track',
               tooltip: title
@@ -638,7 +672,7 @@ export function createTrackLayer({ L, el, localized, t, pointPopup, onFocusBound
             if (tooltipNode) {
               polyline.bindTooltip(tooltipNode, { sticky: true });
             }
-            singleTrackEntries.push({ points, polyline, tooltipNode });
+            singleTrackEntries.push({ points, polyline, tooltipNode, colorIndex: entryColorIndex });
             distancePaths.push({
               points,
               offset: distanceOffset,

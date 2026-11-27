@@ -220,6 +220,24 @@ internal sealed partial class TrailViewerPanel
     {
         var previous = _tileCacheOptions;
         ViewerPreferences.SaveFromQuery(query);
+        var nextHostTheme = ViewerPreferences.ResolveHostTheme();
+        if (nextHostTheme != _hostTheme)
+        {
+            _hostTheme = nextHostTheme;
+            if (!_disposed)
+            {
+                _ = Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    if (!_disposed)
+                    {
+                        Background = nextHostTheme == QuickLook.Common.Plugin.Themes.Light
+                            ? new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(238, 242, 246))
+                            : new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(24, 24, 24));
+                        HostThemeChanged?.Invoke(nextHostTheme);
+                    }
+                }));
+            }
+        }
         var updated = ViewerPreferences.ReadTileCacheOptions();
         _tileCacheOptions = updated;
         var limitTightened = updated.MaxMegabytes > 0

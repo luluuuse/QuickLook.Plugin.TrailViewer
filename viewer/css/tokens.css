@@ -1,8 +1,9 @@
 /* Design tokens and shared primitives.
- * Three user-selectable themes (never auto-switched by map layer):
- *   - swiss   (default): Swiss Parchment cartographic paper UI derived from the 2B swisstopo icon
+ * Four user-selectable themes (never auto-switched by map layer):
+ *   - swiss   : Swiss Parchment cartographic paper UI derived from the 2B swisstopo icon
  *   - slate   : Alpine Slate dark instrument UI derived from the 2B SE rock shadow face
- *   - classic : Original dark-charcoal + electric-blue UI preserved for legacy preference
+ *   - classic : Original dark-charcoal + electric-blue UI preserved as default
+ *   - ios     : iOS 26 Liquid Glass luminous frosted light UI with specular borders & Apple blue accents
  */
 
 :root,
@@ -247,7 +248,7 @@
   --muted: #93a3b5;
   --on-accent: #ffffff;
   --accent: #d43124;
-  --accent-hover: #e54336;
+  --accent-hover: #c0281c;
   --accent-text: #ff6659;
   --accent-muted: rgba(240, 66, 52, 0.48);
   --accent-tint: rgba(240, 66, 52, 0.16);
@@ -404,8 +405,8 @@
   --text-bright: #ffffff;
   --muted: #aeb8c4;
   --on-accent: #ffffff;
-  --accent: #1a78d6;
-  --accent-hover: #2c8ae6;
+  --accent: #166ec7;
+  --accent-hover: #125da8;
   --accent-text: #5cb3ff;
   --accent-muted: #356d9d;
   --accent-tint: rgba(47, 155, 255, 0.18);
@@ -538,6 +539,335 @@
   --scrollbar-thumb: #555555;
   --scrollbar-thumb-hover: #777777;
   --ink-muted: var(--muted);
+}
+
+:root[data-theme="ios"] {
+  color-scheme: dark;
+  --bg: #11161e;
+  --panel: rgba(18, 22, 28, 0.34);
+  --panel-solid: #1c222b;
+  --hud-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.44),
+    inset 1px 0 0 rgba(255, 255, 255, 0.22),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.18),
+    inset -1px 0 0 rgba(255, 255, 255, 0.14),
+    inset 0 0 18px rgba(255, 255, 255, 0.06),
+    0 10px 32px rgba(0, 0, 0, 0.34);
+  --hud-shadow-swiss-top: var(--hud-shadow);
+  --swiss-corner-ticks: none;
+  --graticule-line: rgba(255, 255, 255, 0.14);
+  --track-casing: rgba(255, 255, 255, 0.90);
+  --no-map-bg: #121720;
+  --no-map-grid: none;
+  --text: rgba(255, 255, 255, 0.94);
+  --text-bright: #ffffff;
+  --muted: rgba(235, 240, 248, 0.72);
+  --on-accent: #ffffff;
+  --accent: #64d2ff;
+  --accent-hover: #8be0ff;
+  --accent-text: #64d2ff;
+  --accent-muted: rgba(100, 210, 255, 0.46);
+  --accent-tint: rgba(100, 210, 255, 0.16);
+  --glass-selected-bg: rgba(100, 210, 255, 0.26);
+  --glass-selected-border: #64d2ff;
+  --glass-selected-fg: #ffffff;
+  --glass-hover-bg: rgba(255, 255, 255, 0.20);
+  --glass-hover-border: rgba(255, 255, 255, 0.44);
+  --secondary-accent: #30d158;
+  --secondary-accent-text: #5ce67d;
+  --secondary-accent-tint: rgba(48, 209, 88, 0.18);
+  --secondary-accent-border: rgba(48, 209, 88, 0.48);
+  --shadow-sm: 0 3px 10px rgba(0, 0, 0, 0.26);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.32);
+  --shadow-lg: 0 14px 38px rgba(0, 0, 0, 0.40);
+  --tool-panel-background: rgba(18, 22, 28, 0.36);
+  --tool-panel-filter: blur(14px) saturate(1.9) brightness(1.06);
+  --surface-raised: rgba(24, 30, 38, 0.72);
+  --surface-card: rgba(255, 255, 255, 0.08);
+  --surface-control: rgba(255, 255, 255, 0.10);
+  --surface-muted: rgba(255, 255, 255, 0.06);
+  --surface-input: rgba(12, 16, 22, 0.36);
+  --surface-row: rgba(255, 255, 255, 0.06);
+  --surface-hover: rgba(255, 255, 255, 0.20);
+  --surface-inset: rgba(0, 0, 0, 0.20);
+  --border-hairline: rgba(255, 255, 255, 0.11);
+  --border-subtle: rgba(255, 255, 255, 0.16);
+  --border-control: rgba(255, 255, 255, 0.24);
+  --border-strong: rgba(255, 255, 255, 0.34);
+  --border-focus: rgba(255, 255, 255, 0.56);
+  --border-muted: rgba(255, 255, 255, 0.38);
+  --panel-radius: 22px;
+  --control-radius: 14px;
+  --radius-sm: 10px;
+  --radius-md: 16px;
+  --radius-lg: 22px;
+  --radius-pill: 999px;
+  --motion-panel: 160ms cubic-bezier(0.22, 1, 0.36, 1);
+  --icon-color: rgba(255, 255, 255, 0.94);
+  --icon-hover: #ffffff;
+  --icon-disabled: rgba(235, 240, 248, 0.38);
+  --icon-active: #ffffff;
+  --icon-active-background: rgba(255, 255, 255, 0.22);
+  --icon-active-line: #64d2ff;
+  --focus-ring: #64d2ff;
+  --kbd-bg: rgba(255, 255, 255, 0.12);
+  --kbd-border: rgba(255, 255, 255, 0.22);
+  --kbd-text: rgba(255, 255, 255, 0.86);
+  --snap-accent: #64d2ff;
+  --snap-text: #ffffff;
+  --snap-casing: #0d141c;
+  --snap-border: rgba(100, 210, 255, 0.65);
+  --snap-label-background: rgba(18, 22, 28, 0.72);
+  --snap-label-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.34), 0 4px 12px rgba(0, 0, 0, 0.36);
+  --toolbar-radius: 12px;
+  --toolbar-surface: rgba(18, 22, 28, 0.30);
+  --toolbar-hover-tint: rgba(255, 255, 255, 0.14);
+  --toolbar-surface-hover: rgba(255, 255, 255, 0.18);
+  --toolbar-blur: blur(12px) saturate(1.9) brightness(1.08);
+  --toolbar-border: rgba(255, 255, 255, 0.28);
+  --toolbar-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.50),
+    inset 1px 0 0 rgba(255, 255, 255, 0.24),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.20),
+    inset 0 0 12px rgba(255, 255, 255, 0.07),
+    0 6px 20px rgba(0, 0, 0, 0.28);
+  --editor-surface: rgba(18, 22, 28, 0.38);
+  --editor-active-bg: rgba(255, 255, 255, 0.22);
+  --editor-active-border: rgba(255, 255, 255, 0.44);
+  --editor-active-fg: #ffffff;
+  --editor-keep: #0a84ff;
+  --editor-cut: #8e8e93;
+  --editor-danger: #ff453a;
+  --editor-danger-text: #ff6961;
+  --wpt-tag-photo: #6ee7b7;
+  --wpt-tag-note: #ffd60a;
+  --wpt-tag-custom: #64d2ff;
+  --status-warn-text: #ffd60a;
+  --profile-hr-text: #ff9aa4;
+  --editor-save-bg: #007aff;
+  --editor-save-hover: #0a84ff;
+  --editor-crop-dim: rgba(10, 14, 20, 0.42);
+  --km-bg: rgba(18, 22, 28, 0.46);
+  --km-text: #ffffff;
+  --km-border: rgba(255, 255, 255, 0.30);
+  --scale-bg: rgba(18, 22, 28, 0.36);
+  --scale-border: rgba(255, 255, 255, 0.36);
+  --attrib-bg: rgba(18, 22, 28, 0.38);
+  --pin-fill: #ffffff;
+  --pin-stroke: #121720;
+  --pin-core: #64d2ff;
+  --profile-area-opacity: 0.62;
+  --profile-line: rgba(255, 255, 255, 0.92);
+  --profile-grid: rgba(255, 255, 255, 0.12);
+  --profile-guide: rgba(100, 210, 255, 0.90);
+  --profile-dot-bg: #64d2ff;
+  --profile-dot-ring: #ffffff;
+  --profile-readout-bg: rgba(18, 22, 28, 0.72);
+  --profile-readout-text: #ffffff;
+  --profile-readout-meta: rgba(235, 240, 248, 0.84);
+  --profile-extremum-bg: rgba(18, 22, 28, 0.52);
+  --profile-extremum-high: #ffd60a;
+  --profile-extremum-low: #64d2ff;
+  --profile-split-dim: rgba(10, 14, 20, 0.34);
+  --profile-split-band: rgba(100, 210, 255, 0.20);
+  --profile-split-edge: #64d2ff;
+  --profile-pin-bg: #ffffff;
+  --profile-pin-border: #121720;
+  --profile-pin-photo-ring: #64d2ff;
+  --toast-bg: rgba(18, 22, 28, 0.68);
+  --coord-label-bg: rgba(18, 22, 28, 0.56);
+  --toast-text: #ffffff;
+  --btn-primary-bg: #0066d6;
+  --btn-primary-hover: #0073ec;
+  --btn-primary-border: rgba(255, 255, 255, 0.30);
+  --btn-primary-text: #ffffff;
+  --highlight-fg: #64d2ff;
+  --highlight-tint: rgba(100, 210, 255, 0.18);
+  --highlight-border: rgba(100, 210, 255, 0.55);
+  --brush-bar-bg: rgba(18, 22, 28, 0.52);
+  --brush-bar-text: #ffffff;
+  --brush-bar-border: rgba(255, 255, 255, 0.28);
+  --brush-bar-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.42),
+    0 6px 20px rgba(0, 0, 0, 0.32);
+  --brush-crop-bg: rgba(255, 255, 255, 0.14);
+  --brush-crop-border: rgba(255, 255, 255, 0.28);
+  --brush-crop-fg: #ffffff;
+  --brush-crop-hover-bg: rgba(255, 255, 255, 0.28);
+  --brush-crop-hover-fg: #ffffff;
+  --brush-close-fg: rgba(235, 240, 248, 0.78);
+  --brush-close-hover-bg: rgba(255, 255, 255, 0.18);
+  --brush-close-hover-fg: #ffffff;
+  --toolbox-footer-ring-gap: rgba(24, 30, 38, 0.85);
+  --toolbox-footer-bg:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.10) 0%, rgba(255, 255, 255, 0.03) 55%, rgba(10, 132, 255, 0.10) 100%);
+  --toolbox-footer-btn-bg: rgba(255, 255, 255, 0.12);
+  --toolbox-tool-icon: #64d2ff;
+  --toolbox-tool-icon-bg: rgba(100, 210, 255, 0.18);
+  --heart-fg: #ff9aa4;
+  --heart-tint: rgba(255, 69, 58, 0.18);
+  --heart-border: rgba(255, 105, 97, 0.62);
+  --fastest-fg: #ff6961;
+  --danger-text: #ff6961;
+  --danger-tint: rgba(255, 69, 58, 0.18);
+  --danger-border: rgba(255, 105, 97, 0.52);
+  --success-text: #5ce67d;
+  --success-tint: rgba(48, 209, 88, 0.18);
+  --success-border: rgba(48, 209, 88, 0.48);
+  --scrollbar-thumb: rgba(255, 255, 255, 0.28);
+  --scrollbar-thumb-hover: rgba(255, 255, 255, 0.48);
+  --ink-muted: var(--muted);
+}
+
+:root[data-theme="ios"][data-map-tone="light"] {
+  color-scheme: light;
+  --bg: #eef2f6;
+  --panel: rgba(255, 255, 255, 0.46);
+  --panel-solid: #ffffff;
+  --hud-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.96),
+    inset 1px 0 0 rgba(255, 255, 255, 0.68),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.44),
+    inset 0 0 14px rgba(255, 255, 255, 0.22),
+    0 0 0 0.5px rgba(15, 23, 42, 0.14),
+    0 8px 28px rgba(15, 23, 42, 0.14);
+  --hud-shadow-swiss-top: var(--hud-shadow);
+  --graticule-line: rgba(15, 23, 42, 0.12);
+  --track-casing: rgba(255, 255, 255, 0.94);
+  --text: #111827;
+  --text-bright: #000000;
+  --muted: #3f4a59;
+  --accent: #007aff;
+  --accent-hover: #0066d6;
+  --accent-text: #005fcc;
+  --accent-muted: rgba(0, 122, 255, 0.36);
+  --accent-tint: rgba(0, 122, 255, 0.12);
+  --glass-selected-bg: rgba(0, 122, 255, 0.20);
+  --glass-selected-border: #007aff;
+  --glass-selected-fg: #004ea8;
+  --glass-hover-bg: rgba(15, 23, 42, 0.09);
+  --glass-hover-border: rgba(0, 122, 255, 0.44);
+  --secondary-accent: #34c759;
+  --secondary-accent-text: #1b7a34;
+  --secondary-accent-tint: rgba(52, 199, 89, 0.14);
+  --secondary-accent-border: rgba(52, 199, 89, 0.42);
+  --shadow-sm: 0 2px 8px rgba(15, 23, 42, 0.09);
+  --shadow-md: 0 6px 18px rgba(15, 23, 42, 0.12);
+  --shadow-lg: 0 12px 30px rgba(15, 23, 42, 0.15);
+  --tool-panel-background: rgba(255, 255, 255, 0.48);
+  --tool-panel-filter: blur(14px) saturate(1.9) brightness(1.04);
+  --surface-raised: rgba(255, 255, 255, 0.86);
+  --surface-card: rgba(255, 255, 255, 0.36);
+  --surface-control: rgba(255, 255, 255, 0.44);
+  --surface-muted: rgba(15, 23, 42, 0.06);
+  --surface-input: rgba(255, 255, 255, 0.72);
+  --surface-row: rgba(255, 255, 255, 0.34);
+  --surface-hover: rgba(15, 23, 42, 0.09);
+  --surface-inset: rgba(15, 23, 42, 0.055);
+  --border-hairline: rgba(15, 23, 42, 0.09);
+  --border-subtle: rgba(15, 23, 42, 0.13);
+  --border-control: rgba(15, 23, 42, 0.18);
+  --border-strong: rgba(15, 23, 42, 0.24);
+  --border-focus: rgba(0, 122, 255, 0.52);
+  --border-muted: rgba(15, 23, 42, 0.30);
+  --icon-color: #111827;
+  --icon-hover: #000000;
+  --icon-disabled: #7a8594;
+  --icon-active: #005fcc;
+  --icon-active-background: rgba(0, 122, 255, 0.14);
+  --icon-active-line: #007aff;
+  --focus-ring: #007aff;
+  --kbd-bg: rgba(15, 23, 42, 0.08);
+  --kbd-border: rgba(15, 23, 42, 0.16);
+  --kbd-text: #374151;
+  --snap-accent: #007aff;
+  --snap-casing: #ffffff;
+  --snap-border: rgba(0, 122, 255, 0.55);
+  --snap-label-background: rgba(24, 30, 38, 0.84);
+  --toolbar-surface: rgba(255, 255, 255, 0.46);
+  --toolbar-hover-tint: rgba(0, 122, 255, 0.09);
+  --toolbar-surface-hover: rgba(255, 255, 255, 0.68);
+  --toolbar-blur: blur(12px) saturate(1.9) brightness(1.05);
+  --toolbar-border: rgba(255, 255, 255, 0.72);
+  --toolbar-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.96),
+    inset 1px 0 0 rgba(255, 255, 255, 0.68),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.42),
+    0 0 0 0.5px rgba(15, 23, 42, 0.14),
+    0 4px 16px rgba(15, 23, 42, 0.12);
+  --editor-surface: rgba(255, 255, 255, 0.54);
+  --editor-active-bg: rgba(0, 122, 255, 0.14);
+  --editor-active-border: rgba(0, 122, 255, 0.42);
+  --editor-active-fg: #005fcc;
+  --editor-keep: #007aff;
+  --editor-cut: #58606d;
+  --editor-danger: #ff3b30;
+  --editor-danger-text: #c81e14;
+  --wpt-tag-photo: #0b7a6c;
+  --wpt-tag-note: #b25a00;
+  --wpt-tag-custom: #005fcc;
+  --status-warn-text: #9a5b00;
+  --editor-save-bg: #0066d6;
+  --editor-save-hover: #0055b3;
+  --editor-crop-dim: rgba(15, 23, 42, 0.22);
+  --km-bg: rgba(255, 255, 255, 0.62);
+  --km-text: #111827;
+  --km-border: rgba(15, 23, 42, 0.18);
+  --scale-bg: rgba(255, 255, 255, 0.50);
+  --scale-border: rgba(15, 23, 42, 0.34);
+  --attrib-bg: rgba(255, 255, 255, 0.56);
+  --pin-core: #007aff;
+  --profile-area-opacity: 0.46;
+  --profile-line: #005fcc;
+  --profile-grid: rgba(15, 23, 42, 0.10);
+  --profile-guide: rgba(0, 122, 255, 0.84);
+  --profile-dot-bg: #007aff;
+  --profile-dot-ring: #ffffff;
+  --profile-extremum-bg: rgba(255, 255, 255, 0.76);
+  --profile-extremum-high: #c81e14;
+  --profile-extremum-low: #005fcc;
+  --profile-split-dim: rgba(15, 23, 42, 0.08);
+  --profile-split-band: rgba(0, 122, 255, 0.14);
+  --profile-split-edge: #007aff;
+  --profile-pin-photo-ring: #007aff;
+  --btn-primary-bg: #0066d6;
+  --btn-primary-hover: #0055b3;
+  --btn-primary-border: #0055b3;
+  --highlight-fg: #005fcc;
+  --highlight-tint: rgba(0, 122, 255, 0.14);
+  --highlight-border: rgba(0, 122, 255, 0.44);
+  --brush-bar-bg: rgba(255, 255, 255, 0.72);
+  --brush-bar-text: #111827;
+  --brush-bar-border: rgba(0, 122, 255, 0.36);
+  --brush-bar-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.92),
+    0 4px 16px rgba(15, 23, 42, 0.12);
+  --brush-crop-bg: rgba(0, 122, 255, 0.12);
+  --brush-crop-border: rgba(0, 122, 255, 0.36);
+  --brush-crop-fg: #005fcc;
+  --brush-crop-hover-bg: #0066d6;
+  --brush-crop-hover-fg: #ffffff;
+  --brush-close-fg: #3f4a59;
+  --brush-close-hover-bg: rgba(15, 23, 42, 0.08);
+  --brush-close-hover-fg: #000000;
+  --toolbox-footer-ring-gap: rgba(236, 242, 250, 0.90);
+  --toolbox-footer-bg:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.42) 0%, rgba(220, 238, 255, 0.34) 55%, rgba(232, 246, 238, 0.32) 100%);
+  --toolbox-footer-btn-bg: rgba(255, 255, 255, 0.46);
+  --toolbox-tool-icon: #005fcc;
+  --toolbox-tool-icon-bg: rgba(0, 122, 255, 0.12);
+  --heart-fg: #c81e3a;
+  --heart-tint: rgba(255, 59, 48, 0.11);
+  --heart-border: rgba(255, 59, 48, 0.45);
+  --fastest-fg: #c81e14;
+  --danger-text: #c81e14;
+  --danger-tint: rgba(255, 59, 48, 0.11);
+  --danger-border: rgba(255, 59, 48, 0.38);
+  --success-text: #1b7a34;
+  --success-tint: rgba(52, 199, 89, 0.12);
+  --success-border: rgba(52, 199, 89, 0.42);
+  --scrollbar-thumb: rgba(15, 23, 42, 0.24);
+  --scrollbar-thumb-hover: rgba(15, 23, 42, 0.42);
 }
 
 html, body {
@@ -826,6 +1156,89 @@ body.is-map-dragging .editor-mode-hint {
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
   transition: none;
+}
+
+:root[data-theme="ios"] #info,
+:root[data-theme="ios"] #splits,
+:root[data-theme="ios"] #profile,
+:root[data-theme="ios"] .toolbox-panel,
+:root[data-theme="ios"] .layer-source-menu,
+:root[data-theme="ios"] .waypoint-overview {
+  -webkit-backdrop-filter: var(--tool-panel-filter);
+  backdrop-filter: var(--tool-panel-filter);
+  background-image: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.15) 0%,
+    rgba(255, 255, 255, 0.03) 36%,
+    rgba(255, 255, 255, 0.00) 64%,
+    rgba(255, 255, 255, 0.09) 100%
+  );
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.34);
+}
+
+:root[data-theme="ios"] .layer-switch,
+:root[data-theme="ios"] .toolbox-switch > button,
+:root[data-theme="ios"] .layer-menu-toggle {
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.36);
+}
+
+:root[data-theme="ios"][data-map-tone="light"] #info,
+:root[data-theme="ios"][data-map-tone="light"] #splits,
+:root[data-theme="ios"][data-map-tone="light"] #profile,
+:root[data-theme="ios"][data-map-tone="light"] .toolbox-panel,
+:root[data-theme="ios"][data-map-tone="light"] .layer-source-menu,
+:root[data-theme="ios"][data-map-tone="light"] .waypoint-overview {
+  background-image: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.42) 0%,
+    rgba(255, 255, 255, 0.08) 40%,
+    rgba(255, 255, 255, 0.02) 65%,
+    rgba(255, 255, 255, 0.24) 100%
+  );
+  text-shadow: 0 1px 1px rgba(255, 255, 255, 0.65);
+}
+
+:root[data-theme="ios"][data-map-tone="light"] .layer-switch,
+:root[data-theme="ios"][data-map-tone="light"] .toolbox-switch > button,
+:root[data-theme="ios"][data-map-tone="light"] .layer-menu-toggle {
+  text-shadow: 0 1px 1px rgba(255, 255, 255, 0.65);
+}
+
+:root[data-theme="ios"][data-map-tone="light"] body.is-map-dragging .editor-topbar,
+:root[data-theme="ios"][data-map-tone="light"] body.is-map-dragging .editor-rail,
+:root[data-theme="ios"][data-map-tone="light"] body.is-map-dragging .editor-drawer,
+:root[data-theme="ios"][data-map-tone="light"] body.is-map-dragging .editor-save-popover,
+:root[data-theme="ios"][data-map-tone="light"] body.is-map-dragging .editor-context-menu,
+:root[data-theme="ios"][data-map-tone="light"] body.is-map-dragging .editor-exit-guard,
+:root[data-theme="ios"][data-map-tone="light"] body.is-map-dragging .editor-mode-hint {
+  background-color: rgba(255, 255, 255, 0.84);
+}
+
+:root[data-theme="ios"] #info .stats .pair.accent {
+  border-left-color: var(--icon-active-line);
+}
+
+:root[data-theme="ios"] .toolbox-theme-option[aria-pressed="true"] {
+  box-shadow: 0 0 0 1.8px var(--toolbox-footer-ring-gap), 0 0 0 3.4px var(--icon-active-line);
+}
+
+:root[data-theme="ios"] body.is-map-dragging .toolbox-panel,
+:root[data-theme="ios"] body.is-map-dragging .layer-source-menu,
+:root[data-theme="ios"] body.is-map-dragging .waypoint-overview {
+  -webkit-backdrop-filter: var(--tool-panel-filter);
+  backdrop-filter: var(--tool-panel-filter);
+}
+
+:root[data-theme="ios"] body.is-map-dragging .editor-topbar,
+:root[data-theme="ios"] body.is-map-dragging .editor-rail,
+:root[data-theme="ios"] body.is-map-dragging .editor-drawer,
+:root[data-theme="ios"] body.is-map-dragging .editor-save-popover,
+:root[data-theme="ios"] body.is-map-dragging .editor-context-menu,
+:root[data-theme="ios"] body.is-map-dragging .editor-exit-guard,
+:root[data-theme="ios"] body.is-map-dragging .editor-mode-hint {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background-color: rgba(18, 22, 28, 0.68);
 }
 
 @media (prefers-reduced-motion: reduce) {

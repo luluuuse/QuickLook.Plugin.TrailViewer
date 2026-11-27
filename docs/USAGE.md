@@ -124,7 +124,8 @@
 
 ### 7. 语言、快捷键、更新与隐私
 
-- **界面主题**：点击工具箱底栏的三枚微缩色卡可在 **瑞士纸镜**（默认）、**冷岩墨** 与 **基础深色** 之间手动切换并持久保存，不会随底图切换自动变更。
+- **界面主题**：点击工具箱底栏的四枚微缩色卡可在 **瑞士纸境**、**冷岩墨**、**经典深灰**（默认）与 **液态玻璃** 之间手动切换并持久保存；其中 **液态玻璃** 支持随卫星/路网/地形底图明暗自动反转深透与亮透晶璃，并联动 QuickLook 顶部标题栏深/浅明暗。
+- **QuickLook 顶栏快捷能力**：窗口标题栏自动追加当前路线里程与累计爬升（`▲`），编辑未保存时显示 `* ` 标记；点击标题栏右侧 `···` 可直接触发 **复制轨迹摘要**、**导出透明叠加图** 与 **导出轨迹附件**。
 - **界面语言**：点击工具箱标题栏的地球按钮（`中` / `EN`）就地切换中英文，不重载预览并自动记住选择（未手动选择时跟随系统语言）。
 - **快捷键速查**：点击工具箱标题栏右侧 **?** 查看两列快捷键表（`W / S / A D / Q E / C / M / T / P / L / X`），文本框获焦时自动暂停全局快捷键。
 - **内置检查更新**：工具箱底部显示当前版本与 **检查更新** 入口，后台每 24 小时最多静默竞速检测一次 **GitHub Releases + GitCode 国内镜像**（自动回退）。发现正式新版时，顶部显示柔和青蓝微光提示点、底部显示翠绿胶囊（`↑ vX.Y.Z`）；支持查看双语日志、忽略此版本，以及一键下载安装包（核对 **SHA256 哈希** 与插件清单完整性）并调起 QuickLook 原生安装。
@@ -249,7 +250,8 @@ Listed in Toolbox menu order:
 
 ### 7. Language, shortcuts, updates & privacy
 
-- **Interface themes:** click the three miniature theme cards in the Toolbox footer to switch between **Swiss Paper** (default), **Slate Dark**, and **Classic Dark**; stored persistently and never auto-switched by basemaps.
+- **Interface themes:** click the four miniature theme cards in the Toolbox footer to switch between **Swiss Paper**, **Slate Dark**, **Classic Dark** (default), and **Liquid Glass** (stored persistently); **Liquid Glass** automatically adapts between dark crystal glass (satellite/no-map) and light crystal glass (road/terrain) while syncing QuickLook's native titlebar tone.
+- **QuickLook titlebar shortcuts:** the native titlebar appends live route distance and ascent (`▲`) with a `* ` dirty marker while editing; click `···` in the titlebar to run **Copy track summary**, **Export overlay PNG**, or **Export attachments** directly.
 - **Interface language:** click the globe button (`中` / `EN`) in the Toolbox header to switch in place without reloading; saved automatically (defaults to system language).
 - **Keyboard reference:** click **?** in the Toolbox header to open the two-column shortcut table (`W / S / A D / Q E / C / M / T / P / L / X`); global shortcuts pause automatically while typing in text inputs.
 - **Built-in update checker:** the Toolbox footer displays the installed version and **Check updates**, quietly racing **GitHub Releases + GitCode mirror** at most once every 24 hours with automatic failover. New stable releases show a subtle cyan glow dot on the Toolbox toggle and an emerald footer pill (`↑ vX.Y.Z`), with bilingual release notes, version muting, **SHA256 checksum & manifest verification**, and native QuickLook installer handoff.

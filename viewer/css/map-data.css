@@ -17,14 +17,16 @@
   text-shadow: none;
 }
 
-:root:not([data-theme="classic"]) .leaflet-control-scale {
+:root[data-theme="swiss"] .leaflet-control-scale,
+:root[data-theme="slate"] .leaflet-control-scale {
   display: inline-flex;
   align-items: stretch;
   gap: 4px;
 }
 
 /* Swiss topographic 4-segment alternating scale bar paired with live 1 : N cartographic ratio. */
-:root:not([data-theme="classic"]) .leaflet-control-scale-line {
+:root[data-theme="swiss"] .leaflet-control-scale-line,
+:root[data-theme="slate"] .leaflet-control-scale-line {
   padding: 1px 5px 5px;
   border: 1px solid var(--scale-border);
   border-radius: 1px;
@@ -41,6 +43,26 @@
   background-repeat: no-repeat;
   font-variant-numeric: tabular-nums;
   line-height: 1.15;
+}
+
+:root[data-theme="ios"] .leaflet-control-scale-line {
+  padding: 2px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: var(--radius-pill);
+  background: rgba(18, 22, 28, 0.34);
+  -webkit-backdrop-filter: blur(12px) saturate(1.85);
+  backdrop-filter: blur(12px) saturate(1.85);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.42), 0 4px 14px rgba(0, 0, 0, 0.28);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+
+:root[data-theme="ios"][data-map-tone="light"] .leaflet-control-scale-line {
+  border-color: rgba(15, 23, 42, 0.16);
+  background: rgba(255, 255, 255, 0.56);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.92), 0 3px 10px rgba(15, 23, 42, 0.12);
+  text-shadow: 0 1px 1px rgba(255, 255, 255, 0.72);
 }
 
 .swiss-scale-ratio {
@@ -61,7 +83,8 @@
 }
 
 .swiss-scale-ratio[hidden],
-:root[data-theme="classic"] .swiss-scale-ratio {
+:root[data-theme="classic"] .swiss-scale-ratio,
+:root[data-theme="ios"] .swiss-scale-ratio {
   display: none;
 }
 
@@ -275,12 +298,27 @@ body.measuring #map.leaflet-container .leaflet-interactive {
   transform: translateX(-50%);
 }
 
-:root:not([data-theme="classic"]) .gpx-km {
+:root[data-theme="swiss"] .gpx-km,
+:root[data-theme="slate"] .gpx-km {
   padding: 1px 5px 1px 4px;
   border: 1px solid var(--km-border);
   border-left: 2.5px solid var(--accent);
   border-radius: 2px;
   letter-spacing: 0.01em;
+}
+
+:root[data-theme="ios"] .gpx-km {
+  padding: 1.5px 7px;
+  border: 1px solid rgba(255, 255, 255, 0.30);
+  border-radius: var(--radius-pill);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.44), 0 3px 10px rgba(0, 0, 0, 0.32);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+}
+
+:root[data-theme="ios"][data-map-tone="light"] .gpx-km {
+  border-color: rgba(15, 23, 42, 0.18);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.92), 0 2px 8px rgba(15, 23, 42, 0.14);
+  text-shadow: none;
 }
 
 /* A break in the recording is not joined as if it were walked ground: the connector is dashed and the warning

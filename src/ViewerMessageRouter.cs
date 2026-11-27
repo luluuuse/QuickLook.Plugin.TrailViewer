@@ -26,6 +26,7 @@ internal sealed class ViewerMessageActions
     internal Action<bool> MeasureState { get; set; } = _ => { };
     internal Action<bool> EditorState { get; set; } = _ => { };
     internal Action<bool> EditorDirty { get; set; } = _ => { };
+    internal Action<string> TitleMeta { get; set; } = _ => { };
     internal Action<string> BeginTrackSave { get; set; } = _ => { };
     internal Action<string> AppendTrackSave { get; set; } = _ => { };
     internal Func<string, System.Threading.Tasks.Task> FinishTrackSave { get; set; } =
@@ -91,6 +92,8 @@ internal sealed class ViewerMessageRouter
             _actions.EditorState(message.EndsWith("\t1", StringComparison.Ordinal));
         else if (message == "editor-dirty\t1" || message == "editor-dirty\t0")
             _actions.EditorDirty(message.EndsWith("\t1", StringComparison.Ordinal));
+        else if (message.StartsWith("title-meta\t", StringComparison.Ordinal))
+            _actions.TitleMeta(message.Substring("title-meta\t".Length));
         else if (message.StartsWith("trackbegin\t", StringComparison.Ordinal))
             _actions.BeginTrackSave(message.Substring("trackbegin\t".Length));
         else if (message.StartsWith("trackchunk\t", StringComparison.Ordinal))

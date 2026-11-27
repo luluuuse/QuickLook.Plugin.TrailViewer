@@ -385,7 +385,8 @@
     repeating-linear-gradient(90deg, rgba(52, 211, 153, 0.42) 0 1px, transparent 1px 24px) left bottom / 100% 8px no-repeat;
 }
 
-:root[data-theme="swiss"] .toolbox-quick-action[data-tool="measure"] .toolbox-action-icon {
+:root[data-theme="swiss"] .toolbox-quick-action[data-tool="measure"] .toolbox-action-icon,
+:root[data-theme="ios"][data-map-tone="light"] .toolbox-quick-action[data-tool="measure"] .toolbox-action-icon {
   color: #047857;
   background: rgba(5, 150, 105, 0.11);
 }
@@ -419,7 +420,8 @@
   mask-image: linear-gradient(90deg, transparent 32%, #000 100%);
 }
 
-:root[data-theme="swiss"] .toolbox-quick-action[data-tool="coordinates"] .toolbox-action-icon {
+:root[data-theme="swiss"] .toolbox-quick-action[data-tool="coordinates"] .toolbox-action-icon,
+:root[data-theme="ios"][data-map-tone="light"] .toolbox-quick-action[data-tool="coordinates"] .toolbox-action-icon {
   color: #0369a1;
   background: rgba(2, 132, 199, 0.11);
 }
@@ -456,7 +458,8 @@
   mask-image: linear-gradient(90deg, transparent 38%, #000 100%);
 }
 
-:root[data-theme="swiss"] .toolbox-quick-action[data-tool="export"]:not(:disabled) .toolbox-action-icon {
+:root[data-theme="swiss"] .toolbox-quick-action[data-tool="export"]:not(:disabled) .toolbox-action-icon,
+:root[data-theme="ios"][data-map-tone="light"] .toolbox-quick-action[data-tool="export"]:not(:disabled) .toolbox-action-icon {
   color: #b45309;
   background: rgba(217, 119, 6, 0.11);
 }
@@ -492,7 +495,8 @@
     linear-gradient(rgba(167, 139, 250, 0.36), rgba(167, 139, 250, 0.36)) calc(100% - 7px) calc(100% - 6px) / 1.5px 7px no-repeat;
 }
 
-:root[data-theme="swiss"] .toolbox-quick-action[data-tool="attachments"]:not(:disabled) .toolbox-action-icon {
+:root[data-theme="swiss"] .toolbox-quick-action[data-tool="attachments"]:not(:disabled) .toolbox-action-icon,
+:root[data-theme="ios"][data-map-tone="light"] .toolbox-quick-action[data-tool="attachments"]:not(:disabled) .toolbox-action-icon {
   color: #6d28d9;
   background: rgba(109, 40, 217, 0.11);
 }
@@ -804,7 +808,8 @@
   );
 }
 
-:root[data-theme="swiss"] .toolbox-weather-card[data-active-provider="windy"] .toolbox-action-icon {
+:root[data-theme="swiss"] .toolbox-weather-card[data-active-provider="windy"] .toolbox-action-icon,
+:root[data-theme="ios"][data-map-tone="light"] .toolbox-weather-card[data-active-provider="windy"] .toolbox-action-icon {
   color: #0369a1;
   background: rgba(2, 132, 199, 0.12);
 }
@@ -822,7 +827,8 @@
   );
 }
 
-:root[data-theme="swiss"] .toolbox-weather-card[data-active-provider="ventusky"] .toolbox-action-icon {
+:root[data-theme="swiss"] .toolbox-weather-card[data-active-provider="ventusky"] .toolbox-action-icon,
+:root[data-theme="ios"][data-map-tone="light"] .toolbox-weather-card[data-active-provider="ventusky"] .toolbox-action-icon {
   color: #4338ca;
   background: rgba(79, 70, 229, 0.11);
 }
@@ -833,7 +839,8 @@
     radial-gradient(85% 95% at 18% 90%, rgba(2, 132, 199, 0.10), transparent 68%);
 }
 
-:root[data-theme="swiss"] .toolbox-weather-card[data-active-provider="zoomearth"] .toolbox-action-icon {
+:root[data-theme="swiss"] .toolbox-weather-card[data-active-provider="zoomearth"] .toolbox-action-icon,
+:root[data-theme="ios"][data-map-tone="light"] .toolbox-weather-card[data-active-provider="zoomearth"] .toolbox-action-icon {
   color: #6d28d9;
   background: rgba(109, 40, 217, 0.11);
 }
@@ -846,7 +853,8 @@
   background: linear-gradient(180deg, rgba(217, 119, 6, 0.16), rgba(217, 119, 6, 0.04));
 }
 
-:root[data-theme="swiss"] .toolbox-weather-card[data-active-provider="peakfinder"] .toolbox-action-icon {
+:root[data-theme="swiss"] .toolbox-weather-card[data-active-provider="peakfinder"] .toolbox-action-icon,
+:root[data-theme="ios"][data-map-tone="light"] .toolbox-weather-card[data-active-provider="peakfinder"] .toolbox-action-icon {
   color: #b45309;
   background: rgba(217, 119, 6, 0.12);
 }
@@ -861,7 +869,8 @@
   );
 }
 
-:root[data-theme="swiss"] .toolbox-weather-card[data-active-provider="shademap"] .toolbox-action-icon {
+:root[data-theme="swiss"] .toolbox-weather-card[data-active-provider="shademap"] .toolbox-action-icon,
+:root[data-theme="ios"][data-map-tone="light"] .toolbox-weather-card[data-active-provider="shademap"] .toolbox-action-icon {
   color: #b45309;
   background: rgba(217, 119, 6, 0.12);
 }
@@ -938,6 +947,12 @@
   font-weight: 600;
 }
 
+.toolbox-weather-tab[aria-pressed="true"]:hover:not(:disabled) {
+  background: var(--icon-active-background);
+  color: var(--icon-active);
+  filter: brightness(1.06);
+}
+
 .toolbox-weather-picker {
   display: flex;
   border-top: 1px solid var(--border-subtle);
@@ -992,6 +1007,12 @@
   box-shadow: inset 0 -2px var(--icon-active-line);
 }
 
+.toolbox-weather-mode[aria-pressed="true"]:hover:not(:disabled) {
+  background: var(--icon-active-background);
+  color: var(--icon-active);
+  filter: brightness(1.06);
+}
+
 .toolbox-weather-mode:disabled {
   color: var(--icon-disabled);
   cursor: default;
@@ -1010,7 +1031,7 @@
 .toolbox-theme-pick {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: 5px;
   flex: none;
 }
 
@@ -1020,8 +1041,8 @@
 
 .toolbox-theme-option {
   position: relative;
-  width: 21px;
-  height: 17px;
+  width: 17px;
+  height: 15px;
   padding: 0;
   overflow: hidden;
   border: 1px solid var(--border-control);
@@ -1040,9 +1061,9 @@
 .toolbox-theme-option::after {
   content: "";
   position: absolute;
-  left: 3px;
-  bottom: 3.5px;
-  width: 9px;
+  left: 2.5px;
+  bottom: 3px;
+  width: 8px;
   height: 2px;
   border-radius: 1px;
   opacity: 0.48;
@@ -1086,6 +1107,21 @@
 
 .toolbox-theme-option[data-theme-option="classic"]::after {
   background: #aeb8c4;
+}
+
+.toolbox-theme-option[data-theme-option="ios"] {
+  background: linear-gradient(145deg, #334155 0%, #161e2a 100%);
+  border-color: rgba(218, 230, 244, 0.36);
+  border-radius: 5px;
+}
+
+.toolbox-theme-option[data-theme-option="ios"]::before {
+  background: linear-gradient(90deg, #64d2ff 0%, #dbeafe 55%, #64d2ff 100%);
+}
+
+.toolbox-theme-option[data-theme-option="ios"]::after {
+  background: #e2e8f0;
+  opacity: 0.78;
 }
 
 .toolbox-theme-option:hover {
@@ -1195,6 +1231,12 @@
   box-shadow: inset 0 -2px var(--icon-active-line);
 }
 
+.toolbox-export-settings .pick .option.on:hover:not(:disabled) {
+  background: var(--icon-active-background);
+  color: var(--icon-active);
+  filter: brightness(1.06);
+}
+
 .toolbox-export-settings .pick .option:disabled {
   cursor: default;
   opacity: 0.42;
@@ -1245,18 +1287,19 @@
   grid-column: 1 / -1;
   margin-top: 2px;
   padding: 6px 0;
-  border: 0;
+  border: 1px solid var(--btn-primary-border);
   border-radius: var(--radius-sm);
-  background: var(--accent);
-  color: var(--on-accent);
+  background: var(--btn-primary-bg);
+  color: var(--btn-primary-text);
   font: inherit;
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
 }
 
-.toolbox-export-settings .go:hover {
-  background: var(--accent-hover);
+.toolbox-export-settings .go:hover:not(:disabled) {
+  border-color: var(--btn-primary-hover);
+  background: var(--btn-primary-hover);
 }
 
 .toolbox-coordinate-type {
@@ -1404,6 +1447,12 @@
   font-weight: 500;
 }
 
+.toolbox-attachment-export.local:hover:not(:disabled) {
+  border-color: var(--border-muted);
+  background: var(--surface-hover);
+  color: var(--text-bright);
+}
+
 .toolbox-attachment-export.all:hover:not(:disabled) {
   border-color: var(--btn-primary-hover);
   background: var(--btn-primary-hover);
@@ -1523,7 +1572,19 @@
   color: var(--btn-primary-text);
 }
 
+.toolbox-measure-actions .primary:hover:not(:disabled) {
+  border-color: var(--btn-primary-hover);
+  background: var(--btn-primary-hover);
+  color: var(--btn-primary-text);
+}
+
 .toolbox-measure-actions .danger {
+  color: var(--danger-text);
+}
+
+.toolbox-measure-actions .danger:hover:not(:disabled) {
+  border-color: var(--danger-border);
+  background: var(--danger-tint);
   color: var(--danger-text);
 }
 
@@ -1548,9 +1609,9 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: 6px;
   margin: 4px -10px -10px;
-  padding: 8px 10px 9px;
+  padding: 8px 9px 9px;
   border-top: 1px solid var(--border-hairline);
   background: var(--toolbox-footer-bg);
   font-size: 11px;
@@ -1560,14 +1621,14 @@
 .toolbox-version-brand {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: 6px;
   min-width: 0;
 }
 
 .toolbox-brand-icon {
   display: block;
-  width: 26px;
-  height: 26px;
+  width: 24px;
+  height: 24px;
   flex: none;
   object-fit: contain;
   filter: drop-shadow(0 1px 2px rgba(15, 23, 42, 0.22));
@@ -1842,4 +1903,108 @@
     width: min(286px, calc(100vw - 20px));
     max-height: calc(100vh - var(--floating-panel-top) - var(--profile-height, 0px) - 10px);
   }
+}
+
+/* Unified Liquid Glass 5-state button system across all Toolbox views & subviews. */
+:root[data-theme="ios"] .toolbox-action,
+:root[data-theme="ios"] .toolbox-lang,
+:root[data-theme="ios"] .toolbox-back,
+:root[data-theme="ios"] .toolbox-close,
+:root[data-theme="ios"] .toolbox-help,
+:root[data-theme="ios"] .toolbox-version-btn,
+:root[data-theme="ios"] .toolbox-weather-tab,
+:root[data-theme="ios"] .toolbox-weather-mode,
+:root[data-theme="ios"] .toolbox-export-settings .pick .option,
+:root[data-theme="ios"] .toolbox-export-settings .go,
+:root[data-theme="ios"] .toolbox-coordinate-button,
+:root[data-theme="ios"] .toolbox-coordinate-weather,
+:root[data-theme="ios"] .toolbox-attachment-export,
+:root[data-theme="ios"] .toolbox-measure-actions button,
+:root[data-theme="ios"] .toolbox-update-btn {
+  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease, box-shadow 120ms ease;
+}
+
+:root[data-theme="ios"] .toolbox-export-settings .pick,
+:root[data-theme="ios"] .toolbox-export-settings .go,
+:root[data-theme="ios"] .toolbox-coordinate-button,
+:root[data-theme="ios"] .toolbox-coordinate-weather,
+:root[data-theme="ios"] .toolbox-attachment-export,
+:root[data-theme="ios"] .toolbox-measure-actions button,
+:root[data-theme="ios"] .toolbox-update-btn,
+:root[data-theme="ios"] .toolbox-back,
+:root[data-theme="ios"] .toolbox-close,
+:root[data-theme="ios"] .toolbox-help {
+  border-radius: 8px;
+}
+
+:root[data-theme="ios"] .toolbox-export-settings .pick .option {
+  background: var(--surface-control);
+}
+
+:root[data-theme="ios"] .toolbox-action:hover:not(:disabled),
+:root[data-theme="ios"] .toolbox-lang:hover:not(:disabled),
+:root[data-theme="ios"] .toolbox-version-btn:hover:not(:disabled),
+:root[data-theme="ios"] .toolbox-coordinate-button:hover:not(:disabled),
+:root[data-theme="ios"] .toolbox-attachment-export.local:hover:not(:disabled),
+:root[data-theme="ios"] .toolbox-measure-actions button:not(.primary):not(.danger):hover:not(:disabled) {
+  border-color: var(--glass-hover-border);
+  background: var(--glass-hover-bg);
+  color: var(--text-bright);
+}
+
+:root[data-theme="ios"] .toolbox-back:hover:not(:disabled),
+:root[data-theme="ios"] .toolbox-close:hover:not(:disabled),
+:root[data-theme="ios"] .toolbox-help:hover:not(:disabled),
+:root[data-theme="ios"] .toolbox-weather-tab:hover:not(:disabled),
+:root[data-theme="ios"] .toolbox-weather-mode:hover:not(:disabled),
+:root[data-theme="ios"] .toolbox-export-settings .pick .option:hover:not(:disabled) {
+  background: var(--glass-hover-bg);
+  color: var(--text-bright);
+}
+
+:root[data-theme="ios"] .toolbox-help.active,
+:root[data-theme="ios"] .toolbox-weather-tab[aria-pressed="true"],
+:root[data-theme="ios"] .toolbox-weather-mode[aria-pressed="true"],
+:root[data-theme="ios"] .toolbox-export-settings .pick .option.on {
+  background: var(--glass-selected-bg);
+  color: var(--glass-selected-fg);
+  font-weight: 600;
+}
+
+:root[data-theme="ios"] .toolbox-weather-mode[aria-pressed="true"],
+:root[data-theme="ios"] .toolbox-export-settings .pick .option.on {
+  box-shadow: inset 0 -2px var(--glass-selected-border);
+}
+
+:root[data-theme="ios"] .toolbox-weather-tab[aria-pressed="true"]:hover:not(:disabled),
+:root[data-theme="ios"] .toolbox-weather-mode[aria-pressed="true"]:hover:not(:disabled),
+:root[data-theme="ios"] .toolbox-export-settings .pick .option.on:hover:not(:disabled) {
+  background: linear-gradient(rgba(255, 255, 255, 0.10), rgba(255, 255, 255, 0.10)), var(--glass-selected-bg);
+  color: var(--glass-selected-fg);
+}
+
+:root[data-theme="ios"] .toolbox-export-settings .go,
+:root[data-theme="ios"] .toolbox-coordinate-weather,
+:root[data-theme="ios"] .toolbox-attachment-export.all,
+:root[data-theme="ios"] .toolbox-measure-actions .primary,
+:root[data-theme="ios"] .toolbox-update-btn {
+  border: 1px solid var(--btn-primary-border);
+  background: var(--btn-primary-bg);
+  color: var(--btn-primary-text);
+}
+
+:root[data-theme="ios"] .toolbox-export-settings .go:hover:not(:disabled),
+:root[data-theme="ios"] .toolbox-coordinate-weather:hover:not(:disabled),
+:root[data-theme="ios"] .toolbox-attachment-export.all:hover:not(:disabled),
+:root[data-theme="ios"] .toolbox-measure-actions .primary:hover:not(:disabled),
+:root[data-theme="ios"] .toolbox-update-btn:hover:not(:disabled) {
+  border-color: var(--btn-primary-hover);
+  background: var(--btn-primary-hover);
+  color: var(--btn-primary-text);
+}
+
+:root[data-theme="ios"] .toolbox-measure-actions .danger:hover:not(:disabled) {
+  border-color: var(--danger-border);
+  background: var(--danger-tint);
+  color: var(--danger-text);
 }

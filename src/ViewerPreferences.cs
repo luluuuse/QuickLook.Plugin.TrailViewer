@@ -1,4 +1,5 @@
 using QuickLook.Common.Helpers;
+using QuickLook.Common.Plugin;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -70,7 +71,7 @@ internal static class ViewerPreferences
     private static readonly Dictionary<string, string[]> Allowed = new(StringComparer.Ordinal)
     {
         ["lang"] = new[] { "en", "zh" },
-        ["theme"] = new[] { "swiss", "slate", "classic" },
+        ["theme"] = new[] { "swiss", "slate", "classic", "ios" },
         ["layer"] = new[]
         {
             // Legacy category values remain readable so an upgrade keeps the user's selected background.
@@ -123,6 +124,53 @@ internal static class ViewerPreferences
     {
         MigrateLegacyFile(LegacyFilePath, FilePath);
         SaveFromQueryToFile(query, FilePath);
+    }
+
+    internal static bool IsChinese(string? path = null)
+    {
+        if (path == null)
+            MigrateLegacyFile(LegacyFilePath, FilePath);
+
+        lock (Gate)
+        {
+            var values = Load(path ?? FilePath);
+            if (values.TryGetValue("lang", out var savedLang))
+                return string.Equals(savedLang, "zh", StringComparison.Ordinal);
+            return System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName
+                .Equals("zh", StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
+    internal static Themes ResolveHostTheme(string? path = null)
+    {
+        if (path == null)
+            MigrateLegacyFile(LegacyFilePath, FilePath);
+
+        lock (Gate)
+        {
+            var values = Load(path ?? FilePath);
+            var theme = values.TryGetValue("theme", out var savedTheme) ? savedTheme : "classic";
+            if (string.Equals(theme, "swiss", StringComparison.Ordinal))
+                return Themes.Light;
+            if (!string.Equals(theme, "ios", StringComparison.Ordinal))
+                return Themes.Dark;
+
+            var layer = values.TryGetValue("layer", out var savedLayer) ? savedLayer : "satellite.esri";
+            if (layer.StartsWith("road.", StringComparison.Ordinal)
+                || layer.StartsWith("terrain.", StringComparison.Ordinal)
+                || string.Equals(layer, "map", StringComparison.Ordinal)
+                || string.Equals(layer, "terrain", StringComparison.Ordinal))
+                return Themes.Light;
+            if (layer.StartsWith("satellite.", StringComparison.Ordinal)
+                || string.Equals(layer, "satellite", StringComparison.Ordinal)
+                || string.Equals(layer, "none", StringComparison.Ordinal))
+                return Themes.Dark;
+            return layer.IndexOf("sat", StringComparison.OrdinalIgnoreCase) >= 0
+                || layer.IndexOf("img", StringComparison.OrdinalIgnoreCase) >= 0
+                || layer.IndexOf("dark", StringComparison.OrdinalIgnoreCase) >= 0
+                ? Themes.Dark
+                : Themes.Light;
+        }
     }
 
     internal static TileCacheOptions ReadTileCacheOptions(string? path = null)

@@ -1179,6 +1179,16 @@ async function main() {
     document.body.classList.add('revealed');
   }
   api.revealViewer = revealViewer;
+  api.hostAction = (action) => {
+    if (action === 'copySummary') {
+      const copyButton = document.querySelector('#info .info-copy, #info button[data-action="copy-summary"]');
+      if (copyButton instanceof HTMLElement) copyButton.click();
+    } else if (action === 'openExport') {
+      toolboxController?.openView?.('export');
+    } else if (action === 'openAttachments') {
+      toolboxController?.openView?.('attachments');
+    }
+  };
   window.trailViewer = api;
   window.addEventListener('pagehide', () => {
     if (revealFallbackTimer) {
@@ -1197,6 +1207,16 @@ async function main() {
   requestAnimationFrame(() => requestAnimationFrame(() => {
     timing.firstPaintMs = performance.now() - started;
   }));
+  const titleMetaParts = [];
+  if (Number.isFinite(summary.distanceMeters) && summary.distanceMeters > 0) {
+    titleMetaParts.push(formatDistance(summary.distanceMeters));
+  }
+  if (elevations && summary.elevation && Number.isFinite(elevations.ascent) && elevations.ascent > 0) {
+    titleMetaParts.push(`\u25b2 ${Math.round(elevations.ascent).toLocaleString('en-US')} m`);
+  }
+  if (titleMetaParts.length > 0) {
+    post(`title-meta\t${encodeURIComponent(titleMetaParts.join(' \u00b7 '))}`);
+  }
   post(`ready\t${summary.points} points, ${distanceLog(summary.distanceMeters)}`);
   if (hasQuickLookHost && !viewerRevealed) {
     revealFallbackTimer = setTimeout(revealViewer, 180);

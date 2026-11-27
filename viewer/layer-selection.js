@@ -1,5 +1,13 @@
 import { writeStored } from './storage.js';
 
+function resolveMapTone(target, key) {
+  if (!target) return 'dark';
+  if (target.category === 'satellite' || target.category === 'none') return 'dark';
+  if (target.category === 'road' || target.category === 'terrain') return 'light';
+  const hint = `${key || ''} ${target.provider?.name || ''} ${target.provider?.label || ''}`.toLowerCase();
+  return /(satellite|imagery|aerial|hybrid|dark|night|卫星|影像|暗色|夜)/.test(hint) ? 'dark' : 'light';
+}
+
 /** Chooses one provider and updates the map, persistence and menu state around it. */
 export function applyLayerSelection({
   value, remember, keepMenu = false, restoreFocus = false,
@@ -29,6 +37,9 @@ export function applyLayerSelection({
     layers[key].addTo(map);
     document.body.classList.toggle('no-map', key === 'none');
     if (key !== 'none') setNoMapReturn(key);
+  }
+  if (typeof document !== 'undefined' && document.documentElement) {
+    document.documentElement.dataset.mapTone = resolveMapTone(target, key);
   }
   lastProvider[target.category] = key;
   if (remember) {

@@ -470,6 +470,23 @@ export function createToolbox({
 
   return {
     open: () => openPanel(),
+    openView: (name) => {
+      if (name === 'export') {
+        if (!exportAvailable()) return false;
+        if (measurement.active()) measurement.stop();
+        if (!open) openPanel({ focus: false });
+        showView('export');
+        requestAnimationFrame(() => exportSettingsPanel?.focus());
+        return true;
+      }
+      if (name === 'attachments') {
+        if (measurement.active()) measurement.stop();
+        if (!open) openPanel({ focus: false });
+        showView('attachments');
+        return true;
+      }
+      return false;
+    },
     close: () => closePanel(),
     toggle: () => (open ? closePanel() : openPanel()),
     isOpen: () => open,

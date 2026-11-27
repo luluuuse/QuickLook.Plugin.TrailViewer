@@ -538,8 +538,16 @@ body:not(.with-profile) .coordinate-pick-hint {
   border-bottom: 1px solid var(--border-hairline);
 }
 
+#splits.expanded .split-panel-header:has(.split-toggle:hover) {
+  background: linear-gradient(var(--toolbar-hover-tint), var(--toolbar-hover-tint)), var(--icon-active-background);
+}
+
 #splits.expanded .split-toggle {
   color: inherit;
+}
+
+#splits.expanded .split-toggle:hover {
+  background: transparent;
 }
 
 .split-toggle-label {
@@ -1305,18 +1313,21 @@ body.chrome-hidden.with-profile .leaflet-bottom {
 #profile .extremum.low b { color: var(--profile-extremum-low); }
 
 /* Swiss survey elevation triangles on peak/valley callouts (CSS-only so DOM text stays pure numbers). */
-:root:not([data-theme="classic"]) #profile .extremum {
+:root[data-theme="swiss"] #profile .extremum,
+:root[data-theme="slate"] #profile .extremum {
   border: 1px solid var(--border-subtle);
   border-radius: 2px;
 }
 
-:root:not([data-theme="classic"]) #profile .extremum.high b::before {
+:root[data-theme="swiss"] #profile .extremum.high b::before,
+:root[data-theme="slate"] #profile .extremum.high b::before {
   content: "\25B2\00A0";
   font-size: 8px;
   vertical-align: 1px;
 }
 
-:root:not([data-theme="classic"]) #profile .extremum.low b::before {
+:root[data-theme="swiss"] #profile .extremum.low b::before,
+:root[data-theme="slate"] #profile .extremum.low b::before {
   content: "\25BC\00A0";
   font-size: 8px;
   vertical-align: 1px;
@@ -1474,7 +1485,8 @@ body.chrome-hidden.with-profile .leaflet-bottom {
   pointer-events: none;
 }
 
-:root:not([data-theme="classic"]) #profile .distance-axis {
+:root[data-theme="swiss"] #profile .distance-axis,
+:root[data-theme="slate"] #profile .distance-axis {
   background-image: repeating-linear-gradient(
     90deg,
     var(--border-control) 0 1px,
@@ -1703,7 +1715,8 @@ body.chrome-hidden.with-profile .leaflet-bottom {
   pointer-events: auto;
 }
 
-:root:not([data-theme="classic"]) #profile .brush-stats {
+:root[data-theme="swiss"] #profile .brush-stats,
+:root[data-theme="slate"] #profile .brush-stats {
   border-left: 2.5px solid var(--profile-split-edge);
 }
 

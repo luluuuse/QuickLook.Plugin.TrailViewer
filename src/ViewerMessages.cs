@@ -26,6 +26,8 @@ internal static class ViewerMessages
 
     internal static string PressKey(string key) => $"pressKey\t{Encode(key)}";
 
+    internal static string HostAction(string action) => $"hostAction\t{Encode(action)}";
+
     internal static string TileCacheStats(long totalBytes, int tileCount) =>
         $"tileCacheStats\t{totalBytes}\t{tileCount}";
 

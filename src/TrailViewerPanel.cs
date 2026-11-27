@@ -1,6 +1,7 @@
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.Wpf;
 using QuickLook.Common.Helpers;
+using QuickLook.Common.Plugin;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -69,10 +70,41 @@ internal sealed partial class TrailViewerPanel : UserControl, IDisposable
     private bool _initializingWebView;
     private volatile bool _disposed;
     private DispatcherTimer? _revealTimer;
+    private Themes _hostTheme = ViewerPreferences.ResolveHostTheme();
+    private string _titleMeta = string.Empty;
+
+    public event Action<Themes>? HostThemeChanged;
+    public event Action<string>? HostTitleChanged;
+
+    internal void InvokeHostAction(string action)
+    {
+        if (_disposed || string.IsNullOrWhiteSpace(action))
+            return;
+        _ = PostToViewerMessageAsync(ViewerMessages.HostAction(action));
+    }
+
+    private void UpdateHostTitle()
+    {
+        if (_disposed)
+            return;
+        var baseName = _name ?? Path.GetFileName(_path) ?? string.Empty;
+        if (string.IsNullOrEmpty(baseName))
+            return;
+        var prefix = _editorDirty ? "* " : string.Empty;
+        var suffix = string.IsNullOrEmpty(_titleMeta) ? string.Empty : " \u00b7 " + _titleMeta;
+        var nextTitle = prefix + baseName + suffix;
+        _ = Dispatcher.BeginInvoke(new Action(() =>
+        {
+            if (!_disposed)
+                HostTitleChanged?.Invoke(nextTitle);
+        }));
+    }
 
     public TrailViewerPanel()
     {
-        Background = new SolidColorBrush(Color.FromRgb(24, 24, 24));
+        Background = _hostTheme == Themes.Light
+            ? new SolidColorBrush(Color.FromRgb(238, 242, 246))
+            : new SolidColorBrush(Color.FromRgb(24, 24, 24));
         _timeout = new DispatcherTimer { Interval = LoadTimeout };
         _timeout.Tick += (_, _) => Fail(Strings.TimedOut);
         _focusRetryTimer.Interval = TimeSpan.FromMilliseconds(250);
@@ -99,7 +131,17 @@ internal sealed partial class TrailViewerPanel : UserControl, IDisposable
             SaveCustomSources = SaveCustomSources,
             MeasureState = active => _measureActive = active,
             EditorState = active => _editorActive = active,
-            EditorDirty = dirty => _editorDirty = dirty,
+            EditorDirty = dirty =>
+            {
+                _editorDirty = dirty;
+                UpdateHostTitle();
+            },
+            TitleMeta = encoded =>
+            {
+                try { _titleMeta = Uri.UnescapeDataString(encoded ?? string.Empty).Trim(); }
+                catch (UriFormatException) { _titleMeta = string.Empty; }
+                UpdateHostTitle();
+            },
             BeginTrackSave = BeginTrackSave,
             AppendTrackSave = AppendTrackSave,
             FinishTrackSave = body => _ = FinishTrackSaveAsync(body),
