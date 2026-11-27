@@ -20,11 +20,19 @@ function normalizeLon(value) {
 }
 
 function formatCoord(value) {
-  return Number(value).toFixed(7).replace(/\.?0+$/, '');
+  const rounded = Math.round(Number(value) * 1e7) / 1e7;
+  if (rounded === 0) return '0';
+  const abs = Math.abs(rounded);
+  if (abs < 1e-6 || abs >= 1e21) return rounded.toFixed(7).replace(/\.?0+$/, '');
+  return String(rounded);
 }
 
 function formatEle(value) {
-  return Number(value).toFixed(2).replace(/\.?0+$/, '');
+  const rounded = Math.round(Number(value) * 100) / 100;
+  if (rounded === 0) return '0';
+  const abs = Math.abs(rounded);
+  if (abs >= 1e21) return rounded.toFixed(2).replace(/\.?0+$/, '');
+  return String(rounded);
 }
 
 function formatTime(value) {

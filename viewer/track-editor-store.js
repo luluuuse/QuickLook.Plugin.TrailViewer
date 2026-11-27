@@ -1,7 +1,24 @@
 import { elevationGain } from './profile.js';
+import { clonePoint } from './track-ops-core.js';
 import { cloneParsedTrack, trackTotalDistance } from './track-ops.js';
 
 export const MAX_EDITOR_HISTORY = 50;
+const LARGE_TRACK_POINTS = 20000;
+const LARGE_TRACK_MAX_HISTORY = 20;
+
+function snapshotNextTrack(nextParsed, previous, original) {
+  if (nextParsed === original) return original;
+  if (previous && nextParsed && nextParsed.tracks === previous.tracks && nextParsed.routes === previous.routes) {
+    return {
+      ...nextParsed,
+      tracks: previous.tracks,
+      routes: previous.routes,
+      waypoints: (nextParsed.waypoints || []).map(clonePoint),
+      areas: previous.areas === nextParsed.areas ? previous.areas : (nextParsed.areas || []),
+    };
+  }
+  return cloneParsedTrack(nextParsed);
+}
 
 function countPoints(parsed) {
   let count = 0;
@@ -53,6 +70,7 @@ export function createTrackEditorStore({
   let undoStack = [];
   let redoStack = [];
   let originalStats = null;
+  let effectiveMaxHistory = maxHistory;
   let nextVersionId = 1;
   let currentVersionId = 0;
   let savedVersionId = 0;
@@ -85,8 +103,11 @@ export function createTrackEditorStore({
 
   function enter(parsed) {
     original = cloneParsedTrack(parsed);
-    current = cloneParsedTrack(parsed);
+    current = original;
     originalStats = statsOf(original);
+    effectiveMaxHistory = originalStats.points > LARGE_TRACK_POINTS
+      ? Math.min(maxHistory, LARGE_TRACK_MAX_HISTORY)
+      : maxHistory;
     undoStack = [];
     redoStack = [];
     currentVersionId = 0;
@@ -109,10 +130,10 @@ export function createTrackEditorStore({
 
   function apply(label, nextParsed) {
     if (!active || !current) return false;
-    undoStack.push({ label, track: cloneParsedTrack(current), versionId: currentVersionId });
-    if (undoStack.length > maxHistory) undoStack.shift();
+    undoStack.push({ label, track: current, versionId: currentVersionId });
+    if (undoStack.length > effectiveMaxHistory) undoStack.shift();
     redoStack = [];
-    current = cloneParsedTrack(nextParsed);
+    current = snapshotNextTrack(nextParsed, current, original);
     currentVersionId = (nextVersionId += 1);
     dirty = currentVersionId !== savedVersionId;
     handleChange(current, label);
@@ -123,8 +144,8 @@ export function createTrackEditorStore({
   function undo() {
     if (!active || undoStack.length === 0 || !current) return false;
     const entry = undoStack.pop();
-    redoStack.push({ label: entry.label, track: cloneParsedTrack(current), versionId: currentVersionId });
-    current = cloneParsedTrack(entry.track);
+    redoStack.push({ label: entry.label, track: current, versionId: currentVersionId });
+    current = entry.track;
     currentVersionId = entry.versionId;
     dirty = currentVersionId !== savedVersionId;
     handleChange(current, `undo:${entry.label}`);
@@ -135,8 +156,8 @@ export function createTrackEditorStore({
   function redo() {
     if (!active || redoStack.length === 0 || !current) return false;
     const entry = redoStack.pop();
-    undoStack.push({ label: entry.label, track: cloneParsedTrack(current), versionId: currentVersionId });
-    current = cloneParsedTrack(entry.track);
+    undoStack.push({ label: entry.label, track: current, versionId: currentVersionId });
+    current = entry.track;
     currentVersionId = entry.versionId;
     dirty = currentVersionId !== savedVersionId;
     handleChange(current, `redo:${entry.label}`);

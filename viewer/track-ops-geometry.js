@@ -182,12 +182,17 @@ export function deleteTrackSegment(parsed, trackIndex) {
   return clearSummaryMetadata(next);
 }
 
+const anomalyDetectionCache = new WeakMap();
+
 /**
  * Returns anomaly points detected by trackGaps (implausible speed / GPS spikes).
  * For an isolated A -> B -> C spike where A -> C is plausible, only B is flagged.
  * @param {import('./types.js').ParsedTrack} parsed
  */
 export function detectAnomalyPoints(parsed) {
+  if (parsed && anomalyDetectionCache.has(parsed)) {
+    return anomalyDetectionCache.get(parsed);
+  }
   const sourceTracks = normalizedTracks(parsed);
   const pointIndexMap = new WeakMap();
   for (let ti = 0; ti < sourceTracks.length; ti += 1) {
@@ -233,6 +238,7 @@ export function detectAnomalyPoints(parsed) {
       }
     }
   }
+  if (parsed) anomalyDetectionCache.set(parsed, anomalies);
   return anomalies;
 }
 

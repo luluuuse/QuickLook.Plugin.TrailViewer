@@ -511,11 +511,10 @@ internal sealed class TileCache
         var files = new List<TileFileRecord>();
         try
         {
-            foreach (var file in Directory.EnumerateFiles(_rootDirectory, "*.tile", SearchOption.AllDirectories))
+            foreach (var info in new DirectoryInfo(_rootDirectory).EnumerateFiles("*.tile", SearchOption.AllDirectories))
             {
                 try
                 {
-                    var info = new FileInfo(file);
                     if (!info.Exists)
                         continue;
                     files.Add(new TileFileRecord(
@@ -586,11 +585,10 @@ internal sealed class TileCache
         var count = 0;
         try
         {
-            foreach (var file in Directory.EnumerateFiles(_rootDirectory, "*.tile", SearchOption.AllDirectories))
+            foreach (var info in new DirectoryInfo(_rootDirectory).EnumerateFiles("*.tile", SearchOption.AllDirectories))
             {
                 try
                 {
-                    var info = new FileInfo(file);
                     if (!info.Exists)
                         continue;
                     totalBytes += info.Length;
@@ -627,9 +625,12 @@ internal sealed class TileCache
         return GetStats();
     }
 
+    [ThreadStatic]
+    private static SHA256? _threadSha256;
+
     internal string PathForKey(string normalizedKey)
     {
-        using var sha = SHA256.Create();
+        var sha = _threadSha256 ?? (_threadSha256 = SHA256.Create());
         var hash = sha.ComputeHash(Encoding.UTF8.GetBytes(normalizedKey));
         var builder = new StringBuilder(hash.Length * 2);
         foreach (var b in hash)

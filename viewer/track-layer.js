@@ -21,6 +21,7 @@ const COLORS = ['#df2b1d', '#297bb8', '#d98a1c', '#9c3ce6', '#249e58', '#d9367a'
 const ROUTE_COLOR = '#ffffff';
 const NETWORK_LOD_PIXELS = 0.75;
 const NETWORK_VIEW_PADDING = 0.25;
+const LONG_TRACK_CANVAS_POINTS = 8000;
 export const ENDPOINT_STITCH_METERS = 500;
 
 /**
@@ -259,6 +260,7 @@ export function createTrackLayer({ L, el, localized, t, pointPopup, onFocusBound
         const layer = L.layerGroup().addTo(map);
         const rendered = new Map();
         const simplified = new Map();
+        const totalSourcePoints = networkEntries.reduce((sum, entry) => sum + entry.points.length, 0);
         let lodZoom = null;
         let pending = 0;
         let renderCount = 0;
@@ -308,7 +310,7 @@ export function createTrackLayer({ L, el, localized, t, pointPopup, onFocusBound
             totalLines: networkEntries.length,
             visibleLines: visible.length,
             renderedLines: rendered.size,
-            sourcePoints: networkEntries.reduce((sum, entry) => sum + entry.points.length, 0),
+            sourcePoints: totalSourcePoints,
             renderedPoints,
           };
         }
@@ -549,6 +551,13 @@ export function createTrackLayer({ L, el, localized, t, pointPopup, onFocusBound
         bounds.extend(shape.getBounds());
       }
 
+      const totalSingleTrackPoints = network
+        ? 0
+        : model.trackGroups.reduce((sum, group) => sum
+          + group.segments.reduce((segSum, segmentLine) => segSum + segmentLine.points.length, 0), 0);
+      const longTrackRenderer = !network && totalSingleTrackPoints >= LONG_TRACK_CANVAS_POINTS
+        ? L.canvas({ padding: 0.5 })
+        : null;
       const resolvedEndpoints = showEnds ? resolveTrackEndpoints(model.trackGroups) : [];
       model.trackGroups.forEach((group, groupIndex) => {
         const track = group.track;
@@ -576,12 +585,14 @@ export function createTrackLayer({ L, el, localized, t, pointPopup, onFocusBound
             });
           } else {
             const latLngs = points.map((point) => [point.lat, point.lon]);
+            const rendererOption = longTrackRenderer ? { renderer: longTrackRenderer } : {};
             L.polyline(latLngs, {
               color: '#ffffff',
               weight: 6.5,
               opacity: 0.82,
               interactive: false,
               className: 'gpx-track-casing',
+              ...rendererOption,
             }).addTo(singleLineLayer);
             const tooltipNode = title ? localized(el('span'), () => title(segmentIndex + 1)) : null;
             const polyline = L.polyline(latLngs, {
@@ -589,6 +600,7 @@ export function createTrackLayer({ L, el, localized, t, pointPopup, onFocusBound
               weight: 4,
               opacity: 0.9,
               className: 'gpx-track',
+              ...rendererOption,
             }).addTo(singleLineLayer);
             if (tooltipNode) {
               polyline.bindTooltip(tooltipNode, { sticky: true });

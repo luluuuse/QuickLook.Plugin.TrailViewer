@@ -85,6 +85,7 @@ export function createToolbox({
   const shortcutRows = [];
   let exportView = null;
   let exportBack = null;
+  let exportSettingsContainer = null;
   let exportSettingsPanel = null;
   let view = 'main';
   // Where the shortcut page goes back to. It is opened from any page, so the back action returns to that
@@ -97,6 +98,9 @@ export function createToolbox({
   function showView(next) {
     if (next !== 'coordinate') coordinates.stop();
     view = next;
+    if (next === 'export' && exportSettingsContainer && !exportSettingsPanel) {
+      exportSettingsPanel = mountExportView?.(exportSettingsContainer) || null;
+    }
     render();
     if (next === 'coordinate') coordinates.begin();
   }
@@ -419,9 +423,8 @@ export function createToolbox({
         el('h2', 'toolbox-subtitle', t('export.panel')),
         el('p', 'toolbox-subhint', t('export.panelHint')),
       );
-      const exportSettings = el('div', 'toolbox-export-settings');
-      exportSettingsPanel = mountExportView?.(exportSettings) || null;
-      exportView.append(exportSettings);
+      exportSettingsContainer = el('div', 'toolbox-export-settings');
+      exportView.append(exportSettingsContainer);
 
       panel.append(
         header,

@@ -10,7 +10,6 @@ import { getLang, isChinese, onLangChange, setLang, t, units } from './i18n.js';
 import { THEMES, getTheme, initTheme, onThemeChange, setTheme } from './theme.js';
 import { attachSwissScaleRatio } from './swiss-scale.js';
 import { installSpaceGuard } from './focus.js';
-import { createPhotoViewer } from './photo-viewer.js';
 import { createProfileController } from './profile-controller.js';
 import {
   LAYERS,
@@ -34,7 +33,6 @@ import { createSplitsView } from './split-view.js';
 import { createTrackLayer } from './track-layer.js';
 import { createTrackColorControl, savedTrackColor } from './track-color-control.js';
 import { createWaypointController } from './waypoint-controller.js';
-import { createOverlayExport } from './overlay-export.js';
 import { createKeyboardController } from './keyboard-controller.js';
 import { createMapView } from './map-view.js';
 import { createUiFeedback } from './ui-feedback.js';
@@ -59,7 +57,7 @@ import {
 } from './weather.js';
 import { installLeafletIcons } from './icons.js';
 import { gradeAwareHikeSeconds } from './track-analysis.js';
-import { attachmentItems, createAttachmentExporter } from './attachments.js';
+import { readStored } from './storage.js';
 import { coordinateTargets } from './coordinates.js';
 import { createHostBridge } from './host-bridge.js';
 import { createTestApi } from './test-api.js';
@@ -126,8 +124,31 @@ function showError(text) {
 
 const pointPopup = (point, title, close) => renderPointPopup(point, title, el, close);
 
-// Built on first use: a file whose waypoints carry no photos never pays for the modal DOM.
-const photoViewer = createPhotoViewer({ el, formatters, formatCoord, t });
+// Built on first use: photo-viewer.js is only fetched when the user opens a photo lightbox.
+let photoViewerInstance = null;
+let photoViewerPromise = null;
+function ensurePhotoViewer() {
+  if (photoViewerInstance) return Promise.resolve(photoViewerInstance);
+  if (!photoViewerPromise) {
+    photoViewerPromise = import('./photo-viewer.js').then(({ createPhotoViewer }) => {
+      photoViewerInstance = createPhotoViewer({ el, formatters, formatCoord, t });
+      return photoViewerInstance;
+    });
+  }
+  return photoViewerPromise;
+}
+const photoViewer = {
+  show(...args) {
+    if (photoViewerInstance) return photoViewerInstance.show(...args);
+    return ensurePhotoViewer().then((viewer) => viewer.show(...args));
+  },
+  hide() { photoViewerInstance?.hide(); },
+  relabel() { photoViewerInstance?.relabel(); },
+  stepWithin(delta) { return photoViewerInstance ? photoViewerInstance.stepWithin(delta) : false; },
+  current: () => (photoViewerInstance ? photoViewerInstance.current() : null),
+  isOpen: () => Boolean(photoViewerInstance && photoViewerInstance.isOpen()),
+  count: () => (photoViewerInstance ? photoViewerInstance.count() : 0),
+};
 const waypointContent = createWaypointContent({ el, src, photoViewer });
 const { photosOf, photoPreview } = waypointContent;
 
@@ -686,8 +707,31 @@ async function main() {
     }
     routeModel = createRouteModel(gpx);
     summary = summarize(gpx, routeModel);
-    photoAttachments = attachmentItems(gpx, photosOf, src);
-    attachmentExporter = createAttachmentExporter({ post, hasHost: hasQuickLookHost });
+    const hasWaypointPhotos = (gpx.waypoints || []).some((wpt) => photosOf(wpt).length > 0);
+    if (hasWaypointPhotos) {
+      const { attachmentItems, createAttachmentExporter } = await import('./attachments.js');
+      photoAttachments = attachmentItems(gpx, photosOf, src);
+      attachmentExporter = createAttachmentExporter({ post, hasHost: hasQuickLookHost });
+    } else {
+      photoAttachments = [];
+      let lazyExporter = null;
+      let lazyExporterPromise = null;
+      const ensureExporter = () => {
+        if (lazyExporter) return Promise.resolve(lazyExporter);
+        if (!lazyExporterPromise) {
+          lazyExporterPromise = import('./attachments.js').then(({ createAttachmentExporter }) => {
+            lazyExporter = createAttachmentExporter({ post, hasHost: hasQuickLookHost });
+            return lazyExporter;
+          });
+        }
+        return lazyExporterPromise;
+      };
+      attachmentExporter = {
+        exportAll: (...args) => ensureExporter().then((exp) => exp.exportAll(...args)),
+        result: (...args) => { lazyExporter?.result(...args); },
+        resumeResult: (...args) => { lazyExporter?.resumeResult(...args); },
+      };
+    }
     timing.parseMs = performance.now() - started;
   } catch (e) {
     if (e instanceof FitError) {
@@ -768,19 +812,74 @@ async function main() {
   const bounds = tracks.bounds;
   mapViewController.setRoute(bounds);
   tracks.setAnnotationMarkersVisible(waypointController.visible());
-  overlayExport = createOverlayExport({
-    el,
-    t,
-    post,
-    showToast,
-    params,
-    gpx,
-    summary,
-    elevations,
-    routeModel,
-    fileName,
-    onSettingsChange: syncPreferences,
+  let overlayInstance = null;
+  let overlayPromise = null;
+  let overlayConfig = { gpx, summary, elevations, routeModel };
+  let overlayMountNode = null;
+  let overlayPanelHandle = null;
+  const pickExportChoice = (param, key, choices, fallback) => {
+    const raw = params.get(param) || readStored(key);
+    return choices.includes(raw) ? raw : fallback;
+  };
+  const fallbackOverlaySettings = () => ({
+    size: pickExportChoice('exportSize', 'exportSize', ['1:1', '9:16', '4:3'], '4:3'),
+    ink: pickExportChoice('exportInk', 'exportInk', ['black', 'white', 'swiss'], 'black'),
+    scrim: pickExportChoice('exportScrim', 'exportScrim', ['none', 'soft'], 'none'),
+    content: pickExportChoice('exportContent', 'exportContent', ['full', 'bare'], 'full'),
+    profile: pickExportChoice('exportProfile', 'exportProfile', ['on', 'off'], 'off'),
   });
+  const ensureOverlayExport = () => {
+    if (overlayInstance) return Promise.resolve(overlayInstance);
+    if (!overlayPromise) {
+      overlayPromise = import('./overlay-export.js').then(({ createOverlayExport }) => {
+        overlayInstance = createOverlayExport({
+          el,
+          t,
+          post,
+          showToast,
+          params,
+          gpx: overlayConfig.gpx,
+          summary: overlayConfig.summary,
+          elevations: overlayConfig.elevations,
+          routeModel: overlayConfig.routeModel,
+          fileName,
+          onSettingsChange: syncPreferences,
+        });
+        if (overlayMountNode) {
+          overlayPanelHandle = overlayInstance.mount(overlayMountNode);
+        }
+        return overlayInstance;
+      });
+    }
+    return overlayPromise;
+  };
+  overlayExport = {
+    available: () => Boolean(overlayConfig.routeModel?.lines?.length > 0),
+    settings: () => (overlayInstance ? overlayInstance.settings() : fallbackOverlaySettings()),
+    save: () => ensureOverlayExport().then((exp) => exp.save()),
+    build: (options) => ensureOverlayExport().then((exp) => exp.build(options)),
+    mount(node) {
+      overlayMountNode = node;
+      if (overlayInstance) {
+        overlayPanelHandle = overlayInstance.mount(node);
+      } else {
+        void ensureOverlayExport();
+      }
+      return {
+        focus: () => {
+          if (overlayPanelHandle) overlayPanelHandle.focus();
+          else void ensureOverlayExport().then(() => overlayPanelHandle?.focus());
+        },
+        relabel: () => overlayPanelHandle?.relabel(),
+      };
+    },
+    focus: () => overlayPanelHandle?.focus(),
+    relabel: () => overlayInstance?.relabel(),
+    updateData(next = {}) {
+      overlayConfig = { ...overlayConfig, ...next };
+      overlayInstance?.updateData(next);
+    },
+  };
   const measurement = createMeasurement({
     L,
     map,

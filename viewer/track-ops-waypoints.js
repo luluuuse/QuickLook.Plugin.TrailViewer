@@ -9,6 +9,17 @@ import {
 import { isTrackClosedLoop } from './track-ops-geometry.js';
 
 const routeSortCache = new WeakMap();
+const LONG_SEG_METERS = 500;
+
+function cloneForWaypointEdit(parsed) {
+  return {
+    ...parsed,
+    tracks: parsed?.tracks || [],
+    routes: parsed?.routes || [],
+    waypoints: (parsed?.waypoints || []).map(clonePoint),
+    areas: parsed?.areas || [],
+  };
+}
 
 /**
  * Returns waypoints sorted by their projected distance along the track, keeping original indices.
@@ -57,15 +68,26 @@ export function sortWaypointsByRoute(parsed) {
     }
   }
   const closed = hasSegs && isTrackClosedLoop(parsed, 50);
+  const segCount = indexedSegs.length;
+  const useCoarse = segCount > 512;
+  const stride = useCoarse ? Math.max(1, Math.floor(segCount / 400)) : 1;
+  const longSegIndices = [];
+  if (useCoarse) {
+    for (let i = 0; i < segCount; i += 1) {
+      if (indexedSegs[i].step > LONG_SEG_METERS) longSegIndices.push(i);
+    }
+  }
   const result = wpts
     .map((wpt, index) => {
       let along = index;
-      if (indexedSegs.length > 0) {
-        const lonScale = 111320 * Math.max(0.1, Math.cos(wpt.lat * (Math.PI / 180)));
+      if (segCount > 0) {
+        const cosLat = Math.max(0.1, Math.cos(wpt.lat * (Math.PI / 180)));
+        const lonScale = 111320 * cosLat;
         let bestDistSq = Infinity;
         let bestAlong = 0;
-        for (let i = 0; i < indexedSegs.length; i += 1) {
-          const entry = indexedSegs[i];
+        const testSeg = (segIdx) => {
+          const entry = indexedSegs[segIdx];
+          if (!entry) return;
           const dLat = wpt.lat < entry.minLat
             ? entry.minLat - wpt.lat
             : (wpt.lat > entry.maxLat ? wpt.lat - entry.maxLat : 0);
@@ -73,7 +95,7 @@ export function sortWaypointsByRoute(parsed) {
             ? entry.minLon - wpt.lon
             : (wpt.lon > entry.maxLon ? wpt.lon - entry.maxLon : 0);
           const minPossibleSq = (dLat * 111320) ** 2 + (dLon * lonScale) ** 2;
-          if (minPossibleSq >= bestDistSq) continue;
+          if (minPossibleSq >= bestDistSq) return;
           const px = (wpt.lon - entry.a.lon) * entry.lonScale;
           const py = (wpt.lat - entry.a.lat) * 111320;
           const t = entry.lenSq > 0
@@ -86,6 +108,43 @@ export function sortWaypointsByRoute(parsed) {
             bestDistSq = distSq;
             bestAlong = entry.alongA + entry.step * t;
           }
+        };
+        if (useCoarse) {
+          let best0 = -1;
+          let best1 = -1;
+          let best2 = -1;
+          let d0 = Infinity;
+          let d1 = Infinity;
+          let d2 = Infinity;
+          for (let i = 0; i < segCount; i += stride) {
+            const pt = indexedSegs[i].a;
+            const dl = pt.lat - wpt.lat;
+            const dn = (pt.lon - wpt.lon) * cosLat;
+            const dSq = dl * dl + dn * dn;
+            if (dSq < d0) {
+              d2 = d1; best2 = best1;
+              d1 = d0; best1 = best0;
+              d0 = dSq; best0 = i;
+            } else if (dSq < d1) {
+              d2 = d1; best2 = best1;
+              d1 = dSq; best1 = i;
+            } else if (dSq < d2) {
+              d2 = dSq; best2 = i;
+            }
+          }
+          const anchors = [best0, best1, best2];
+          for (let a = 0; a < anchors.length; a += 1) {
+            const center = anchors[a];
+            if (center < 0) continue;
+            const lo = Math.max(0, center - stride);
+            const hi = Math.min(segCount - 1, center + stride);
+            for (let s = lo; s <= hi; s += 1) testSeg(s);
+          }
+          for (let k = 0; k < longSegIndices.length; k += 1) {
+            testSeg(longSegIndices[k]);
+          }
+        } else {
+          for (let i = 0; i < segCount; i += 1) testSeg(i);
         }
         along = bestAlong;
         if (closed && along <= 50 && /终点|finish|end/i.test(wpt.name || '')) {
@@ -104,7 +163,7 @@ export function sortWaypointsByRoute(parsed) {
 
 
 export function addWaypoint(parsed, waypoint) {
-  const next = cloneParsedTrack(parsed);
+  const next = cloneForWaypointEdit(parsed);
   next.waypoints.push(clonePoint(waypoint));
   return next;
 }
@@ -115,7 +174,7 @@ export function addWaypoint(parsed, waypoint) {
  * @param {Partial<import('./types.js').TrackPoint>} patch
  */
 export function updateWaypoint(parsed, index, patch) {
-  const next = cloneParsedTrack(parsed);
+  const next = cloneForWaypointEdit(parsed);
   if (index < 0 || index >= next.waypoints.length) return next;
   const merged = { ...next.waypoints[index], ...patch };
   if (('description' in patch || 'desc' in patch || 'comment' in patch) && !('insightText' in patch)) {
@@ -140,7 +199,7 @@ export function moveWaypoint(parsed, index, lat, lon) {
  * @param {number} index
  */
 export function deleteWaypoint(parsed, index) {
-  const next = cloneParsedTrack(parsed);
+  const next = cloneForWaypointEdit(parsed);
   if (index < 0 || index >= next.waypoints.length) return next;
   next.waypoints.splice(index, 1);
   return next;
@@ -148,7 +207,7 @@ export function deleteWaypoint(parsed, index) {
 
 
 export function sortWaypointsAlongTrack(parsed, { offTrackThresholdMeters = 500 } = {}) {
-  const next = cloneParsedTrack(parsed);
+  const next = cloneForWaypointEdit(parsed);
   if (!Array.isArray(next.waypoints) || next.waypoints.length < 2) {
     return { track: next, changed: false };
   }
@@ -179,7 +238,7 @@ function waypointRichnessScore(wpt) {
  * @param {{ radiusMeters?: number }} [options]
  */
 export function dedupeWaypoints(parsed, { radiusMeters = 20 } = {}) {
-  const next = cloneParsedTrack(parsed);
+  const next = cloneForWaypointEdit(parsed);
   const wpts = next.waypoints || [];
   if (wpts.length < 2) return { track: next, removedCount: 0 };
 
