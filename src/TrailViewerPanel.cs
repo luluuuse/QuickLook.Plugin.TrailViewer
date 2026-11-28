@@ -60,6 +60,7 @@ internal sealed partial class TrailViewerPanel : UserControl, IDisposable
     private GlobalKeys? _keys;
     private volatile bool _onScreen;
     private volatile bool _textInput;
+    private volatile bool _textComposing;
     private volatile bool _measureActive;
     private volatile bool _editorActive;
     private volatile bool _editorDirty;
@@ -70,6 +71,8 @@ internal sealed partial class TrailViewerPanel : UserControl, IDisposable
     private bool _initializingWebView;
     private volatile bool _disposed;
     private DispatcherTimer? _revealTimer;
+    private SizeChangedEventHandler? _revealSizeHandler;
+    private WebView2? _revealWebView;
     private Themes _hostTheme = ViewerPreferences.ResolveHostTheme();
     private string _titleMeta = string.Empty;
 
@@ -145,7 +148,13 @@ internal sealed partial class TrailViewerPanel : UserControl, IDisposable
             BeginTrackSave = BeginTrackSave,
             AppendTrackSave = AppendTrackSave,
             FinishTrackSave = body => _ = FinishTrackSaveAsync(body),
-            TextInput = active => _textInput = active,
+            TextInput = active =>
+            {
+                _textInput = active;
+                if (!active)
+                    _textComposing = false;
+            },
+            TextComposing = active => _textComposing = active,
             ConfigureTiandituKey = value => ConfigureTiandituKey(IsEnglishMessage(value)),
             RemoveTiandituKey = value => RemoveTiandituKey(IsEnglishMessage(value)),
             RequestTileCacheStats = RequestTileCacheStats,
@@ -249,7 +258,8 @@ internal sealed partial class TrailViewerPanel : UserControl, IDisposable
             // someone clicks into the preview. The viewer keys are caught below the application instead.
             var hookClock = Stopwatch.StartNew();
             _keys = new GlobalKeys(
-                () => _onScreen, () => _measureActive, () => _textInput, OnGlobalKey, () => _editorActive);
+                () => _onScreen, () => _measureActive, () => _textInput, OnGlobalKey,
+                () => _editorActive, () => _textComposing);
             _keys.Start();
             Trace($"keyboard hook ready in {hookClock.ElapsedMilliseconds} ms (installed={_keys.Installed})");
             // Kept as a fallback: when the hook is unavailable, a preview that did get the keyboard still works.
@@ -475,18 +485,27 @@ internal sealed partial class TrailViewerPanel : UserControl, IDisposable
         }
     }
 
+    private void CancelHostReveal()
+    {
+        _revealTimer?.Stop();
+        _revealTimer = null;
+        if (_revealWebView != null && _revealSizeHandler != null)
+            _revealWebView.SizeChanged -= _revealSizeHandler;
+        _revealSizeHandler = null;
+        _revealWebView = null;
+    }
+
     private void ScheduleHostReveal()
     {
+        CancelHostReveal();
         if (_disposed || _webView == null)
             return;
         var webView = _webView;
-        SizeChangedEventHandler? onSizeChanged = null;
         var timer = new DispatcherTimer(DispatcherPriority.Loaded, Dispatcher)
         {
             Interval = TimeSpan.FromMilliseconds(50),
         };
-        _revealTimer = timer;
-        onSizeChanged = (_, _) =>
+        SizeChangedEventHandler onSizeChanged = (_, _) =>
         {
             if (_disposed || !ReferenceEquals(_revealTimer, timer))
                 return;
@@ -494,13 +513,13 @@ internal sealed partial class TrailViewerPanel : UserControl, IDisposable
             timer.Interval = TimeSpan.FromMilliseconds(35);
             timer.Start();
         };
+        _revealTimer = timer;
+        _revealSizeHandler = onSizeChanged;
+        _revealWebView = webView;
         webView.SizeChanged += onSizeChanged;
         timer.Tick += (_, _) =>
         {
-            timer.Stop();
-            webView.SizeChanged -= onSizeChanged;
-            if (ReferenceEquals(_revealTimer, timer))
-                _revealTimer = null;
+            CancelHostReveal();
             if (!_disposed && ReferenceEquals(_webView, webView))
                 _ = PostToViewerMessageAsync("hostReveal");
         };
@@ -574,11 +593,11 @@ internal sealed partial class TrailViewerPanel : UserControl, IDisposable
     {
         _disposed = true;
         _finished = true; // no callbacks after the preview is closed
-        _revealTimer?.Stop();
-        _revealTimer = null;
+        CancelHostReveal();
         _lifecycle.Cancel();
         _onScreen = false;
         _textInput = false;
+        _textComposing = false;
         _timeout.Stop();
         _focusRetryTimer.Stop();
         InputManager.Current.PreProcessInput -= OnPreProcessInput;

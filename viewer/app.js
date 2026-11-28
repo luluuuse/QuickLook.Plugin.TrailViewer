@@ -27,10 +27,11 @@ import {
   formatters,
 } from './format.js';
 import { createWaypointContent, renderPointPopup } from './waypoint-content.js';
-import { createSummaryView } from './summary-view.js';
+import { createSummaryView, trackSummaryText } from './summary-view.js';
 import { analyseSplits, splitCount } from './split-analysis.js';
 import { createSplitsView } from './split-view.js';
 import { createTrackLayer } from './track-layer.js';
+import { createTrackViewController } from './track-view-controller.js';
 import { createTrackColorControl, savedTrackColor } from './track-color-control.js';
 import { createWaypointController } from './waypoint-controller.js';
 import { createKeyboardController } from './keyboard-controller.js';
@@ -96,6 +97,7 @@ const initialDirectTiandituKey = runtimeTiandituKey;
 let tiandituTransientShown = false;
 let tiandituRejectedShown = false;
 let photoAttachments = [];
+let buildAttachmentItems = null;
 let attachmentExporter = null;
 
 function fileNameFromSource(source) {
@@ -169,6 +171,16 @@ function localized(node, fill, attribute = null) {
   return node;
 }
 
+function pruneLocalized() {
+  let write = 0;
+  for (let i = 0; i < localizedNodes.length; i += 1) {
+    const entry = localizedNodes[i];
+    if (!entry.node?.isConnected) continue;
+    localizedNodes[write++] = entry;
+  }
+  localizedNodes.length = write;
+}
+
 function repaintLocalized() {
   let write = 0;
   for (let i = 0; i < localizedNodes.length; i += 1) {
@@ -192,19 +204,32 @@ const splitController = createSplitsView({
   onLayoutChange: () => mapViewController?.refreshControls({ refitHome: false }),
   onSelect: (split) => focusSplit(split),
 });
+async function copySummaryText(text) {
+  try {
+    await copyText(text);
+    showToast(t('summary.copied'), 2500);
+  } catch (error) {
+    showToast(t('summary.copyFailed', { detail: error.message }), 4000);
+    throw error;
+  }
+}
+
+function syncHostTitleMeta(summary, elevations) {
+  const parts = [];
+  if (summary && Number.isFinite(summary.distanceMeters) && summary.distanceMeters > 0) {
+    parts.push(formatDistance(summary.distanceMeters));
+  }
+  if (elevations && summary?.elevation && Number.isFinite(elevations.ascent) && elevations.ascent > 0) {
+    parts.push(`\u25b2 ${Math.round(elevations.ascent).toLocaleString('en-US')} m`);
+  }
+  post(`title-meta\t${parts.length > 0 ? encodeURIComponent(parts.join(' \u00b7 ')) : ''}`);
+}
+
 const renderInfo = createSummaryView({
   el,
   fileName,
   photosOf,
-  onCopySummary: async (text) => {
-    try {
-      await copyText(text);
-      showToast(t('summary.copied'), 2500);
-    } catch (error) {
-      showToast(t('summary.copyFailed', { detail: error.message }), 4000);
-      throw error;
-    }
-  },
+  onCopySummary: copySummaryText,
   onLayoutChange: () => mapViewController?.refreshControls(),
 });
 
@@ -225,6 +250,8 @@ const trackLayer = createTrackLayer({
   onFocusBounds: (bounds, options) => mapViewController?.focusBounds(bounds, options),
 });
 let activeTrackLayer = null;
+let trackViewController = null;
+let updatePhotoAttachments = null;
 let activeProfile = null;
 function focusSplit(split) {
   if (!split) {
@@ -500,6 +527,9 @@ async function ensureEditorLoaded() {
                 });
               }
               splitController.render(nextSummary, { reset: true, ...nextSplitPreview });
+              trackViewController?.syncSource(committed, nextModel);
+              updatePhotoAttachments?.(committed);
+              syncHostTitleMeta(nextSummary, nextElevations);
               activeTrackLayer?.destroy?.();
               waypointController.destroy();
               const newTracks = trackLayer.draw(ctx.map, committed, nextModel);
@@ -590,6 +620,7 @@ async function openTrackEditor({ initialTool = 'crop', cropRange = null } = {}) 
     await ensureEditorLoaded();
     if (!editorShell || !editorOverlay || editorStore?.isActive()) return;
     if (measurementController?.active()) measurementController.stop();
+    trackViewController?.reset();
     activeScrub?.clearRange?.();
     activeProfile?.clearSplitFocus?.();
     activeTrackLayer?.clearSplitHighlight?.();
@@ -714,9 +745,11 @@ async function main() {
     const hasWaypointPhotos = (gpx.waypoints || []).some((wpt) => photosOf(wpt).length > 0);
     if (hasWaypointPhotos) {
       const { attachmentItems, createAttachmentExporter } = await import('./attachments.js');
+      buildAttachmentItems = attachmentItems;
       photoAttachments = attachmentItems(gpx, photosOf, src);
       attachmentExporter = createAttachmentExporter({ post, hasHost: hasQuickLookHost });
     } else {
+      buildAttachmentItems = null;
       photoAttachments = [];
       let lazyExporter = null;
       let lazyExporterPromise = null;
@@ -923,6 +956,52 @@ async function main() {
     });
     trackColorControl.mount();
   }
+  updatePhotoAttachments = (targetGpx) => {
+    const nextItems = buildAttachmentItems ? buildAttachmentItems(targetGpx, photosOf, src) : [];
+    photoAttachments.splice(0, photoAttachments.length, ...nextItems);
+    toolboxController?.render?.();
+  };
+  trackViewController = createTrackViewController({
+    map,
+    node: document.getElementById('track-selector'),
+    el,
+    t,
+    formatDistance,
+    initialGpx: gpx,
+    initialModel: routeModel,
+    trackLayer,
+    waypointController,
+    profileController,
+    splitController,
+    renderInfo,
+    getActiveTrackLayer: () => activeTrackLayer,
+    setActiveTrackLayer: (next) => { activeTrackLayer = next; },
+    getActiveProfile: () => activeProfile,
+    setActiveProfile: (next) => { activeProfile = next; },
+    getActiveScrub: () => activeScrub,
+    setActiveScrub: (next) => { activeScrub = next; },
+    getTrackColorControl: () => trackColorControl,
+    getMeasurementController: () => measurementController,
+    getOverlayExport: () => overlayExport,
+    getMapViewController: () => mapViewController,
+    onViewDataApplied: ({
+      viewGpx, viewModel, viewSummary, viewElevations, viewHikeEstimate, viewSplitPreview,
+    }) => {
+      Object.assign(liveState, {
+        gpx: viewGpx,
+        routeModel: viewModel,
+        summary: viewSummary,
+        elevations: viewElevations,
+        hikeEstimate: viewHikeEstimate,
+        splitPreview: viewSplitPreview,
+      });
+      if (editorContext) editorContext.elevations = viewElevations;
+      splitData = null;
+      updatePhotoAttachments?.(viewGpx);
+      syncHostTitleMeta(viewSummary, viewElevations);
+    },
+    pruneLocalized,
+  });
   let pendingCoordinateMove = null;
   toolboxController = createToolbox({
     L,
@@ -1079,8 +1158,18 @@ async function main() {
   const scrub = profile ? profileController.attach(map, profile) : null;
   activeScrub = scrub;
   installSpaceGuard();
-  const textFieldOf = (node) => node instanceof Element
-    && Boolean(node.closest('input, textarea, select, [contenteditable="true"]'));
+  const nonTextInputTypes = new Set([
+    'button', 'checkbox', 'color', 'file', 'image', 'radio', 'range', 'reset', 'submit',
+  ]);
+  const textFieldOf = (node) => {
+    if (!(node instanceof Element)) return false;
+    const field = node.closest('input, textarea, select, [contenteditable="true"]');
+    if (!field) return false;
+    if (field instanceof HTMLInputElement && nonTextInputTypes.has((field.type || '').toLowerCase())) {
+      return false;
+    }
+    return true;
+  };
   document.addEventListener('keydown', (event) => {
     if (editorStore?.isActive()) {
       if (!textFieldOf(event.target) && editorShell?.handleKeyDown?.(event)) {
@@ -1121,6 +1210,8 @@ async function main() {
     syncPreferences();
     renderInfo(liveState.gpx, liveState.summary, liveState.elevations, liveState.hikeEstimate);
     splitController.render(liveState.summary, liveState.splitPreview);
+    trackViewController?.relabel();
+    syncHostTitleMeta(liveState.summary, liveState.elevations);
     switcher.relabel();
     locateCtrl.relabel();
     measurement.relabel();
@@ -1148,6 +1239,7 @@ async function main() {
     syncPreferences();
     toolboxController?.refreshTheme?.();
     activeTrackLayer?.refreshTheme?.();
+    trackViewController?.refreshTheme?.();
   });
   const api = createTestApi({
     gpx, summary, map, scrub, photoViewer, hikeEstimate, tracks, timing, loadSplitsData,
@@ -1180,9 +1272,12 @@ async function main() {
   }
   api.revealViewer = revealViewer;
   api.hostAction = (action) => {
+    if (editorStore?.isActive?.()) {
+      showToast(t('host.exitEditFirst'), 2500);
+      return;
+    }
     if (action === 'copySummary') {
-      const copyButton = document.querySelector('#info .info-copy, #info button[data-action="copy-summary"]');
-      if (copyButton instanceof HTMLElement) copyButton.click();
+      void copySummaryText(trackSummaryText(liveState.gpx, liveState.summary, liveState.elevations, fileName));
     } else if (action === 'openExport') {
       toolboxController?.openView?.('export');
     } else if (action === 'openAttachments') {
@@ -1207,16 +1302,7 @@ async function main() {
   requestAnimationFrame(() => requestAnimationFrame(() => {
     timing.firstPaintMs = performance.now() - started;
   }));
-  const titleMetaParts = [];
-  if (Number.isFinite(summary.distanceMeters) && summary.distanceMeters > 0) {
-    titleMetaParts.push(formatDistance(summary.distanceMeters));
-  }
-  if (elevations && summary.elevation && Number.isFinite(elevations.ascent) && elevations.ascent > 0) {
-    titleMetaParts.push(`\u25b2 ${Math.round(elevations.ascent).toLocaleString('en-US')} m`);
-  }
-  if (titleMetaParts.length > 0) {
-    post(`title-meta\t${encodeURIComponent(titleMetaParts.join(' \u00b7 '))}`);
-  }
+  syncHostTitleMeta(summary, elevations);
   post(`ready\t${summary.points} points, ${distanceLog(summary.distanceMeters)}`);
   if (hasQuickLookHost && !viewerRevealed) {
     revealFallbackTimer = setTimeout(revealViewer, 180);

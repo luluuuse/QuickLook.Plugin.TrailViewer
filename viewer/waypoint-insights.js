@@ -67,7 +67,7 @@ const RULES = [
   {
     key: 'viewpoint',
     important: false,
-    positive: /观景|景点|视野开阔|拍照点|摄影点|viewpoint|viewpoint|scene|photo spot|camera/gi,
+    positive: /观景|景点|视野开阔|拍照点|摄影点|viewpoint|scene|photo spot/gi,
     negative: /无景观|no view|view blocked/gi,
   },
 ];

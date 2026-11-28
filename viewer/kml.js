@@ -388,18 +388,27 @@ export function parseKmlDocument(doc) {
     if (href) styles.set(style.id, textOf(href));
   }
 
-  const visit = (node) => {
+  const visit = (node, folderPath = '') => {
     for (const element of node.children) {
       if (element.localName === 'Placemark') {
         const found = { segments: [], areas: [], points: [] };
         readPlacemark(element, found, styles, { skipTime: network, skipElevation: network });
         if (found.segments.length > 0) {
-          tracks.push({ name: childText(element, 'name'), segments: found.segments });
+          const track = { name: childText(element, 'name'), segments: found.segments };
+          if (folderPath) track.folder = folderPath;
+          tracks.push(track);
         }
         areas.push(...found.areas);
-        for (const point of found.points) addWaypoint(waypoints, seen, point);
-      } else if (element.localName === 'Folder' || element.localName === 'Document' || element.localName === 'kml') {
-        visit(element);
+        for (const point of found.points) {
+          if (folderPath) point.folder = folderPath;
+          addWaypoint(waypoints, seen, point);
+        }
+      } else if (element.localName === 'Folder') {
+        const name = childText(element, 'name');
+        const nextFolder = name ? (folderPath ? `${folderPath}/${name}` : name) : folderPath;
+        visit(element, nextFolder);
+      } else if (element.localName === 'Document' || element.localName === 'kml') {
+        visit(element, folderPath);
       }
     }
   };

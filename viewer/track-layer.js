@@ -34,7 +34,7 @@ function activeThemeName() {
   return typeof document !== 'undefined' ? (document.documentElement?.dataset?.theme || '') : '';
 }
 
-function trackColorForIndex(index, theme = activeThemeName()) {
+export function trackColorForIndex(index, theme = activeThemeName()) {
   const palette = THEME_PALETTES[theme] || COLORS;
   return palette[index % palette.length];
 }
@@ -238,7 +238,7 @@ function activateMarker(marker, action) {
 /** Draws KML areas, track/route lines and start/end markers; waypoint markers are left to the controller. */
 export function createTrackLayer({ L, el, localized, t, pointPopup, onFocusBounds }) {
   return {
-    draw(map, gpx, routeModel = null) {
+    draw(map, gpx, routeModel = null, options = {}) {
       const model = routeModel || createRouteModel(gpx);
       const network = Boolean(gpx.network);
       const bounds = L.latLngBounds([]);
@@ -246,6 +246,8 @@ export function createTrackLayer({ L, el, localized, t, pointPopup, onFocusBound
       const navigationMarks = [];
       let distancePaths = [];
       const networkEntries = [];
+      const referenceLayer = L.layerGroup().addTo(map);
+      const referenceEntries = [];
       const baseLayer = L.layerGroup().addTo(map);
       const distanceLayer = L.layerGroup().addTo(map);
       const anomalyLineLayer = L.layerGroup().addTo(map);
@@ -256,12 +258,13 @@ export function createTrackLayer({ L, el, localized, t, pointPopup, onFocusBound
       const singleLineLayer = L.layerGroup().addTo(map);
       const colorOverlayGroup = L.layerGroup();
       const colorRenderer = L.canvas({ padding: 0.5 });
+      let refRenderer = null;
       const singleTrackEntries = [];
       let colorMode = 'single';
       let baseVisible = true;
       let anomalyEpisodes = [];
       let gapEpisodes = [];
-      let colorIndex = 0;
+      let colorIndex = Number.isInteger(options.trackColorStartIndex) ? options.trackColorStartIndex : 0;
       let distanceOffset = 0;
       const showEnds = !network && model.trackGroups.length <= 20;
       let distanceCache = null;
@@ -616,6 +619,10 @@ export function createTrackLayer({ L, el, localized, t, pointPopup, onFocusBound
           const nextColor = trackColorForIndex(entry.colorIndex, theme);
           entry.polyline.setStyle({ color: nextColor });
         }
+        for (const entry of referenceEntries) {
+          const nextColor = trackColorForIndex(entry.colorIndex, theme);
+          entry.polyline.setStyle({ color: nextColor });
+        }
         if (networkEntries.length > 0) {
           for (const entry of networkEntries) {
             if (typeof entry.colorIndex === 'number') {
@@ -626,6 +633,28 @@ export function createTrackLayer({ L, el, localized, t, pointPopup, onFocusBound
         }
       }
       const initialTheme = activeThemeName();
+      if (!network && Array.isArray(options.referenceTracks) && options.referenceTracks.length > 0) {
+        refRenderer = L.canvas({ padding: 0.5 });
+        for (const ref of options.referenceTracks) {
+          let refColorIndex = Number.isInteger(ref.colorIndex) ? ref.colorIndex : 0;
+          for (const segPoints of ref.track?.segments || []) {
+            if (!segPoints || segPoints.length < 2) continue;
+            const refColor = trackColorForIndex(refColorIndex, initialTheme);
+            const polyline = L.polyline(segPoints.map((point) => [point.lat, point.lon]), {
+              color: refColor,
+              weight: 2.5,
+              opacity: 0.24,
+              lineCap: 'round',
+              lineJoin: 'round',
+              interactive: false,
+              renderer: refRenderer,
+              className: 'gpx-track-reference',
+            }).addTo(referenceLayer);
+            referenceEntries.push({ polyline, colorIndex: refColorIndex });
+            refColorIndex += 1;
+          }
+        }
+      }
       const initialCanvasCasingStyle = longTrackRenderer ? readCanvasCasingStyle() : null;
       const resolvedEndpoints = showEnds ? resolveTrackEndpoints(model.trackGroups) : [];
       model.trackGroups.forEach((group, groupIndex) => {
@@ -855,6 +884,7 @@ export function createTrackLayer({ L, el, localized, t, pointPopup, onFocusBound
         setBaseVisible(visible) {
           baseVisible = Boolean(visible);
           if (baseVisible) {
+            referenceLayer.addTo(map);
             baseLayer.addTo(map);
             if (network || colorMode === 'single') {
               singleLineLayer.addTo(map);
@@ -866,6 +896,7 @@ export function createTrackLayer({ L, el, localized, t, pointPopup, onFocusBound
             anomalyLineLayer.addTo(map);
             gapLineLayer.addTo(map);
           } else {
+            referenceLayer.remove();
             baseLayer.remove();
             singleLineLayer.remove();
             colorOverlayGroup.remove();
@@ -920,6 +951,7 @@ export function createTrackLayer({ L, el, localized, t, pointPopup, onFocusBound
           map.off('zoomend', onMapZoomEnd);
           map.off('moveend', onMapViewportChange);
           map.off('resize', onMapViewportChange);
+          referenceLayer.remove();
           baseLayer.remove();
           singleLineLayer.remove();
           networkLayer?.destroy?.();
@@ -931,6 +963,9 @@ export function createTrackLayer({ L, el, localized, t, pointPopup, onFocusBound
           anomalyMarkerLayer.remove();
           gapMarkerLayer.remove();
           splitHighlightLayer.remove();
+          colorRenderer.remove();
+          longTrackRenderer?.remove();
+          refRenderer?.remove();
         },
       };
     },

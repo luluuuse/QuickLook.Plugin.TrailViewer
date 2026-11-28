@@ -115,6 +115,7 @@ export function createMapView({ map, isChromeHidden }) {
     const base = container.getBoundingClientRect();
     const infoNode = document.getElementById('info');
     const splitNode = document.getElementById('splits');
+    const trackSelectorNode = document.getElementById('track-selector');
     const zoomNode = map.zoomControl?.getContainer().closest('.leaflet-top.leaflet-left');
     const toolsNode = document.querySelector('#map .leaflet-top.leaflet-right');
     const hidden = isChromeHidden();
@@ -128,6 +129,7 @@ export function createMapView({ map, isChromeHidden }) {
       info: hidden ? null : rectWithin(infoNode, base),
       splitElement: splitNode,
       splits: hidden ? null : rectWithin(splitNode, base),
+      trackSelector: hidden ? null : rectWithin(trackSelectorNode, base),
       zoom: rectWithin(zoomNode, base),
       tools: rectWithin(toolsNode, base),
       toolChildren,
@@ -154,6 +156,7 @@ export function createMapView({ map, isChromeHidden }) {
     for (const selector of [
       '#info',
       '#splits',
+      '#track-selector',
       '#profile',
       '#toolbox-panel',
       '.waypoint-overview',
@@ -215,6 +218,11 @@ export function createMapView({ map, isChromeHidden }) {
       10,
     );
     setVariable('--splits-top', cssPixels(splitTop || 10));
+    const splitsHeight = splits ? splits.height : 0;
+    const trackSelectorTop = splitsHeight > 0
+      ? splitTop + splitsHeight + (infoCompact ? 6 : 8)
+      : splitTop;
+    setVariable('--track-selector-top', cssPixels(trackSelectorTop || 10));
 
     const layoutClass = `layout-${next}`;
     if (next !== layoutState || !document.body.classList.contains(layoutClass)) {
@@ -225,10 +233,11 @@ export function createMapView({ map, isChromeHidden }) {
     }
 
     if (infoCompact) {
-      const splitsHeight = splits ? splits.height : 0;
-      const underSplitsTop = splitsHeight > 0
-        ? splitTop + splitsHeight + 6
-        : (card?.bottom || 8) + 6;
+      const trackSelectorHeight = snapshot.trackSelector ? snapshot.trackSelector.height : 0;
+      const leftStackBottom = trackSelectorHeight > 0
+        ? trackSelectorTop + trackSelectorHeight
+        : (splitsHeight > 0 ? splitTop + splitsHeight : (card?.bottom || 8));
+      const underSplitsTop = leftStackBottom + 6;
       setVariable('--zoom-left', '10px');
       setVariable('--zoom-top', cssPixels(underSplitsTop));
       setVariable('--tools-left', 'auto');
@@ -386,6 +395,7 @@ export function createMapView({ map, isChromeHidden }) {
   function refineDependentVariables(snapshot) {
     const card = snapshot.info;
     const splits = snapshot.splits;
+    const trackSelector = snapshot.trackSelector;
     const zoom = snapshot.zoom;
     const infoCompact = document.body.classList.contains('info-compact')
       && !document.body.classList.contains('is-editing');
@@ -399,9 +409,15 @@ export function createMapView({ map, isChromeHidden }) {
       10,
     );
     setVariable('--splits-top', cssPixels(splitTop));
+    const trackSelectorTop = splits
+      ? splitTop + splits.height + (infoCompact ? 6 : 8)
+      : splitTop;
+    setVariable('--track-selector-top', cssPixels(trackSelectorTop));
     if (infoCompact && zoom) {
-      const underSplitsTop = splits ? splitTop + splits.height + 6 : (card?.bottom || 8) + 6;
-      setVariable('--zoom-top', cssPixels(underSplitsTop));
+      const leftStackBottom = trackSelector
+        ? trackSelectorTop + trackSelector.height
+        : (splits ? splitTop + splits.height : (card?.bottom || 8));
+      setVariable('--zoom-top', cssPixels(leftStackBottom + 6));
     }
     const toolsBottom = snapshot.tools?.bottom || 0;
     setVariable('--floating-panel-top', cssPixels(Math.max(54, toolsBottom + 4)));

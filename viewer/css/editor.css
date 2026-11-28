@@ -2,6 +2,7 @@
 
 body.is-editing #info,
 body.is-editing #splits,
+body.is-editing #track-selector,
 body.is-editing .track-color-switch,
 body.is-editing .toolbox-switch,
 body.is-editing .waypoint-overview-switch,

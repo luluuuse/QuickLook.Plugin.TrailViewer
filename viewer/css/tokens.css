@@ -596,11 +596,11 @@
   --border-strong: rgba(255, 255, 255, 0.34);
   --border-focus: rgba(255, 255, 255, 0.56);
   --border-muted: rgba(255, 255, 255, 0.38);
-  --panel-radius: 22px;
-  --control-radius: 14px;
-  --radius-sm: 10px;
-  --radius-md: 16px;
-  --radius-lg: 22px;
+  --panel-radius: 16px;
+  --control-radius: 12px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
   --radius-pill: 999px;
   --motion-panel: 160ms cubic-bezier(0.22, 1, 0.36, 1);
   --icon-color: rgba(255, 255, 255, 0.94);
@@ -1499,6 +1499,7 @@ html[lang^="zh"] .waypoint-desc {
 
 #info,
 #splits,
+#track-selector,
 #profile,
 .toolbox-panel,
 .layer-source-menu,
@@ -1508,12 +1509,14 @@ html[lang^="zh"] .waypoint-desc {
 
 #info:not([hidden]),
 #splits:not([hidden]),
+#track-selector:not([hidden]),
 #profile:not([hidden]) {
   animation: panel-fade var(--motion-panel);
 }
 
 #info:not([hidden]) > *,
 #splits:not([hidden]) > *,
+#track-selector:not([hidden]) > *,
 #profile:not([hidden]) > * {
   animation: panel-content-enter var(--motion-panel);
 }
@@ -1580,6 +1583,7 @@ html[lang^="zh"] .waypoint-desc {
 html.is-theme-switching body,
 html.is-theme-switching #info,
 html.is-theme-switching #splits,
+html.is-theme-switching #track-selector,
 html.is-theme-switching #profile,
 html.is-theme-switching .toolbox-panel,
 html.is-theme-switching .layer-switch,
@@ -1634,6 +1638,7 @@ body.is-map-dragging .editor-mode-hint {
 
 :root[data-theme="ios"] #info,
 :root[data-theme="ios"] #splits,
+:root[data-theme="ios"] #track-selector,
 :root[data-theme="ios"] #profile,
 :root[data-theme="ios"] .toolbox-panel,
 :root[data-theme="ios"] .layer-source-menu,
@@ -1658,6 +1663,7 @@ body.is-map-dragging .editor-mode-hint {
 
 :root[data-theme="ios"][data-map-tone="light"] #info,
 :root[data-theme="ios"][data-map-tone="light"] #splits,
+:root[data-theme="ios"][data-map-tone="light"] #track-selector,
 :root[data-theme="ios"][data-map-tone="light"] #profile,
 :root[data-theme="ios"][data-map-tone="light"] .toolbox-panel,
 :root[data-theme="ios"][data-map-tone="light"] .layer-source-menu,

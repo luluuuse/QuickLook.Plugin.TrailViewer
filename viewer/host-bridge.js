@@ -399,15 +399,28 @@ export function createHostBridge() {
 
   function installTextInputReporting(isTextField) {
     let reported = null;
+    let composingReported = false;
     const report = (active) => {
       if (active === reported) return;
       reported = active;
       post(`text-input\t${active ? '1' : '0'}`);
     };
+    const reportComposing = (active) => {
+      if (active === composingReported) return;
+      composingReported = active;
+      post(`text-composing\t${active ? '1' : '0'}`);
+    };
     document.addEventListener('focusin', (event) => report(isTextField(event.target)));
     document.addEventListener('focusout', (event) => {
-      if (!isTextField(event.relatedTarget)) report(false);
+      if (!isTextField(event.relatedTarget)) {
+        reportComposing(false);
+        report(false);
+      }
     });
+    document.addEventListener('compositionstart', (event) => {
+      if (isTextField(event.target)) reportComposing(true);
+    });
+    document.addEventListener('compositionend', () => reportComposing(false));
   }
 
   return {

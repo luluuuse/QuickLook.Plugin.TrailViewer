@@ -5,6 +5,7 @@
 body.ql-host:not(.revealed):not(.failed) #map,
 body.ql-host:not(.revealed):not(.failed) #info,
 body.ql-host:not(.revealed):not(.failed) #splits,
+body.ql-host:not(.revealed):not(.failed) #track-selector,
 body.ql-host:not(.revealed):not(.failed) #profile {
   opacity: 0;
   pointer-events: none;
@@ -668,6 +669,248 @@ body.is-editing .locate-switch svg {
   padding: 0 10px 10px;
 }
 
+/* Multi-track selector: mirrors #splits so multi-route files (e.g. 50/70/100 km packs) can isolate one track. */
+#track-selector {
+  position: absolute;
+  z-index: var(--z-floating-panel);
+  top: var(--track-selector-top, 144px);
+  left: 10px;
+  box-sizing: border-box;
+  width: max-content;
+  max-width: min(268px, calc(100% - 20px));
+  overflow: hidden;
+  border-radius: var(--panel-radius);
+  background-color: var(--panel);
+  box-shadow: var(--hud-shadow);
+}
+
+#track-selector[hidden] {
+  display: none;
+}
+
+#track-selector.expanded {
+  width: min(268px, calc(100% - 20px));
+  background-image: var(--swiss-corner-ticks);
+  box-shadow: var(--hud-shadow-swiss-top);
+}
+
+.track-selector-header {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.track-selector-toggle {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  min-height: 36px;
+  padding: 7px 11px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.track-selector-toggle:hover {
+  background: var(--toolbar-hover-tint);
+}
+
+#track-selector.expanded .track-selector-header,
+#track-selector.filtered .track-selector-header {
+  background: var(--icon-active-background);
+  color: var(--icon-active);
+  box-shadow: inset 0 -2px var(--icon-active-line);
+}
+
+#track-selector.expanded .track-selector-header {
+  border-bottom: 1px solid var(--border-hairline);
+}
+
+#track-selector.expanded .track-selector-header:has(.track-selector-toggle:hover),
+#track-selector.filtered .track-selector-header:has(.track-selector-toggle:hover) {
+  background: linear-gradient(var(--toolbar-hover-tint), var(--toolbar-hover-tint)), var(--icon-active-background);
+}
+
+#track-selector.expanded .track-selector-toggle,
+#track-selector.filtered .track-selector-toggle {
+  color: inherit;
+}
+
+#track-selector.expanded .track-selector-toggle:hover,
+#track-selector.filtered .track-selector-toggle:hover {
+  background: transparent;
+}
+
+.track-selector-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.track-selector-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.track-selector-count {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+#track-selector.filtered .track-selector-count,
+#track-selector.expanded .track-selector-count {
+  color: inherit;
+  opacity: 0.82;
+}
+
+.track-selector-count-compact {
+  display: none;
+}
+
+.track-selector-icon,
+.track-selector-chevron {
+  width: var(--icon-size);
+  height: var(--icon-size);
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: var(--icon-stroke);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.track-selector-chevron {
+  transition: transform 120ms ease;
+}
+
+#track-selector.expanded .track-selector-chevron {
+  transform: rotate(180deg);
+}
+
+body.info-compact #track-selector:not(.expanded) {
+  border-radius: 999px;
+}
+
+body.info-compact #track-selector:not(.expanded) .track-selector-toggle {
+  min-height: 26px;
+  height: 26px;
+  padding: 0 9px;
+  gap: var(--space-1);
+}
+
+body.info-compact #track-selector:not(.expanded) .track-selector-name,
+body.info-compact #track-selector:not(.expanded) .track-selector-count {
+  display: none;
+}
+
+body.info-compact #track-selector:not(.expanded) .track-selector-count-compact {
+  display: inline;
+  color: var(--icon-active);
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+body.info-compact #track-selector:not(.expanded) .track-selector-chevron {
+  width: 12px;
+  height: 12px;
+}
+
+.track-selector-content {
+  padding: 6px;
+}
+
+.track-selector-list {
+  display: grid;
+  gap: 2px;
+  max-height: clamp(120px, 24vh, 224px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 3px;
+  border: 1px solid var(--border-hairline);
+  border-radius: var(--radius-sm);
+  background: var(--surface-inset);
+}
+
+.track-selector-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  transition: background var(--motion-panel), color var(--motion-panel);
+}
+
+.track-selector-item:hover {
+  background: var(--surface-hover);
+  color: var(--text-bright);
+}
+
+.track-selector-item.selected {
+  background: var(--icon-active-background);
+  color: var(--icon-active);
+  font-weight: 600;
+}
+
+.track-selector-item.selected:hover {
+  background: linear-gradient(var(--toolbar-hover-tint), var(--toolbar-hover-tint)), var(--icon-active-background);
+}
+
+.track-selector-dot {
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border-radius: 999px;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.25);
+}
+
+.track-selector-dot.is-all {
+  background: conic-gradient(#df2b1d 0 120deg, #297bb8 120deg 240deg, #249e58 240deg 360deg);
+}
+
+.track-selector-item-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.track-selector-item-meta {
+  flex: none;
+  color: var(--muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.track-selector-item.selected .track-selector-item-meta {
+  color: inherit;
+  opacity: 0.85;
+}
+
 .splits-scroll {
   max-height: clamp(108px, 22vh, 210px);
   overflow-x: hidden;
@@ -1097,6 +1340,14 @@ body.layout-docked #info[data-details="full"] {
   pointer-events: none;
 }
 
+:root[data-theme="ios"] #profile {
+  padding: 8px 14px 9px;
+}
+
+:root[data-theme="ios"] #profile.collapsed {
+  padding-bottom: 8px;
+}
+
 /* Leaflet puts the attribution and the scale on the floor, which is now under the panel. Written by
    renderProfile from the measured height, so the credit clears the drawing whatever it grew to. */
 body.with-profile .leaflet-bottom {
@@ -1109,6 +1360,7 @@ body.with-profile .leaflet-bottom {
    toolbox header, so it goes with the toolbox. */
 body.chrome-hidden #info,
 body.chrome-hidden #splits,
+body.chrome-hidden #track-selector,
 body.chrome-hidden #profile,
 body.chrome-hidden .waypoint-overview,
 body.chrome-hidden #map .leaflet-top {
@@ -1147,20 +1399,19 @@ body.chrome-hidden.with-profile .leaflet-bottom {
 }
 
 #profile .profile-collapse-toggle {
-  display: inline-flex;
+  display: inline-grid;
   flex: none;
-  align-items: center;
-  justify-content: center;
-  width: 18px;
-  height: 18px;
+  place-items: center;
+  width: 20px;
+  height: 20px;
   padding: 0;
-  border: 1px solid var(--border-control);
+  border: 0;
   border-radius: var(--radius-sm);
   background: transparent;
   color: var(--muted);
   cursor: pointer;
   pointer-events: auto;
-  transition: background var(--motion-panel), color var(--motion-panel), border-color var(--motion-panel);
+  transition: background var(--motion-panel), color var(--motion-panel);
 }
 
 #profile .label .scale[hidden] + .profile-collapse-toggle {
@@ -1168,7 +1419,6 @@ body.chrome-hidden.with-profile .leaflet-bottom {
 }
 
 #profile .profile-collapse-toggle:hover {
-  border-color: var(--border-muted);
   background: var(--toolbar-hover-tint);
   color: var(--text-bright);
 }

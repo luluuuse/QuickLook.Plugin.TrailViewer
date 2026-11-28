@@ -29,8 +29,13 @@ internal sealed class GlobalKeys : IDisposable
     private const int VkShift = 0x10;
     private const int VkControl = 0x11;
     private const int VkMenu = 0x12;
+    private const int VkSpace = 0x20;
     private const int VkLWin = 0x5B;
     private const int VkRWin = 0x5C;
+    private const uint InputKeyboard = 1;
+    private const uint KeyEventFKeyUp = 0x0002;
+    private const ushort VkDigitOne = 0x31;
+    private const ushort ScanDigitOne = 0x02;
 
     // The windows a QuickLook preview is normally driven from. QuickLook itself polls the selection of these
     // windows and follows it, which is why a swallowed key must not reach them.
@@ -45,6 +50,7 @@ internal sealed class GlobalKeys : IDisposable
     private readonly Func<bool> _measureActive;
     private readonly Func<bool> _editorActive;
     private readonly Func<bool> _textInputActive;
+    private readonly Func<bool> _textComposing;
     private readonly Action<string> _onKey;
     private readonly HookProc _callback; // held in a field: the GC must not collect the thunk the OS calls
     private readonly ManualResetEventSlim _ready = new(false);
@@ -58,6 +64,8 @@ internal sealed class GlobalKeys : IDisposable
     private Thread? _thread;
     private Dispatcher? _dispatcher;
     private IntPtr _hook;
+    private bool _swallowedSpace;
+    private bool _swallowedSpaceAsImeCommit;
     private bool _disposed;
 
     /// <param name="onScreen">Asked on the hook thread: is there a preview to act on right now?</param>
@@ -71,12 +79,14 @@ internal sealed class GlobalKeys : IDisposable
         Func<bool> measureActive,
         Func<bool> textInputActive,
         Action<string> onKey,
-        Func<bool>? editorActive = null)
+        Func<bool>? editorActive = null,
+        Func<bool>? textComposing = null)
     {
         _onScreen = onScreen;
         _measureActive = measureActive;
         _editorActive = editorActive ?? (() => false);
         _textInputActive = textInputActive;
+        _textComposing = textComposing ?? (() => false);
         _onKey = onKey;
         _callback = Filter;
     }
@@ -134,6 +144,9 @@ internal sealed class GlobalKeys : IDisposable
         {
             _calls++;
             var info = Marshal.PtrToStructure<KbdHook>(lParam);
+            if ((int)info.vkCode == VkSpace)
+                return HandleSpace(code, wParam, lParam, info);
+
             var name = NameOf((int)info.vkCode);
             if (name == null) // the common case: one comparison and back out
                 return Next(code, wParam, lParam);
@@ -191,19 +204,147 @@ internal sealed class GlobalKeys : IDisposable
         }
     }
 
-    private bool SafeOnScreen()
+    private IntPtr HandleSpace(int code, IntPtr wParam, IntPtr lParam, KbdHook info)
+    {
+        var message = (int)wParam;
+        if (message == WmKeyUp || message == WmSysKeyUp)
+        {
+            if (!_swallowedSpace)
+                return Next(code, wParam, lParam);
+            var wasImeCommit = _swallowedSpaceAsImeCommit;
+            _swallowedSpace = false;
+            _swallowedSpaceAsImeCommit = false;
+            if (!wasImeCommit)
+                PostSpaceKey((uint)WmKeyUp, info.scanCode, isKeyUp: true, isRepeat: false);
+            Reason = wasImeCommit ? "space-ime-commit-up" : "space-text-input-up";
+            return (IntPtr)1;
+        }
+
+        if (message != WmKeyDown && message != WmSysKeyDown)
+            return Next(code, wParam, lParam);
+
+        var control = Down(VkControl);
+        var shift = Down(VkShift);
+        var alt = Down(VkMenu);
+        var win = Down(VkLWin) || Down(VkRWin);
+        if (alt || win || !TextInputActive() || !IsOnScreen() || !OwnWindowIsForeground())
+            return Next(code, wParam, lParam);
+
+        var isRepeat = _swallowedSpace;
+        if (!control && !shift && TextComposing())
+        {
+            _swallowedSpace = true;
+            _swallowedSpaceAsImeCommit = true;
+            if (!isRepeat)
+                ThreadPool.QueueUserWorkItem(_ => SendDigitOne());
+            Reason = "space-ime-commit";
+            return (IntPtr)1;
+        }
+
+        _swallowedSpace = true;
+        _swallowedSpaceAsImeCommit = false;
+        PostSpaceKey((uint)WmKeyDown, info.scanCode, isKeyUp: false, isRepeat: isRepeat);
+        Reason = "space-text-input";
+        return (IntPtr)1;
+    }
+
+    private bool TextComposing()
     {
         try
         {
-            // A focused text field owns every letter: let the key through so the page can type it.
-            if (TextInputActive())
-                return false;
+            return _textComposing != null && _textComposing();
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static void SendDigitOne()
+    {
+        var inputs = new[]
+        {
+            new Input
+            {
+                type = InputKeyboard,
+                u = new InputUnion
+                {
+                    ki = new KeybdInput { wVk = VkDigitOne, wScan = ScanDigitOne },
+                },
+            },
+            new Input
+            {
+                type = InputKeyboard,
+                u = new InputUnion
+                {
+                    ki = new KeybdInput { wVk = VkDigitOne, wScan = ScanDigitOne, dwFlags = KeyEventFKeyUp },
+                },
+            },
+        };
+        SendInput((uint)inputs.Length, inputs, Marshal.SizeOf<Input>());
+    }
+
+    private void PostSpaceKey(uint message, uint scanCode, bool isKeyUp, bool isRepeat)
+    {
+        var target = FocusedForegroundWindow();
+        if (target == IntPtr.Zero)
+            return;
+        PostMessage(target, message, (IntPtr)VkSpace, MakeKeyLParam(scanCode, isKeyUp, isRepeat));
+    }
+
+    private static IntPtr FocusedForegroundWindow()
+    {
+        var fg = GetForegroundWindow();
+        if (fg == IntPtr.Zero)
+            return IntPtr.Zero;
+        var threadId = GetWindowThreadProcessId(fg, out _);
+        if (threadId != 0)
+        {
+            var gui = new GuiThreadInfo { cbSize = Marshal.SizeOf<GuiThreadInfo>() };
+            if (GetGUIThreadInfo(threadId, ref gui) && gui.hwndFocus != IntPtr.Zero)
+                return gui.hwndFocus;
+        }
+        return fg;
+    }
+
+    private static IntPtr MakeKeyLParam(uint scanCode, bool isKeyUp, bool isRepeat)
+    {
+        var sc = scanCode != 0 ? (scanCode & 0xFFu) : 0x39u;
+        uint value = 1u | (sc << 16);
+        if (isRepeat || isKeyUp)
+            value |= 1u << 30;
+        if (isKeyUp)
+            value |= 1u << 31;
+        return IntPtr.Size == 8 ? new IntPtr((long)value) : new IntPtr(unchecked((int)value));
+    }
+
+    private bool IsOnScreen()
+    {
+        try
+        {
             return _onScreen();
         }
         catch
         {
             return false;
         }
+    }
+
+    private bool SafeOnScreen()
+    {
+        // A focused text field owns every letter: let the key through so the page can type it.
+        if (TextInputActive())
+            return false;
+        return IsOnScreen();
+    }
+
+    private bool OwnWindowIsForeground()
+    {
+        var hwnd = GetForegroundWindow();
+        if (hwnd == IntPtr.Zero)
+            return false;
+        GetWindowThreadProcessId(hwnd, out var pid);
+        return pid == _ownPid;
     }
 
     private bool TextInputActive()
@@ -361,6 +502,29 @@ internal sealed class GlobalKeys : IDisposable
         public IntPtr dwExtraInfo;
     }
 
+    [StructLayout(LayoutKind.Sequential)]
+    private struct Rect
+    {
+        public int Left;
+        public int Top;
+        public int Right;
+        public int Bottom;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct GuiThreadInfo
+    {
+        public int cbSize;
+        public int flags;
+        public IntPtr hwndActive;
+        public IntPtr hwndFocus;
+        public IntPtr hwndCapture;
+        public IntPtr hwndMenuOwner;
+        public IntPtr hwndMoveSize;
+        public IntPtr hwndCaret;
+        public Rect rcCaret;
+    }
+
     [DllImport("user32.dll", SetLastError = true)]
     private static extern IntPtr SetWindowsHookEx(int idHook, HookProc callback, IntPtr module, uint threadId);
 
@@ -378,6 +542,59 @@ internal sealed class GlobalKeys : IDisposable
 
     [DllImport("user32.dll")]
     private static extern uint GetWindowThreadProcessId(IntPtr hwnd, out uint pid);
+
+    [DllImport("user32.dll")]
+    private static extern bool GetGUIThreadInfo(uint idThread, ref GuiThreadInfo lpgui);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct Input
+    {
+        public uint type;
+        public InputUnion u;
+    }
+
+    [StructLayout(LayoutKind.Explicit)]
+    private struct InputUnion
+    {
+        [FieldOffset(0)] public MouseInput mi;
+        [FieldOffset(0)] public KeybdInput ki;
+        [FieldOffset(0)] public HardwareInput hi;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct MouseInput
+    {
+        public int dx;
+        public int dy;
+        public uint mouseData;
+        public uint dwFlags;
+        public uint time;
+        public IntPtr dwExtraInfo;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct KeybdInput
+    {
+        public ushort wVk;
+        public ushort wScan;
+        public uint dwFlags;
+        public uint time;
+        public IntPtr dwExtraInfo;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct HardwareInput
+    {
+        public uint uMsg;
+        public ushort wParamL;
+        public ushort wParamH;
+    }
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern uint SendInput(uint nInputs, Input[] pInputs, int cbSize);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool PostMessage(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
 
     [DllImport("user32.dll")]
     private static extern short GetAsyncKeyState(int vk);

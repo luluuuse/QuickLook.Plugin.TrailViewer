@@ -1515,13 +1515,21 @@
   overflow: hidden;
   border: 1px solid var(--border-control);
   border-radius: var(--radius-sm);
-  background: #707070;
+  background: var(--surface-inset);
 }
 
 .toolbox-export-preview canvas {
   display: block;
   max-width: 100%;
   max-height: 112px;
+  background-color: #707070;
+  background-image: conic-gradient(
+    #686868 90deg,
+    #787878 90deg 180deg,
+    #686868 180deg 270deg,
+    #787878 270deg
+  );
+  background-size: 12px 12px;
   outline: 1px solid rgba(255, 255, 255, 0.92);
   outline-offset: 0;
   box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.78);

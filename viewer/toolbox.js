@@ -567,6 +567,7 @@ export function createToolbox({
     applyUpdateStatus: updateTool.applyStatus,
     applyUpdateProgress: updateTool.applyProgress,
     applyUpdateDownloadResult: updateTool.applyDownloadResult,
+    render: () => render(),
     refreshTheme: () => render(),
     destroy() {
       lifecycle.abort();

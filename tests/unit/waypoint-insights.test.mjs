@@ -50,6 +50,12 @@ test('unrecognised waypoint text stays neutral', () => {
   assert.deepEqual(result.evidence, []);
 });
 
+test('generic camera icon does not misclassify photo waypoints as viewpoint', () => {
+  const result = classifyWaypoint({ name: '航点', icon: 'camera' });
+  assert.equal(result.primary, null);
+  assert.deepEqual(result.evidence, []);
+});
+
 test('icon hints classify a generic waypoint at medium confidence', () => {
   const result = classifyWaypoint({
     name: 'Waypoint',

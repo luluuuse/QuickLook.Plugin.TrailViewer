@@ -32,6 +32,7 @@ internal sealed class ViewerMessageActions
     internal Func<string, System.Threading.Tasks.Task> FinishTrackSave { get; set; } =
         _ => System.Threading.Tasks.Task.CompletedTask;
     internal Action<bool> TextInput { get; set; } = _ => { };
+    internal Action<bool> TextComposing { get; set; } = _ => { };
     internal Action<string> ConfigureTiandituKey { get; set; } = _ => { };
     internal Action<string> RemoveTiandituKey { get; set; } = _ => { };
     internal Action RequestTileCacheStats { get; set; } = () => { };
@@ -102,6 +103,8 @@ internal sealed class ViewerMessageRouter
             _ = _actions.FinishTrackSave(message.Substring("trackdone\t".Length));
         else if (message == "text-input\t1" || message == "text-input\t0")
             _actions.TextInput(message.EndsWith("\t1", StringComparison.Ordinal));
+        else if (message == "text-composing\t1" || message == "text-composing\t0")
+            _actions.TextComposing(message.EndsWith("\t1", StringComparison.Ordinal));
         else if (message.StartsWith("tianditu-key\tconfigure", StringComparison.Ordinal))
             _actions.ConfigureTiandituKey(message);
         else if (message.StartsWith("tianditu-key\tremove", StringComparison.Ordinal))

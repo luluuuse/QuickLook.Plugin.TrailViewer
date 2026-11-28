@@ -66,6 +66,8 @@ const UI_ICONS = Object.freeze({
   stop: '<rect x="5" y="5" width="14" height="14" rx="2"/>',
   route: '<path d="M4 19c4-8 7 2 11-6 1.3-2.7 3-4 5-4"/>'
     + '<circle cx="4" cy="19" r="1.5"/><circle cx="20" cy="9" r="1.5"/>',
+  'multi-track': '<path d="M4 12h4.5c3 0 4-5.5 7.5-5.5h4"/>'
+    + '<path d="M8.5 12c3 0 4 5.5 7.5 5.5h4"/>',
   filter: '<path d="M4 5h16l-6 7v6l-4 2v-8Z"/>',
   edit: '<path d="m4 20 4.5-1 10-10a2.1 2.1 0 0 0-3-3l-10 10Z"/>'
     + '<path d="m13.5 8 3 3"/>',
