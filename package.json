@@ -22,10 +22,12 @@
     "test:live": "node tests/smoke/terrain-live.cjs",
     "test:version": "node tests/version-test.cjs",
     "release:prepare": "node scripts/release.cjs",
+    "build:viewer": "node scripts/build-viewer.cjs",
     "pack": "node scripts/pack.cjs"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",
+    "esbuild": "^0.28.2",
     "eslint": "^9.39.4",
     "globals": "^16.5.0",
     "playwright-core": "1.64.1",

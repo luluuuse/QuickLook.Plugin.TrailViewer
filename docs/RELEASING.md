@@ -84,6 +84,15 @@ GitHub Release，随后通过 `scripts/sync-gitcode-release.cjs` 自动同步发
 
 已推送的 tag 不移动、不覆盖。若发布失败，修复后按 SemVer 创建下一个 PATCH 版本。
 
+## 打包
+
+```powershell
+dotnet build src/QuickLook.Plugin.TrailViewer.csproj -c Release
+npm run pack
+```
+
+`npm run pack`（与直接运行 `node scripts/pack.cjs` 等价）会在打包前自动调用 `scripts/build-viewer.cjs`：将 `viewer/` 分包压缩并合并首屏样式输出到 `bin/Release/viewer/`（保留编辑器与导出等懒加载边界），同时排除未使用的 `Microsoft.Web.WebView2.WinForms.dll`、开发期文件与 `runtimes/win-arm64/`（仅支持 x64/x86 Windows）。Debug 构建与本地测试继续直接使用源码 `viewer/`，无需预构建。
+
 ## 缓存
 
 WebView 主机名由 `viewer/` 内容哈希生成。发布版本变化不会单独决定缓存，前端内容和页面协议才决定缓存。

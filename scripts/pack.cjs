@@ -4,8 +4,18 @@ const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
 const { readVersion } = require('./version.cjs');
+const { buildViewer } = require('./build-viewer.cjs');
 
-const skip = new Set(['.pdb', '.xml']);
+const skipExt = new Set(['.pdb', '.xml']);
+const skipFiles = new Set(['Microsoft.Web.WebView2.WinForms.dll']);
+const skipPrefixes = ['runtimes/win-arm64/'];
+
+function shouldSkip(name, baseName) {
+  if (skipExt.has(path.extname(baseName))) return true;
+  if (baseName.endsWith('.deps.json')) return true;
+  if (skipFiles.has(name) || skipFiles.has(baseName)) return true;
+  return skipPrefixes.some((prefix) => name.startsWith(prefix));
+}
 
 function walk(dir, prefix = '') {
   const entries = [];
@@ -13,24 +23,15 @@ function walk(dir, prefix = '') {
     .sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
   for (const item of items) {
     const name = prefix ? `${prefix}/${item.name}` : item.name;
-    if (item.isDirectory()) entries.push(...walk(path.join(dir, item.name), name));
-    else if (!skip.has(path.extname(item.name)) && !item.name.endsWith('.deps.json')) {
+    if (item.isDirectory()) {
+      if (!skipPrefixes.includes(`${name}/`)) {
+        entries.push(...walk(path.join(dir, item.name), name));
+      }
+    } else if (!shouldSkip(name, item.name)) {
       entries.push({ name, data: fs.readFileSync(path.join(dir, item.name)) });
     }
   }
   return entries;
-}
-
-function relativeFiles(dir, prefix = '') {
-  const names = [];
-  const items = fs.readdirSync(dir, { withFileTypes: true })
-    .sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
-  for (const item of items) {
-    const name = prefix ? `${prefix}/${item.name}` : item.name;
-    if (item.isDirectory()) names.push(...relativeFiles(path.join(dir, item.name), name));
-    else names.push(name);
-  }
-  return names;
 }
 
 const CRC_TABLE = (() => {
@@ -111,19 +112,37 @@ function buildZip(entries) {
   return Buffer.concat([...locals, directory, end]);
 }
 
-function packRelease(root, release, out, version) {
+async function packRelease(root, release, out, version) {
   if (!fs.existsSync(release)) throw new Error(`no build output at ${release}; build the Release first`);
+  await buildViewer(root, path.join(release, 'viewer'));
+
   const entries = walk(release);
   if (entries.length === 0) throw new Error(`${release} is empty`);
 
-  const builtViewer = entries.filter((entry) => entry.name.startsWith('viewer/')).map((entry) => entry.name)
-    .sort();
-  const sourceViewer = relativeFiles(path.join(root, 'viewer')).map((name) => `viewer/${name}`).sort();
-  if (JSON.stringify(builtViewer) !== JSON.stringify(sourceViewer)) {
-    const extra = builtViewer.filter((name) => !sourceViewer.includes(name));
-    const missing = sourceViewer.filter((name) => !builtViewer.includes(name));
-    throw new Error(`release viewer differs from source (extra: ${extra.join(', ') || 'none'};`
-      + ` missing: ${missing.join(', ') || 'none'})`);
+  const entryNames = new Set(entries.map((entry) => entry.name));
+  const requiredViewerFiles = [
+    'viewer/index.html',
+    'viewer/app.js',
+    'viewer/css/app.css',
+    'viewer/css/editor.css',
+    'viewer/vendor/leaflet/leaflet.js',
+    'viewer/vendor/leaflet/leaflet.css',
+    'viewer/vendor/leaflet/LICENSE',
+    'viewer/assets/trailviewer-icon.svg',
+  ];
+  const missing = requiredViewerFiles.filter((file) => !entryNames.has(file));
+  if (missing.length > 0) {
+    throw new Error(`release viewer is missing required files: ${missing.join(', ')}`);
+  }
+  const hasChunks = entries.some((entry) => entry.name.startsWith('viewer/chunks/') && entry.name.endsWith('.js'));
+  if (!hasChunks) {
+    throw new Error('release viewer has no lazy-loaded JS chunks under viewer/chunks/');
+  }
+  const forbidden = entries
+    .map((entry) => entry.name)
+    .filter((name) => name.endsWith('.d.ts') || name === 'viewer/vendor/versions.json');
+  if (forbidden.length > 0) {
+    throw new Error(`release viewer contains non-runtime files: ${forbidden.join(', ')}`);
   }
 
   const builtConfig = path.join(release, 'QuickLook.Plugin.Metadata.config');
@@ -149,11 +168,12 @@ const root = path.resolve(__dirname, '..');
 const version = readVersion().version;
 const out = path.join(root, `QuickLook.Plugin.TrailViewer-${version}.qlplugin`);
 
-try {
-  const result = packRelease(root, path.join(root, 'bin', 'Release'), out, version);
-  console.log(`${path.basename(out)}: ${result.entries} files, `
-    + `${(result.inBytes / 1024).toFixed(0)} KB -> ${(result.outBytes / 1024).toFixed(0)} KB`);
-} catch (error) {
-  console.error(error.message);
-  process.exit(1);
-}
+packRelease(root, path.join(root, 'bin', 'Release'), out, version)
+  .then((result) => {
+    console.log(`${path.basename(out)}: ${result.entries} files, `
+      + `${(result.inBytes / 1024).toFixed(0)} KB -> ${(result.outBytes / 1024).toFixed(0)} KB`);
+  })
+  .catch((error) => {
+    console.error(error.message);
+    process.exit(1);
+  });
