@@ -46,11 +46,14 @@ PR CI 将浏览器套件分为五组并行运行；发布标签仍运行完整�
 
 ```powershell
 dotnet build src/QuickLook.Plugin.TrailViewer.csproj -c Release
-node scripts/pack.cjs
+npm run pack
 ```
 
-安装包写入仓库根目录，文件名包含产品版本。`bin/Release/viewer` 必须与 `viewer/` 文件清单一致；不一致时
-打包脚本会拒绝出包。
+安装包写入仓库根目录，文件名包含产品版本。`npm run pack`（与直接执行 `node scripts/pack.cjs` 等价）会在打包前自动调用
+`scripts/build-viewer.cjs`，使用 `esbuild` 清空并重新输出压缩、分包后的 `bin/Release/viewer/`（合并首屏样式为
+`css/app.css`，保留编辑器等懒加载 chunk 与 `css/editor.css`），同时排除未使用的 `Microsoft.Web.WebView2.WinForms.dll`、
+开发期文件（`.d.ts`、`versions.json`）及 `runtimes/win-arm64/`（仅支持 Windows x64/x86），并校验核心运行时产物齐全。
+Debug 构建与本地测试继续直接使用源码 `viewer/`，无需预构建。
 
 ## 常用路径
 

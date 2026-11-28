@@ -2289,7 +2289,9 @@ body.failed #map {
 
 .leaflet-control-zoom,
 .locate-switch,
+.compass-switch,
 .track-color-switch,
+.map3d-switch,
 .pins-switch,
 .waypoint-overview-switch {
   overflow: hidden;
@@ -2298,7 +2300,7 @@ body.failed #map {
   backdrop-filter: var(--toolbar-blur);
 }
 
-.leaflet-bar a, .locate-switch button, .track-color-switch button, .pins-switch button,
+.leaflet-bar a, .locate-switch button, .compass-switch button, .track-color-switch button, .map3d-switch button, .pins-switch button,
 .waypoint-overview-switch button {
   background: transparent;
   color: var(--text);
@@ -2322,7 +2324,9 @@ body.failed #map {
 
 .leaflet-bar a:not(.leaflet-disabled):hover,
 .locate-switch button:not(:disabled):hover,
+.compass-switch button:not(:disabled):hover,
 .track-color-switch button:not(:disabled):hover,
+.map3d-switch button:not(:disabled):hover,
 .pins-switch button:not(:disabled):hover,
 .waypoint-overview-switch button:not(:disabled):hover {
   background: var(--toolbar-hover-tint);
@@ -2351,6 +2355,7 @@ body.failed #map {
 }
 
 .track-color-switch,
+.map3d-switch,
 .layer-switch,
 .pins-switch,
 .waypoint-overview-switch {
@@ -2360,6 +2365,267 @@ body.failed #map {
   border-radius: var(--toolbar-radius);
 }
 
+.map3d-switch .map3d-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--toolbar-height);
+  height: 100%;
+  padding: 0 7px;
+  border: 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+}
+
+.map3d-switch .map3d-toggle.active {
+  background: var(--icon-active-background);
+  color: var(--icon-active);
+  box-shadow: inset 0 -2px 0 var(--icon-active-line);
+}
+
+.map3d-switch .map3d-toggle.active:not(:disabled):hover {
+  background: var(--toolbar-surface-hover);
+  color: var(--icon-active);
+}
+
+.map3d-switch .map3d-toggle:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+#map-3d {
+  position: fixed;
+  inset: 0;
+  z-index: 450;
+  background: var(--bg);
+}
+
+#map-3d[hidden] {
+  display: none;
+}
+
+body.is-3d #map .leaflet-pane,
+body.is-3d #map .leaflet-control-scale,
+body.is-3d #map .leaflet-control-attribution {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+body.is-3d #map {
+  pointer-events: none;
+}
+
+body.is-3d #map .leaflet-control {
+  pointer-events: auto;
+}
+
+body.is-3d #map .leaflet-control-zoom a.leaflet-disabled {
+  opacity: 1;
+  color: var(--text);
+  cursor: pointer;
+}
+
+body.is-3d #map .leaflet-control-zoom a.leaflet-disabled:hover {
+  background: var(--toolbar-hover-tint);
+  color: var(--text-bright);
+}
+
+.map3d-controls {
+  position: fixed;
+  right: 12px;
+  bottom: calc(var(--profile-height, 0px) + 12px);
+  z-index: var(--z-floating-panel);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: calc(100vw - 24px);
+  padding: 5px 8px;
+  border: 1px solid var(--toolbar-border);
+  border-radius: var(--toolbar-radius);
+  background: var(--toolbar-surface);
+  -webkit-backdrop-filter: var(--toolbar-blur);
+  backdrop-filter: var(--toolbar-blur);
+  box-shadow: var(--toolbar-shadow);
+  color: var(--text);
+  font-size: var(--text-sm);
+  user-select: none;
+}
+
+.map3d-controls[hidden],
+body.chrome-hidden .map3d-controls {
+  display: none;
+}
+
+body:not(.with-profile) .map3d-controls {
+  bottom: 14px;
+}
+
+.map3d-hud-left {
+  position: fixed;
+  left: 12px;
+  bottom: calc(var(--profile-height, 0px) + 12px);
+  z-index: var(--z-floating-panel);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: calc(50vw - 20px);
+  pointer-events: none;
+  user-select: none;
+}
+
+.map3d-hud-left[hidden],
+body.chrome-hidden .map3d-hud-left {
+  display: none;
+}
+
+body:not(.with-profile) .map3d-hud-left {
+  bottom: 14px;
+}
+
+.map3d-scale {
+  display: inline-flex;
+  align-items: stretch;
+  gap: 4px;
+  flex: none;
+}
+
+.map3d-scale[hidden] {
+  display: none;
+}
+
+.map3d-scale-line {
+  box-sizing: border-box;
+  padding: 2px 5px 1px;
+  border: 2px solid var(--scale-border);
+  border-top: none;
+  font-size: 11px;
+  line-height: 1.1;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.map3d-attrib {
+  padding: 2px 8px;
+  border: 1px solid var(--border-hairline);
+  border-radius: var(--control-radius);
+  background: var(--attrib-bg);
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.35;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: auto;
+}
+
+@media (max-width: 620px) {
+  .map3d-attrib {
+    display: none;
+  }
+}
+
+.map3d-exag-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--control-radius);
+  background: var(--surface-inset);
+}
+
+.map3d-exag-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 22px;
+  padding: 0 7px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  cursor: pointer;
+  transition: background var(--motion-panel), color var(--motion-panel), border-color var(--motion-panel);
+}
+
+.map3d-exag-btn:hover {
+  background: var(--toolbar-hover-tint);
+  color: var(--text-bright);
+}
+
+.map3d-exag-btn[aria-pressed="true"] {
+  border-color: var(--icon-active-line);
+  background: var(--icon-active-background);
+  color: var(--icon-active);
+}
+
+.map3d-exag-btn[aria-pressed="true"]:hover {
+  background: var(--toolbar-surface-hover);
+  color: var(--icon-active);
+}
+
+.map3d-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding-left: 6px;
+  border-left: 1px solid var(--border-hairline);
+  color: var(--muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.map3d-hint-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.map3d-popup .maplibregl-popup-content {
+  width: 224px;
+  padding: 0;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: var(--hud-shadow);
+  animation: pin-card-enter var(--motion-panel) both;
+}
+
+.map3d-popup.maplibregl-popup-anchor-top .maplibregl-popup-tip,
+.map3d-popup.maplibregl-popup-anchor-top-left .maplibregl-popup-tip,
+.map3d-popup.maplibregl-popup-anchor-top-right .maplibregl-popup-tip {
+  border-bottom-color: var(--panel);
+}
+
+.map3d-popup.maplibregl-popup-anchor-bottom .maplibregl-popup-tip,
+.map3d-popup.maplibregl-popup-anchor-bottom-left .maplibregl-popup-tip,
+.map3d-popup.maplibregl-popup-anchor-bottom-right .maplibregl-popup-tip {
+  border-top-color: var(--panel);
+}
+
+.map3d-popup.maplibregl-popup-anchor-left .maplibregl-popup-tip {
+  border-right-color: var(--panel);
+}
+
+.map3d-popup.maplibregl-popup-anchor-right .maplibregl-popup-tip {
+  border-left-color: var(--panel);
+}
+
+@media (max-width: 780px) {
+  .map3d-hint {
+    display: none;
+  }
+}
+
 .layer-switch {
   position: relative;
 }
@@ -2367,13 +2633,27 @@ body.failed #map {
 /* Two square buttons under the zoom buttons, in the same column: the way home, then the picture. Both act on
    the route as a whole; the other corner is about what the map shows. Six pixels instead of Leaflet's ten: it
    reads as the next cell of the same stack. */
-.leaflet-top.leaflet-left .locate-switch {
+.leaflet-top.leaflet-left .locate-switch,
+.leaflet-top.leaflet-left .compass-switch {
   margin-top: 6px;
 }
 
-.locate-switch {
+.locate-switch,
+.compass-switch {
   display: flex;
   overflow: hidden; /* the bar's radius has to clip the button, which carries the background */
+}
+
+.leaflet-bar.compass-switch {
+  box-sizing: border-box;
+  width: calc(var(--toolbar-height) + 2px);
+  height: calc(var(--toolbar-height) + 2px);
+  flex: none;
+  border-radius: 50% !important;
+}
+
+.compass-switch[hidden] {
+  display: none;
 }
 
 .locate-switch button {
@@ -2385,4 +2665,39 @@ body.failed #map {
   padding: 0;
   border: 0;
   cursor: pointer;
+}
+
+.compass-switch button {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.compass-switch button.is-rotated {
+  background: var(--icon-active-background);
+  color: var(--icon-active);
+}
+
+.compass-switch button.is-rotated:not(:disabled):hover {
+  background: var(--toolbar-surface-hover);
+  color: var(--icon-active);
+}
+
+.compass-dial {
+  display: block;
+  flex: none;
+  width: 30px;
+  height: 30px;
+}
+
+.compass-readout {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
 }

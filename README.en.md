@@ -48,7 +48,7 @@ in Explorer to see the route, waypoints, photos and elevation profile without op
 ## Quick start
 
 1. Install **QuickLook** first (skip if already installed) via the [Microsoft Store](https://apps.microsoft.com/detail/9nv4bs3l1h4s), [QuickLook GitHub Releases](https://github.com/QL-Win/QuickLook/releases), or `winget install QL-Win.QuickLook`.
-2. Download the latest `.qlplugin` from [GitHub Releases](https://github.com/luluuuse/QuickLook.Plugin.TrailViewer/releases/latest).
+2. Download the latest `.qlplugin` (Windows x64 / x86) from [GitHub Releases](https://github.com/luluuuse/QuickLook.Plugin.TrailViewer/releases/latest).
 3. Press <kbd>Space</kbd> on (or open) the `.qlplugin` package to install it, then quit and restart QuickLook from the system tray.
 4. Select a `.gpx`, `.kml`, `.kmz` or `.fit` file in Explorer and press <kbd>Space</kbd>.
 
@@ -57,7 +57,7 @@ in Explorer to see the route, waypoints, photos and elevation profile without op
 | Category | Action | Shortcut / Entry |
 |---|---|---|
 | **View & basemaps** | Switch basemap / No-map mode / Fit complete route | <kbd>Q</kbd> <kbd>E</kbd> / <kbd>X</kbd> / <kbd>C</kbd> |
-| | Cycle track coloring | <kbd>L</kbd> |
+| | Toggle 3D terrain / Cycle track coloring | <kbd>3</kbd> / <kbd>L</kbd> |
 | | Collapse or expand profile / Hide UI chrome | <kbd>P</kbd> / <kbd>S</kbd> |
 | **Waypoints & measure** | Move between waypoints / Show or hide waypoints | <kbd>←</kbd> <kbd>→</kbd> (or <kbd>A</kbd> <kbd>D</kbd>) / <kbd>W</kbd> |
 | | Start or finish measuring | <kbd>M</kbd> |
@@ -71,6 +71,7 @@ in Explorer to see the route, waypoints, photos and elevation profile without op
 ### Maps and basemaps
 
 - **Built-in basemaps & outdoor overlays:** 10 built-in basemaps across Road (OpenStreetMap, Esri Light/Dark Gray, Tianditu), Terrain (CyclOSM, OpenHikingMap, OpenTopoMap, Esri World Topo) and Satellite (Esri Imagery, Tianditu), with multi-node switching, direct host network probing, 3 toggleable transparent outdoor overlays (Waymarked Hiking/Cycling and OpenSnowMap Pistes), and local disk tile caching.
+- **On-demand 3D terrain:** click **3D** or press <kbd>3</kbd> to lazily open a 3D terrain canvas (local bundle, destroyed on exit to free GPU memory) draping the active basemap over cached global Terrarium DEM tiles, with `1× / 1.3× / 1.8×` exaggeration, reset north, 360° orbit/tilt, and elevation-profile cursor sync.
 - **Custom sources & offline grid:** 11 one-click custom source presets (Japan GSI, Taiwan RudyMap, US USGS, Swiss swisstopo, Google Satellite, and 4 pro outdoor API-key presets), 512 px tile support, 2bulu placeholder auto-conversion, and an offline Grid (no-map) mode.
 
 ### Track analysis and browsing

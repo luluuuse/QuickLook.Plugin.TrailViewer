@@ -16,6 +16,8 @@ import {
   createLayerSwitcher,
   loadCustomProviders,
   createLocateControl,
+  createCompassControl,
+  createMap3DControl,
   savedLayer,
   savedTileCache,
 } from './map-controls.js';
@@ -262,7 +264,8 @@ function focusSplit(split) {
   const highlight = activeTrackLayer?.highlightRange(split.fromMeters, split.toMeters);
   activeProfile?.setSplitFocus(split);
   if (highlight?.bounds.isValid()) {
-    mapViewController?.focusBounds(highlight.bounds, { maxZoom: 16, animate: true });
+    if (map3dActive) map3dController?.fitBounds?.(highlight.bounds, { animate: true });
+    else mapViewController?.focusBounds(highlight.bounds, { maxZoom: 16, animate: true });
   }
 }
 function focusProfileRange(range) {
@@ -273,7 +276,8 @@ function focusProfileRange(range) {
   splitController.clearSelection?.();
   const highlight = activeTrackLayer?.highlightRange(range.fromMeters, range.toMeters);
   if (range.focusMap && highlight?.bounds.isValid()) {
-    mapViewController?.focusBounds(highlight.bounds, { maxZoom: 16, animate: true });
+    if (map3dActive) map3dController?.fitBounds?.(highlight.bounds, { animate: true });
+    else mapViewController?.focusBounds(highlight.bounds, { maxZoom: 16, animate: true });
   }
 }
 const waypointController = createWaypointController({
@@ -293,11 +297,18 @@ const waypointController = createWaypointController({
       activeTrackLayer?.setAnnotationMarkersVisible(visible);
     }
     editorOverlay?.setWaypointsVisible?.(visible);
+    if (map3dActive) map3dController?.setWaypointsVisible?.(visible);
   },
-  onFocus: (stop, popup) => mapViewController?.focusSelection(
-    [stop.point.lat, stop.point.lon],
-    { popup },
-  ),
+  onFocus: (stop, popup) => {
+    if (map3dActive && stop?.point) {
+      open3DWaypointCard(stop.point, { focus: true });
+      return;
+    }
+    mapViewController?.focusSelection(
+      [stop.point.lat, stop.point.lon],
+      { popup },
+    );
+  },
   onLayoutChange: () => mapViewController?.refreshControls({ refitHome: true, animate: true }),
   onOverviewOpen: () => {
     toolboxController?.close();
@@ -323,7 +334,12 @@ const profileController = createProfileController({
   focusStop: (index) => {
     if (!editorStore?.isActive()) waypointController.focus(index);
   },
-  revealPoint: (latlng, options) => mapViewController?.revealPoint(latlng, options),
+  revealPoint: (latlng, options) => {
+    if (!map3dActive) mapViewController?.revealPoint(latlng, options);
+  },
+  onHighlight: (lat, lon) => {
+    if (map3dActive) map3dController?.setHighlightPoint?.(lat, lon);
+  },
   onLayoutChange: () => mapViewController?.refreshControls({ refitHome: true, animate: true }),
   onRangeSelect: (range) => focusProfileRange(range),
   onCropRange: (fromMeters, toMeters) => openTrackEditor({ initialTool: 'crop', cropRange: [fromMeters, toMeters] }),
@@ -345,6 +361,19 @@ let openingEditor = false;
 let editorContext = null;
 let currentEditedGpx = null;
 let savedColorModeBeforeEdit = null;
+let map3dController = null;
+let map3dModulePromise = null;
+let map3dActive = false;
+let map3dToggling = false;
+let map3dSessionToken = 0;
+let map3dControl = null;
+let map3dControlsBar = null;
+let map3dHudLeft = null;
+let map3dExaggeration = 1.0;
+let exit3DView = (/** @type {{ syncCamera?: boolean }} */ _opts = {}) => {};
+let toggle3DView = () => {};
+let sync3DTracks = () => {};
+let open3DWaypointCard = (/** @type {any} */ _point, /** @type {{ focus?: boolean }} */ _opts = {}) => {};
 
 function ensureEditorCss() {
   if (document.getElementById('editor-stylesheet')) return Promise.resolve();
@@ -561,7 +590,10 @@ async function ensureEditorLoaded() {
                   tracks: newTracks,
                   initialMode: savedTrackColor(params),
                   showToast,
-                  onChange: () => syncPreferences(),
+                  onChange: () => {
+                    syncPreferences();
+                    sync3DTracks();
+                  },
                 });
                 trackColorControl.mount();
               }
@@ -617,6 +649,7 @@ async function openTrackEditor({ initialTool = 'crop', cropRange = null } = {}) 
   if (!source || source.network || openingEditor || editorStore?.isActive()) return;
   openingEditor = true;
   try {
+    exit3DView({ syncCamera: true });
     await ensureEditorLoaded();
     if (!editorShell || !editorOverlay || editorStore?.isActive()) return;
     if (measurementController?.active()) measurementController.stop();
@@ -662,8 +695,15 @@ const keyboardController = createKeyboardController({
     redo: () => editorStore?.redo(),
     save: () => editorShell?.triggerSave(),
   }),
-  fit: () => mapViewController?.fit({ animate: true }),
+  fit: () => {
+    if (map3dActive && activeTrackLayer?.bounds?.isValid?.()) {
+      map3dController?.fitBounds?.(activeTrackLayer.bounds, { animate: true });
+      return;
+    }
+    mapViewController?.fit({ animate: true });
+  },
   toggleChrome,
+  toggle3d: () => { void toggle3DView(); },
 });
 const pressKey = keyboardController.pressKey;
 const onKeyDown = keyboardController.onKeyDown;
@@ -937,6 +977,7 @@ async function main() {
   let reportedMeasurementActive = null;
   const reportMeasurementState = () => {
     const active = measurement.active();
+    if (active) exit3DView({ syncCamera: true });
     if (active === reportedMeasurementActive) return;
     reportedMeasurementActive = active;
     post(`measure-state\t${active ? '1' : '0'}`);
@@ -952,7 +993,10 @@ async function main() {
       tracks,
       initialMode: savedTrackColor(params),
       showToast,
-      onChange: () => syncPreferences(),
+      onChange: () => {
+        syncPreferences();
+        sync3DTracks();
+      },
     });
     trackColorControl.mount();
   }
@@ -999,6 +1043,13 @@ async function main() {
       splitData = null;
       updatePhotoAttachments?.(viewGpx);
       syncHostTitleMeta(viewSummary, viewElevations);
+    },
+    onTrackViewChanged: ({ bounds: nextBounds, fit }) => {
+      if (!map3dActive) return;
+      sync3DTracks();
+      if (fit && nextBounds?.isValid?.()) {
+        map3dController?.fitBounds?.(nextBounds, { animate: true });
+      }
     },
     pruneLocalized,
   });
@@ -1091,9 +1142,31 @@ async function main() {
       layerSwitch?.close();
     },
     onLayoutChange: () => mapViewController?.refreshControls({ refitHome: false, revealFocus: false }),
+    onExit3d: () => {
+      exit3DView({ syncCamera: true });
+    },
   });
   // First of the corner controls, so it stands leftmost: "where the map looks" before "what the map shows".
-  const locateCtrl = createLocateControl({ L, map, el, t, onLocate: () => mapViewController.fit({ animate: true }) });
+  const locateCtrl = createLocateControl({
+    L,
+    map,
+    el,
+    t,
+    onLocate: () => {
+      if (map3dActive && activeTrackLayer?.bounds?.isValid?.()) {
+        map3dController?.fitBounds?.(activeTrackLayer.bounds, { animate: true });
+        return;
+      }
+      mapViewController.fit({ animate: true });
+    },
+  });
+  const compassCtrl = createCompassControl({
+    L,
+    map,
+    el,
+    t,
+    onReset: () => map3dController?.resetNorth?.(),
+  });
   const warnTiandituTemporarily = () => {
     if (tiandituTransientShown) return;
     tiandituTransientShown = true;
@@ -1119,6 +1192,7 @@ async function main() {
     t,
     initial: savedLayer(params),
     onRemember: syncPreferences,
+    onLayerChange: () => sync3DBaseLayer(),
     tiandituDirectKey: initialDirectTiandituKey,
     onTiandituDirectError: () => queueMicrotask(warnTiandituTemporarily),
     onCustomError: () => showToast(t('layer.customError'), 5000),
@@ -1148,6 +1222,313 @@ async function main() {
     onProbeNode: hasQuickLookHost ? hostBridge.probeNode : null,
   }); // after the view is set: the grid needs the map bounds
   layerSwitch = switcher;
+
+  function build3DLayerSpec() {
+    const spec = switcher.getLayerSpec();
+    const styles = getComputedStyle(document.documentElement);
+    const noMapBg = styles.getPropertyValue('--no-map-bg').trim() || '#181a1f';
+    const isDark = styles.colorScheme === 'dark';
+    return { ...spec, noMapBg, isDark };
+  }
+
+  function stripHtml(raw) {
+    if (!raw || typeof raw !== 'string') return '';
+    return raw.replace(/<[^>]*>/g, '').replace(/&copy;/gi, '\u00a9').replace(/&mdash;/gi, '\u2014').replace(/\s+/g, ' ').trim();
+  }
+
+  function describe3DBaseLayer(spec) {
+    if (!spec || spec.key === 'none' || !spec.provider) {
+      return {
+        shortName: t('layer.none'),
+        fullAttrib: `${t('layer.none')} \u00b7 MapLibre GL \u00b7 AWS Terrarium DEM`,
+      };
+    }
+    const provider = spec.provider;
+    const shortName = provider.custom
+      ? (provider.custom.name || t('layer.custom'))
+      : (provider.label ? t(provider.label) : spec.key);
+    const rawAttrib = provider.custom
+      ? (provider.custom.attribution || '')
+      : (provider.options?.attribution || provider.layers?.[0]?.options?.attribution || '');
+    const overlayAttribs = (spec.overlays || [])
+      .map((o) => stripHtml(o.options?.attribution || ''))
+      .filter(Boolean);
+    const parts = ['MapLibre GL', stripHtml(rawAttrib), ...overlayAttribs, 'AWS Terrarium DEM'].filter(Boolean);
+    return {
+      shortName,
+      fullAttrib: parts.join(' \u00b7 '),
+    };
+  }
+
+  function ensure3DHudLeft() {
+    if (map3dHudLeft) return map3dHudLeft;
+    const wrap = el('div', 'map3d-hud-left');
+    wrap.hidden = true;
+
+    const scaleBox = el('div', 'map3d-scale leaflet-control-scale');
+    const scaleLine = el('div', 'map3d-scale-line leaflet-control-scale-line');
+    const scaleRatio = el('span', 'swiss-scale-ratio');
+    scaleRatio.setAttribute('aria-hidden', 'true');
+    scaleRatio.hidden = true;
+    scaleBox.append(scaleLine, scaleRatio);
+
+    const attrib = el('div', 'map3d-attrib');
+    wrap.append(scaleBox, attrib);
+    document.body.append(wrap);
+
+    map3dHudLeft = {
+      node: wrap,
+      updateScale(metrics) {
+        if (!metrics || !metrics.label || !metrics.widthPx) {
+          scaleBox.hidden = true;
+          return;
+        }
+        scaleBox.hidden = false;
+        scaleLine.style.width = `${metrics.widthPx}px`;
+        scaleLine.textContent = metrics.label;
+        scaleRatio.textContent = metrics.ratioText || '';
+        scaleRatio.hidden = !metrics.ratioText;
+      },
+      updateAttrib() {
+        const info = describe3DBaseLayer(switcher.getLayerSpec());
+        attrib.textContent = `${info.shortName} \u00b7 ${t('map3d.terrainTag')}`;
+        attrib.title = info.fullAttrib;
+      },
+    };
+    map3dHudLeft.updateAttrib();
+    return map3dHudLeft;
+  }
+
+  function sync3DBaseLayer() {
+    if (!map3dActive || !map3dController) return;
+    map3dController.updateBaseLayer(build3DLayerSpec());
+    map3dHudLeft?.updateAttrib();
+  }
+
+  sync3DTracks = () => {
+    if (!map3dActive || !map3dController) return;
+    const drawOptions = trackViewController?.getDrawOptions?.() || {};
+    map3dController.updateTracks(liveState.gpx, {
+      theme: getTheme(),
+      colorMode: trackColorControl?.activeMode?.() || 'single',
+      trackColorStartIndex: drawOptions.trackColorStartIndex || 0,
+      referenceTracks: drawOptions.referenceTracks || [],
+    });
+  };
+
+  open3DWaypointCard = (point, { focus = true } = {}) => {
+    if (!map3dActive || !map3dController || !point) return;
+    const closePopup = () => map3dController?.closePopup?.();
+    const photos = photosOf(point);
+    const card = photos.length > 0
+      ? photoPreview(photos, point, closePopup)
+      : renderPointPopup(point, point.name || t('label.waypoint'), el, closePopup);
+    map3dController.showWaypointPopup(point.lat, point.lon, card, { focus });
+  };
+
+  function ensure3DControlsBar() {
+    if (map3dControlsBar) return map3dControlsBar;
+    const bar = el('div', 'map3d-controls');
+    bar.hidden = true;
+    bar.setAttribute('role', 'toolbar');
+
+    const exagGroup = el('div', 'map3d-exag-group');
+    exagGroup.setAttribute('role', 'group');
+    const levels = [1.0, 1.3, 1.8];
+    const exagButtons = levels.map((val) => {
+      const btn = el('button', 'map3d-exag-btn', `${val === 1 ? '1' : val}\u00d7`);
+      btn.type = 'button';
+      btn.dataset.exaggeration = String(val);
+      btn.setAttribute('aria-pressed', String(val === map3dExaggeration));
+      btn.addEventListener('click', () => {
+        map3dExaggeration = val;
+        map3dController?.setExaggeration?.(val);
+        for (const item of exagButtons) {
+          item.setAttribute('aria-pressed', String(Number(item.dataset.exaggeration) === map3dExaggeration));
+        }
+      });
+      exagGroup.append(btn);
+      return btn;
+    });
+
+    const hint = el('div', 'map3d-hint');
+    const hintPan = el('span', 'map3d-hint-item');
+    const hintRotate = el('span', 'map3d-hint-item');
+    const hintZoom = el('span', 'map3d-hint-item');
+    hint.append(hintPan, hintRotate, hintZoom);
+
+    bar.append(exagGroup, hint);
+    document.body.append(bar);
+    map3dControlsBar = {
+      node: bar,
+      exagGroup,
+      exagButtons,
+      hintPan,
+      hintRotate,
+      hintZoom,
+      relabel() {
+        bar.setAttribute('aria-label', t('map3d.controlsLabel'));
+        exagGroup.setAttribute('aria-label', t('map3d.exaggerationLabel'));
+        for (const btn of exagButtons) {
+          const v = btn.dataset.exaggeration;
+          const key = v === '1'
+            ? 'map3d.exaggerationHint1'
+            : v === '1.3'
+              ? 'map3d.exaggerationHint13'
+              : 'map3d.exaggerationHint18';
+          btn.title = t(key);
+          btn.setAttribute('aria-label', btn.title);
+        }
+        hintPan.innerHTML = `<kbd class="control-key">${t('map3d.hintLeftKey')}</kbd><span>${t('map3d.hintPan')}</span>`;
+        hintRotate.innerHTML = `<kbd class="control-key">${t('map3d.hintRightKey')}</kbd><span>${t('map3d.hintRotate')}</span>`;
+        hintZoom.innerHTML = `<kbd class="control-key">${t('map3d.hintWheelKey')}</kbd><span>${t('map3d.hintZoom')}</span>`;
+      },
+    };
+    map3dControlsBar.relabel();
+    return map3dControlsBar;
+  }
+
+  exit3DView = ({ syncCamera = true } = {}) => {
+    map3dSessionToken += 1;
+    if (!map3dActive) return;
+    const cam = syncCamera ? map3dController?.getCamera?.() : null;
+    map3dController?.destroy?.();
+    map3dController = null;
+    map3dActive = false;
+    const container3d = document.getElementById('map-3d');
+    if (container3d) container3d.hidden = true;
+    if (map3dControlsBar) map3dControlsBar.node.hidden = true;
+    if (map3dHudLeft) map3dHudLeft.node.hidden = true;
+    compassCtrl.setVisible(false);
+    document.body.classList.remove('is-3d');
+    map3dControl?.setActive(false);
+    map.invalidateSize({ animate: false });
+    if (cam && Number.isFinite(cam.center?.lat) && Number.isFinite(cam.center?.lng)) {
+      map.setView([cam.center.lat, cam.center.lng], cam.zoom, { animate: false });
+    }
+  };
+
+  async function enter3DView() {
+    if (map3dActive || map3dToggling || editorStore?.isActive?.()) return;
+    const container3d = document.getElementById('map-3d');
+    if (!container3d) return;
+    const token = ++map3dSessionToken;
+    map3dToggling = true;
+    map3dControl?.setLoading(true);
+    let pendingController = null;
+    const isStale = () => token !== map3dSessionToken || Boolean(editorStore?.isActive?.());
+    try {
+      toolboxController?.close();
+      layerSwitch?.close();
+      waypointController.closeOverview(false);
+      if (measurement.active()) measurement.stop();
+
+      if (!map3dModulePromise) {
+        map3dModulePromise = import('./map-3d.js').catch((err) => {
+          map3dModulePromise = null;
+          throw err;
+        });
+      }
+      const mod = await map3dModulePromise;
+      if (isStale()) return;
+
+      const controller = mod.createMap3D();
+      pendingController = controller;
+      const center = map.getCenter();
+      const zoom = map.getZoom();
+
+      container3d.hidden = false;
+      document.body.classList.add('is-3d');
+      const hudLeft = ensure3DHudLeft();
+      hudLeft.updateAttrib();
+      const controls = ensure3DControlsBar();
+      const drawOptions = trackViewController?.getDrawOptions?.() || {};
+      await controller.mount(container3d, {
+        center: { lat: center.lat, lng: center.lng },
+        zoom,
+        gpx: liveState.gpx,
+        layerSpec: build3DLayerSpec(),
+        theme: getTheme(),
+        colorMode: trackColorControl?.activeMode?.() || 'single',
+        trackColorStartIndex: drawOptions.trackColorStartIndex || 0,
+        referenceTracks: drawOptions.referenceTracks || [],
+        exaggeration: map3dExaggeration,
+        waypointsVisible: waypointController.visible(),
+        onWaypointClick: (hit) => {
+          if (hit.kind === 'start' || hit.kind === 'end') {
+            open3DWaypointCard({
+              lat: hit.lat,
+              lon: hit.lon,
+              ele: hit.ele,
+              time: hit.time,
+              name: t(hit.kind === 'start' ? 'label.start' : 'label.end'),
+            }, { focus: true });
+            return;
+          }
+          const wpt = liveState.gpx?.waypoints?.[hit.index];
+          if (wpt) open3DWaypointCard(wpt, { focus: true });
+        },
+        onScaleChange: (metrics) => hudLeft.updateScale(metrics),
+        onCompassChange: (state) => compassCtrl.update(state),
+      });
+      if (isStale()) {
+        controller.destroy();
+        pendingController = null;
+        container3d.hidden = true;
+        document.body.classList.remove('is-3d');
+        map3dControl?.setActive(false);
+        return;
+      }
+      pendingController = null;
+      map3dController = controller;
+      map3dActive = true;
+      map3dControl?.setActive(true);
+      compassCtrl.setVisible(true);
+      controls.node.hidden = false;
+      hudLeft.node.hidden = false;
+    } catch (err) {
+      pendingController?.destroy?.();
+      pendingController = null;
+      container3d.hidden = true;
+      document.body.classList.remove('is-3d');
+      map3dController?.destroy?.();
+      map3dController = null;
+      map3dActive = false;
+      map3dControl?.setActive(false);
+      if (isStale()) return;
+      if (err?.name === 'WebGLUnsupportedError') {
+        showToast(t('map3d.webglUnsupported'), 4500);
+      } else {
+        showToast(t('map3d.loadFailed'), 4000);
+      }
+    } finally {
+      map3dToggling = false;
+      map3dControl?.setLoading(false);
+    }
+  }
+
+  toggle3DView = () => {
+    if (map3dActive) exit3DView({ syncCamera: true });
+    else void enter3DView();
+  };
+
+  map3dControl = createMap3DControl({
+    L,
+    map,
+    el,
+    t,
+    onToggle: () => toggle3DView(),
+  });
+  const zoomContainer = map.zoomControl?.getContainer?.();
+  zoomContainer?.addEventListener('click', (event) => {
+    if (!map3dActive || !map3dController) return;
+    const btn = event.target instanceof Element ? event.target.closest('a') : null;
+    if (!btn) return;
+    event.preventDefault();
+    event.stopPropagation();
+    if (btn.classList.contains('leaflet-control-zoom-in')) map3dController.zoomIn?.();
+    else if (btn.classList.contains('leaflet-control-zoom-out')) map3dController.zoomOut?.();
+  }, { capture: true });
   // A file that draws no dots and has no waypoints gets no switch: there is nothing for it to show or hide.
   waypointController.createControl(map);
   mapViewController.observeControls();
@@ -1214,6 +1595,10 @@ async function main() {
     syncHostTitleMeta(liveState.summary, liveState.elevations);
     switcher.relabel();
     locateCtrl.relabel();
+    compassCtrl.relabel();
+    map3dControl?.relabel();
+    map3dControlsBar?.relabel();
+    map3dHudLeft?.updateAttrib();
     measurement.relabel();
     toolboxController.relabel();
     trackColorControl?.relabel();
@@ -1240,6 +1625,8 @@ async function main() {
     toolboxController?.refreshTheme?.();
     activeTrackLayer?.refreshTheme?.();
     trackViewController?.refreshTheme?.();
+    sync3DBaseLayer();
+    sync3DTracks();
   });
   const api = createTestApi({
     gpx, summary, map, scrub, photoViewer, hikeEstimate, tracks, timing, loadSplitsData,
@@ -1291,6 +1678,11 @@ async function main() {
       revealFallbackTimer = 0;
     }
     swissScaleRatio?.destroy?.();
+    exit3DView({ syncCamera: false });
+    map3dControl?.destroy?.();
+    compassCtrl.destroy();
+    map3dControlsBar?.node?.remove?.();
+    map3dHudLeft?.node?.remove?.();
     toolboxController?.destroy();
     layerSwitch?.destroy();
     trackColorControl?.destroy();

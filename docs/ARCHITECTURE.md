@@ -63,8 +63,10 @@ QuickLook
 | `viewer/icons.js` | 统一 UI 图标与地图数据符号注册表、Leaflet 原生控件图标适配 |
 | `viewer/export*.js` | 离屏画布、版式和 PNG 分块传输 |
 
-`viewer/index.html` 并行加载 `viewer/css/` 下的 tokens、panels、toolbox、layers、map-data 与 photos
-样式文件，不再经过串行 `@import` 瀑布。主要浮层间距、面板和模态层级通过 `--z-*` 变量统一约束。
+`viewer/index.html` 在开发与测试期并行加载 `viewer/css/` 下的 tokens、panels、toolbox、layers、map-data 与 photos
+样式文件，不再经过串行 `@import` 瀑布；Release 打包时由 `scripts/build-viewer.cjs`（`esbuild`）将首屏 6 份样式合并压缩为
+`css/app.css`，并对入口脚本执行分包压缩输出到 `bin/Release/viewer/`（完整保留编辑器、照片查看、叠加图与附件导出的按需
+动态 `import()` 懒加载边界以及独立的 `css/editor.css`）。主要浮层间距、面板和模态层级通过 `--z-*` 变量统一约束。
 浮层使用 `contain: layout style paint`；地图拖动期间临时关闭模糊。剖面色阶为低饱和松绿、暖琥珀、
 焦糖橙和暗绯红，并对密集航点做像素抽稀。剖面填充固定为一条 SVG 路径和一个横向渐变；静态 SVG 独立
 包含并提升为合成层，参考线、圆点和读数只更新 `translate3d`，鼠标移动不读取图表边界。

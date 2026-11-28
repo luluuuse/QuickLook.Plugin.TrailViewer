@@ -18,6 +18,12 @@ const LEAFLET_FILES = [
   'LICENSE',
 ];
 
+const MAPLIBRE_FILES = [
+  'maplibre-gl.js',
+  'maplibre-gl.css',
+  'LICENSE',
+];
+
 function dirStats(dir) {
   let files = 0;
   let bytes = 0;
@@ -118,6 +124,12 @@ async function buildViewer(root = path.resolve(__dirname, '..'), outDir = path.j
   fs.mkdirSync(leafletOutDir, { recursive: true });
   for (const file of LEAFLET_FILES) {
     fs.copyFileSync(path.join(srcDir, 'vendor', 'leaflet', file), path.join(leafletOutDir, file));
+  }
+
+  const maplibreOutDir = path.join(outDir, 'vendor', 'maplibre');
+  fs.mkdirSync(maplibreOutDir, { recursive: true });
+  for (const file of MAPLIBRE_FILES) {
+    fs.copyFileSync(path.join(srcDir, 'vendor', 'maplibre', file), path.join(maplibreOutDir, file));
   }
 
   const after = dirStats(outDir);

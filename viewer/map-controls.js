@@ -92,7 +92,7 @@ export function savedTileCache(params, hosted = null) {
 }
 
 export function createLayerSwitcher({
-  L, map, el, t, initial, onRemember, tiandituDirectKey = '',
+  L, map, el, t, initial, onRemember, onLayerChange = null, tiandituDirectKey = '',
   onConfigureTianditu = () => {}, onRemoveTianditu = () => {},
   onTiandituDirectError = () => {}, onCustomError = () => {},
   onOpen = () => {}, onCustomSave, customSources = null,
@@ -215,6 +215,7 @@ export function createLayerSwitcher({
     }
     saveOverlayPreferences(writeStored, activeOverlays);
     renderOverlays();
+    onLayerChange?.();
   }
   function selectProviderNode(providerKey, nodeId) {
     const nodes = PROVIDER_NODES[providerKey];
@@ -235,6 +236,7 @@ export function createLayerSwitcher({
       if (wasActive) layers[key].addTo(map);
     }
     renderNodes();
+    onLayerChange?.();
   }
   async function checkAllProviderNodes() {
     if (probingNodes || !nodesUi) return;
@@ -270,6 +272,7 @@ export function createLayerSwitcher({
     if (token !== probeToken) return;
     probingNodes = false;
     renderNodes();
+    onLayerChange?.();
   }
   function persistTileCacheSettings() {
     writeStored('tileCache', tileCacheState.enabled ? '1' : '0');
@@ -324,6 +327,7 @@ export function createLayerSwitcher({
     updateMenuButton();
     renderNoMapButton({ noMapButton, current, t });
     if (result.keepMenu) renderMenu();
+    onLayerChange?.();
     return true;
   }
   function closeMenu({ restoreFocus = false } = {}) {
@@ -630,6 +634,19 @@ export function createLayerSwitcher({
     },
     current: () => current,
     currentCategory: () => currentCategory,
+    getLayerSpec() {
+      const entry = current && current !== 'none' ? PROVIDERS[current] : null;
+      const provider = entry?.provider
+        ? (entry.provider.custom ? entry.provider : resolveProvider(entry.provider, nodePrefs))
+        : null;
+      const overlays = MAP_OVERLAYS.filter((overlay) => activeOverlays.has(overlay.id));
+      return {
+        key: current || 'none',
+        provider,
+        directKey,
+        overlays,
+      };
+    },
     setTileCacheStats(totalBytes, tileCount) {
       tileCacheState.stats = {
         totalBytes: Math.max(0, Number(totalBytes) || 0),
@@ -691,6 +708,143 @@ export function createLocateControl({ L, map, el, t, onLocate }) {
       if (!button) return;
       button.title = t('locate.title');
       button.setAttribute('aria-label', t('locate.title'));
+    },
+  };
+}
+
+export function createCompassControl({ L, map, el, t, onReset }) {
+  let bar = null;
+  let button = null;
+  let needle = null;
+  let readout = null;
+  let control = null;
+  let visible = false;
+  let latest = { heading: 0, dir: 'N', needleDeg: 0, isRotated: false };
+
+  function render() {
+    if (!bar || !button) return;
+    bar.hidden = !visible;
+    if (needle) {
+      needle.setAttribute('transform', `rotate(${latest.needleDeg.toFixed(1)} 18 18)`);
+    }
+    if (readout) {
+      readout.textContent = latest.isRotated ? `${latest.heading}°` : 'N';
+    }
+    button.classList.toggle('is-rotated', Boolean(latest.isRotated));
+    const dirName = t(`map3d.dir.${latest.dir}`);
+    const title = latest.isRotated
+      ? t('map3d.compassHeading', { dir: dirName, deg: latest.heading })
+      : t('map3d.compassNorth');
+    button.title = title;
+    button.setAttribute('aria-label', title);
+  }
+
+  const Control = L.Control.extend({
+    options: { position: 'topleft' },
+    onAdd() {
+      bar = el('div', 'compass-switch leaflet-bar');
+      bar.hidden = !visible;
+      button = el('button', 'compass-toggle');
+      button.type = 'button';
+      button.dataset.map3dAction = 'north';
+      button.innerHTML = '<svg class="compass-dial" viewBox="0 0 36 36" width="34" height="34" aria-hidden="true">'
+        + '<circle cx="18" cy="18" r="14.5" fill="none" stroke="currentColor" stroke-opacity="0.16" stroke-width="1.4"/>'
+        + '<g class="compass-needle">'
+        + '<path d="M18 1.6 L21.4 6.6 L14.6 6.6 Z" fill="#ef4444"/>'
+        + '</g>'
+        + '<text class="compass-readout" x="18" y="21.5" text-anchor="middle" fill="currentColor" '
+        + 'font-size="9.5" font-weight="700">N</text>'
+        + '</svg>';
+      needle = button.querySelector('.compass-needle');
+      readout = button.querySelector('.compass-readout');
+      button.addEventListener('click', (event) => {
+        event.stopPropagation();
+        onReset?.();
+      });
+      bar.append(button);
+      L.DomEvent.disableClickPropagation(bar);
+      L.DomEvent.disableScrollPropagation(bar);
+      render();
+      return bar;
+    },
+  });
+  control = new Control();
+  map.addControl(control);
+
+  return {
+    setVisible(next) {
+      visible = Boolean(next);
+      render();
+    },
+    update(state) {
+      if (!state) return;
+      latest = state;
+      render();
+    },
+    relabel: render,
+    destroy() {
+      control?.remove();
+      control = null;
+      bar = null;
+      button = null;
+      needle = null;
+      readout = null;
+    },
+  };
+}
+
+export function createMap3DControl({ L, map, el, t, onToggle }) {
+  let button = null;
+  let control = null;
+  let active = false;
+  let loading = false;
+
+  function update() {
+    if (!button) return;
+    button.classList.toggle('active', active);
+    button.classList.toggle('loading', loading);
+    button.setAttribute('aria-pressed', String(active));
+    button.disabled = loading;
+    const label = active ? t('map3d.exitTitle') : t('map3d.enterTitle');
+    button.title = label;
+    button.setAttribute('aria-label', label);
+  }
+
+  const Control = L.Control.extend({
+    options: { position: 'topright' },
+    onAdd() {
+      const bar = el('div', 'map3d-switch leaflet-bar');
+      button = el('button', 'map3d-toggle', '3D');
+      button.type = 'button';
+      button.dataset.map3d = 'toggle';
+      button.addEventListener('click', (event) => {
+        event.stopPropagation();
+        onToggle?.();
+      });
+      bar.append(button);
+      L.DomEvent.disableClickPropagation(bar);
+      L.DomEvent.disableScrollPropagation(bar);
+      update();
+      return bar;
+    },
+  });
+  control = new Control();
+  map.addControl(control);
+
+  return {
+    setActive(next) {
+      active = Boolean(next);
+      update();
+    },
+    setLoading(next) {
+      loading = Boolean(next);
+      update();
+    },
+    relabel: update,
+    destroy() {
+      control?.remove();
+      control = null;
+      button = null;
     },
   };
 }

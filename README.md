@@ -48,7 +48,7 @@
 ## 快速开始
 
 1. 先安装宿主软件 **QuickLook**（如已安装可跳过）：可通过 [Microsoft Store](https://apps.microsoft.com/detail/9nv4bs3l1h4s)、[QuickLook GitHub Releases](https://github.com/QL-Win/QuickLook/releases) 下载安装，或在终端执行 `winget install QL-Win.QuickLook`。
-2. 从 [GitHub Releases](https://github.com/luluuuse/QuickLook.Plugin.TrailViewer/releases/latest) 下载最新 `.qlplugin`。
+2. 从 [GitHub Releases](https://github.com/luluuuse/QuickLook.Plugin.TrailViewer/releases/latest) 下载最新 `.qlplugin`（支持 Windows x64 / x86）。
 3. 选中 `.qlplugin` 安装包按 <kbd>Space</kbd>（或双击打开）完成安装，并从系统托盘完全退出后重新启动 QuickLook。
 4. 在资源管理器中选中 `.gpx`、`.kml`、`.kmz` 或 `.fit` 文件，按 <kbd>Space</kbd> 即可预览。
 
@@ -57,7 +57,7 @@
 | 场景 | 操作 | 快捷键 / 入口 |
 |---|---|---|
 | **视图与底图** | 切换底图 / 无底图模式 / 回到完整轨迹 | <kbd>Q</kbd> <kbd>E</kbd> / <kbd>X</kbd> / <kbd>C</kbd> |
-| | 切换轨迹热力着彩 | <kbd>L</kbd> |
+| | 切换 3D 立体地形 / 轨迹热力着彩 | <kbd>3</kbd> / <kbd>L</kbd> |
 | | 收起或展开海拔剖面 / 隐藏界面 | <kbd>P</kbd> / <kbd>S</kbd> |
 | **航点与测距** | 切换航点 / 显示或隐藏航点 | <kbd>←</kbd> <kbd>→</kbd>（或 <kbd>A</kbd> <kbd>D</kbd>） / <kbd>W</kbd> |
 | | 开始或结束测距 | <kbd>M</kbd> |
@@ -71,6 +71,7 @@
 ### 地图与底图
 
 - **多图源与户外叠加层**：内置 10 套底图，覆盖路网（OpenStreetMap、Esri 浅灰/深灰、天地图）、地形（CyclOSM、OpenHikingMap、OpenTopoMap、Esri 地形）与卫星（Esri 影像、天地图），支持多节点切换、宿主直连真实网络测速、3 套透明户外叠加层（徒步/骑行/雪道）及本地瓦片磁盘缓存。
+- **按需 3D 立体地形**：点击右上角 **3D** 或按 <kbd>3</kbd> 懒加载 3D 地形画布（零外部 CDN、退出即释放显存），复用当前底图贴合免费全球 DEM 高程（纳入本地缓存），支持 `1× / 1.3× / 1.8×` 地形夸张、复位正北、360° 旋转俯仰与海拔剖面游标联动。
 - **定制图源与无底图模式**：内置 11 套定制图源一键预设（含日本 GSI、台湾鲁地图、美国 USGS、瑞士 swisstopo、Google 卫星及 4 套专业户外 API Key 预设），支持两步路占位符、512 px 地址与离线网格无底图模式。
 
 ### 轨迹分析与浏览

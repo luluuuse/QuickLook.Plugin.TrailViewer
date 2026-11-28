@@ -51,6 +51,7 @@ export function createToolbox({
   themeModes = [],
   onOpen,
   onLayoutChange,
+  onExit3d,
 }) {
   const lifecycle = new AbortController();
   // Declared with their real signatures: the defaults below are zero-argument stubs, and TypeScript would
@@ -100,6 +101,7 @@ export function createToolbox({
   let measureWasActive = false;
 
   function showView(next) {
+    if (next === 'coordinate' || next === 'measure') onExit3d?.();
     if (next !== 'coordinate') coordinates.stop();
     view = next;
     if (next === 'export' && exportSettingsContainer && !exportSettingsPanel) {

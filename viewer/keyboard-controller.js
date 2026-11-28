@@ -13,6 +13,7 @@ export function createKeyboardController({
   editor: getEditor,
   fit,
   toggleChrome,
+  toggle3d,
 }) {
   function cycleLayer(step) {
     const switcher = getLayerSwitch();
@@ -49,9 +50,13 @@ export function createKeyboardController({
         editor.save();
         return;
       }
-      if (name === 'l' || name === 'm' || name === 't' || name === 's') {
+      if (name === 'l' || name === 'm' || name === 't' || name === 's' || name === '3') {
         return;
       }
+    }
+    if (name === '3') {
+      toggle3d?.();
+      return;
     }
     const measurement = getMeasurement?.();
     if (name === 'm') {
@@ -117,7 +122,7 @@ export function createKeyboardController({
     if (event.ctrlKey || event.altKey || event.metaKey) return;
     const plainShortcut = !event.shiftKey
       && (key === 'w' || key === 's' || key === 'c' || key === 'm' || key === 't'
-        || key === 'p' || key === 'l' || key === 'x' || LAYER_KEYS[key]);
+        || key === 'p' || key === 'l' || key === 'x' || key === '3' || LAYER_KEYS[key]);
     if (!photoOpen && plainShortcut) {
       if (event.repeat) return;
       event.preventDefault();

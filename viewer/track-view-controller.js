@@ -36,11 +36,13 @@ export function createTrackViewController({
   getOverlayExport,
   getMapViewController,
   onViewDataApplied,
+  onTrackViewChanged,
   pruneLocalized,
 }) {
   let sourceGpx = initialGpx;
   let sourceModel = initialModel;
   let selectedTrackIndex = null;
+  let currentDrawOptions = {};
   const trackViewCache = new Map();
 
   function getTrackViewData(index) {
@@ -102,6 +104,7 @@ export function createTrackViewController({
       viewSplitPreview,
       drawOptions,
     } = viewData;
+    currentDrawOptions = drawOptions || {};
 
     onViewDataApplied?.(viewData);
     renderInfo(viewGpx, viewSummary, viewElevations, viewHikeEstimate);
@@ -164,6 +167,12 @@ export function createTrackViewController({
       mapView?.fit({ animate: true });
     }
     mapView?.refreshControls({ refitHome: false, revealFocus: false });
+    onTrackViewChanged?.({
+      viewGpx,
+      drawOptions: currentDrawOptions,
+      bounds: nextTracks.bounds,
+      fit,
+    });
   }
 
   const selector = createTrackSelector({
@@ -188,9 +197,11 @@ export function createTrackViewController({
       sourceGpx = nextGpx;
       sourceModel = nextModel;
       selectedTrackIndex = null;
+      currentDrawOptions = {};
       trackViewCache.clear();
       selector.render(nextGpx, nextModel, null);
     },
+    getDrawOptions: () => currentDrawOptions,
     relabel: () => selector.relabel(),
     refreshTheme: () => selector.refreshTheme(),
     selectedIndex: () => selectedTrackIndex,

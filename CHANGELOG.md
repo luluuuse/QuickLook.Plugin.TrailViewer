@@ -11,6 +11,12 @@ Added / Changed / Deprecated / Removed / Fixed / Security 分类；没有内容�
 
 ### 中文
 
+### English
+
+## 1.37.0 — 2026-11-28
+
+### 中文
+
 - 暂无。
 
 ### English

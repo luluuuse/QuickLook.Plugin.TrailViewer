@@ -128,6 +128,9 @@ async function packRelease(root, release, out, version) {
     'viewer/vendor/leaflet/leaflet.js',
     'viewer/vendor/leaflet/leaflet.css',
     'viewer/vendor/leaflet/LICENSE',
+    'viewer/vendor/maplibre/maplibre-gl.js',
+    'viewer/vendor/maplibre/maplibre-gl.css',
+    'viewer/vendor/maplibre/LICENSE',
     'viewer/assets/trailviewer-icon.svg',
   ];
   const missing = requiredViewerFiles.filter((file) => !entryNames.has(file));

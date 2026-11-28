@@ -23,6 +23,7 @@
   - **卫星**：Esri 世界影像、天地图
 - **户外专题叠加层**：图层面板底部可自由开关 3 套透明叠加层（**徒步路网**、**骑行路网**、**滑雪雪道**），可叠加于任意底图并共用本地瓦片缓存。
 - **无底图网格模式**：点击图层标题栏中的网格图标或按 <kbd>X</kbd> 一键开关，仅在本地网格上显示轨迹与测距，不请求在线瓦片；再次点击、再按 <kbd>X</kbd> 或切换底图分类即恢复原底图。
+- **3D 立体地形模式**：点击右上角 **3D** 按钮或按 <kbd>3</kbd> 按需开启（首次点击才加载本地 3D 引擎，退出立即释放显存），自动复用当前底图与叠加层贴合全球高程山体（高程瓦片共用本地磁盘缓存）；右下角浮条支持切换地形夸张倍数（`1× / 1.3× / 1.8×`）与复位正北，左键平移、右键旋转/俯仰、滚轮缩放，并与底部海拔剖面悬停游标联动；进入编辑、测距或点位坐标时自动切回 2D 并同步视野。
 - **面板互斥**：工具箱、图层面板与航点列表互斥，打开其一会自动关闭另外两个。
 
 #### 地图设置
@@ -156,6 +157,7 @@
   - **Satellite:** Esri World Imagery, Tianditu
 - **Transparent outdoor overlays:** toggle 3 overlays at the bottom of the layer panel (**Waymarked Hiking**, **Waymarked Cycling**, **OpenSnowMap Pistes**) over any basemap, backed by the local tile cache.
 - **No-map Grid mode:** click the grid icon in the layer header or press <kbd>X</kbd> to toggle local coordinate-grid mode without fetching online tiles; click again, press <kbd>X</kbd>, or switch categories to restore the previous basemap.
+- **3D terrain preview:** click the **3D** button in the top-right controls or press <kbd>3</kbd> to launch on-demand 3D terrain (loaded lazily on first click and destroyed on exit to free GPU memory), draping the active basemap and overlays over global DEM tiles (cached locally); use the bottom-right bar to adjust terrain exaggeration (`1× / 1.3× / 1.8×`) or reset north, with left-drag pan, right-drag rotate/tilt, wheel zoom, and live elevation-profile hover sync; entering edit, measure or coordinates automatically exits 3D and preserves the viewport.
 - **Mutual exclusion:** the Toolbox, Layer panel and Waypoint list are mutually exclusive—opening one closes the others.
 
 #### Map settings

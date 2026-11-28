@@ -162,6 +162,7 @@ internal sealed class TileCache
         "https://services.arcgisonline.com/ArcGIS/rest/services/*",
         "https://tianditu.gov.cn/*",
         "https://*.tianditu.gov.cn/*",
+        "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/*",
     };
 
     internal static IReadOnlyList<string> GetWebResourceFilterPatterns(
@@ -299,6 +300,13 @@ internal sealed class TileCache
         {
             canonicalHost = "t.tianditu.gov.cn";
             isTianditu = true;
+        }
+        else if (string.Equals(host, "s3.amazonaws.com", StringComparison.OrdinalIgnoreCase)
+            && uri.AbsolutePath.StartsWith(
+                "/elevation-tiles-prod/terrarium/",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            canonicalHost = "s3.amazonaws.com";
         }
         else if (customMatchers != null)
         {

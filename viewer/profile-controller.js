@@ -89,6 +89,7 @@ function attachScrub({
   getStops,
   focusStop,
   revealPoint,
+  onHighlight,
   onRangeSelect,
   onCropRange,
   isEditingSuspended = () => false,
@@ -243,6 +244,7 @@ function attachScrub({
       marker.addTo(map);
       onMap = true;
     }
+    onHighlight?.(point.lat, point.lon);
     if (reveal) revealPoint?.(latlng, { remember: pinned });
   }
 
@@ -262,6 +264,7 @@ function attachScrub({
       marker.remove();
       onMap = false;
     }
+    onHighlight?.(null, null);
     current = null;
   }
 
@@ -453,6 +456,7 @@ export function createProfileController({
   getStops,
   focusStop,
   revealPoint,
+  onHighlight,
   onLayoutChange,
   onRangeSelect,
   onCropRange,
@@ -500,6 +504,7 @@ export function createProfileController({
         getStops,
         focusStop,
         revealPoint,
+        onHighlight,
         onRangeSelect,
         onCropRange,
         isEditingSuspended,

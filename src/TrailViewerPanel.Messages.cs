@@ -274,7 +274,7 @@ internal sealed partial class TrailViewerPanel
         foreach (var pattern in TileCache.GetWebResourceFilterPatterns(customMatchers))
         {
             if (_registeredTileFilters.Add(pattern))
-                core.AddWebResourceRequestedFilter(pattern, CoreWebView2WebResourceContext.Image);
+                core.AddWebResourceRequestedFilter(pattern, CoreWebView2WebResourceContext.All);
         }
     }
 
@@ -425,7 +425,7 @@ internal sealed partial class TrailViewerPanel
                             new MemoryStream(bytes, writable: false),
                             200,
                             "OK",
-                            $"Content-Type: {detectedType}\r\nCache-Control: no-store\r\nX-TrailViewer-Cache: refreshed");
+                            $"Content-Type: {detectedType}\r\nAccess-Control-Allow-Origin: *\r\nCache-Control: no-store\r\nX-TrailViewer-Cache: refreshed");
                         responseSet = true;
                     }
                     return;
@@ -486,7 +486,7 @@ internal sealed partial class TrailViewerPanel
             new MemoryStream(entry.Data, writable: false),
             200,
             "OK",
-            $"Content-Type: {entry.ContentType}\r\nCache-Control: no-store\r\nX-TrailViewer-Cache: {cacheHeader}");
+            $"Content-Type: {entry.ContentType}\r\nAccess-Control-Allow-Origin: *\r\nCache-Control: no-store\r\nX-TrailViewer-Cache: {cacheHeader}");
 
     /// <summary>
     /// Image loads do not expose an HTTP status to the page. Observe Tianditu responses out of band so only an
