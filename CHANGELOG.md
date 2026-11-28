@@ -11,17 +11,35 @@ Added / Changed / Deprecated / Removed / Fixed / Security 分类；没有内容�
 
 ### 中文
 
-### English
-
-## 1.37.0 — 2026-11-28
-
-### 中文
-
 - 暂无。
 
 ### English
 
 - None yet.
+
+## 1.37.0 — 2026-11-28
+
+### 中文
+
+#### 新增
+
+- **按需懒加载 3D 立体地形预览**：右上地图控件栏新增 `3D` 开关（快捷键 `3`），未开启前零加载引擎与零显存占用；开启后基于离线内置的 MapLibre GL JS 与免费免 Key 的 AWS Terrarium 全球高程瓦片（已纳入本地瓦片磁盘缓存并放行跨域响应头），自动复用当前内置底图、天地图双层、透明户外叠加层及全部定制图源贴合山体。
+- **3D 交互、罗盘与全链路联动**：支持真实 `1×`（默认）/`1.3×`/`1.8×` 地形夸张与悬停说明、左上角运动手表环标实时指北针（旋转直显方位角，单击回正）、左下角实时比例尺与图源署名、绿/红起终点与带相机徽章的照片航点弹窗、多段轨迹原色与参考线同步、每公里分段/海拔剖面悬停与区间聚焦联动、暗色/无底图夜空雾效适配，以及进入编辑/测距/取坐标或关闭窗口时的异步竞态防护与显存彻底释放。
+
+#### 变更
+
+- **安装包瘦身与首屏冷启动提速**：Release 打包阶段引入 `esbuild` 对前端脚本执行分包压缩（保留编辑器、3D 地形、照片查看、叠加图导出与附件导出等按需懒加载边界），合并压缩首屏样式并剔除未使用的 WinForms 与 ARM64 运行时依赖，同时新增 MapLibre 离线运行时打包强校验。
+
+### English
+
+#### Added
+
+- **On-Demand 3D Terrain Preview**: Added a lazy-loaded `3D` toggle in the top-right controls (shortcut `3`) with zero script or WebGL overhead until activated. Powered by bundled offline MapLibre GL JS and free AWS Terrarium global DEM tiles (cached locally via the host tile cache with CORS headers), draping all built-in basemaps, Tianditu dual layers, transparent outdoor overlays, and custom sources onto 3D relief.
+- **3D Controls, Ring Compass & Full Sync**: Includes true `1×` (default) / `1.3×` / `1.8×` terrain exaggeration with descriptive tooltips, a live top-left ring compass (showing live heading degrees and click-to-reset north), bottom-left live scale bar and attribution pill, green/red endpoints and photo-badged waypoint popups, multi-track palette & reference-line sync, per-km split & elevation-profile focus sync, dark/no-map sky adaptation, and async race-safe WebGL cleanup when switching to edit/measure/coordinates or closing the preview.
+
+#### Changed
+
+- **Release Package Slimming & Faster Cold Start**: Added an `esbuild` Release viewer build pipeline that bundles and minifies frontend scripts while preserving lazy-loaded dynamic chunks, merges first-screen stylesheets, removes unused WinForms and ARM64 runtime dependencies, and enforces MapLibre runtime asset verification during packing.
 
 ## 1.35.0 — 2026-11-28
 
