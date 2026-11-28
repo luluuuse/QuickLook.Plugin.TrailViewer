@@ -64,6 +64,10 @@
 - **排序与抗极值比例条**：点击任意列头循环切换降序 / 升序 / 默认顺序；数值单元格内嵌比例条，运动速度、垂直速度与单公里时间自动识别坐车/长休等异常极值（以满格斜纹与侧边竖条标识），保持正常徒步段对比清晰。
 - **地图与剖面联动**：点击或 `Tab` 选中某一公里，地图与海拔剖面图同步青色高亮该区间；再次点击或收起表格清除高亮。
 
+#### 多段轨迹切换
+
+- 当文件包含 2 条及以上独立轨迹（非路网）时，左侧自动显示 **轨迹** 折叠入口；点击任一条轨迹可单独查看其视野、所属航点、摘要统计、海拔剖面、每公里分段与导出内容，其余轨迹自动降透明度作为参考线，再次点击或选择 **全部轨迹** 恢复总览。
+
 #### 路网轨迹
 
 - 自动识别由多条独立路线合并而成的路网 KML，完整渲染路线与航点，跳过全局用时、均速、每公里分段和合并海拔剖面。航点、照片、测距与叠加图导出（仅显示总长与段数）仍可正常使用。
@@ -189,6 +193,10 @@ Click the gear icon in the layer panel header to open **Map settings**:
 - Timed routes show a collapsible **Splits** table below the summary with distance, elapsed time, moving speed and bottom totals; toggle **Details** for cumulative time, ascent/descent, average heart rate and vertical speed.
 - **Sorting & outlier-resistant bars:** click any column header to cycle descending, ascending and default order; inline proportion bars use IQR-based outlier capping (diagonal hatch and edge bar) so isolated car-ride or long-rest spikes do not crush normal hiking splits.
 - **Map & profile sync:** click or `Tab` onto a split row to spotlight that kilometre in cyan on both map and elevation profile; click again or collapse to clear.
+
+#### Multi-track switcher
+
+- Non-network files with 2 or more independent tracks display a collapsible **Tracks** switcher on the left; selecting a track isolates its viewport, matching waypoints, summary stats, profile, splits and exports while dimming other tracks as reference lines; click again or choose **All tracks** to restore the full view.
 
 #### Route networks
 

@@ -17,6 +17,48 @@ Added / Changed / Deprecated / Removed / Fixed / Security 分类；没有内容�
 
 - None yet.
 
+## 1.35.0 — 2026-11-28
+
+### 中文
+
+#### 新增
+
+- **多段轨迹单选查看器**：当 GPX / KML / KMZ 文件包含 2 条及以上独立轨迹（如 50 / 70 / 100 km 赛事合集包或多日行程）时，左侧摘要与每公里下方自动显示可折叠的 **轨迹** 切换入口（采用全新无圆点双分叉图标）；选中单条轨迹后保留原色高亮并自动缩放居中，其余轨迹降至低透明度作为参考线，同时按同分组文件夹或 350 米沿线邻近自动筛选当前轨迹航点，摘要统计、海拔剖面、主坡段、每公里分段、附件导出、叠加图导出、天气查询与宿主标题栏实时同步。
+- **文本输入态空格保护与中文输入法选词兼容**：在页面内任意文本输入框（轨迹信息、航点编辑、自定义图源等）打字时，插件底层键盘钩子自动拦截空格键防止 QuickLook 误关预览窗口，普通输入态转发空格字符，中文输入法拼写组合态自动触发首个候选词上屏，切出输入框后按空格仍正常退出预览。
+
+#### 变更
+
+- **液态玻璃主题圆角与剖面图留白优化**：将 `ios` 液态玻璃主题顶层面板圆角从 `22px` 收敛至 `16px` 并同步同心收窄内部控件圆角，同时适度放宽剖面图左右内边距，消除大倒角压迫角落文字与按钮的观感。
+- **剖面图折叠按钮与叠加图预览底衬精修**：剖面图右上角折叠按钮去掉常驻细边框并微调为 `20×20` 轻悬停样式，消除高 DPI 缩放下的视觉偏心感；透明叠加图预览框外层改为跟随当前主题的凹陷底色，仅白框画布内保留中灰透明棋盘格，兼顾黑/白/瑞士墨色可读性与主题一致性。
+- **多轨切换性能与代码结构优化**：抽离独立的多轨视图切换与缓存控制器为 `app.js` 减负；长轨迹航点邻近匹配加入单段包围盒快速剪枝；多轨列表重绘时保持当前滚动位置与键盘焦点。
+
+#### 修复
+
+- **多轨反复切换越切越卡修复**：修复销毁旧路线时未从地图移除 Leaflet Canvas 渲染器导致全屏画布与地图监听持续堆积的问题，并按段缓存重算结果与及时清理脱离 DOM 的本地化节点引用。
+- **普通照片航点批量误标为「观景」修复**：将通用 `camera` 图标移出「观景」识别规则，仅在名称、备注或专用观景图标明确匹配时归类为观景，避免两步路/六只脚/KMZ 导出的所有带照片航点刷屏误标。
+- **宿主标题栏、菜单守卫与窗口关闭泄漏修复**：统一首屏、切子轨、覆盖保存与切语言四处同步 QuickLook 标题栏里程/爬升（无数据时清空旧后缀）；编辑态点击 `···` 菜单改为弹轻提示而非误触后台隐藏面板，预览态复制摘要改为直接调用；预览窗口销毁时统一停止延迟显示计时并解绑 `SizeChanged` 事件。
+- **最简模式左侧控件重叠修复**：修正最简模式下二次布局校准未计入轨迹切换胶囊高度导致缩放按钮被遮挡的问题。
+
+### English
+
+#### Added
+
+- **Multi-Track Single-Route Switcher**: Files containing 2 or more independent tracks (such as 50 / 70 / 100 km race packs or multi-day trips) now show a collapsible **Tracks** switcher below the summary/splits stack with a clean dot-free forked icon. Selecting a track highlights it in its original palette color, fits the viewport to it, dims unselected tracks as subtle reference lines, filters waypoints to the active track (matching KML folders and within 350 m along the route), and synchronizes summary stats, elevation profile, climbs, splits, attachments, overlay export, weather targets, and the QuickLook titlebar.
+- **Text-Input Space Guard & Chinese IME Candidate Selection**: While typing in any in-page text input (track metadata, waypoint editor, custom map sources), the low-level keyboard hook intercepts `Space` so QuickLook does not close the preview; plain text input forwards spaces directly while active IME composition commits the first candidate cleanly, and `Space` still closes the preview normally outside text fields.
+
+#### Changed
+
+- **Liquid Glass Corner Radius & Profile Breathing Room**: Tightened the `ios` Liquid Glass panel radius from `22px` to `16px` with concentric inner control radii and slightly widened the elevation profile padding so corner arcs no longer crowd top labels or buttons.
+- **Profile Collapse Button & Export Preview Backdrop Polish**: Switched the profile collapse button to a borderless `20×20` hover-tinted control to eliminate subpixel alignment asymmetry at fractional Windows DPI; moved the neutral mid-gray transparency checkerboard strictly inside the export preview canvas while the outer frame follows the active theme surface.
+- **Multi-Track Performance & Modularization**: Extracted multi-track view caching and switching into a dedicated `track-view-controller.js` module, added per-segment bounding-box pruning to waypoint proximity matching, and preserved scroll position and focus across track list re-renders.
+
+#### Fixed
+
+- **Progressive Lag on Repeated Track Switching**: Properly removed Leaflet Canvas renderers from the map when tearing down track layers so orphaned full-viewport canvases and map listeners no longer accumulate, cached per-track computed view data, and pruned disconnected localized DOM references.
+- **Photo Waypoints Misclassified as Viewpoints**: Removed generic `camera` icons from the `viewpoint` classification rule so ordinary photo waypoints exported by outdoor apps stay neutral unless their text or icon explicitly indicates a viewpoint.
+- **Host Titlebar Sync, More-Menu Edit Guard & Reveal Leak**: Unified live `title-meta` updates across initial load, track switching, editor overwrite, and language switching (clearing stale suffixes when empty); guarded QuickLook's `···` More menu during editing with a toast and replaced DOM button clicking with direct summary copying; and unbound `WebView2.SizeChanged` via `CancelHostReveal()` on `Dispose()`.
+- **Compact-Mode Zoom Overlap**: Fixed secondary layout refinement in compact mode overlooking the multi-track pill height and placing zoom buttons behind it.
+
 ## 1.32.4 — 2026-11-28
 
 ### 中文
